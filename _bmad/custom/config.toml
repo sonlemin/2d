@@ -5,3 +5,17 @@
 #
 # [agents.bmad-agent-pm]
 # description = "Prefers short, bulleted PRDs over narrative drafts."
+
+# ── De-duplicate shared path keys (bmm + gds) ──────────────────────
+# The installer writes planning_artifacts / implementation_artifacts /
+# project_knowledge under BOTH [modules.bmm] and [modules.gds] (same values).
+# Short-token lookup (_bmad/scripts/render_skill.py, bmad-loop validate)
+# refuses a key that appears as a scalar more than once, so `{implementation_artifacts}`
+# etc. fail to render. Overriding the gds copies with an empty table removes
+# them from that lookup (tables are skipped), leaving [modules.bmm] canonical.
+# gds skills are unaffected: they read _bmad/gds/config.yaml, not this file.
+# Keep the bmm values in sync with _bmad/gds/config.yaml if you change paths.
+[modules.gds]
+planning_artifacts = {}
+implementation_artifacts = {}
+project_knowledge = {}
