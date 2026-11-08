@@ -10,6 +10,12 @@ const CrawlerScene := preload("res://scenes/enemies/crawler.tscn")
 const LurkerScene := preload("res://scenes/enemies/lurker.tscn")
 const TileTexture := preload("res://art/tile.png")
 const RESPAWN_DELAY := 0.6
+## Ambient brightness of the dark (CanvasModulate value). F1 cycles it in game.
+## Lower = more tension; too low and darkness turns into confusion (Pillar 2).
+const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
+const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
+
+static var ambient_index := 1  # static: survives the scene reload on death
 
 const LAYOUT: Array[String] = [
 	"##############################",
@@ -122,11 +128,13 @@ const LAYOUT: Array[String] = [
 @onready var _walls: TileMapLayer = $Walls
 @onready var _player: Player = $Player
 @onready var _debug: Label = $Debug/Label
+@onready var _darkness: CanvasModulate = $Darkness
 
 var _deepest := 0.0
 
 
 func _ready() -> void:
+	_apply_ambient()
 	_walls.tile_set = _make_tileset()
 	_build()
 	_player.died.connect(_on_player_died)
@@ -185,15 +193,28 @@ func _is_wall(x: int, y: int) -> bool:
 	return y >= 0 and y < LAYOUT.size() and x >= 0 and x < LAYOUT[y].length() and LAYOUT[y][x] == "#"
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and not key.echo and key.physical_keycode == KEY_F1:
+		ambient_index = (ambient_index + 1) % AMBIENT_LEVELS.size()
+		_apply_ambient()
+
+
+func _apply_ambient() -> void:
+	var v := AMBIENT_LEVELS[ambient_index]
+	_darkness.color = Color(v * AMBIENT_TINT.r, v * AMBIENT_TINT.g, minf(v * AMBIENT_TINT.b, 1.0))
+
+
 func _process(_delta: float) -> void:
 	_deepest = maxf(_deepest, _player.position.y / TILE)
 	var hunting := 0
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:
 			hunting += 1
-	_debug.text = "chain %d   light %d px%s   depth %d   predators alert %d" % [
+	_debug.text = "chain %d   light %d px%s   depth %d   predators alert %d   [F1] bright %d/%d" % [
 		_player.chain.count, int(_player.light_radius()),
-		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting]
+		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting,
+		ambient_index + 1, AMBIENT_LEVELS.size()]
 
 
 func _on_player_died() -> void:
