@@ -11,7 +11,8 @@ signal chain_changed(count: int)
 @export var run_speed := 110.0
 @export var run_accel := 900.0
 @export var gravity := 900.0
-@export var max_fall := 330.0
+@export var max_fall := 210.0            ## was 330; slowed for the first playtests
+@export var fall_gravity_scale := 0.6   ## gravity multiplier while falling (rising is unchanged)
 @export var jump_velocity := -270.0
 @export var jump_cut := 0.45            ## velocity multiplier when Jump is released early
 @export var coyote_time := 0.08
@@ -125,7 +126,8 @@ func _handle_horizontal(delta: float) -> void:
 func _handle_vertical(delta: float) -> void:
 	if _dash_left > 0.0:
 		return  # dash ignores gravity
-	velocity.y = minf(velocity.y + gravity * delta, max_fall)
+	var g := gravity * (fall_gravity_scale if velocity.y > 0.0 else 1.0)
+	velocity.y = minf(velocity.y + g * delta, max_fall)
 	if Input.is_action_just_pressed("jump"):
 		_buffer = jump_buffer
 	if _buffer > 0.0 and _coyote > 0.0:
