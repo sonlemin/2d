@@ -16,6 +16,7 @@ const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
 const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
 
 static var ambient_index := 1  # static: survives the scene reload on death
+static var show_controls := true
 
 const LAYOUT: Array[String] = [
 	"##############################",
@@ -129,12 +130,14 @@ const LAYOUT: Array[String] = [
 @onready var _player: Player = $Player
 @onready var _debug: Label = $Debug/Label
 @onready var _darkness: CanvasModulate = $Darkness
+@onready var _controls: Label = $Debug/Controls
 
 var _deepest := 0.0
 
 
 func _ready() -> void:
 	_apply_ambient()
+	_controls.visible = show_controls
 	_walls.tile_set = _make_tileset()
 	_build()
 	_player.died.connect(_on_player_died)
@@ -195,9 +198,14 @@ func _is_wall(x: int, y: int) -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key and key.pressed and not key.echo and key.physical_keycode == KEY_F1:
+	if not key or not key.pressed or key.echo:
+		return
+	if key.physical_keycode == KEY_F1:
 		ambient_index = (ambient_index + 1) % AMBIENT_LEVELS.size()
 		_apply_ambient()
+	elif key.physical_keycode == KEY_F2:
+		show_controls = not show_controls
+		_controls.visible = show_controls
 
 
 func _apply_ambient() -> void:
