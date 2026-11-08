@@ -17,6 +17,8 @@ const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edg
 
 static var ambient_index := 1  # static: survives the scene reload on death
 static var show_controls := true
+static var best_chain := 0  # session stats for playtest notes (survive death reloads)
+static var deaths := 0
 
 const LAYOUT: Array[String] = [
 	"##############################",
@@ -215,17 +217,19 @@ func _apply_ambient() -> void:
 
 func _process(_delta: float) -> void:
 	_deepest = maxf(_deepest, _player.position.y / TILE)
+	best_chain = maxi(best_chain, _player.chain.count)
 	var hunting := 0
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:
 			hunting += 1
-	_debug.text = "chain %d   light %d px%s   depth %d   predators alert %d   [F1] bright %d/%d" % [
-		_player.chain.count, int(_player.light_radius()),
-		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting,
+	_debug.text = "chain %d (best %d)   light %d px%s   depth %d   alert %d   deaths %d   [F1] bright %d/%d" % [
+		_player.chain.count, best_chain, int(_player.light_radius()),
+		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting, deaths,
 		ambient_index + 1, AMBIENT_LEVELS.size()]
 
 
 func _on_player_died() -> void:
+	deaths += 1
 	await get_tree().create_timer(RESPAWN_DELAY, true, false, true).timeout
 	if get_tree().current_scene == self:  # test harnesses add the shaft by hand; don't reload there
 		get_tree().reload_current_scene()
