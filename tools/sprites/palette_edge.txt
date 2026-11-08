@@ -1,0 +1,8 @@
+# Edge of the Abyss palette (layer 1). One "char #hex" per line.
+# '.' is always transparent. 'L' is the chain-light colour: constant across every layer.
+0 #0d0b14
+1 #2a2440
+2 #4f5d75
+3 #a9b4c2
+L #ffd27a
+E #d9473f

@@ -1,0 +1,81 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/player.png" id="2_player"]
+[ext_resource type="Texture2D" path="res://art/light.png" id="3_light"]
+[ext_resource type="Texture2D" path="res://art/slash.png" id="4_slash"]
+
+[sub_resource type="RectangleShape2D" id="body_shape"]
+size = Vector2(10, 20)
+
+[sub_resource type="RectangleShape2D" id="slash_shape"]
+size = Vector2(22, 16)
+
+[sub_resource type="RectangleShape2D" id="pogo_shape"]
+size = Vector2(16, 22)
+
+[sub_resource type="RectangleShape2D" id="hurt_shape"]
+size = Vector2(8, 18)
+
+[sub_resource type="CanvasItemMaterial" id="unshaded"]
+light_mode = 1
+
+[node name="Player" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_player")
+
+[node name="Body" type="CollisionShape2D" parent="."]
+position = Vector2(0, 2)
+shape = SubResource("body_shape")
+
+[node name="Light" type="PointLight2D" parent="."]
+color = Color(1, 0.823529, 0.478431, 1)
+energy = 1.4
+texture = ExtResource("3_light")
+texture_scale = 0.625
+
+[node name="Slash" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="Shape" type="CollisionShape2D" parent="Slash"]
+position = Vector2(14, 0)
+shape = SubResource("slash_shape")
+
+[node name="Sprite" type="Sprite2D" parent="Slash"]
+material = SubResource("unshaded")
+position = Vector2(12, 0)
+texture = ExtResource("4_slash")
+
+[node name="Pogo" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="Shape" type="CollisionShape2D" parent="Pogo"]
+position = Vector2(0, 18)
+shape = SubResource("pogo_shape")
+
+[node name="Sprite" type="Sprite2D" parent="Pogo"]
+material = SubResource("unshaded")
+position = Vector2(0, 16)
+rotation = 1.5708
+texture = ExtResource("4_slash")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 12
+monitorable = false
+
+[node name="Shape" type="CollisionShape2D" parent="Hurtbox"]
+position = Vector2(0, 2)
+shape = SubResource("hurt_shape")
+
+[node name="Camera" type="Camera2D" parent="."]
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0

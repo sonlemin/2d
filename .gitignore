@@ -5,3 +5,7 @@ _bmad/render/
 
 # Python bytecode (from _bmad/scripts resolvers)
 __pycache__/
+# Godot
+game/.godot/
+game/export/
+*.tmp
