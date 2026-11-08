@@ -36,6 +36,7 @@ func _run() -> void:
 	await frames(2)
 	await test_pogo_builds_chain()
 	await test_landing_breaks_chain()
+	await test_jump_height()
 	await test_bot_chains_long_run()
 	await test_lurker_telegraph_hunt_lose()
 	await test_lurker_kills()
@@ -89,6 +90,33 @@ func test_landing_breaks_chain() -> void:
 	await seconds(1.0)
 	check(_player.is_on_floor(), "player landed on the spawn ledge")
 	check(_player.chain.count == 0, "landing breaks the chain")
+
+
+## Measures a real jump from the spawn ledge: holding Jump peaks about 60 px up (3.8 tiles);
+## tapping it cuts the jump short (variable height).
+func test_jump_height() -> void:
+	var full := await _measure_jump(true)
+	var tap := await _measure_jump(false)
+	check(full >= 55.0 and full <= 66.0, "held jump peaks ~60 px (got %.1f)" % full)
+	check(tap < full * 0.6, "tapped jump is much lower than held (tap %.1f vs held %.1f)" % [tap, full])
+
+
+func _measure_jump(hold: bool) -> float:
+	place(Vector2(5 * 16 + 8, 6 * 16 - 12))  # standing on the spawn ledge
+	await frames(5)
+	var start_y := _player.global_position.y
+	var top := start_y
+	Input.action_press("jump")
+	for i in 90:
+		await frames(1)
+		if not hold and i == 2:
+			Input.action_release("jump")
+		top = minf(top, _player.global_position.y)
+		if i > 5 and _player.is_on_floor():
+			break
+	Input.action_release("jump")
+	await frames(2)
+	return start_y - top
 
 
 ## Level-design reachability: a simple bot drops into the long run (chain run 2) and

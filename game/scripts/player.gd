@@ -13,7 +13,7 @@ signal chain_changed(count: int)
 @export var gravity := 900.0
 @export var max_fall := 210.0            ## was 330; slowed for the first playtests
 @export var fall_gravity_scale := 0.6   ## gravity multiplier while falling (rising is unchanged)
-@export var jump_velocity := -270.0
+@export var jump_velocity := -330.0       ## apex ~60 px (~3.8 tiles); was -270 (~40 px)
 @export var jump_cut := 0.45            ## velocity multiplier when Jump is released early
 @export var coyote_time := 0.08
 @export var jump_buffer := 0.10
