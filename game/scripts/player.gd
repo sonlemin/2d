@@ -1,6 +1,6 @@
 class_name Player
 extends CharacterBody2D
-## The descender. Runs, jumps, dashes, slashes and pogos (Down+Attack in the air).
+## The descender. Runs, jumps, dashes, slashes on the ground and pogos (Attack in the air).
 ## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light (light radius).
 ## Landing or holding Light (Snuff) breaks the chain. Touching a predator kills.
 
@@ -142,7 +142,7 @@ func _handle_vertical(delta: float) -> void:
 func _handle_attack() -> void:
 	if not Input.is_action_just_pressed("attack") or _swing_cd > 0.0:
 		return
-	_swing_is_pogo = Input.is_action_pressed("move_down") and not is_on_floor()
+	_swing_is_pogo = not is_on_floor()  # in the air, Attack always pogoes (one key, still timed)
 	_swing_left = swing_active
 	_swing_cd = swing_cooldown
 	_swing_hit = false

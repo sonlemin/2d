@@ -67,7 +67,6 @@ func _hovers() -> Array:
 func test_pogo_builds_chain() -> void:
 	var target: Node2D = _hovers()[0]
 	place(target.global_position + Vector2(0, -40))
-	Input.action_press("move_down")
 	var hit := false
 	for i in 60:
 		if not hit and target.global_position.y - _player.global_position.y < 26:
@@ -78,8 +77,7 @@ func test_pogo_builds_chain() -> void:
 		await frames(1)
 		if _player.chain.count > 0:
 			break
-	Input.action_release("move_down")
-	check(_player.chain.count == 1, "pogo on a hover crawler -> chain 1 (got %d)" % _player.chain.count)
+	check(_player.chain.count == 1, "X alone in the air pogoes -> chain 1 (got %d)" % _player.chain.count)
 	check(_player.velocity.y < 0.0, "pogo bounces the player up")
 	check(_player.chain.light_radius() > ChainState.BASE_RADIUS, "chain grows the light")
 
@@ -104,7 +102,6 @@ func test_bot_chains_long_run() -> void:
 	place(run[0].global_position + Vector2(0, -48))
 	var best := 0
 	var swung_for: Node2D = null
-	Input.action_press("move_down")
 	var i_end := 0
 	for i in 600:
 		i_end = i
@@ -130,7 +127,7 @@ func test_bot_chains_long_run() -> void:
 			Input.action_release("attack")
 		await frames(1)
 		best = maxi(best, _player.chain.count)
-	for a in ["move_down", "move_left", "move_right"]:
+	for a in ["move_left", "move_right"]:
 		Input.action_release(a)
 	print("     bot ended: frame %d, dead=%s, floor=%s, y=%d" % [i_end, _player.is_dead, _player.is_on_floor(), int(_player.global_position.y / 16)])
 	check(best >= 5, "bot chains 5+ pogos through the long run (best %d)" % best)
