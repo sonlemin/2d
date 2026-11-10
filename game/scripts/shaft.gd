@@ -136,6 +136,9 @@ const LAYOUT: Array[String] = [
 
 var _deepest := 0.0
 
+const HUD_COLOR := Color(1, 0.823529, 0.478431)
+const ALERT_COLOR := Color(1, 0.35, 0.3)  ## top label turns red while any lurker is awake
+
 
 func _ready() -> void:
 	_apply_ambient()
@@ -226,6 +229,7 @@ func _process(_delta: float) -> void:
 		_player.chain.count, best_chain, int(_player.light_radius()),
 		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting, deaths,
 		ambient_index + 1, AMBIENT_LEVELS.size()]
+	_debug.add_theme_color_override("font_color", ALERT_COLOR if hunting > 0 else HUD_COLOR)
 
 
 func _on_player_died() -> void:

@@ -6,3 +6,5 @@
 3 #a9b4c2
 L #ffd27a
 E #d9473f
+# e: hot core of lurker eyes
+e #ffb08a

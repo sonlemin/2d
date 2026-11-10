@@ -20,6 +20,8 @@ enum State { IDLE, TELEGRAPH, HUNT, RETURN }
 @export var return_speed := 40.0
 @export var eye_pulse_hz := 2.0         ## smooth sine, under the 3 flashes/s cap
 @export var screen_margin := 8.0        ## px: only notice when this far inside the visible screen
+@export var glow_energy := 1.3          ## red light the eyes cast on the wall around them
+@export var eye_open_time := 0.2        ## eyes "open" (squash -> full) at the start of the telegraph
 
 var state: State = State.IDLE
 var _timer := 0.0
@@ -31,6 +33,7 @@ var _player: Node2D
 
 @onready var _eyes: Sprite2D = $Eyes
 @onready var _body_sprite: Sprite2D = $Sprite
+@onready var _glow: PointLight2D = $Glow
 
 
 func _ready() -> void:
@@ -92,6 +95,18 @@ func _physics_process(delta: float) -> void:
 				_enter(State.TELEGRAPH)
 			elif global_position.distance_to(_home) < 1.0:
 				_enter(State.IDLE)
+	_update_look()
+
+
+## Readability: the eyes cast red light on the wall (and on the lurker's own body while it hunts),
+## and they open from a slit to full at the start of the telegraph.
+func _update_look() -> void:
+	_glow.energy = _eyes.modulate.a * glow_energy
+	_glow.visible = _glow.energy > 0.01
+	if state == State.TELEGRAPH:
+		_eyes.scale.y = clampf((telegraph_time - _timer) / eye_open_time, 0.25, 1.0)
+	else:
+		_eyes.scale.y = 1.0
 
 
 func _enter(next: State) -> void:
