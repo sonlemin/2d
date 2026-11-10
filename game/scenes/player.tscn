@@ -12,7 +12,7 @@ size = Vector2(10, 20)
 size = Vector2(22, 16)
 
 [sub_resource type="RectangleShape2D" id="pogo_shape"]
-size = Vector2(16, 22)
+size = Vector2(26, 24)
 
 [sub_resource type="RectangleShape2D" id="hurt_shape"]
 size = Vector2(8, 18)

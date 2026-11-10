@@ -10,6 +10,7 @@ signal chain_changed(count: int)
 # --- Movement tuning ---
 @export var run_speed := 110.0
 @export var run_accel := 900.0
+@export var air_accel := 1500.0          ## snappier steering in the air, to line up the next pogo
 @export var gravity := 900.0
 @export var max_fall := 210.0            ## was 330; slowed for the first playtests
 @export var fall_gravity_scale := 0.6   ## gravity multiplier while falling (rising is unchanged)
@@ -20,10 +21,13 @@ signal chain_changed(count: int)
 @export var dash_speed := 260.0
 @export var dash_time := 0.12
 # --- Combat tuning ---
-@export var pogo_velocity := -260.0
+@export var pogo_velocity := -300.0      ## apex ~50 px: hang time to steer to the next target (was -260)
 @export var swing_active := 0.12
+@export var air_swing_active := 0.22    ## a pogo stays armed longer: pressing X a bit early still hits
 @export var swing_cooldown := 0.22
-@export var hitstop := 0.045            ## freeze frame on pogo hit (seconds, real time)
+@export var hitstop := 0.075            ## freeze frame on pogo hit (seconds, real time; was 0.045)
+@export var shake := 2.5                ## px camera kick on a pogo hit
+@export var light_kick := 18.0          ## px the light flares on a pogo hit
 @export var knockback := Vector2(150, -150)
 @export var invuln_time := 0.6
 @export var light_lerp := 10.0          ## how fast the visible light eases to its target radius
@@ -46,12 +50,14 @@ var _swing_is_pogo := false
 var _swing_hit := false                 ## a swing connects at most once for the chain
 var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
+var _shake := 0.0
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _light: PointLight2D = $Light
 @onready var _slash: Area2D = $Slash
 @onready var _pogo: Area2D = $Pogo
 @onready var _hurtbox: Area2D = $Hurtbox
+@onready var _camera: Camera2D = $Camera
 
 
 func _ready() -> void:
@@ -89,6 +95,14 @@ func _physics_process(delta: float) -> void:
 	_update_light(delta)
 
 
+## Real-time juice (runs during hitstop too): squash recovers, camera kick decays.
+func _process(delta: float) -> void:
+	var real := delta / maxf(Engine.time_scale, 0.001)
+	_sprite.scale = _sprite.scale.lerp(Vector2.ONE, clampf(12.0 * real, 0.0, 1.0))
+	_shake = move_toward(_shake, 0.0, 20.0 * real)
+	_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+
+
 func _tick_timers(delta: float) -> void:
 	_coyote = maxf(_coyote - delta, 0.0)
 	_buffer = maxf(_buffer - delta, 0.0)
@@ -120,7 +134,8 @@ func _handle_horizontal(delta: float) -> void:
 		_jumping = false
 		velocity = Vector2(dash_speed * _dash_dir, 0.0)
 		return
-	velocity.x = move_toward(velocity.x, dir * run_speed, run_accel * delta)
+	var accel := run_accel if is_on_floor() else air_accel
+	velocity.x = move_toward(velocity.x, dir * run_speed, accel * delta)
 
 
 func _handle_vertical(delta: float) -> void:
@@ -143,7 +158,7 @@ func _handle_attack() -> void:
 	if not Input.is_action_just_pressed("attack") or _swing_cd > 0.0:
 		return
 	_swing_is_pogo = not is_on_floor()  # in the air, Attack always pogoes (one key, still timed)
-	_swing_left = swing_active
+	_swing_left = air_swing_active if _swing_is_pogo else swing_active
 	_swing_cd = swing_cooldown
 	_swing_hit = false
 	_set_swing_visible(true)
@@ -173,6 +188,10 @@ func _on_pogo_hit() -> void:
 	_dash_left = 0.0
 	_can_dash = true  # pogo refreshes the air dash: keeps the chain steerable
 	chain.add_hit()
+	_shown_radius += light_kick
+	_shake = shake
+	_sprite.scale = Vector2(0.75, 1.3)  # stretch up out of the bounce
+	Fx.chain_popup(get_parent(), global_position, chain.count)
 	_freeze_frame()
 
 

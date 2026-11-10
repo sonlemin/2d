@@ -40,4 +40,5 @@ func _physics_process(delta: float) -> void:
 
 
 func take_hit() -> void:
+	Fx.pop(get_parent(), global_position)
 	queue_free()

@@ -135,11 +135,13 @@ func test_bot_chains_long_run() -> void:
 		i_end = i
 		if _player.is_dead or (i > 5 and _player.is_on_floor()):  # is_on_floor is stale until the next move
 			break
+		# Like a player: aim for the nearest target below (rows now offer a left/right choice).
 		var next: Node2D = null
 		for h in run:
-			if is_instance_valid(h) and h.global_position.y > _player.global_position.y + 4:
+			if not is_instance_valid(h) or h.global_position.y <= _player.global_position.y + 4:
+				continue
+			if next == null or h.global_position.distance_to(_player.global_position) < next.global_position.distance_to(_player.global_position):
 				next = h
-				break
 		if next == null:
 			break
 		var dx := next.global_position.x - _player.global_position.x
