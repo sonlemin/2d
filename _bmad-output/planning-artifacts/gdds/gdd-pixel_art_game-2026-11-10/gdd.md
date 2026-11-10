@@ -4,10 +4,12 @@ game_type: metroidvania (descent; action-platformer feel conventions)
 platforms: [PC Windows, PC Linux, web/itch.io for playtests]
 created: 2026-11-10
 updated: 2026-11-10
-status: draft-complete
+status: final
 inputs:
   - _bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/
   - _bmad-output/implementation-artifacts/m1-playtest-findings.md
+  - _bmad-output/brainstorming-session-2026-11-07.md
+  - _bmad-output/planning-artifacts/research/domain-indie-pixel-art-pogo-descent-platformer-research-2026-11-07.md
 ---
 
 # The Unbroken Chain - Game Design Document
@@ -32,7 +34,7 @@ A 2D descent Metroidvania. The pogo chain is your light. Chaining hits without l
 - **Primary:** Metroidvania regulars, adults who finished *Hollow Knight* or *Celeste*.
 - **Secondary:** precision-platformer and arcade-descent fans (*Downwell*, *Celeste*).
 - **Sessions:** 20–45 min.
-- **Difficulty:** Normal is hard but fair, around *Hollow Knight* level, with bosses that take several attempts. Easy opens the game to players who mainly want to explore. Hard raises the stakes of death (see Economy).
+- **Difficulty:** Normal is hard but fair, around *Hollow Knight* level, with bosses that take 3–8 attempts. Easy opens the game to players who mainly want to explore. Hard raises the stakes of death (see Economy).
 
 ### Unique Selling Points (USPs)
 
@@ -49,6 +51,7 @@ Positioning rule: lead with chain-as-light. Never market it as a "roguelike" or 
 ### Project Goals
 
 - **Creative:** a game that delivers *daring mastery* across 7 layers (8–12 h).
+- **Commercial target:** **$15–20 premium** (research-advised). The full game needs 8–12 h: 7 layers at 45–60 min of spine, plus bosses and side areas, to justify the price. No marketing work before M2 (designer's call); the store and marketing plan is decided in E7.
 - **Personal:** a passion and learning project. Solo, 5–10 h/week, no deadline. The full game likely takes 5 or more years, and that is accepted.
 - **Milestone 2 (this GDD's immediate target):** a vertical slice. Layer 1 fully connected, a Lift Station, the first hub NPCs, the Weaver boss and Flare Toss. It is the first build to share, and the Steam vs itch.io decision is made with it.
 
@@ -72,7 +75,7 @@ In priority order. When two conflict, the higher one wins unless a ruling says o
 1. **Chain = Light = Danger.** Chaining hits without landing makes you stronger, brighter, richer and hunted. Every feature must feed this tension or at least not weaken it. *This pillar survives any cut.*
 2. **Every death teaches.** Failure is fair and readable. Predators always telegraph (a sound, eyes in the dark, a glow at the screen edge). An escape taken in time (landing, Snuff, cling) always works. Darkness creates tension, not confusion. *Ruling: this pillar beats off-screen ambushes.*
 3. **Knowledge is power.** The abyss is fixed and hand-built, with no procedural generation. You progress by gaining skills, not XP. Knowing the world tells you *where* to be daring; it never replaces daring. *Ruling: key gates and shortcuts open only with a long chain.*
-4. **Few buttons, deep play.** Movement plus 4 buttons (Attack, Jump, Dash, Light). Each layer changes how the same verbs are used instead of adding new ones.
+4. **Few buttons, deep play.** Movement plus 4 buttons (Attack, Jump, Dash, Light). The same 4 buttons all game: each layer changes how the verbs are used, and new abilities reuse the same buttons (Swing is a hold on Dash).
 
 ### Core Gameplay Loop
 
@@ -94,8 +97,8 @@ In priority order. When two conflict, the higher one wins unless a ruling says o
 
 ### Win/Loss Conditions
 
-- **Win (full game):** reach The Bottom (Layer 7) and finish **The Final Chain**, a playable, unbroken descent. **M2 win:** defeat the Weaver and gain Swing.
-- **Loss:** none permanent. Death costs held embers, carried embers (dropped as a cache) and the distance back from the last lantern anchor. World progress (opened gates, repaired stations, abilities, deposited embers) is never lost. *This is not a roguelike.*
+- **Win (full game):** reach The Bottom (Layer 7) and finish **The Final Chain**, a playable, unbroken descent with your light at full strength. **M2 win:** defeat the Weaver and gain Swing.
+- **Loss:** none permanent. Death costs held embers, carried embers (dropped as a cache) and the distance back from the last lantern anchor. World progress (opened gates, repaired stations, abilities, deposited embers, map reveals, journal entries, defeated bosses) is never lost. *This is not a roguelike.*
 - **Per dive:** success is reaching the next Lift Station or home with your embers. Failure is a death that the Field Journal explains (Pillar 2).
 
 ---
@@ -124,6 +127,12 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
   - A hit bounces you up at −300 px/s (apex ≈ 50 px) and adds **1 link**.
   - Each hit freezes the game for a 75 ms hitstop.
   - A pogo landing on the same frame you touch the ground adds nothing.
+- **Boxes (M1):**
+  - Player body: 10×20 px.
+  - Player hurtbox: 8×18 px, smaller than the body, so grazes don't count.
+  - Slash hitbox: 22×16 px, in front.
+  - Pogo hitbox: 26×24 px, below the feet.
+  - Blade Bloom scales both hitboxes, never the hurtbox.
 - **Chain:** +1 link per pogo hit without touching the ground, capped at 20 links.
   - **Chain-Light radius** = 40 + 22·√links px, so 40 px at 0 links, 84 at 4, 110 at 10 and 138 at 20.
   - **Blade Bloom:** the slash and pogo hitboxes scale ×(1 + 0.18·√links), up to ×1.8.
@@ -135,9 +144,11 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 | Landing | breaks | → carried | → 40 px |
 | Snuff (hold Light ≥ 0.12 s) | breaks | → carried | → 12 px while held |
 | Wall cling | **paused**, 1.0 s per chain (a pogo hit refills it), then breaks | kept, then → carried | → 40 px while clinging |
-| Crawler contact | breaks | → carried | → 40 px |
+| Any hit (crawler, spiderling, boss, lurker, spikes) | breaks | → carried | → 40 px |
 | Flare Toss | −half (see below) | share → carried | shrinks to the new chain |
 | Death | breaks | **lost** | n/a |
+
+*Why Snuff is a button despite the research's "no hide button" advice:* *Last Light* testers found a light toggle on top of platforming overwhelming. Snuff is not a toggle you leave on: it **ends your chain**, so it works as a cash-out. The light stays automatic; Snuff is only an emergency exit (the brief's decision log also kept it). Two things to watch in playtests: whether tap vs hold on Light feels overwhelming mid-chain (E1), and whether an instant mid-air Snuff becomes a free bank every time a telegraph starts (see Risks).
 
 #### Wall cling (M1)
 
@@ -161,11 +172,11 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 
 #### Swing (M2, unlocked by Weaver Silk)
 
-- **Input:** hold Dash within 56 px of a **silk anchor** (a placed level object, visible at base light).
+- **Input:** press Dash within 56 px of a **silk anchor** (a placed level object, visible at base light) to grab the rope. Hold Dash to stay on. Out of range, Dash is the normal air dash.
 - **The rope:** attaches at its current distance, clamped to 32–96 px. You swing like a pendulum, with left/right adding pump.
 - **Release Dash:** launches you with your current velocity ×1.1.
 - **Chain:** swinging does not touch the ground, so the chain continues. You stay bright, so predators keep hunting you. Swinging buys position, not safety.
-- **Gating:** anchors are placed so that routes, secrets and chain gates in Layer 1 open only with Swing (see Ability-Gating).
+- **Gating:** 3 silk anchors in Layer 1 (in A, S2 and C) each guard one secret that opens only with Swing (see Ability-Gating).
 
 #### Health and damage (M2; replaces M1's one-touch death)
 
@@ -176,6 +187,7 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 | Hunting lurker | 2 | only while it hunts; idle or returning lurkers are harmless; it loses you the moment it can't sense you |
 | Spikes and hazards | 1 | respawn at the last safe ledge in the same room |
 
+- **Any hit** breaks the chain and moves held embers to carried. Only death loses held embers: pain costs health, not embers.
 - **Health:** 4 HP. Masks to raise the maximum are Layer 2+ exploration rewards and out of scope for M2.
 - **Healing:** full at a Lift Station; +1 HP when you bank a chain of 10 or more. [ASSUMPTION: the bank-heal threshold needs a playtest.]
 - **0 HP:** death. You respawn at the last lit lantern anchor or Lift Station with full HP, and embers follow the Economy rules.
@@ -183,22 +195,23 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 #### Predators: Lurker (M1)
 
 - **Wakes:** when your light radius is ≥ 80 px (4 links), it is within radius × 1.6 of you, and it is **on screen**.
+- **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), you hear a quiet stirring panned to that side and see a faint red glow at that screen edge. It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*).
 - **Telegraph:** 0.9 s (never below 0.75 s). Its eyes open with an animation and pulse at 2 Hz, cast red light on the wall, and the HUD turns red.
-- **Hunt:** 95 px/s straight at you, passing through walls. It stops chasing the moment it can't sense you, gives up after 0.6 s and returns home.
+- **Hunt:** 95 px/s straight at you, passing through walls. It **senses** you while your light radius is ≥ 80 px and you are within radius × 1.6. Once it can't sense you, it stops at once and is harmless, waits 0.6 s, then returns home.
 
 ### Controls and Input
 
-Keyboard first. Every action maps to a single gamepad button (no chords), so a controller mapping can follow later.
+Keyboard and gamepad, both from M2. Every action is a single button (no chords). Default gamepad: left stick/d-pad = move, A = jump, X = attack, RB = dash, B = light (tap: Flare Toss, hold: Snuff), Start = pause.
 
 | Action | Default key | Tap | Hold |
 |---|---|---|---|
 | Move | Arrow keys | Run. ↓ drops off a wall. **↓ on the ground: interact** (rest at a station, talk, read) | — |
 | Jump | Z or ↑ | Jump (hold for full height) | At a wall while falling: **cling**; release to **kick off** |
 | Attack | X | Ground: slash. Air: **pogo** | — |
-| Dash | C | Air dash | Near a silk anchor: **swing** (after the Weaver) |
+| Dash | C | Air dash; within 56 px of a silk anchor: **grab** the rope (after the Weaver) | Stay on the rope: **swing** |
 | Light | V | **Flare Toss** (< 0.12 s) | **Snuff** (≥ 0.12 s) |
 
-- **Accessibility:** a "reduce flashing" toggle; screen shake can be turned off; a brightness setting with 4 levels (M1: F1).
+- **Accessibility:** a "reduce flashing" toggle; screen shake can be turned off; a brightness setting with 4 levels (in M1 this is cycled with F1).
 - **Rebinding:** every action can be rebound in M2's settings menu.
 
 ---
@@ -211,15 +224,29 @@ Keyboard first. Every action maps to a single gamepad button (no chords), so a c
 
 **Structure (whole game):** the hub (Abyss Island) sits above one pit with 7 stacked layers. A layer is a **spine**, the main descent shaft, with **side branches** at depth. Layers connect only downward through their boss and upward through Lift Stations.
 
+**Base rule: the ground is a sanctuary.** Landing ends the chain and puts you out of reach of light-hunters. Each layer can twist one rule; Freezing Magma flips this one, because light is warmth there and going dark costs you.
+
+| # | Layer | Rule twist | Boss | Lesson |
+|---|---|---|---|---|
+| 1 | Edge of the Abyss | the tutorial; the daylight fades as you descend | Weaver | restraint |
+| 2 | Bright Moon | predators always see you up close; there is a force field [open] | Moon-Eyed Stalker | [open; brainstorm: spacing] |
+| 3 | Inverted Trees | [open] | Rootmother | [open; brainstorm: the environment as a weapon] |
+| 4 | Great Mountain | [open] | Mountain-That-Walks | [open; brainstorm: endurance and flow] |
+| 5 | Whirlstorm Hell | flares are carried far | Eye of the Storm | [open; brainstorm: companions and patience] |
+| 6 | Freezing Magma | light is warmth: the sanctuary rule flips | Hollow Furnace | commitment (the counterpart to the Weaver's restraint) |
+| 7 | The Bottom | everything | The Last Explorer | a mirror fight |
+
+*"Layer 7 for now":* the game could be extended later.
+
 **Layer 1: Edge of the Abyss** (M2 scope)
 - Near the surface: scaffolds, ropes, the last daylight. It is the tutorial layer.
 - **Size:** about 23 screens of spine plus 3 side areas (1 screen = 30×17 tiles).
-- **First playthrough:** 45–60 min to the Weaver.
+- **First playthrough:** 45–60 min to the Weaver. This runs over the brief's 20–45 min session target, so quitting at an anchor saves your position. Later dives using the gate-2 shortcut fit one session.
 
 | Segment | Screens | Teaches / tests | Contents |
 |---|---|---|---|
 | **S1 The Lip** | 0–3 | run, jump, slash, first pogo over safety nets; landing banks embers | ◆ **Lip Station** (lift to the hub); no lurkers |
-| **S2 Scaffold Drop** | 4–9 | first lurker, with its eyes opening right above a ledge (the cash-out lesson); **wall cling** in a narrow stretch with no ledges; **Flare Toss** taught in a lurker pocket | branch to **[A] Rope Works** |
+| **S2 Scaffold Drop** | 4–9 | first lurker, with its eyes opening right above a ledge (the cash-out lesson); **wall cling** in a narrow stretch with no ledges; **Flare Toss** taught in a lurker pocket | branch to **[A] Rope Works**; ⟡ 1 Swing secret |
 | **S3 The Lantern Door** | 10–12 | **chain gate 1 (≥ 4 links)** on the main path; a row of hoverers above it teaches the run-up | |
 | **S4 Explorers' Grave** | 13–18 | lurker rooms that test Flare Toss and cling under pressure | branches to **[B] Old Mine** and **[C] Sky Ledge** |
 | **S5 Weaver's Hollow** | 19–22 | the restraint lesson begins: the Weaver is heard and glimpsed before the arena | ◆ **Hollow Station** before the arena; ☠ **Weaver** |
@@ -229,9 +256,9 @@ Keyboard first. Every action maps to a single gamepad button (no chords), so a c
 
 | Area | Off | Theme | Rewards |
 |---|---|---|---|
-| **[A] Rope Works** | S2 | an old rope yard | ember cache (≈ 60), 2 journal entries, ⟡ 1 Swing secret |
-| **[B] Old Mine** | S4 | dark galleries packed with lurkers | ember cache (≈ 80), 1 Cartographer hint, 1 journal entry |
-| **[C] Sky Ledge** | S4 | an open cliff under daylight | behind **chain gate 2 (≥ 8 links)**: a **shortcut** back up to the hub, the only safe deposit mid-layer; ⟡ 1 Swing secret |
+| **[A] Rope Works** | S2 | an old rope yard | Ember Hoard (≈ 60), 2 journal entries, ⟡ 1 Swing secret |
+| **[B] Old Mine** | S4 | dark galleries with ≥ 1 lurker per screen | Ember Hoard (≈ 80), 1 Cartographer hint, 1 journal entry |
+| **[C] Sky Ledge** | S4 | an open cliff under daylight | behind **chain gate 2 (≥ 8 links)**: a **shortcut** back up to the hub, the only safe deposit mid-layer; Ember Hoard (≈ 100); ⟡ 1 Swing secret |
 
 **Respawn and rest points:**
 
@@ -294,7 +321,7 @@ Pillar 3: progress through skills and chain mastery, never XP.
 
 ### Backtracking Design
 
-- **After the Weaver:** the free landing-arena station returns you to the hub. From there, the Lip and Hollow stations put you back in Layer 1 to collect the **3 Swing secrets**.
+- **After the Weaver:** the free landing-arena station returns you to the hub. From there, the Lip Station puts you back at the top of Layer 1. Descend to collect the **3 Swing secrets** (S2, A, C), then take the gate-2 shortcut or the Hollow Station home.
 - **Fast travel:** between the hub and every repaired Lift Station. There is no fast travel to lantern anchors.
 - **Enemies** respawn when you rest at a station or leave the layer. Chain fuel must always be there.
 - **Changed world:** opened gates and repaired stations stay that way for good. World progress is never lost (brainstorm #23).
@@ -303,8 +330,8 @@ Pillar 3: progress through skills and chain mastery, never XP.
 
 | Reward | Layer 1 count | Where |
 |---|---|---|
-| Ember caches | 4 | A, B, C, a Swing secret |
-| Journal entries | 4 | A ×2, B, plus the Memorial clue in a Swing secret |
+| Ember Hoards | 4 | A, B, C, a Swing secret |
+| Journal entries | 3 | A ×2, B |
 | Cartographer hint | 1 | B |
 | Gear: Silk Grip (+0.25 s cling grace) | 1 | Swing secret |
 | Memorial clue (the Last Explorer) | 1 | Swing secret |
@@ -318,7 +345,7 @@ Pillar 3: progress through skills and chain mastery, never XP.
 - No ranged attack. Flare Toss deals no damage.
 
 **Defense:**
-- Chain breaks: landing, Snuff, cling and Flare Toss.
+- Ways to end or pause the chain: landing and Snuff break it, cling pauses it, Flare Toss halves it (see the chain table).
 - 0.6 s of invulnerability after a hit.
 - No block or parry in M2. The lurker parry is a candidate for after M2.
 
@@ -343,7 +370,7 @@ Pillar 3: progress through skills and chain mastery, never XP.
 - Each strand has an **anchor** on both ends. Slashing an anchor 2 times **weakens** that strand, shown by a frayed sprite and a sag.
 - **HP:** 12. The Fall triggers at 6.
 
-**The loop (Snuff → Herd → Strike):**
+**The loop (Snuff → Herd → Strike;** the brief's "Snuff, Lure, Strike", where going dark is the lure**):**
 
 | Your state | Weaver does | Numbers |
 |---|---|---|
@@ -363,7 +390,8 @@ Pillar 3: progress through skills and chain mastery, never XP.
   - About 6 s of **free fall** with debris and web clumps to pogo off: a bonus chain section that pays embers.
   - You land in the **Layer 2 landing arena**, under a new sky: Bright Moon palette, one screen.
 
-**Phase 2 (6 → 0 HP, landing arena):**
+**Phase 2 (6 → 0 HP, landing arena):** the Bright Moon rule ("predators always see you up close") is **off** in the landing arena. It first applies in Layer 2 proper, so going dark still lures the Weaver.
+
 - **2 strands** only. Faster: bite telegraph 0.75 s (the minimum), descent 90 px/s.
 - **Re-Weave at 3 HP:** rebuilds the 2 strands.
 - **On defeat:**
@@ -376,7 +404,7 @@ Pillar 3: progress through skills and chain mastery, never XP.
 ### Sequence Breaking
 
 - **Stance:** a skip is allowed if it takes skill and leaves the game finishable. Chain gates can't be skipped: they read the chain.
-- **Known skips to allow:** a cling-kick plus air dash can reach some side-area entrances early. That's fine, since they're optional.
+- **Known skips to allow:** a cling-kick plus air dash can reach the [A] Rope Works and [B] Old Mine entrances early. That's fine, since they're optional.
 - **Softlock prevention:**
   - Layer 1 is a one-way descent between stations, so every drop leads on to the Weaver or a station.
   - Gate 2's shortcut goes up to the hub only.
@@ -394,10 +422,10 @@ Three tracks, none of them XP (Pillar 3):
 | Track | What grows | How it feeds the loop | M2 |
 |---|---|---|---|
 | **Skill** | your chain length, reading telegraphs, cash-out timing | the main track: longer chains pay quadratically more embers | a best-chain record at the Guild |
-| **Abilities** | new verbs or new uses of old ones, earned from bosses or world finds | each one reopens earlier layers (backtracking) | Swing (from the Weaver) |
+| **Abilities** | new uses of the 4 buttons, earned from bosses or world finds | each one reopens earlier layers (backtracking) | Swing (from the Weaver) |
 | **Gear** | small rule-bends bought with embers | each bend moves a number the player already knows | 3 sold, 1 found |
 
-- **Out of scope for M2:** raising max HP (masks), more ability unlocks, and the Mentor techniques the brief mentions.
+- **Out of scope for M2:** raising max HP (masks), more ability unlocks, and Mentor techniques (from the brainstorm: retired explorers who teach techniques).
 
 ### Difficulty Curve
 
@@ -407,7 +435,7 @@ Three tracks, none of them XP (Pillar 3):
 
 **Layer 1 target struggle points:**
 - **Gate 1 (chain 4):** most players need 1–3 tries.
-- **Old Mine (optional):** dense lurkers.
+- **Old Mine (optional):** ≥ 1 lurker per screen.
 - **The Weaver:** Normal difficulty, *Hollow Knight*-level; most players need 3–8 attempts.
 
 **Layer 1 coast points:** S1, the hub, and every Lift Station approach.
@@ -422,7 +450,7 @@ Three tracks, none of them XP (Pillar 3):
 
 **Embers are the one currency.** They replace the brief's "haul" and "currency".
 
-**Earning:** each pogo hit pays `ember_value(link)`. It is linear: link *k* pays *k*, so a chain of *n* pays n(n+1)/2. A chain of 5 pays 15 and a chain of 10 pays 55.
+**Earning:** each pogo hit pays embers equal to its link number: link *k* pays *k*, so a chain of *n* pays n(n+1)/2. A chain of 5 pays 15 and a chain of 10 pays 55.
 - The cap at 20 links stops the light from growing, but hits keep paying.
 - This curve is the temptation lever. M1 confirmed it works ("Yes, I want to keep the chain going").
 
@@ -450,8 +478,8 @@ Three tracks, none of them XP (Pillar 3):
 |---|---|---|---|
 | Maps and hints | Cartographer | layer maps, secret and gate hints | 3: you buy *where* to be daring |
 | Lift Station repairs | Guild | restores deeper stations as shortcuts and fast travel. **Layer 2 onward:** Layer 1 has no broken station in M2 | session loop |
-| Gear | Smith | small upgrades that *bend* chain rules (e.g. +0.25 s cling grace, +10% Blade Bloom). **Rule: gear bends a rule, it never adds raw power.** | 1, within 3's "skills, not XP" |
-| Journal and cosmetics | Naturalist | journal entries, lore, cosmetic palettes | none: a safe sink |
+| Gear | Smith | small upgrades that *bend* chain rules (e.g. Quick Wick, Long Wick, Steady Grip; see Hub). **Rule: gear bends a rule, it never adds raw power.** | 1, within 3's "skills, not XP" |
+| Cosmetics | Naturalist | cosmetic palettes. The Naturalist also *pays* 10 embers per new journal entry, a small source of embers rather than a sink | none: a safe sink |
 
 **Starting prices** (to tune in the M2 playtest):
 
@@ -460,8 +488,8 @@ Three tracks, none of them XP (Pillar 3):
 | Map | 60 |
 | Hint | 25 |
 | Station repair | 150 |
-| Gear | 200–400 |
-| Cosmetic | 50–150 |
+| Gear | 200–300 (M2 items) |
+| Cosmetic | 75–150 |
 
 [ASSUMPTION: a Layer 1 dive between stations earns about 100–250 embers for a competent player. M2 playtests set the real prices.]
 
@@ -488,7 +516,7 @@ Three tracks, none of them XP (Pillar 3):
 - **Order:** Layer 1 runs in a fixed order: S1 → S2 (A) → S3 gate 1 → S4 (B, C) → S5 Weaver → Layer 2 landing arena.
 - **Rhythm:** a new idea every 4–6 screens, and a lantern anchor at about the same rate.
 - **Hard rule from M1:** every lurker telegraph must be on screen, and every predator-heavy stretch must have an escape (a ledge, a wall to cling to, or room to Snuff) within reach.
-- **Level validation:** an automated bot must reach a chain of ≥ 5 in every spine shaft and the required chain at every gate, using plain movement and no dash. M1 already runs this test. [NOTE FOR DESIGNER: keep this check in M2 so every gate stays reachable.]
+- **Level validation:** an automated bot must reach a chain of ≥ 5 in every spine shaft and the required chain at every gate, using plain movement and no dash. M1 already runs this test. M2 keeps this check in the automated suite for every room and gate.
 
 ---
 
@@ -499,7 +527,7 @@ Three tracks, none of them XP (Pillar 3):
 **Format:**
 - 480×270 at integer scale.
 - Sprites of 16–24 px; bosses are built from segments.
-- Each layer has **4–6 colours**, and bright text pixel grids feed the M1 pipeline.
+- Each palette zone has **4 colours**, plus the 2 reserved colours. Sprites are text pixel grids fed to the M1 pipeline.
 
 **Two reserved colours, used the same in every layer:**
 
@@ -524,6 +552,12 @@ Three tracks, none of them XP (Pillar 3):
 - Ledge rims glow faintly.
 - Predators and the effects of your light ignore the darkness, so they always read.
 - The world gets darker; the player never loses track of themselves.
+
+**Feel rules (addendum):**
+- Freeze frames and sparks on every pogo hit.
+- **Slow motion only at boss climaxes:** The Fall begins with 0.5 s at ×0.3, and so does the Weaver's defeat.
+- Screen shake can be turned off.
+- Creature deaths dissolve into sparks, never blood (keeps age ratings low).
 
 ### Audio and Music
 
@@ -565,22 +599,49 @@ Three tracks, none of them XP (Pillar 3):
 
 ---
 
+## Narrative and Tone
+
+**Premise:** you aren't discovering the abyss; you're **coming home to it**.
+
+**Tone:** the mood of layered-abyss adventure fiction: wonder, melancholy, danger at the edge of the light. **The world, creatures and story are original.** No names, creatures, places or plot beats are borrowed from any existing work.
+
+**Three reveals at most** (brief): *origin, theft, cycle*. They land across the 7 layers. Layer 1 holds only **deniable early clues**: 2–3 hints spread across journal text, NPC lines and the Memorial clue (brainstorm #103, #112: "deniable early, undeniable deep").
+
+**How the story is told:**
+- mostly through the environment, the journal and the Memorial Wall;
+- brief conversations with hub NPCs.
+
+**Story reasons for systems:**
+- **The Anchor** (brainstorm #111): a lantern binds your spark to the island, and death snaps you back to it. This is why lantern anchors and Lift Stations respawn you.
+- **The Last Explorer** holds the island's all-time depth record, shown on the Guild board as the target to beat (#108).
+- **Creatures** are hungry, not hateful: predators crave your light, they do not hate you (#109).
+
+**Ending:** *The Final Chain*, a playable, unbroken descent with your light at full strength.
+
+**Layer 1 set-piece, *The Last Entry* (#56):** in S4 Explorers' Grave, a lost explorer's camp and a half-written journal ("going deeper"). It also counts as a journal entry.
+
+[NOTE FOR DESIGNER: details (reveal placement, NPC lines, the Last Explorer's presence in the hub) are for the recommended `gds-create-narrative` pass after this GDD.]
+
+---
+
 ## Technical Specifications
 
 ### Performance Requirements
 
-- **60 FPS sustained** at 480×270 scaled ×3 (1440×810) on the developer laptop and on a 2016-era integrated GPU. Measured over a 10-minute Layer 1 run, including the Weaver fight.
+- **60 FPS sustained** at 480×270 scaled ×3 (1440×810) on the developer laptop and on an Intel HD Graphics 620-class integrated GPU. Measured over a 10-minute Layer 1 run, including the Weaver fight.
 - **Hitstop and input:** input is read every frame; no frame of input is dropped during a 75 ms hitstop.
 - **Load time:** under 2 s from the hub to a Lift Station on the laptop.
-- **Web build:** 60 FPS in desktop Chrome or Firefox on the laptop; download under 30 MB.
+- **Memory:** ≤ 512 MB RAM on desktop, ≤ 300 MB in a web tab.
+- **Web build:** 60 FPS in desktop Chrome or Firefox on the laptop; download under 30 MB; playable within 10 s on a 50 Mbps link; pauses when the tab loses focus.
 
 ### Platform-Specific Details
 
 - **Engine:** Godot 4.7 (GDScript only), with the Compatibility renderer so web builds work.
 - **Targets:** PC Windows and Linux. Web/itch.io builds for playtests. The Steam vs itch.io decision is made with the M2 build.
-- **Input:** keyboard first. Every action is one button (no chords), so a controller mapping follows later. Rebinding arrives in M2.
+- **Input:** keyboard and gamepad from M2 (default mapping in E1). Every action is one button (no chords). Rebinding arrives in M2.
+- **Steam Deck:** a test pass in E7. At ×2 integer scaling (960×540, letterboxed) the HUD and text must be readable. "Verified" is the goal if Steam is chosen.
 - **Display:** integer scaling only (×2, ×3, ×4), nearest filtering, letterboxed.
-- **Saves:** automatic at every Lift Station rest and on the hub. One profile in M2.
+- **Saves:** automatic at every Lift Station rest, on the hub, and **when you quit at a lit lantern anchor**. Quitting at an anchor saves your position, so a long first descent can span two sessions. Carried embers stay at risk until a station. One profile in M2.
 - **Flash safety:** no more than 3 flashes per second anywhere. Settings include "reduce flashing", a screen-shake toggle and 4 brightness levels.
 
 ### Asset Requirements
@@ -589,8 +650,8 @@ Three tracks, none of them XP (Pillar 3):
 
 | Asset | Count | Notes |
 |---|---|---|
-| Player | 1 set | about 10 animations: idle, run, jump, fall, pogo, slash, dash, cling, swing, hurt |
-| Enemies | 3 regular + spiderling | |
+| Player | 1 set | 10 animations: idle, run, jump, fall, pogo, slash, dash, cling, swing, hurt |
+| Enemies | crawler walker, crawler hoverer, lurker, spiderling | +1 if the third regular enemy is added |
 | Weaver | 1 boss | built from segments: body, 8 legs, strands |
 | NPCs | 4 | |
 | Layer 1 tileset | 1 | with a ledge-rim variant |
@@ -624,7 +685,7 @@ Three tracks, none of them XP (Pillar 3):
 
 **Rule:** if an epic's playtest answer is "no", fix it before starting the next epic.
 
-[ASSUMPTION: size S ≈ 2–4 weeks, M ≈ 4–8 weeks, L ≈ 8–16 weeks at 5–10 h/week. That puts M2 at roughly 9–18 months.]
+[ASSUMPTION: size S ≈ 2–4 weeks, M ≈ 4–8 weeks, L ≈ 8–16 weeks at 5–10 h/week. That puts M2 at roughly 36–72 weeks (8–17 months). No epic is size S.]
 
 ---
 
@@ -632,7 +693,7 @@ Three tracks, none of them XP (Pillar 3):
 
 ### Technical Metrics
 
-- 60 FPS sustained (see Performance), with no stutter on a chain hit, measured in the 10-minute run.
+- 60 FPS sustained (see Performance): no frame over 20 ms outside the intentional 75 ms hitstop, measured in the 10-minute run.
 - Zero softlocks in M2, checked by the reachability bot and the playtest.
 - Automated tests stay green on every commit: chain rules, gate reachability, lurker escape rules (M1 suite).
 
@@ -657,11 +718,45 @@ Solo project, so these come from playtest notes, not telemetry. For the M2 share
 - Masks (max HP), Mentor techniques, abilities other than Swing.
 - Lift Station repairs (start in Layer 2), Docks, Gallery and the other hub NPCs.
 - The lurker parry, phase dash, cashing in chain, more pogo directions, climbing as an upgrade (ideas list).
-- Controller mapping (after M2), a leaderboard.
+- A leaderboard, Steam Cloud saves (only if Steam is chosen in E7).
 
-**Parked** (full-vision tier only): Roaming Ecology, The Abyss Breathes, Crafting, Food Chain.
+**Parked** (full-vision tier only): Roaming Ecology, The Abyss Breathes, Crafting, Food Chain, Dive Boons.
 
-**Cut:** The Climb Back, the Boon Deck, Dive Boons. [NOTE FOR DESIGNER: the brief says Dive Boons are "likely cut" and the brainstorm says "deferred". This draft lists them as cut; confirm.]
+**Cut:** The Climb Back, the Boon Deck.
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **Burnout** on a solo project lasting years | every epic ends playable; post a short devlog or private build after each epic, and share publicly at M2 (brief: "each milestone is a finished thing") |
+| **The loop stops being fun** as systems pile up | each epic carries one playtest question; a "no" is fixed before the next epic |
+| **Snuff weakens greed:** an instant mid-air Snuff banks held embers, so it could become a free cash-out the moment eyes open | watch for it in the E1 playtest. If players Snuff on every telegraph, add a cost (for example, Snuff banks only half the held embers) |
+| **Scope creep:** M2 adds many systems at once | the brief's rule: anything the current epic's question doesn't need waits for a later epic |
+| **Flash safety** | ≤ 3 flashes/s cap and the "reduce flashing" toggle from **E1** (brief: "from day one"), with a check for every new effect |
+| **AI-art perception** | disclose on every store page, covering art, audio and text pipelines; keep provenance in git |
+| **Differentiation** (Downwell comparisons) | lead with chain-as-light and the fixed world; show the hub, map and journal within the first 5 minutes |
+
+---
+
+## Open Questions
+
+Not blocking M2 architecture; each is decided by the epic or pass named.
+
+| Question | Decide in |
+|---|---|
+| The Bright Moon force field; predator telegraphs per layer; lessons for bosses 2–5 | each layer's own milestone |
+| Do bosses react to "what you are"? What does "breaking the cycle" mean? Layer 7's Truth; the island economy after the ending | the narrative pass |
+| Which meta systems are core? Living Map, Field Journal, Depth Record and Lift Stations are core in M2. Expedition Loadout is **replaced by always-on gear** (revisit if gear grows). Relic Haul is replaced by embers; "relic" stays a story motif | confirmed here; revisit after M2 |
+| Weaver details: behaviour at 62–78 px of light (1–3 links); the exact flee target of the herd | E2 prototype |
+| How each side area exits back to the spine | E4 |
+| Respawn point for a phase-2 death (the landing station is broken until victory) | E6 |
+| Hub and Layer 2 landing palettes | E5 / E6 |
+| Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits) | architecture |
+| Assist options for Easy (the brief takes Celeste's assists) | E7 |
+| Ways to fail: Hard Landing and Grip Gives Out are dropped by M1 tuning (slow max fall, cling without stamina); Running Dry needs crafting (parked); Prey (a capture becomes an escape) | a later layer |
+| Peak moments: The Speck, Riding the Giant, Felling the Canopy, The Curious Companion | their layers |
 
 ---
 
@@ -673,7 +768,10 @@ Solo project, so these come from playtest notes, not telemetry. For the M2 share
 - **Playtesters:** about 5 external testers are available for the M2 shared build. [ASSUMPTION]
 
 **Assumption index:**
-1. Ember earnings per dive (Economy).
-2. The bank-heal threshold (Health).
-3. Weaver attempt counts (Difficulty).
-4. Tester availability (above).
+1. The bank-heal threshold (Health).
+2. Weaver attempt counts (Difficulty).
+3. Ember earnings per dive (Economy).
+4. The Layer 2 landing palette (Art).
+5. The hub palette (Art).
+6. Epic sizes and M2 duration (Epic Structure).
+7. Tester availability (above).

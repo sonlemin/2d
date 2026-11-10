@@ -112,3 +112,51 @@
 - **Size estimate:** M2 ≈ 9–18 months at 5–10 h/week [ASSUMPTION].
 - **Files:** `epics.md` holds the details and a coverage table; `gdd.md` holds the summary.
 - **Status:** the draft is complete. Next is Finalize (log audit, input reconciliation, validation, open items).
+
+## 2026-11-10 — Finalize: reconciliation and validation (autofixes applied)
+
+- **Checks run:** 3 input reconciliations (brief, brainstorm, research) and 1 checklist validator. Verdict: PASS WITH FIXES.
+- **Autofixes:**
+  - Hit and hurt boxes (M1 values).
+  - Removed `ember_value` (an engine-style name).
+  - Contradictions fixed: Swing gating, defense list, Naturalist and Smith rows and prices, lurker "senses", palette count, asset enemies, S2 secret, backtracking via the Lip, epic sum (8–17 months).
+  - Vague quantifiers replaced with numbers; the GPU is named; memory and web budgets added.
+  - Assumption index renumbered to A1–A7.
+  - World caches renamed **Ember Hoard**; **Ember Cache** is the death drop only. Sky Ledge gets a hoard (≈ 100).
+  - Pillar 4 reworded ("new abilities reuse the same buttons").
+  - Feel rules added: slow motion only at boss climaxes, deaths dissolve without blood.
+  - Snuff rationale added (cash-out, not a toggle) with playtest watch items.
+  - The Bright Moon rule is off in the Weaver landing arena.
+- **Added from the inputs:**
+  - The 7-layer table and the sanctuary base rule.
+  - Narrative and Tone: three reveals, originality rule, the Anchor lore, the Last Explorer's record, *The Last Entry* in S4.
+  - Risks section and Open Questions section; Expedition Loadout replaced by gear; relic kept as a story motif.
+- **epics.md:**
+  - Flash-safety cap, reduce-flashing toggle and the Field Journal death line moved to **E1**, because the brief says "from day one" and Pillar 2 needs them.
+  - Journal entry count fixed.
+  - A devlog after each epic.
+
+## 2026-11-10 — Finalize: designer decisions (batch 1)
+
+- **Any hit** breaks the chain and moves held embers to carried. Only death loses held embers.
+- **Dash/Swing:** within 56 px of a silk anchor, Dash grabs the rope; otherwise it is the air dash. No hold threshold, so dashes have no delay.
+- **Gamepad in M2:** the default mapping ships in E1; a Steam Deck pass in E7 (×2 scaling, HUD readability). Reverses the brief's "controller later", following the research.
+- **Off-screen stirring:** a lurker that would wake just off screen gives a panned stirring sound and an edge glow, but it can't hunt until it is on screen and has telegraphed.
+
+## 2026-11-10 — Finalize: designer decisions (batch 2)
+
+- **Session length:** quitting at a lit lantern anchor saves your position, so the 45–60 min first descent can span two sessions.
+- **Price target:** $15–20 premium.
+- **Marketing:** no section and no marketing work before M2 (designer's call). Decided in E7.
+- **Dive Boons:** parked, not cut.
+
+## 2026-11-10 — v1.0 FINAL
+
+- **Open-items triage:** there are no phase blockers left. These 3 notes are deliberately deferred:
+  - a third Layer 1 enemy, decided in E4;
+  - the glowing Ember Cache that draws lurkers, an E1 playtest idea;
+  - narrative details, decided in the narrative pass.
+- The A1–A7 assumptions and the Open Questions table each name the epic or pass that resolves them.
+- **Polish:** no `doc_standards` are configured, so it was skipped. There are no external handoffs.
+- **Narrative handoff:** `needs_narrative` is set. `gds-create-narrative` was offered to the user.
+- **Status:** gdd.md `status: final`. Next step: `gds-game-architecture`, in a fresh session.

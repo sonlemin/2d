@@ -1,6 +1,6 @@
 # The Unbroken Chain — Milestone 2 Epics
 
-Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer is fixed before the next epic starts. The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
+Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer is fixed before the next epic starts. **After each epic, post a short devlog or private build** (the brief's burnout mitigation). The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
 
 ---
 
@@ -9,7 +9,9 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **Goal:** the full M2 move set and survival rules, in the existing M1 shaft.
 
 **In:**
-- **Health:** 4 HP, the damage table, 0.6 s invulnerability, crawler contact deals 1, a hunting lurker deals 2, +1 HP for banking a chain of 10 or more.
+- **Health:** 4 HP, the damage table, 0.6 s invulnerability, crawler contact deals 1, a hunting lurker deals 2, +1 HP for banking a chain of 10 or more. **Any hit** breaks the chain and moves held embers to carried.
+- **Default gamepad mapping.**
+- **Lurker off-screen stirring:** a faint edge glow now, with the sound added in E3.
 - **Flare Toss:** tap Light; needs ≥ 2 links; costs half the chain, with a matching share of embers moved to carried; 4 s; predators treat it as the player.
 - **↓ interact** on the ground.
 - **Lantern anchors:** lit by touch; respawn point.
@@ -17,6 +19,8 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 - **Lift Station rest** (a placeholder station): full heal, deposit, enemies respawn.
 - **Saving:** autosave on rest.
 - **HUD:** HP, held and carried embers.
+- **Flash safety from day one:** the ≤ 3 flashes/s cap is checked for every effect, and the "reduce flashing" toggle ships in E1.
+- **Field Journal death line:** one line on death naming what killed you and how to avoid it (Pillar 2; deferred from M1).
 
 **Out:** the Weaver; audio; new art; Swing.
 
@@ -36,7 +40,11 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 7. Placeholder Lift Station rest
 8. Save and load
 9. HUD v2
-10. Tests for all chain, ember and damage rules
+10. Flash-safety cap and the reduce-flashing toggle
+10b. Default gamepad mapping
+10c. Lurker off-screen stirring and edge glow
+11. Field Journal death line
+12. Tests for all chain, ember and damage rules
 
 ---
 
@@ -113,7 +121,8 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 - **Lift Stations:** Lip and Hollow (real ones). About 5 lantern anchors.
 - **Palette shift:** dusk → umber → violet. Ledge rims.
 - **Map:** fills as you explore.
-- **Journal objects** (4 entries) and ember caches.
+- **Journal objects:** 3 entries (A ×2, B), plus *The Last Entry* set-piece in S4. The Memorial clue arrives with the Swing secrets in E6.
+- **Ember Hoards** in A, B and C.
 - **Layer 1 tileset and enemy art.** A third regular enemy if the walk-through shows a need (NOTE in the GDD).
 - **Reachability bot** extended to every shaft and gate.
 
@@ -213,17 +222,18 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **Goal:** the first build to share with outside testers.
 
 **In:**
-- **Settings:** rebinding, reduce flashing, screen shake on/off, 4 brightness levels, volume.
-- **Field Journal death lines** (deferred from M1).
+- **Settings:** rebinding, screen shake on/off, 4 brightness levels, volume. (Reduce flashing already shipped in E1.)
+- **Full Field Journal:** lore entries plus the death-line history (the death line itself ships in E1).
 - **HUD polish.**
 - **Art pass:** player animations (about 10), plus the hub and Layer 2 landing palettes.
 - **Composed music stems** for Layer 1, the hub and the Weaver.
 - **Performance:** check 60 FPS (see Tech Specs).
+- **Steam Deck test pass:** ×2 scaling, HUD readability, battery.
 - **Builds:** web and desktop (Windows and Linux).
 - **Playtest round** with about 5 testers against the Success Metrics.
 - **The Steam vs itch.io decision.**
 
-**Out:** controller mapping; Layers 2–7.
+**Out:** Layers 2–7. (Gamepad ships in E1.)
 
 **Depends on:** E1–E6.
 
