@@ -65,6 +65,7 @@ var _light_held := 0.0
 func _ready() -> void:
 	add_to_group("player")
 	chain.changed.connect(_on_chain_changed)
+	chain.banked.connect(_on_banked)
 	_hurtbox.area_entered.connect(_on_hurt_area)
 	_set_swing_visible(false)
 	_apply_bloom()
@@ -195,7 +196,7 @@ func _on_pogo_hit() -> void:
 	_shown_radius += light_kick
 	_shake = shake
 	_sprite.scale = Vector2(0.75, 1.3)  # stretch up out of the bounce
-	Fx.chain_popup(get_parent(), global_position, chain.count)
+	Fx.chain_popup(get_parent(), global_position, chain.count, ChainState.ember_value(chain.count))
 	_freeze_frame()
 
 
@@ -210,6 +211,11 @@ func _freeze_frame() -> void:
 func _set_swing_visible(on: bool) -> void:
 	_slash.visible = on and not _swing_is_pogo
 	_pogo.visible = on and _swing_is_pogo
+
+
+func _on_banked(amount: int) -> void:
+	if not is_dead:
+		Fx.popup(get_parent(), global_position + Vector2(0, -10), "+%d banked" % amount, Color(1, 0.93, 0.7), 10)
 
 
 func _on_chain_changed(count: int) -> void:
@@ -264,7 +270,9 @@ func die() -> void:
 		return
 	is_dead = true
 	Engine.time_scale = 1.0
-	chain.break_chain()
+	var lost := chain.lose()  # unbanked embers die with you
+	if lost > 0:
+		Fx.popup(get_parent(), global_position + Vector2(0, -10), "-%d lost" % lost, Color(1, 0.35, 0.3), 10)
 	velocity = Vector2.ZERO
 	_set_swing_visible(false)
 	died.emit()

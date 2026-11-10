@@ -19,6 +19,7 @@ func _init() -> void:
 		"test_cap_clamps",
 		"test_curves_monotonic",
 		"test_changed_signal",
+		"test_embers_held_banked_lost",
 	]:
 		call(t)
 	if _failures == 0:
@@ -107,3 +108,34 @@ func test_changed_signal() -> void:
 	c.break_chain()
 	c.break_chain()  # already 0: must not emit again
 	check(seen == [1, 2, 0], "changed emits on real changes only (got %s)" % [seen])
+
+
+## M1 reward: hits fill a held pile; a safe break banks it (once); death loses it.
+func test_embers_held_banked_lost() -> void:
+	var c = ChainStateScript.new()
+	var got := []
+	c.banked.connect(func(a): got.append(a))
+	for i in 4:
+		c.add_hit()
+	var expect := 0
+	for n in range(1, 5):
+		expect += ChainStateScript.ember_value(n)
+	check(c.held == expect, "4 hits hold the sum of ember_value(1..4) (got %d)" % c.held)
+	check(ChainStateScript.ember_value(5) >= ChainStateScript.ember_value(4), "a later hit is worth at least as much")
+	c.break_chain()
+	check(got == [expect] and c.held == 0, "landing banks the held embers exactly once")
+	c.break_chain()
+	check(got.size() == 1, "breaking an empty chain banks nothing")
+	c.add_hit(); c.add_hit()
+	c.set_snuffed(true)
+	check(got.size() == 2 and c.held == 0, "Snuff is a safe exit: it banks too")
+	c.set_snuffed(false)
+	c.add_hit(); c.add_hit(); c.add_hit()
+	var held_before: int = c.held
+	var lost: int = c.lose()
+	check(lost == held_before and lost > 0 and c.held == 0 and c.count == 0, "death loses the held embers")
+	check(got.size() == 2, "death banks nothing")
+	c.count = ChainStateScript.MAX_CHAIN
+	var h0: int = c.held
+	c.add_hit()
+	check(c.held > h0, "hits at the chain cap still pay embers")

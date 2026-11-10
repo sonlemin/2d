@@ -19,6 +19,7 @@ static var ambient_index := 1  # static: survives the scene reload on death
 static var show_controls := true
 static var best_chain := 0  # session stats for playtest notes (survive death reloads)
 static var deaths := 0
+static var banked_embers := 0  # the haul: kept across deaths (only HELD embers are lost)
 
 const LAYOUT: Array[String] = [
 	"##############################",
@@ -146,6 +147,7 @@ func _ready() -> void:
 	_walls.tile_set = _make_tileset()
 	_build()
 	_player.died.connect(_on_player_died)
+	_player.chain.banked.connect(func(amount: int) -> void: banked_embers += amount)
 	var cam: Camera2D = _player.get_node("Camera")
 	cam.limit_left = 0
 	cam.limit_top = 0
@@ -225,10 +227,9 @@ func _process(_delta: float) -> void:
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:
 			hunting += 1
-	_debug.text = "chain %d (best %d)   light %d px%s   depth %d   alert %d   deaths %d   [F1] bright %d/%d" % [
-		_player.chain.count, best_chain, int(_player.light_radius()),
-		"  [SNUFF]" if _player.chain.snuffed else "", int(_deepest), hunting, deaths,
-		ambient_index + 1, AMBIENT_LEVELS.size()]
+	_debug.text = "embers %d  (held +%d)   chain %d (best %d)   light %d%s   depth %d   alert %d   deaths %d" % [
+		banked_embers, _player.chain.held, _player.chain.count, best_chain, int(_player.light_radius()),
+		" SNUFF" if _player.chain.snuffed else "", int(_deepest), hunting, deaths]
 	_debug.add_theme_color_override("font_color", ALERT_COLOR if hunting > 0 else HUD_COLOR)
 
 

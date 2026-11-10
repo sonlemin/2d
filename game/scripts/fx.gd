@@ -33,17 +33,22 @@ static func pop(parent: Node, pos: Vector2, amount := 14) -> void:
 
 
 ## A floating "x5" over the hit, so the chain count is felt where the eyes are.
-static func chain_popup(parent: Node, pos: Vector2, count: int) -> void:
+static func chain_popup(parent: Node, pos: Vector2, count: int, embers: int) -> void:
+	popup(parent, pos, "x%d  +%d" % [count, embers], SPARK, 8 if count < 5 else 10)
+
+
+## Floating text that rises and fades.
+static func popup(parent: Node, pos: Vector2, text: String, color: Color, size := 8) -> void:
 	var l := Label.new()
 	l.material = _unshaded()
-	l.text = "x%d" % count
-	l.add_theme_font_size_override("font_size", 8 if count < 5 else 10)
-	l.add_theme_color_override("font_color", SPARK)
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
 	l.add_theme_constant_override("outline_size", 3)
 	l.z_index = 5
 	parent.add_child(l)
-	l.global_position = pos + Vector2(-6, -30)
+	l.global_position = pos + Vector2(-10, -30)
 	var tw := l.create_tween().set_parallel()
 	tw.tween_property(l, "position:y", l.position.y - 14.0, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tw.tween_property(l, "modulate:a", 0.0, 0.6).set_delay(0.25)

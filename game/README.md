@@ -19,6 +19,7 @@ Open this folder in Godot 4.7 and press F5.
 
 - Pogo off crawlers without landing to build the **chain**. Each link makes your slash bigger and your light brighter.
 - **Landing** ends the chain.
+- **Embers:** each pogo hit adds embers to a **held** pile, and later hits pay more (hit 5 pays 5). Landing or Snuff **banks** them. Dying **loses** whatever you're holding. The top bar shows `embers` (banked) and `held`.
 - A big light wakes the **lurkers**: red eyes pulse in the dark for about a second, then they hunt you. Contact with a hunting lurker kills you.
 - To shake a lurker off, **land or Snuff**. Both break the chain.
 - Touching a crawler knocks you back and breaks the chain, but doesn't kill you.
