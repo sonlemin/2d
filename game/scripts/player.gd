@@ -30,7 +30,7 @@ signal chain_changed(count: int)
 @export var light_kick := 18.0          ## px the light flares on a pogo hit
 @export var knockback := Vector2(150, -150)
 @export var invuln_time := 0.6
-@export var snuff_hold := 0.2          ## Light must be HELD this long to Snuff: a tap or brush never breaks the chain
+@export var snuff_hold := 0.12         ## Light must be HELD this long to Snuff: a tap or brush never breaks the chain
 @export var light_lerp := 10.0          ## how fast the visible light eases to its target radius
 
 const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px

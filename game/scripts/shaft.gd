@@ -19,6 +19,7 @@ static var ambient_index := 1  # static: survives the scene reload on death
 static var show_controls := true
 static var best_chain := 0  # session stats for playtest notes (survive death reloads)
 static var deaths := 0
+static var checkpoint := Vector2.INF  # last ledge stood on: death respawns here, not at the top (F3 clears)
 static var banked_embers := 0  # the haul: kept across deaths (only HELD embers are lost)
 
 const LAYOUT: Array[String] = [
@@ -146,6 +147,8 @@ func _ready() -> void:
 	_controls.visible = show_controls
 	_walls.tile_set = _make_tileset()
 	_build()
+	if checkpoint.is_finite():
+		_player.position = checkpoint
 	_player.died.connect(_on_player_died)
 	_player.chain.banked.connect(func(amount: int) -> void: banked_embers += amount)
 	var cam: Camera2D = _player.get_node("Camera")
@@ -213,6 +216,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key.physical_keycode == KEY_F2:
 		show_controls = not show_controls
 		_controls.visible = show_controls
+	elif key.physical_keycode == KEY_F3:  # full run from the top
+		checkpoint = Vector2.INF
+		get_tree().reload_current_scene()
 
 
 func _apply_ambient() -> void:
@@ -223,6 +229,8 @@ func _apply_ambient() -> void:
 func _process(_delta: float) -> void:
 	_deepest = maxf(_deepest, _player.position.y / TILE)
 	best_chain = maxi(best_chain, _player.chain.count)
+	if _player.is_on_floor() and not _player.is_dead:
+		checkpoint = _player.position  # the ground is the sanctuary: it is also where you come back
 	var hunting := 0
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:

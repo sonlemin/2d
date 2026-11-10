@@ -39,6 +39,7 @@ func _run() -> void:
 	await test_jump_height()
 	await test_bot_chains_long_run()
 	await test_lurker_telegraph_hunt_lose()
+	await test_snuff_escape_point_blank()
 	await test_lurker_kills()
 	await test_snuff_needs_hold()
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
@@ -225,6 +226,25 @@ func test_lurker_telegraph_hunt_lose() -> void:
 	_player.chain.break_chain()
 
 
+## Playtest: "saw it, couldn't escape". A Snuff in time must save you even with the lurker
+## at full speed a body-length away: it is harmless the moment it loses the scent.
+func test_snuff_escape_point_blank() -> void:
+	var lurker: Lurker = get_nodes_in_group("predator")[0]
+	_player.set_physics_process(false)
+	place(lurker.global_position + Vector2(60, 0))
+	for i in 10:
+		_player.chain.add_hit()
+	lurker.global_position = _player.global_position + Vector2(-18, 0)
+	lurker._enter(Lurker.State.HUNT)
+	lurker._velocity = Vector2(lurker.hunt_speed, 0)
+	await frames(1)
+	_player.chain.set_snuffed(true)
+	await seconds(1.2)
+	check(not _player.is_dead, "Snuff with a hunting lurker 18 px away still saves you")
+	check(lurker.state != Lurker.State.HUNT, "and the lurker gives up")
+	_player.chain.set_snuffed(false)
+
+
 func test_lurker_kills() -> void:
 	var lurker: Lurker = get_nodes_in_group("predator")[0]
 	var died := [false]
@@ -239,6 +259,8 @@ func test_lurker_kills() -> void:
 	place(idle.global_position)
 	await frames(3)
 	check(not died[0], "touching an IDLE lurker does not kill (no telegraph yet)")
+	for i in 10:
+		_player.chain.add_hit()  # a big light: the lurker still has the scent
 	lurker._enter(Lurker.State.HUNT)
 	place(lurker.global_position)
 	await frames(3)

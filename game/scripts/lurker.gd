@@ -79,6 +79,7 @@ func _physics_process(delta: float) -> void:
 		State.HUNT:
 			_eyes.modulate.a = 1.0
 			_unsensed = 0.0 if sensed else _unsensed + delta
+			monitorable = sensed  # lost the scent -> harmless at once: a Snuff or landing in time always saves you
 			if _unsensed >= lose_track_time:
 				_enter(State.RETURN)
 			else:

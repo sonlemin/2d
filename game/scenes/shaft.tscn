@@ -37,4 +37,4 @@ offset_right = 476.0
 offset_bottom = 268.0
 theme_override_colors/font_color = Color(0.662745, 0.705882, 0.760784, 0.85)
 theme_override_font_sizes/font_size = 8
-text = "Arrows move   Z/Up jump   X slash (ground) / pogo (air)   C air dash   hold V snuff   F1 brightness   F2 hide"
+text = "Arrows move   Z/Up jump   X slash (ground) / pogo (air)   C air dash   hold V snuff   F1 brightness   F2 hide   F3 restart top"
