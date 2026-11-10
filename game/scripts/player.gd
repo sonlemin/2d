@@ -27,6 +27,7 @@ signal chain_changed(count: int)
 @export var swing_cooldown := 0.22
 @export var hitstop := 0.075            ## freeze frame on pogo hit (seconds, real time; was 0.045)
 @export var shake := 2.5                ## px camera kick on a pogo hit
+@export var look_ahead := 70.0          ## px the camera leads downward while falling (see ledges sooner)
 @export var light_kick := 18.0          ## px the light flares on a pogo hit
 @export var knockback := Vector2(150, -150)
 @export var invuln_time := 0.6
@@ -104,6 +105,9 @@ func _process(delta: float) -> void:
 	_sprite.scale = _sprite.scale.lerp(Vector2.ONE, clampf(12.0 * real, 0.0, 1.0))
 	_shake = move_toward(_shake, 0.0, 20.0 * real)
 	_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+	# Lead the view downward while falling; ease back when standing or rising.
+	var lead := look_ahead if velocity.y > 40.0 and not is_on_floor() else 0.0
+	_camera.position.y = move_toward(_camera.position.y, lead, 140.0 * real)
 
 
 func _tick_timers(delta: float) -> void:

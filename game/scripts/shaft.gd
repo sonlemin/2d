@@ -137,8 +137,10 @@ const LAYOUT: Array[String] = [
 @onready var _controls: Label = $Debug/Controls
 
 var _deepest := 0.0
+var _rim_material := _unshaded_material()
 
 const HUD_COLOR := Color(1, 0.823529, 0.478431)
+const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here"
 const ALERT_COLOR := Color(1, 0.35, 0.3)  ## top label turns red while any lurker is awake
 
 
@@ -187,6 +189,8 @@ func _build() -> void:
 			match row[x]:
 				"#":
 					_walls.set_cell(cell, 0, Vector2i.ZERO)
+					if y > 0 and LAYOUT[y - 1][x] != "#" and LAYOUT[y - 1][x] != "L":
+						_add_ledge_rim(x, y)
 				"P":
 					_player.position = Vector2(center.x, (y + 1) * TILE - 12)  # feet on the tile below (body bottom = +12)
 				"c", "h":
@@ -200,6 +204,17 @@ func _build() -> void:
 					var lurker: Lurker = LurkerScene.instantiate()
 					lurker.position = center
 					add_child(lurker)
+
+
+## A faint unshaded line on every floor surface, so places to land read even in the dark.
+func _add_ledge_rim(x: int, y: int) -> void:
+	var rim := ColorRect.new()
+	rim.material = _rim_material
+	rim.color = LEDGE_RIM
+	rim.position = Vector2(x * TILE, y * TILE)
+	rim.size = Vector2(TILE, 1)
+	rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(rim)
 
 
 func _is_wall(x: int, y: int) -> bool:
@@ -246,3 +261,9 @@ func _on_player_died() -> void:
 	await get_tree().create_timer(RESPAWN_DELAY, true, false, true).timeout
 	if get_tree().current_scene == self:  # test harnesses add the shaft by hand; don't reload there
 		get_tree().reload_current_scene()
+
+
+static func _unshaded_material() -> CanvasItemMaterial:
+	var m := CanvasItemMaterial.new()
+	m.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	return m
