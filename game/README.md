@@ -11,7 +11,7 @@ Open this folder in Godot 4.7 and press F5.
 | X on the ground | Slash sideways |
 | X in the air | **Pogo**: strike down, bounce off an enemy and add 1 to the chain |
 | C | Air dash (refilled by each pogo) |
-| Hold V | **Snuff**: go dark. Breaks the chain, and lurkers lose you |
+| Hold V | **Snuff** (hold about 0.2 s; a quick tap does nothing): go dark. Breaks the chain, and lurkers lose you |
 | F1 | Cycle brightness (4 levels) |
 | F2 | Show or hide the on-screen controls |
 

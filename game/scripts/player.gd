@@ -30,6 +30,7 @@ signal chain_changed(count: int)
 @export var light_kick := 18.0          ## px the light flares on a pogo hit
 @export var knockback := Vector2(150, -150)
 @export var invuln_time := 0.6
+@export var snuff_hold := 0.2          ## Light must be HELD this long to Snuff: a tap or brush never breaks the chain
 @export var light_lerp := 10.0          ## how fast the visible light eases to its target radius
 
 const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px
@@ -51,6 +52,7 @@ var _swing_hit := false                 ## a swing connects at most once for the
 var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
 var _shake := 0.0
+var _light_held := 0.0
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _light: PointLight2D = $Light
@@ -80,7 +82,7 @@ func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
 	_tick_timers(delta)
-	_handle_snuff()
+	_handle_snuff(delta)
 	_handle_horizontal(delta)
 	_handle_vertical(delta)
 	_handle_attack()
@@ -111,10 +113,12 @@ func _tick_timers(delta: float) -> void:
 	_sprite.visible = _invuln <= 0.0 or fmod(_invuln, 0.4) < 0.25  # 2.5 Hz blink stays under the 3 flashes/s cap
 
 
-func _handle_snuff() -> void:
-	var held := Input.is_action_pressed("light")
-	if held != chain.snuffed:
-		chain.set_snuffed(held)
+## Hold = Snuff (the design's tap on Light is reserved for Flare Toss, later).
+func _handle_snuff(delta: float) -> void:
+	_light_held = _light_held + delta if Input.is_action_pressed("light") else 0.0
+	var snuff := _light_held >= snuff_hold
+	if snuff != chain.snuffed:
+		chain.set_snuffed(snuff)
 
 
 func _handle_horizontal(delta: float) -> void:

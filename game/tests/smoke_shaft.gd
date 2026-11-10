@@ -40,6 +40,7 @@ func _run() -> void:
 	await test_bot_chains_long_run()
 	await test_lurker_telegraph_hunt_lose()
 	await test_lurker_kills()
+	await test_snuff_needs_hold()
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
 	quit(0 if _fail == 0 else 1)
 
@@ -63,6 +64,30 @@ func _hovers() -> Array:
 			out.append(e)
 	out.sort_custom(func(a, b): return a.position.y < b.position.y)
 	return out
+
+
+## A tap or brush of Light (V is next to Dash) must never break the chain; a real hold Snuffs.
+func test_snuff_needs_hold() -> void:
+	_shaft.queue_free()  # the lurker test left the player dead: use a fresh shaft
+	_shaft = ShaftScene.instantiate()
+	root.add_child(_shaft)
+	_player = _shaft.get_node("Player")
+	await frames(2)
+	place(_hovers()[0].global_position + Vector2(40, -60))
+	await frames(1)
+	for i in 5:
+		_player.chain.add_hit()
+	Input.action_press("light")
+	await frames(4)  # ~0.07 s: a misclick
+	Input.action_release("light")
+	await frames(1)
+	check(_player.chain.count == 5 and not _player.chain.snuffed, "tapping Light keeps the chain (got %d)" % _player.chain.count)
+	Input.action_press("light")
+	await frames(18)  # 0.3 s: a deliberate hold
+	check(_player.chain.snuffed and _player.chain.count == 0, "holding Light Snuffs and breaks the chain")
+	Input.action_release("light")
+	await frames(1)
+	check(not _player.chain.snuffed, "releasing Light ends the Snuff")
 
 
 func test_pogo_builds_chain() -> void:
