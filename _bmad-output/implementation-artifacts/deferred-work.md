@@ -17,3 +17,6 @@ Rule: add these one at a time, each as its own experiment, only after M1 answers
 - **Chain-bending upgrades** — power-ups per run that change chain rules
   (e.g., "survive one landing", "Snuff doesn't break the chain").
 - **More pogo directions** — diagonal pogo; pogo off spikes and lurker projectiles, not only crawlers.
+- **Wall-jump climbing (earned upgrade)** — M1 cling only slides down (a pause, not a route).
+  Climbing comes back later as an ability you find, gating areas in Metroidvania style
+  (Pillar 3: progress by skills, not XP). Variant to test: climbing costs chain links.
