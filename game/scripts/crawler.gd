@@ -20,8 +20,12 @@ var _home := Vector2.ZERO
 func _ready() -> void:
 	add_to_group("enemy")
 	_home = position
-	# Desync hoverers by position, not randomness: the abyss is hand-built and must play the same every time.
-	_t = fposmod(position.x * 0.37 + position.y * 0.11, hover_period)
+	reset_phase()
+
+
+## Desync hoverers by position, not randomness: the abyss is hand-built and must play the same every time.
+func reset_phase() -> void:
+	_t = fposmod(_home.x * 0.37 + _home.y * 0.11, hover_period)
 
 
 func _physics_process(delta: float) -> void:

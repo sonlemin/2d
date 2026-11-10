@@ -22,6 +22,7 @@ const BLOOM_GAIN := 0.18         ## scale per sqrt(link)
 
 var count: int = 0
 var snuffed: bool = false
+var clinging: bool = false       ## wall cling: chain paused and hidden (base light), not broken
 var held: int = 0                ## embers riding on the current chain, not yet safe
 
 
@@ -74,10 +75,17 @@ func set_snuffed(value: bool) -> void:
 		break_chain()
 
 
+## Wall cling pauses the chain: the count and held embers stay, the light drops to base.
+func set_clinging(value: bool) -> void:
+	clinging = value
+
+
 ## Chain-Light radius in px. Diminishing returns: early links matter most.
 func light_radius() -> float:
 	if snuffed:
 		return SNUFF_RADIUS
+	if clinging:
+		return BASE_RADIUS  # pressed to the wall, the chain-light is shielded: lurkers lose you
 	return radius_for(count)
 
 

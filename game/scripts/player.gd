@@ -20,6 +20,10 @@ signal chain_changed(count: int)
 @export var jump_buffer := 0.10
 @export var dash_speed := 260.0
 @export var dash_time := 0.12
+@export var cling_time := 1.0           ## chain grace per chain while clinging (refilled by a pogo), then it breaks
+@export var cling_slide := 18.0         ## px/s slow slide while clinging
+@export var wall_kick := Vector2(150, -260)  ## release Jump while clinging = kick off the wall
+@export var kick_lock := 0.15           ## s of no steering after a kick, so it actually carries you away
 # --- Combat tuning ---
 @export var pogo_velocity := -300.0      ## apex ~50 px: hang time to steer to the next target (was -260)
 @export var swing_active := 0.12
@@ -54,6 +58,10 @@ var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
 var _shake := 0.0
 var _light_held := 0.0
+var _clinging := false
+var _cling_side := 0
+var _cling_left := 0.0
+var _kick_left := 0.0
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _light: PointLight2D = $Light
@@ -70,6 +78,7 @@ func _ready() -> void:
 	_hurtbox.area_entered.connect(_on_hurt_area)
 	_set_swing_visible(false)
 	_apply_bloom()
+	_cling_left = cling_time
 
 
 func _exit_tree() -> void:
@@ -85,11 +94,14 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_timers(delta)
 	_handle_snuff(delta)
-	_handle_horizontal(delta)
-	_handle_vertical(delta)
-	_handle_attack()
+	if not _handle_cling(delta):
+		_handle_horizontal(delta)
+		_handle_vertical(delta)
+		_handle_attack()
 	move_and_slide()
 	if is_on_floor():
+		_end_cling()
+		_cling_left = cling_time
 		_coyote = coyote_time
 		_can_dash = true
 		_jumping = false
@@ -126,6 +138,50 @@ func _handle_snuff(delta: float) -> void:
 		chain.set_snuffed(snuff)
 
 
+## Wall cling (hold Jump at a wall while falling): the chain pauses and its light hides.
+## Release Jump = kick off the wall; Down = drop. Grace runs out -> the chain breaks (banks).
+## Returns true while clinging (normal movement is skipped).
+func _handle_cling(delta: float) -> bool:
+	if not _clinging:
+		if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not Input.is_action_pressed("jump"):
+			return false
+		_cling_side = _wall_side()
+		if _cling_side == 0:
+			return false
+		_clinging = true
+		chain.set_clinging(true)
+	if not Input.is_action_pressed("jump"):
+		_end_cling()
+		velocity = Vector2(-_cling_side * wall_kick.x, wall_kick.y)
+		_facing = -_cling_side
+		_sprite.flip_h = _facing < 0
+		_kick_left = kick_lock
+		_jumping = false
+		return true
+	if Input.is_action_pressed("move_down") or _wall_side() != _cling_side:
+		_end_cling()
+		return false
+	_cling_left -= delta
+	if _cling_left <= 0.0:
+		chain.break_chain()  # grace is over: the chain ends safely, embers bank
+	velocity = Vector2(0.0, cling_slide)
+	return true
+
+
+func _end_cling() -> void:
+	if _clinging:
+		_clinging = false
+		chain.set_clinging(false)
+
+
+## Which side (-1 left, 1 right) has a wall right next to the body, or 0.
+func _wall_side() -> int:
+	for side in [_facing, -_facing]:
+		if test_move(global_transform, Vector2(side * 2.0, 0.0)):
+			return side
+	return 0
+
+
 func _handle_horizontal(delta: float) -> void:
 	var dir := Input.get_axis("move_left", "move_right")
 	if dir != 0.0:
@@ -144,6 +200,9 @@ func _handle_horizontal(delta: float) -> void:
 		velocity = Vector2(dash_speed * _dash_dir, 0.0)
 		return
 	var accel := run_accel if is_on_floor() else air_accel
+	if _kick_left > 0.0:
+		_kick_left -= delta
+		return
 	velocity.x = move_toward(velocity.x, dir * run_speed, accel * delta)
 
 
@@ -196,6 +255,7 @@ func _on_pogo_hit() -> void:
 	_jumping = false
 	_dash_left = 0.0
 	_can_dash = true  # pogo refreshes the air dash: keeps the chain steerable
+	_cling_left = cling_time
 	chain.add_hit()
 	_shown_radius += light_kick
 	_shake = shake
@@ -255,6 +315,7 @@ func _check_contact() -> void:
 
 
 func _take_knockback(body: Node2D) -> void:
+	_end_cling()
 	_invuln = invuln_time
 	_jumping = false
 	var away := signf(global_position.x - body.global_position.x)
@@ -273,6 +334,7 @@ func die() -> void:
 	if is_dead:
 		return
 	is_dead = true
+	_end_cling()
 	Engine.time_scale = 1.0
 	var lost := chain.lose()  # unbanked embers die with you
 	if lost > 0:

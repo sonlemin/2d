@@ -20,6 +20,7 @@ func _init() -> void:
 		"test_curves_monotonic",
 		"test_changed_signal",
 		"test_embers_held_banked_lost",
+		"test_cling_pauses_and_hides",
 	]:
 		call(t)
 	if _failures == 0:
@@ -139,3 +140,16 @@ func test_embers_held_banked_lost() -> void:
 	var h0: int = c.held
 	c.add_hit()
 	check(c.held > h0, "hits at the chain cap still pay embers")
+
+
+## Wall cling: the chain and held embers survive, but the light drops to base (lurkers lose you).
+func test_cling_pauses_and_hides() -> void:
+	var c = ChainStateScript.new()
+	for i in 6:
+		c.add_hit()
+	var held: int = c.held
+	c.set_clinging(true)
+	check(c.count == 6 and c.held == held, "clinging keeps the chain and the held embers")
+	check(is_equal_approx(c.light_radius(), ChainStateScript.BASE_RADIUS), "clinging drops the light to base")
+	c.set_clinging(false)
+	check(is_equal_approx(c.light_radius(), ChainStateScript.radius_for(6)), "letting go restores the chain-light")

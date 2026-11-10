@@ -37,6 +37,7 @@ func _run() -> void:
 	await test_pogo_builds_chain()
 	await test_landing_breaks_chain()
 	await test_jump_height()
+	await test_wall_cling()
 	await test_bot_chains_long_run()
 	await test_lurker_telegraph_hunt_lose()
 	await test_snuff_escape_point_blank()
@@ -89,6 +90,31 @@ func test_snuff_needs_hold() -> void:
 	Input.action_release("light")
 	await frames(1)
 	check(not _player.chain.snuffed, "releasing Light ends the Snuff")
+
+
+## Wall cling: hold Jump at a wall while falling -> chain paused + hidden; grace ends -> banks;
+## releasing Jump kicks you away from the wall.
+func test_wall_cling() -> void:
+	var y: float = _hovers()[2].global_position.y
+	place(Vector2(2 * 16 + 5.5, y))  # body (10 px wide) touching the left wall, mid-air
+	_player._cling_left = _player.cling_time
+	for i in 6:
+		_player.chain.add_hit()
+	var held: int = _player.chain.held
+	Input.action_press("move_left")
+	await frames(2)
+	Input.action_release("move_left")
+	Input.action_press("jump")
+	await seconds(0.4)
+	check(_player._clinging, "holding Jump at a wall while falling clings")
+	check(_player.chain.count == 6 and _player.chain.held == held, "cling keeps the chain (got %d)" % _player.chain.count)
+	check(is_equal_approx(_player.light_radius(), ChainState.BASE_RADIUS), "cling hides the chain-light")
+	await seconds(0.8)
+	check(_player.chain.count == 0 and _player.chain.held == 0, "grace runs out -> the chain breaks (banks)")
+	Input.action_release("jump")
+	await frames(2)
+	check(not _player._clinging and _player.velocity.x > 0.0, "releasing Jump kicks off the wall")
+	await seconds(0.3)
 
 
 func test_pogo_builds_chain() -> void:
@@ -153,9 +179,13 @@ func test_bot_chains_long_run() -> void:
 	var run := _hovers().filter(func(h): return h.position.y > 44 * 16 and h.position.y < 84 * 16)
 	set_lurkers_active(false)
 	_player.chain.break_chain()
+	for h in run:
+		h.reset_phase()  # same drift every run, whatever ran before (test order must not matter)
+	await frames(1)
 	place(run[0].global_position + Vector2(0, -48))
 	var best := 0
 	var swung_for: Node2D = null
+	var last_row_y := -INF  # the hit crawler is freed, so remember its row as a number
 	var i_end := 0
 	for i in 600:
 		i_end = i
@@ -163,8 +193,10 @@ func test_bot_chains_long_run() -> void:
 			break
 		# Like a player: aim for the nearest target below (rows now offer a left/right choice).
 		var next: Node2D = null
+		# ...in a row below the one just pogoed (not its partner in the same row).
+		var floor_y := maxf(_player.global_position.y + 4, last_row_y + 8)
 		for h in run:
-			if not is_instance_valid(h) or h.global_position.y <= _player.global_position.y + 4:
+			if not is_instance_valid(h) or h.global_position.y <= floor_y:
 				continue
 			if next == null or h.global_position.distance_to(_player.global_position) < next.global_position.distance_to(_player.global_position):
 				next = h
@@ -178,6 +210,7 @@ func test_bot_chains_long_run() -> void:
 		var dy := next.global_position.y - _player.global_position.y
 		if dy < 28 and absf(dx) < 12 and _player.velocity.y > 0 and swung_for != next:
 			swung_for = next
+			last_row_y = next.global_position.y
 			Input.action_press("attack")
 			await frames(1)
 			Input.action_release("attack")

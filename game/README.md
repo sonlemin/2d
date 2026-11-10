@@ -8,6 +8,7 @@ Open this folder in Godot 4.7 and press F5.
 |---|---|
 | ← → | Move |
 | Z or ↑ | Jump (hold for a higher jump) |
+| Hold Z/↑ at a wall (falling) | **Wall cling**: the chain pauses and your light drops to normal, so lurkers lose you. You get 1 s per chain (refilled by a pogo), then the chain ends and your embers bank. **Release** to kick off the wall; **↓** to drop |
 | X on the ground | Slash sideways |
 | X in the air | **Pogo**: strike down, bounce off an enemy and add 1 to the chain |
 | C | Air dash (refilled by each pogo) |
