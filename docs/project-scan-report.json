@@ -1,0 +1,137 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-11-11T16:38:07+07:00",
+    "last_updated": "2026-11-11T16:55:30+07:00",
+    "completed": "2026-11-11T16:55:30+07:00"
+  },
+  "mode": "initial_scan",
+  "scan_level": "exhaustive",
+  "project_root": "/home/sonlm/project/pixel_art_game",
+  "output_folder": "/home/sonlm/project/pixel_art_game/docs",
+  "completed_steps": [
+    {
+      "step": "step_1",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:03+07:00",
+      "summary": "Classified as monolith with 1 part (game, Godot 4.7)"
+    },
+    {
+      "step": "step_2",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:03+07:00",
+      "summary": "Found 13 existing docs (game/README.md + 12 _bmad-output artifacts); user focus: as-built + M2 gaps"
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:03+07:00",
+      "summary": "Tech stack: Godot 4.7 / GDScript / GL Compatibility; Python+Pillow sprite pipeline"
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:03+07:00",
+      "summary": "Exhaustive scan: 31 files in 6 batches; state mgmt = ChainState + shaft statics; asset inventory 7 PNGs; no API/data/CI/deploy/i18n"
+    },
+    {
+      "step": "step_5",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:35+07:00",
+      "summary": "Source tree with 6 critical folders written"
+    },
+    {
+      "step": "step_6",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:40:35+07:00",
+      "summary": "Dev setup gathered (Godot 4.7, run_tests.sh, build_sprites.py); no deployment/CI/contribution config found; step 7 skipped (single part)"
+    },
+    {
+      "step": "step_8",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:42:24+07:00",
+      "summary": "Architecture written for 1 part (as-built + M2 gap table)"
+    },
+    {
+      "step": "step_9",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:43:22+07:00",
+      "summary": "Supporting docs written: project-overview, component-inventory, development-guide"
+    },
+    {
+      "step": "step_10",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:43:22+07:00",
+      "summary": "Master index generated; 0 incomplete markers; all relative links resolve"
+    },
+    {
+      "step": "step_11",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:55:30+07:00",
+      "summary": "Validation and review complete; user chose finalize (no commit)"
+    },
+    {
+      "step": "step_12",
+      "status": "completed",
+      "timestamp": "2026-11-11T16:55:30+07:00",
+      "summary": "Workflow complete"
+    }
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": "monolith, 1 part (game/ Godot 4.7 project; tools/ sprite pipeline documented as asset pipeline)",
+    "existing_docs": "game/README.md + 12 planning/implementation artifacts under _bmad-output/ (brief, research, GDD v1.0, epics, UX DESIGN/EXPERIENCE, M1 spec, playtest findings, deferred-work)",
+    "user_context": "Focus: as-built M1 code plus gaps vs GDD/UX M2 targets (input for owed architecture notes)",
+    "technology_stack": "Godot 4.7, GDScript, GL Compatibility renderer, 480x270 viewport integer-scaled; Python 3 + Pillow for sprites; no addons, no autoloads, no CI, no export presets",
+    "batches_completed": [
+      {
+        "path": "game/ (config)",
+        "files_scanned": 3,
+        "summary": "project.godot (8 input actions, 4 physics layers, pixel snap), README, run_tests.sh"
+      },
+      {
+        "path": "game/scripts",
+        "files_scanned": 6,
+        "summary": "ChainState (pure logic), Player, Shaft (ASCII level + session statics + debug HUD), Crawler, Lurker (4-state FSM), Fx (static juice)"
+      },
+      {
+        "path": "game/scenes",
+        "files_scanned": 4,
+        "summary": "shaft.tscn main scene; player, crawler, lurker prefabs"
+      },
+      {
+        "path": "game/tests",
+        "files_scanned": 3,
+        "summary": "10 unit tests on ChainState, 9-test headless smoke on the real shaft, screenshot tool (needs xvfb)"
+      },
+      {
+        "path": "game/art",
+        "files_scanned": 7,
+        "summary": "7 generated PNGs (16x16..128x128); never hand-edited"
+      },
+      {
+        "path": "tools",
+        "files_scanned": 8,
+        "summary": "build_sprites.py + 6 text grids + Edge of the Abyss palette"
+      }
+    ],
+    "verification": "run_tests.sh ALL GREEN on 2026-11-11 (unit ALL PASS; smoke 28 ok, bot best chain 8)"
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "source-tree-analysis.md",
+    "architecture.md",
+    "project-overview.md",
+    "component-inventory.md",
+    "development-guide.md",
+    "index.md"
+  ],
+  "resume_instructions": "Resume at completed",
+  "project_types": [
+    {
+      "part_id": "game",
+      "project_type_id": "game",
+      "display_name": "Godot 4.7 game (GDScript) + Python sprite pipeline"
+    }
+  ]
+}
