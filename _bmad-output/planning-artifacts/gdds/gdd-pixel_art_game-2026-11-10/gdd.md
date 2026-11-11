@@ -745,7 +745,7 @@ Solo project, so these come from playtest notes, not telemetry. For the M2 share
 - Layers 2–7, apart from the Weaver's landing arena; bosses 2–7.
 - Masks (max HP), Mentor techniques, abilities other than Swing.
 - Lift Station repairs (start in Layer 2), Docks, Gallery and the other hub NPCs.
-- The lurker parry, phase dash, cashing in chain, more pogo directions, climbing as an upgrade (ideas list).
+- The lurker parry, phase dash, cashing in chain, more pogo directions, climbing as an upgrade (ideas list, `deferred-work.md`). Reviewed at the M2 retrospective, before the Layer 2 GDD update; at most one per layer milestone, each its own experiment. Per-run "chain-bending upgrades" are absorbed by Smith gear and the parked Dive Boons.
 - A leaderboard, Steam Cloud saves (only if Steam is chosen in E7).
 
 **Parked** (full-vision tier only): Roaming Ecology, The Abyss Breathes, Crafting, Food Chain, Dive Boons.

@@ -563,7 +563,7 @@ None (O1 decided 2026-11-11).
 - O11. [OPEN] Extra cue at chain cap (E7).
 - O12. [OPEN] Large HUD ember display above 4 digits; text scale layout for menus, speech and journal (E7).
 - O14. [OPEN] Hearing: mono audio and separate sliders (E3); the full list of visual sound cues (E7).
-- O15. [OPEN] An accessibility persona or test pass (colour-blind sim, sound off, ×2).
+- O15. [OPEN] An accessibility persona or test pass (colour-blind sim, sound off, ×2) (E7).
 - O18. [OPEN] Tab widths and CJK glyph size for later localisation.
-- O19. [OPEN] Title logo art.
+- O19. [OPEN] Title logo art (E7; E1 uses a text placeholder).
 - O20. [OPEN] If Snuff gains a cost (GDD Risks), the HUD must show it.

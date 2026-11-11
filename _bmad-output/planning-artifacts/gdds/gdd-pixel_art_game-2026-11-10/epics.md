@@ -244,6 +244,8 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - **Composed music stems** for Layer 1, the hub and the Weaver.
 - **Performance:** check 60 FPS (see Tech Specs).
 - **Steam Deck test pass:** ×2 scaling, HUD readability, battery. (The Deck-size font check was done in E1.)
+- **Accessibility test pass** (UX O15): colour-blind simulation, sound off, ×2.
+- **Title logo art** (UX O19); E1 ships a text placeholder.
 - **Builds:** web and desktop (Windows and Linux).
 - **Playtest round** with about 5 testers against the Success Metrics.
 - **The Steam vs itch.io decision.**

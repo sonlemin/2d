@@ -219,3 +219,10 @@ Source: `_bmad-output/narrative-design.md` (gds-create-narrative, complete), Pro
 - **Amber rule clarified:** lit ember lanterns only in the hub and on anchors; layer lamps dead or cold; creature sparks turn amber as they fade.
 - **Epics:** E1 death lines follow the narrative voice; E4 adds the Memorial name list, `anchor_s4_oda` and story flags; E5 adds a UX update first, Oda's house and opening, story text, flag registry and text validators, and grows **M → L**; E6 adds the partner tag, defeat presentation and the M2 closing beat.
 - **Status:** stays `final`; `updated: 2026-11-12`.
+
+## 2026-11-12 — Owners for deferred work
+
+- **Mechanic ideas list** (parry, phase dash, cash in chain, pogo directions, climbing): owner is the M2 retrospective, before the Layer 2 GDD update. Out of Scope updated. The ledger's "parry: top candidate for M2" corrected to "after M2".
+- **Chain-bending upgrades:** closed, absorbed by always-on Smith gear and the parked Dive Boons.
+- **Death line and HUD polish:** marked as owned by E1 in the ledger.
+- **UX O15 accessibility pass and O19 title logo:** added to E7.
