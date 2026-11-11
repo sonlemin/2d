@@ -12,6 +12,7 @@ inputs:
   - _bmad-output/planning-artifacts/research/domain-indie-pixel-art-pogo-descent-platformer-research-2026-11-07.md
   - _bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md
+  - _bmad-output/narrative-design.md
 ---
 
 # The Unbroken Chain - Game Design Document
@@ -261,7 +262,7 @@ Keyboard and gamepad, both from M2. Every action is a single button (no chords).
 | **S1 The Lip** | 0–3 | run, jump, slash, first pogo over safety nets; landing banks embers | ◆ **Lip Station** (lift to the hub); no lurkers |
 | **S2 Scaffold Drop** | 4–9 | first lurker, with its eyes opening right above a ledge (the cash-out lesson); **wall cling** in a narrow stretch with no ledges; **Flare Toss** taught in a lurker pocket | branch to **[A] Rope Works**; ⟡ 1 Swing secret |
 | **S3 The Lantern Door** | 10–12 | **chain gate 1 (≥ 4 links)** on the main path; a row of hoverers above it teaches the run-up | |
-| **S4 Explorers' Grave** | 13–18 | lurker rooms that test Flare Toss and cling under pressure | branches to **[B] Old Mine** and **[C] Sky Ledge** |
+| **S4 Explorers' Grave** | 13–18 | lurker rooms that test Flare Toss and cling under pressure; ***The Last Entry***: Oda's camp, whose cold lantern is a lantern anchor you relight | branches to **[B] Old Mine** and **[C] Sky Ledge** |
 | **S5 Weaver's Hollow** | 19–22 | the restraint lesson begins: the Weaver is heard and glimpsed before the arena | ◆ **Hollow Station** before the arena; ☠ **Weaver** |
 | **Layer 2 landing arena** | 1 | Weaver phase 2 under the Bright Moon sky | ◆ broken station, repaired free on victory |
 
@@ -292,7 +293,7 @@ Keyboard and gamepad, both from M2. Every action is a single button (no chords).
 A small walkable village around the mouth of the pit. It is **2 screens wide**, on flat ground with no platforming, enemies or chain. It is where you come home, deposit, shop and read the story. Daylight and a warm palette set it against the dark below.
 
 ```
-[Smith]  [Cartographer]   (LIFT)   [Naturalist]  [Guild + Memorial Wall]
+[Smith]  [Cartographer]   (LIFT)   [Naturalist]  [Guild + Memorial Wall]  [Oda's house]
 ==========================================================================
                                pit below
 ```
@@ -301,9 +302,10 @@ A small walkable village around the mouth of the pit. It is **2 screens wide**, 
 |---|---|---|
 | **Cartographer** | maps and hints | Layer 1 map (60); 3 hints (25 each) that point to a side area, gate 2 and a Swing secret |
 | **Smith** | gear that **bends a rule** (always on; no slots or charms) | **Quick Wick:** instant Snuff. The light starts dimming the moment Light is pressed; if Light is released inside the tap window, the press becomes a Flare Toss as usual. The tap window itself does not change (200). **Long Wick:** flare burns 4 → 6 s (250). **Steady Grip:** cling slide 18 → 10 px/s (300). Silk Grip (+0.25 s cling grace) is found in a Swing secret, not sold |
-| **Naturalist** | reads journal entries | pays **10 embers per new entry**; sells 2 cosmetic palettes (75, 150) |
-| **Guild + Memorial Wall** | records and story, no shop | records: deepest depth, best chain, most embers banked in one chain, deaths. The Memorial Wall lists lost explorers' names; the Layer 1 Memorial clue adds the first name tied to the Last Explorer |
+| **Naturalist** | reads journal entries | **copies** each new entry and pays **10 embers** for the copy (originals stay with you); sells 2 cosmetic palettes (75, 150) |
+| **Guild + Memorial Wall** | records and story, no shop | records: deepest depth, best chain, most embers banked in one chain, deaths. The Memorial Wall lists lost explorers' names, Oda Vell (the Last Explorer) among them; the Layer 1 Memorial clue (a Swing secret, E6) is the Guild tag of **Oda's dive partner**, which adds the partner's name to the Wall (narrative, 2026-11-12) |
 
+- **Oda's house** (narrative, 2026-11-12): a small interior beside the Guild where Glim lives — bed, Oda's empty chair, her gear wall, where found pages of her journal are pinned as flag-gated props. Props and lines only; **not** a save or rest point. A new game opens here (from E5; until the hub exists, New Game starts in S1).
 - **The lift** links the hub to every repaired Lift Station (fast travel).
 - **Arrival:** arriving home **deposits all carried embers** and heals you fully.
 
@@ -315,7 +317,7 @@ A small walkable village around the mouth of the pit. It is **2 screens wide**, 
   - **deposits** carried embers (safe forever);
   - opens the fast-travel menu (hub and repaired stations);
   - **respawns the layer's enemies**, so you get chain fuel back but the threats return too.
-- **Leaving by lift:** riding a lift up plays **The Watching Departure**, where creatures of the layer gather at the edge of your light to watch you go (brainstorm).
+- **Leaving by lift:** riding a lift up plays **The Watching Departure**, where creatures gather at the edge of your light to watch you go (brainstorm). The ride up has a **fixed duration** that covers the full gathering, so it never adds time. The full gathering plays once per station layer, and only after you have met a lurker; later rides show a few eyes. Fast travel down or sideways has none (narrative, 2026-11-12).
 - **Interact key:** ↓ while standing still on the ground also talks to NPCs and reads journal objects. ↑ stays Jump.
 
 ### Ability-Gating System
@@ -412,6 +414,7 @@ Pillar 3: progress through skills and chain mastery, never XP.
   - It drops **Weaver Silk** (Swing unlocked).
   - A broken **Lift Station** in the landing arena is repaired for free and returns you to the hub.
   - The way down into Layer 2 stays sealed in M2.
+  - **Presentation** (narrative, 2026-11-12): the defeat reads as a win first (slow-mo, a burst of light, the station repairing); then, as a coda, the Weaver dims and withdraws downward into the dark in sparks. Bosses are never shown dying.
 
 **Death:** you respawn at the Lift Station before the arena, with full HP and the fight reset. If you died in phase 2, the fight resumes from **phase 2** in the landing arena, so you never replay a phase you've beaten.
 
@@ -553,7 +556,7 @@ Three tracks, none of them XP (Pillar 3):
 
 | Colour | Hex | Means | Rule |
 |---|---|---|---|
-| **Chain-light amber** | `#ffd27a` | *you*: light, embers, the flare, chain popups; in menus, the selection cursor (menu light is your lantern, UX 2026-11-10) | never used for anything else |
+| **Chain-light amber** | `#ffd27a` | *you*: light, embers, the flare, chain popups; in menus, the selection cursor (menu light is your lantern, UX 2026-11-10). In-world, ember lanterns burn amber only in the hub and on lantern anchors; old lamps in the layers are dead or a cold tint. Hit creatures burst into sparks in their own tint that turn amber as they fade (narrative, 2026-11-12) | never used for anything else |
 | **Predator red** | `#d9473f` | *danger that hunts by light*: lurker eyes, telegraphs, the HUD alert frame and eye | never used for anything else |
 
 - **Colour-blind safety:** every telegraph also has a shape and motion cue (eyes opening, a pulse, a shiver) and a sound. Colour is never the only signal.
@@ -625,7 +628,7 @@ Three tracks, none of them XP (Pillar 3):
 
 **Tone:** the mood of layered-abyss adventure fiction: wonder, melancholy, danger at the edge of the light. **The world, creatures and story are original.** No names, creatures, places or plot beats are borrowed from any existing work.
 
-**Three reveals at most** (brief): *origin, theft, cycle*. They land across the 7 layers. Layer 1 holds only **deniable early clues**: 2–3 hints spread across journal text, NPC lines and the Memorial clue (brainstorm #103, #112: "deniable early, undeniable deep").
+**Three reveals at most** (brief): *origin, theft, cycle*. They land across the 7 layers. Layer 1 holds only **deniable early clues**: exactly three pointed clues in M2 — Old Tessaly's First Dive line, The Watching Departure, and Tessaly's "luck" line after the Weaver (brainstorm #103, #112: "deniable early, undeniable deep"; narrative, 2026-11-12).
 
 **How the story is told:**
 - mostly through the environment, the journal and the Memorial Wall;
@@ -635,12 +638,15 @@ Three tracks, none of them XP (Pillar 3):
 - **The Anchor** (brainstorm #111): a lantern binds your spark to the island, and death snaps you back to it. This is why lantern anchors and Lift Stations respawn you.
 - **The Last Explorer** holds the island's all-time depth record, shown on the Guild board as the target to beat (#108).
 - **Creatures** are hungry, not hateful: predators crave your light, they do not hate you (#109).
+- **Embers** are scraps of the abyss's light: the island's coin and its fuel (lanterns, lift winches). Every pogo hit takes light from a creature — *you take too*. Depositing is, in-world, feeding the island.
+
+**Cast (narrative, 2026-11-12):** **Glim**, the silent protagonist (never gendered); **Oda Vell** (she/her), the Last Explorer, who raised Glim; **Old Tessaly** (he/him), the Guild keeper.
 
 **Ending:** *The Final Chain*, a playable, unbroken descent with your light at full strength.
 
-**Layer 1 set-piece, *The Last Entry* (#56):** in S4 Explorers' Grave, a lost explorer's camp and a half-written journal ("going deeper"). It also counts as a journal entry.
+**Layer 1 set-piece, *The Last Entry* (#56):** in S4 Explorers' Grave, Oda's unsigned camp and a half-written journal ("going deeper"). Her cold lantern is a lantern anchor you relight. It also counts as a journal entry.
 
-[NOTE FOR DESIGNER: details (reveal placement, NPC lines, the Last Explorer's presence in the hub) are for the recommended `gds-create-narrative` pass after this GDD.]
+**Narrative design:** `_bmad-output/narrative-design.md` (complete 2026-11-12) holds the full arc, reveal placement, characters, world, dialogue rules, the M2 clue budget, story flags and the content-by-epic map. It is the source of truth for all story text. No NPC or death-card lines are written until sonlm approves 3 voice-anchor lines per speaker.
 
 ---
 
@@ -698,7 +704,7 @@ Three tracks, none of them XP (Pillar 3):
 | E2 | Weaver prototype | a rough Weaver fight in a test arena | Is the restraint fight (dark → herd → strike) fun? | M |
 | E3 | Audio | the shaft with SFX and chain-reactive music | Does sound make the pogo feel great and telegraphs readable? | M |
 | E4 | Layer 1 world | Layer 1 from the Lip to the Weaver's door | Do players learn each move, and want gates and side areas? | L |
-| E5 | Hub | dive → home → spend | Do the three ember stages and the shops make diving home feel worth it? | M |
+| E5 | Hub | dive → home → spend | Do the three ember stages and the shops make diving home feel worth it? | L |
 | E6 | Weaver final | the complete slice | Does the Weaver teach restraint? Does Swing make backtracking rewarding? | L |
 | E7 | Slice polish and ship | the first shared build (web plus desktop) | Pillar metrics (see Success Metrics) with about 5 testers | M |
 
@@ -728,6 +734,7 @@ Solo project, so these come from playtest notes, not telemetry. For the M2 share
 | 2. Every death teaches | testers can name what killed them and how to avoid it | ≥ 80% of deaths |
 | 3. Knowledge is power | testers open gate 2 or buy a map or hint | 3 of 5 testers |
 | 4. Few buttons | testers use Flare Toss and cling unprompted after S2 | 4 of 5 testers |
+| Story clues (deniable early) | asked "Where do you think Glim comes from?": some suspect the abyss, none are certain | ≥ 1 suspects, 0 certain |
 | Weaver | wins within 8 attempts; testers describe it as "about restraint" without being told | 4 of 5 testers |
 
 ---

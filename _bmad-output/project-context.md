@@ -69,6 +69,7 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 - **Sprites:** source is `tools/sprites/*.txt` + `palette_edge.txt`; `game/art/*.png` is build output. Never hand-edit or hand-create PNGs: edit the grid, run `python3 tools/build_sprites.py`, re-import. `L` (#ffd27a) is constant across palettes. **If a pipeline doesn't support an asset type, stop and ask.**
 - **Commit `.gd.uid` and `.import` files** with their sources; move scripts with `git mv`, then re-import and re-save moved scenes.
 - **Design source of truth:** GDD v1.0 + UX `DESIGN.md`/`EXPERIENCE.md` (`_bmad-output/planning-artifacts/`) + this architecture. M1 playtest findings supersede the brief on controls, cling and embers.
+- **Story text** (NPC lines, documents, death lines, Memorial names) follows `_bmad-output/narrative-design.md`: island dialect in word choice, never phonetic spelling; Glim is never gendered; Layer 1 has exactly three pointed clues. **No line is written until sonlm has approved 3 voice-anchor lines for that speaker.** Story flag ids live in one registry in `rules/` and are save data (never renamed).
 
 ### Testing Rules
 
@@ -120,4 +121,4 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 - Keep it lean: only rules agents would otherwise get wrong.
 - Update it when the architecture or the stack changes; remove rules that become obvious or obsolete.
 
-Last Updated: 2026-11-11
+Last Updated: 2026-11-12

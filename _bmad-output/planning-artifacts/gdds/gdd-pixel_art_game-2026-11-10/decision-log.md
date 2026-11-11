@@ -203,3 +203,19 @@ Source: `_bmad-output/game-architecture.md`, Validation → Follow-ups.
 - **Spine width wording:** "22 tiles of open space" → "22 tiles wall to wall, side walls included". Updated: Level Types, the gutter framing note, epics E1 and E4.
 - **Open questions:** added a cap on simultaneous flares (E1 perf scene + playtest); the bloom question records the architecture's answer and moves to the E1 perf scene.
 - **Status:** stays `final`; `updated: 2026-11-12`.
+
+## 2026-11-12 — Narrative design follow-ups
+
+Source: `_bmad-output/narrative-design.md` (gds-create-narrative, complete), Production Planning → changes required.
+
+- **Cast and lore:** Glim, Oda Vell, Old Tessaly; embers are the abyss's light (coin and fuel); "you take too". Added to Narrative and Tone, which now points to the narrative doc (the designer note is resolved).
+- **Clue budget:** Layer 1 has exactly three pointed clues (Tessaly First Dive, The Watching Departure, Tessaly after the Weaver). Updated Narrative and Tone; added a story-clue row to Gameplay Metrics.
+- **Hub:** Oda's house added (interior beside the Guild; not a save point); new games open there from E5.
+- **Memorial clue changed:** it is now the Guild tag of Oda's dive partner, not "the first name tied to the Last Explorer" (Oda is known from the start). **Changes** the Guild row and E6.
+- **The Last Entry** is Oda's unsigned camp; her cold lantern is a lantern anchor (S4 row, E4).
+- **Naturalist** copies entries and pays for the copy.
+- **Lift ride up:** fixed duration; full Watching Departure once per station layer after meeting a lurker.
+- **Boss defeat:** win first, then a dim-and-withdraw coda; bosses are never shown dying.
+- **Amber rule clarified:** lit ember lanterns only in the hub and on anchors; layer lamps dead or cold; creature sparks turn amber as they fade.
+- **Epics:** E1 death lines follow the narrative voice; E4 adds the Memorial name list, `anchor_s4_oda` and story flags; E5 adds a UX update first, Oda's house and opening, story text, flag registry and text validators, and grows **M → L**; E6 adds the partner tag, defeat presentation and the M2 closing beat.
+- **Status:** stays `final`; `updated: 2026-11-12`.

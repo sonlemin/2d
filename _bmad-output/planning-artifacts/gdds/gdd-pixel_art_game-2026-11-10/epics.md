@@ -24,7 +24,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - **Options (small, from the Pause menu):** Game tab (difficulty) and Accessibility tab (reduce flashing, screen shake, reduced motion with the OS default on web, Light tap window 0.12 / 0.2 / 0.3 s, hold→press toggles for Cling and Snuff; with the Snuff toggle On, Light is Flare Toss only and Snuff moves to Shift / pad LB as a press-toggle).
 - **Web:** 960×540 (×2) itch embed.
 - **Flash safety from day one:** the ≤ 3 flashes/s cap is checked for every effect, and the "reduce flashing" toggle ships in E1.
-- **Field Journal death line:** one line on death naming what killed you and how to avoid it (Pillar 2; deferred from M1).
+- **Field Journal death line:** one line on death naming what killed you and how to avoid it (Pillar 2; deferred from M1). Written in the narrative voice after sonlm approves the death-card voice anchors (`narrative-design.md` → Dialogue Framework); island idiom may colour the cause, the avoidance is always plain.
 
 **Out:** the Weaver; audio; new art; Swing.
 
@@ -126,9 +126,11 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - **Lift Stations:** Lip and Hollow (real ones). About 5 lantern anchors.
 - **Palette shift:** dusk → umber → violet. Ledge rims.
 - **Map:** fills as you explore.
-- **Journal objects:** 3 entries (A ×2, B), plus *The Last Entry* set-piece in S4. The Memorial clue arrives with the Swing secrets in E6.
+- **Journal objects:** 3 entries (A ×2, B) by the island's lost, plus *The Last Entry* in S4: Oda's camp, whose cold lantern is the anchor `anchor_s4_oda`. Write the **Memorial Wall name list** here, with the documents, so names match (E5 displays it). Reading a document pauses play. The Memorial clue arrives with the Swing secrets in E6.
+- **Story flags from E4 builds on:** `last_entry_read`, `lurker_met` (saves carry them until the hub shows their payoff).
+- **Old lamps** in the layers are dead or a cold tint (amber means you).
 - **Ember Hoards** in A, B and C.
-- **Layer 1 tileset and enemy art.** A third regular enemy if the walk-through shows a need (NOTE in the GDD).
+- **Layer 1 tileset and enemy art.** A third regular enemy if the walk-through shows a need (NOTE in the GDD). Hit creatures burst into sparks in their own tint that turn amber as they fade (small, through `Fx`).
 - **Reachability bot** extended to every shaft and gate.
 
 **Out:** the hub (a placeholder room is fine); the Weaver arena art; Swing secrets (they need E6).
@@ -158,14 +160,18 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 **Goal:** close the session loop: dive → home → spend.
 
 **In:**
-- **Abyss Island village:** 2 screens, flat ground; arriving deposits embers and heals.
+- **UX update first (gds-ux):** Oda's house and the opening, lift ride timing, the speech box (closes UX O5).
+- **Abyss Island village:** 2 screens, flat ground; arriving deposits embers and heals. Relic crates by the lift, stamped for shipping.
+- **Oda's house and the new-game opening:** Glim wakes beside the empty chair; ↓ is taught on the door; Tessaly's First Dive registration is the only required talk. The gear wall shows pinned pages (`prop_house_page_last_entry`). Not a save point.
+- **Story text:** NPC lines and idles per `narrative-design.md` (≤ 3 lines per flag, one idle line then the shop), after the voice-anchor gate; a per-NPC `{seen, idle}` record in `SlotState`.
+- **Flag registry and text validators:** one flag list in `rules/` with a validator for every `requires_flag`; a length validator measuring speech lines in the UI font (≤ 2 rows).
 - **Cartographer:** map (60), 3 hints (25 each).
 - **Smith:** Quick Wick (200; instant Snuff: the light dims on press, and a release inside the tap window still throws a flare), Long Wick (250), Steady Grip (300).
-- **Naturalist:** 10 embers per journal entry; 2 palettes (75, 150).
+- **Naturalist:** copies each new journal entry and pays 10 embers for the copy; 2 palettes (75, 150).
 - **Guild records and Memorial Wall.**
 - **Minimal Journal tab:** creature entries with "new" marks, so the Naturalist payout reads (moved from E7).
 - **Fast travel** between the hub and repaired stations.
-- **The Watching Departure** on the lift ride up.
+- **The Watching Departure** on the lift ride up: a fixed-duration ride; the full gathering once per station layer after `lurker_met` (`departure_l1_seen`, `departure_l2_seen`), then a few eyes.
 - **Hub art:** 4 NPCs and the village tileset.
 
 **Out:** Docks, Gallery, Mentors, station repairs.
@@ -178,7 +184,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 
 **Stories:**
 1. Hub scene and walking
-2. NPC dialogue and shop framework
+2. NPC dialogue and shop framework (flag registry, `{seen, idle}`, text validators)
 3. Cartographer
 4. Smith and gear effects
 5. Naturalist, journal payout and the minimal Journal tab
@@ -186,6 +192,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 7. Fast travel
 8. Watching Departure
 9. Price tuning pass
+10. Oda's house and the new-game opening
 
 ---
 
@@ -200,7 +207,9 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - The **Layer 2 landing arena** (Bright Moon palette) and **phase 2**: 2 strands, 0.75 s telegraph.
 - The phase checkpoint.
 - The **Silk → Swing** unlock: hold Dash near a silk anchor; rope 32–96 px; release ×1.1.
-- The **3 Swing secrets** in A, S2 and C: Silk Grip, the Memorial clue and a cache.
+- The **3 Swing secrets** in A, S2 and C: Silk Grip, the Memorial clue (the Guild tag of Oda's dive partner; sonlm names the partner) and a cache.
+- **Defeat presentation:** win first (slow-mo, light burst, station repair), then the Weaver dims and withdraws downward in sparks.
+- **M2 closing beat:** the first ride up from the landing arena plays the full Watching Departure; at home Old Tessaly logs your depth, still short of Oda's record (`weaver_defeated`).
 - The landing station is repaired free and returns you to the hub.
 
 **Out:** the rest of Layer 2.
