@@ -8,19 +8,19 @@
 /*
 Key screens: Title and Load slot picker (Dusk, outside play).
 Governing spine sections:
-  DESIGN.md  Colors > Zone-matched UI roles (Dusk); Typography (menu-item, body-line; face [OPEN]);
+  DESIGN.md  Colors > Zone-matched UI roles (Dusk); Typography (menu-item, body-line; face Fusion Pixel Font 8px);
              Layout & Spacing (360 px column x 60-420, menu-text-x 64, cursor-gap 9, menu-row-pitch 24, slot-row-pitch 40);
              Components: Menu item, Ember cursor, Menu screen, Title screen, Slot picker, Confirm step.
   EXPERIENCE.md  Information Architecture (screen map, Title, Slot picker, first launch); Component Patterns: Title screen,
              Slot picker, Ember cursor; State Patterns: Empty slot; Menu bindings; E1 defaults D9, D13.
-Font: system monospace is a PLACEHOLDER. The pixel face is [OPEN] (DESIGN Typography). textLength pins 5 px per glyph.
+Font: system monospace stands in for Fusion Pixel Font 8px (DESIGN Typography, decided 2026-11-11). textLength pins 5 px per glyph (Fusion digits are 5 px).
 Static mock: no JS, no network. Cursor flicker, 120 ms ease and the shaft scroll are motion and are not shown.
 */
 
 :root {
   --page: #120d0a; --panel: #1c1510; --line: #3a2c20; --fg: #e6dccb; --muted: #a8977f; --amber: #ffd27a;
   --ui: ui-sans-serif, system-ui, sans-serif;
-  /* Placeholder: system monospace stands in for the pixel font. The face is [OPEN] (DESIGN Typography; chosen in E1 with the Deck-size check). */
+  /* Placeholder: system monospace stands in for Fusion Pixel Font 8px (DESIGN Typography, decided 2026-11-11). The Deck-size check runs in E1 with that face. */
   --pixel: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }

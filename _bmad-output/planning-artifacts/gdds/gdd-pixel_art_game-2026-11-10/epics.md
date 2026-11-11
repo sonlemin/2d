@@ -1,6 +1,6 @@
 # The Unbroken Chain — Milestone 2 Epics
 
-Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer is fixed before the next epic starts. **After each epic, post a short devlog or private build** (the brief's burnout mitigation). The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
+Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md`, Epic Rollout. Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer is fixed before the next epic starts. **After each epic, post a short devlog or private build** (the brief's burnout mitigation). The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
 
 ---
 
@@ -10,15 +10,19 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 
 **In:**
 - **Health:** 4 HP, the damage table, 0.6 s invulnerability, crawler contact deals 1, a hunting lurker deals 2, +1 HP for banking a chain of 10 or more. **Any hit** breaks the chain and moves held embers to carried.
-- **Default gamepad mapping.**
-- **Lurker off-screen stirring:** a faint edge glow now, with the sound added in E3.
-- **Flare Toss:** tap Light; needs ≥ 2 links; costs half the chain, with a matching share of embers moved to carried; 4 s; predators treat it as the player.
+- **Default gamepad mapping.** Pause: Esc or P on keyboard, Start on gamepad.
+- **Lurker off-screen stirring:** a half-open eye at the play-area edge that opens as the lurker stirs, plus a glow with a minimum strength; the sound is added in E3.
+- **Flare Toss:** tap Light inside the tap window (default 0.12 s); needs ≥ 2 links; costs half the chain, with a matching share of embers moved to carried; 4 s; predators treat it as the player.
 - **↓ interact** on the ground.
 - **Lantern anchors:** lit by touch; respawn point.
-- **Three ember stages:** held → carried → deposited. The Ember Cache drops on death and can be recovered once. Easy, Normal and Hard differ only in death cost.
+- **Three ember stages:** held → carried → deposited. The Ember Cache drops on death and can be recovered once; its glow draws nearby lurkers. Easy, Normal and Hard differ only in death cost.
 - **Lift Station rest** (a placeholder station): full heal, deposit, enemies respawn.
-- **Saving:** autosave on rest.
-- **HUD:** HP, held and carried embers.
+- **Saving:** autosave on rest; **3 save slots** with a slot picker, Continue and Load on the title.
+- **Resize the M1 shaft:** `game/scripts/shaft.gd` LAYOUT is 30 tiles (480 px) wide. Rebuild it at 22 tiles (352 px) to fit the gutter view, and set the camera limits so the shaft sits inside the play area.
+- **HUD v2 in side gutters:** HP, held and carried embers, chain number and meter. The play area is about 360 px wide. Lurker alert = pulsing red gutter frame plus an eye icon.
+- **Font:** Fusion Pixel Font 8px (OFL), with the **Deck-size legibility check** (×2, 960×540) done alongside. The full Deck pass stays in E7.
+- **Options (small, from the Pause menu):** Game tab (difficulty) and Accessibility tab (reduce flashing, screen shake, reduced motion with the OS default on web, Light tap window 0.12 / 0.2 / 0.3 s, hold→press toggles for Cling and Snuff; with the Snuff toggle On, Light is Flare Toss only and Snuff moves to Shift / pad LB as a press-toggle).
+- **Web:** 960×540 (×2) itch embed.
 - **Flash safety from day one:** the ≤ 3 flashes/s cap is checked for every effect, and the "reduce flashing" toggle ships in E1.
 - **Field Journal death line:** one line on death naming what killed you and how to avoid it (Pillar 2; deferred from M1).
 
@@ -38,11 +42,12 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 5. Three-stage embers and the Ember Cache
 6. Difficulty death-cost tiers
 7. Placeholder Lift Station rest
-8. Save and load
-9. HUD v2
+8. Save and load (3 slots)
+9. HUD v2 (gutters) and font choice with the Deck-size check
 10. Flash-safety cap and the reduce-flashing toggle
+10a. Options screen (Game + Accessibility tabs)
 10b. Default gamepad mapping
-10c. Lurker off-screen stirring and edge glow
+10c. Lurker off-screen stirring, edge eye and glow
 11. Field Journal death line
 12. Tests for all chain, ember and damage rules
 
@@ -53,7 +58,7 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **Goal:** prove the restraint fight is fun before content is built around it.
 
 **In:**
-- A rough placeholder arena (30×34 tiles) with 4 pogo-able strands and anchors that can be weakened.
+- A rough placeholder arena (30×34 tiles, scrolling horizontally inside the ~360 px view) with 4 pogo-able strands and anchors that can be weakened.
 - Weaver behaviour: bright → retreat and drop spiderlings; dark → descend and bite (0.9 s telegraph).
 - The light-burst stun (chain 3 within 96 px); the flare herds it; dropping a strand deals 2 damage and stuns.
 - HP 12. One Re-Weave at 9 HP. **The Fall is stubbed:** the fight ends at 6 HP.
@@ -89,7 +94,7 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 - **The SFX list:** pogo with pitch +1 semitone per link up to +12, bank chime, lurker growl (panned) and hunting hiss, Snuff, cling, flare, Weaver strands, chain gate.
 - **Chain-reactive music system:** stems fade in at 3, 6 and 10 links, resolve on a bank, cut on death.
 - **Mix:** predator cues duck the music by 6 dB.
-- **Settings:** volume sliders.
+- **Settings:** the Audio tab with volume sliders.
 
 **Out:** final composed music (placeholder stems are fine); hub and boss themes.
 
@@ -115,7 +120,7 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **Goal:** Edge of the Abyss, from the Lip to the Weaver's door.
 
 **In:**
-- Rooms and screen transitions; the camera leads downward.
+- Rooms and screen transitions; the camera leads downward. Spine shafts are 22 tiles (352 px) wide, with no sideways scrolling.
 - The spine **S1–S5** (about 23 screens) and side areas **A Rope Works, B Old Mine, C Sky Ledge**.
 - **Chain gate 1 (≥ 4)** and **gate 2 (≥ 8)**, which opens the shortcut to the hub.
 - **Lift Stations:** Lip and Hollow (real ones). About 5 lantern anchors.
@@ -155,9 +160,10 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **In:**
 - **Abyss Island village:** 2 screens, flat ground; arriving deposits embers and heals.
 - **Cartographer:** map (60), 3 hints (25 each).
-- **Smith:** Quick Wick (200), Long Wick (250), Steady Grip (300).
+- **Smith:** Quick Wick (200; instant Snuff: the light dims on press, and a release inside the tap window still throws a flare), Long Wick (250), Steady Grip (300).
 - **Naturalist:** 10 embers per journal entry; 2 palettes (75, 150).
 - **Guild records and Memorial Wall.**
+- **Minimal Journal tab:** creature entries with "new" marks, so the Naturalist payout reads (moved from E7).
 - **Fast travel** between the hub and repaired stations.
 - **The Watching Departure** on the lift ride up.
 - **Hub art:** 4 NPCs and the village tileset.
@@ -175,7 +181,7 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 2. NPC dialogue and shop framework
 3. Cartographer
 4. Smith and gear effects
-5. Naturalist and journal payout
+5. Naturalist, journal payout and the minimal Journal tab
 6. Guild records and Memorial
 7. Fast travel
 8. Watching Departure
@@ -222,13 +228,13 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 **Goal:** the first build to share with outside testers.
 
 **In:**
-- **Settings:** rebinding, screen shake on/off, 4 brightness levels, volume. (Reduce flashing already shipped in E1.)
-- **Full Field Journal:** lore entries plus the death-line history (the death line itself ships in E1).
+- **Settings:** Video tab (4 brightness levels, fullscreen, scale) and Controls tab (rebinding). Accessibility adds large HUD, text scale, timing assists (separate from difficulty) and visual sound cues. (The E1 Options and the E3 volume sliders already shipped.)
+- **Full Field Journal:** death log, lore, records and polish (the death line ships in E1; the minimal Journal tab in E5).
 - **HUD polish.**
 - **Art pass:** player animations (about 10), plus the hub and Layer 2 landing palettes.
 - **Composed music stems** for Layer 1, the hub and the Weaver.
 - **Performance:** check 60 FPS (see Tech Specs).
-- **Steam Deck test pass:** ×2 scaling, HUD readability, battery.
+- **Steam Deck test pass:** ×2 scaling, HUD readability, battery. (The Deck-size font check was done in E1.)
 - **Builds:** web and desktop (Windows and Linux).
 - **Playtest round** with about 5 testers against the Success Metrics.
 - **The Steam vs itch.io decision.**
@@ -260,11 +266,11 @@ Source: `gdd.md` (2026-11-10). Order is risk-first. Every epic ends with somethi
 | Mechanic | Epic |
 |---|---|
 | Movement, pogo, chain (M1) | done |
-| HP, Flare Toss, anchors, three ember stages, rest, saving | E1 |
+| HP, Flare Toss, anchors, three ember stages, rest, saving (3 slots), Options (Game + Accessibility), font | E1 |
 | Weaver behaviour | E2 → E6 |
 | Spiderlings | E2 |
 | Audio and music | E3 → E7 |
 | Layer 1, gates, map, journal, palettes | E4 |
-| Hub, NPCs, gear, fast travel | E5 |
+| Hub, NPCs, gear, fast travel, minimal Journal tab | E5 |
 | Swing, Swing secrets, The Fall, phase 2 | E6 |
-| Settings, Field Journal, accessibility | E7 |
+| Video and Controls settings, full Field Journal, E7 accessibility additions | E7 |

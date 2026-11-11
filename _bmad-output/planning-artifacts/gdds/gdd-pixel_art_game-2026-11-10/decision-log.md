@@ -160,3 +160,35 @@
 - **Polish:** no `doc_standards` are configured, so it was skipped. There are no external handoffs.
 - **Narrative handoff:** `needs_narrative` is set. `gds-create-narrative` was offered to the user.
 - **Status:** gdd.md `status: final`. Next step: `gds-game-architecture`, in a fresh session.
+
+## 2026-11-11 — Update: UX decisions carried back
+
+Source: `ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md` (Notes for Other Docs) and its `.decision-log.md`. These are newer designer decisions, so they win over the v1.0 text. The UX spines are added to the gdd.md `inputs`.
+
+- **Light tap window** is a player setting: 0.12 s (default), 0.2 s or 0.3 s (UX 2026-11-11). Flare Toss, Controls and the chain table now cite 0.12 s as the default. Lands in E1.
+- **Quick Wick** changes the Snuff response, not the tap window (UX 2026-11-11). **Reverses** the Hub line "Snuff hold 0.12 → 0.08 s". Its new effect is not defined yet; added to Open Questions (E5).
+- **Reserved amber:** the menu selection cursor counts as the player's lantern, so amber in menus is allowed (UX 2026-11-10). Art Style table updated.
+- **Ember Cache glow:** the cache glows and draws nearby lurkers (UX 2026-11-10). Turns the deferred designer note into a decision. Glow radius and pull are a new assumption (A8), tuned in E1.
+- **Lurker alert:** "the HUD turns red" **is replaced by** a pulsing red gutter frame (≤ 2 Hz) plus an eye icon; HUD values are not recoloured (UX 2026-11-11).
+- **Off-screen stirring:** a half-open edge eye that opens as the lurker stirs, plus a glow with a minimum strength. Glow alone is not enough (UX 2026-11-11).
+- **Weaver:** no health bar; health reads from fraying, falling segments and sagging threads (UX 2026-11-11).
+- **Pause:** Esc or P on keyboard, Start on gamepad (UX 2026-11-11). Added to Controls.
+- **Timing assists** are separate settings, not difficulty. "Difficulty never changes telegraphs" still holds; assisted runs stay out of Guild records (UX 2026-11-10). Resolves the "Assist options for Easy" open question.
+- **Difficulty** is chosen at New Game and changeable any time in Options (UX 2026-11-10).
+- **Gutters:** the HUD sits in ~60 px side gutters, leaving ~360 px of play area. Rooms are framed for 360 px; wider rooms scroll. Noted in Movement, Art Style and Level Design Framework for level design and the camera.
+- **Options rollout:** a small Options screen ships from E1 (Game + Accessibility: reduce flashing, screen shake, reduced motion, tap window, Cling/Snuff hold→press toggles). Audio in E3. Video and Controls in E7. The brightness F1 hotkey is removed. **Changes** epics E1, E3 and E7 (screen shake moves from E7 to E1).
+- **Cling/Snuff toggles** ship in E1 (UX log, Update O13). Full rebinding stays in E7.
+- **Saves:** 3 slots instead of one profile; slot picker, Continue, Load; failed saves are shown (UX 2026-11-10/11). **Reverses** "One profile in M2".
+- **Web baseline:** the itch embed is 960×540 (×2); Performance and Platform-Specific Details updated.
+- **Steam Deck:** the Deck-size legibility check moves to E1 with the font choice; the full pass stays in E7.
+- **UI font:** Fusion Pixel Font 8px, proportional latin build, OFL 1.1 (UX log, Update O1). Added to Art Style and E1.
+- **Journal:** a minimal Journal tab (creature entries, "new" marks) moves to E5; E7 keeps the death log, lore, records and polish.
+- **Not carried over (architecture notes):** death card line storage, save-failure UI details, slot delete, and devicePixelRatio scaling stay with the architecture.
+- **Status:** stays `final`; `updated: 2026-11-11`.
+
+## 2026-11-11 — Designer decisions on the two UX-update follow-ups
+
+- **Quick Wick = instant Snuff.** The light starts dimming the moment Light (V) is pressed. A release inside the player's tap window still becomes a Flare Toss. The tap window does not change. Replaces the E5 Open Question added earlier today. Updated: Hub gear table, epics E5.
+- **Spine shafts narrow from 26 tiles (416 px) to 22 tiles (352 px),** so they fit the ~360 px view between the gutters with no sideways scrolling. The Weaver arena stays 30 tiles (480 px) and scrolls horizontally with the camera ("one screen wide" removed). Updated: Level Types, the gutter framing note, the Weaver arena, epics E2 and E4. The M1 findings give no shaft widths, so nothing there conflicts.
+
+- 2026-11-11 — Snuff toggle mode (from UX): with the Accessibility Snuff toggle On, Light only throws Flare Tosses and Snuff moves to its own key (default Shift; pad LB) as a press-toggle. It still ends the chain. Pillar 4's "no new buttons" holds for the default scheme; the extra key exists only in this accessibility mode.

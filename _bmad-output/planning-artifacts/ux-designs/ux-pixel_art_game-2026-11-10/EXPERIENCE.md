@@ -79,10 +79,10 @@ Quit in the Pause tab uses the confirm step: "Quit to title?" No / Yes, with No 
 | Tab | Settings | Lands |
 |---|---|---|
 | Game | Difficulty (changeable any time) | E1 |
-| Accessibility | Reduce flashing; screen shake on/off; reduced motion; Light tap window (0.12 / 0.2 / 0.3 s) | E1 (tap window [ASSUMPTION] E1, since Flare Toss lands there) |
+| Accessibility | Reduce flashing; screen shake on/off; reduced motion; Light tap window (0.12 / 0.2 / 0.3 s); Cling toggle; Snuff toggle (hold→press, both Off by default; decided 2026-11-11, O13) | E1 (tap window [ASSUMPTION] E1, since Flare Toss lands there; the toggles land in E1 so public web builds are playable before E7) |
 | Audio | Volume sliders | E3 |
 | Video | Brightness (4 levels), fullscreen, scale | E7 [ASSUMPTION] brightness may move earlier, since the F1 hotkey is removed for web |
-| Controls | Rebinding, hold↔toggle for Snuff and Cling | E7 |
+| Controls | Rebinding | E7 |
 | Accessibility (E7 additions) | Large HUD; text scale; game-speed and timing assists; visual sound cues | E7 |
 
 Tabs that have not landed are hidden. [ASSUMPTION] Hidden, not shown disabled. The Pause tabs follow the same rule: in E1 the tab bar holds Pause alone; Map appears in E4 and Journal in E5 (log 2026-11-11).
@@ -152,7 +152,7 @@ Every action is a single button, with no chords (GDD Controls).
 | Rule | Decision |
 |---|---|
 | Rebinding | Every action, keyboard and gamepad, in Options > Controls (E7) |
-| Hold↔toggle | For Snuff and Cling (E7) |
+| Hold↔toggle | Cling toggle and Snuff toggle in Options > Accessibility (E1, decided 2026-11-11, O13). Cling toggle turns the hold into a press. Snuff toggle: when On, Light only throws Flare Tosses (any press, no tap window) and Snuff moves to its own key (default Shift; pad LB), pressed once to start and again to end. Snuff still ends the chain, so this is not a light you leave on. Quick Wick has no extra effect in this mode. Full rebinding stays in E7. |
 | Light tap window | 0.12 s (GDD default), 0.2 s or 0.3 s, in Options > Accessibility. Releasing Light inside the window is Flare Toss; holding past it is Snuff. |
 | Quick Wick | Changes the Snuff response, not the tap window ([NOTE FOR GDD]). |
 | Glyph swap | Prompts and the controls reference show the last-used device's glyphs. Any button press, or a stick or trigger past 0.5, switches to gamepad; any key press switches to keyboard. Stick input below 0.5 and mouse movement never flip glyphs. [ASSUMPTION — default, review] |
@@ -167,12 +167,14 @@ Terse field notes: short, factual, slightly ominous. The world speaks like an ex
 | Context | Example | Not |
 |---|---|---|
 | Journal creature line | "Lurker. Waits where the light is dim." | "Lurkers are dangerous enemies!" |
-| Death line | "Lurker. It waits where the light is dim. Watch for the red glow at the screen edge." | "You died. Try again?" |
+| Death line | "Lurker. It waits where the light is dim. Watch the edge for an opening eye." | "You died. Try again?" |
 | Death card tier line | Normal "Embers left below. Once." Hard "Nothing left below." Easy: no line (log 2026-11-11) | "You lost 40 embers!" |
 | Cache lost | [ASSUMPTION] "The cache went dark." | "Ember Cache lost (-40)" |
 | Gamepad lost | "Controller disconnected" (log) | Error codes |
 | Difficulty step | States only what death costs on each tier, and that it can be changed later | Words like "casual" or "hardcore" [ASSUMPTION] |
 | Menu labels | One or two words: Resume, Options, Load, Quit, Descend | Sentences |
+
+**Copy rule** (decided 2026-11-11, O16): death lines, tips and cues name the shape (eye, glow, frame), never the colour. For example: "Watch the edge for an opening eye." This keeps copy true for colour-blind players and under any palette.
 
 All strings live in a string table from day one. M2 ships English only.
 
@@ -182,7 +184,7 @@ Behaviour and copy only. DESIGN.md Components gives the visual spec under the sa
 
 | Component | Behaviour |
 |---|---|
-| Gutter | Always present, in every scene including the hub and the Weaver arena. Tint follows the active palette zone. |
+| Gutter | Always present, in every scene including the hub and the Weaver arena. Tint follows the active palette zone and cross-fades at a zone boundary (Game Feel & Juice). |
 | Gutter icon | Static. Icons replace text labels, so the gutters carry no localised text. |
 | HP pip | Updates on hit and heal. A lost pip becomes an outline. Invulnerability blink per Game Feel & Juice. |
 | Ember counter | Held counts up with hits; its icon flickers while held embers exist. On bank, held moves to carried. On rest, carried flies to the bank. |
@@ -236,6 +238,7 @@ Behaviour and copy only. DESIGN.md Components gives the visual spec under the sa
 | Rest | ↓ at Lift Station | One press: heal, embers fly into the bank with a count-up, autosave icon, then the station menu ([mock](mockups/key-station-menu.html)). |
 | Autosave | Station rest, hub, quit at a lit anchor (GDD) | Autosave icon. |
 | Save failed | A save does not complete (web storage blocked or full, disk error) | Crossed autosave icon and the field note "Not saved"; retries at the next rest; the Pause note explains the fix, e.g. "Saves are blocked. Allow site storage for this page, then rest again." (log 2026-11-11; copy [ASSUMPTION]) |
+| Zone change | The camera centre crosses a palette-zone boundary (E4) | Gutter fill, rules and every zone-role UI colour cross-fade to the new zone over 500 ms, with no flash (Game Feel & Juice). Under reduced motion they snap. Amber and red never change. |
 | Paused | Pause key, or focus loss | The game stops and the Pause tab opens. Web auto-pauses on focus loss. |
 | Gamepad disconnected | Pad lost mid-play | Auto-pause with "Controller disconnected". Glyphs switch to keyboard. Reconnecting the pad or pressing any key resumes. |
 | Web cold load | Page open | Click-to-play gate until the first click or key; fullscreen suggestion below ×2 ([mock](mockups/key-web-gate.html)). |
@@ -262,7 +265,7 @@ The tier line is the third body line, under the tip. Any further per-tier copy f
 | Confirm / back | Z / X on keyboard (plus Enter, Space / Backspace, Esc), A / B on gamepad. See Menu bindings. |
 | Skip death card | Fresh press after 0.6 s; held buttons ignored; auto-advance at about 3 s. |
 | One-press rest | A single ↓ runs the full rest sequence, with no menu until it ends. |
-| Hold vs tap | Light: release inside the tap window = Flare Toss; hold past it = Snuff. Window set in Accessibility. Toggle option in E7. |
+| Hold vs tap | Light: release inside the tap window = Flare Toss; hold past it = Snuff. Window set in Accessibility. With the Snuff toggle On, Light is Flare Toss only and Snuff is a press-toggle on its own key (Shift / LB). |
 | Resume after disconnect | Reconnect the pad or press any key. |
 
 ## Game Feel & Juice
@@ -280,8 +283,9 @@ UI-side decisions only. This table owns event → response, and other sections p
 | Rest | Embers count into the bank | Same |
 | Menu move | Ember cursor eases 120 ms and flickers | Cursor jumps |
 | Alert | Gutter frame pulses ≤ 2 Hz, eye shows | Same |
+| Zone boundary (decided 2026-11-11, O4) | When the camera centre crosses the boundary, gutter tint and UI role colours cross-fade over 500 ms; no flash | Snaps in one frame |
 
-Reduced motion (Accessibility, E1) stops cursor easing, rising popups and UI shake. On web it defaults to the OS setting. [ASSUMPTION] On PC it defaults to off.
+Reduced motion (Accessibility, E1) stops cursor easing, rising popups and UI shake, and makes the zone cross-fade snap. On web it defaults to the OS setting. [ASSUMPTION] On PC it defaults to off.
 
 Reduce flashing (Accessibility, E1) changes these effects (log 2026-11-11):
 
@@ -308,7 +312,7 @@ Reduce flashing (Accessibility, E1) changes these effects (log 2026-11-11):
 | Death card | Held input ignored, skip lockout and auto-advance (Interaction Primitives); lines kept for the death log | E1 |
 | Brightness | 4 levels in Options > Video (M1 F1 hotkey removed) | E7 [ASSUMPTION] may move earlier |
 | Rebinding | Every action, both devices | E7 |
-| Hold↔toggle | Snuff and Cling | E7 |
+| Hold↔toggle | Cling toggle and Snuff toggle in Options > Accessibility (O13) | E1 |
 | Large HUD | Numbers and icons ×2, ember block stacked in the lower left gutter (DESIGN Layout & Spacing) | E7 |
 | Text scale | Menus, speech, journal. [OPEN] Layout. | E7 |
 | Timing assists | Game speed and timing assists. Separate settings, not difficulty. Runs that use them are kept out of Guild records. | E7 |
@@ -322,9 +326,9 @@ Difficulty only changes death cost. It never changes telegraphs (GDD Difficulty 
 |---|---|
 | Web (itch.io) | Embed `{spacing.embed-width}` × `{spacing.embed-height}` (×2). If the window is still below ×2, the click-to-play gate suggests fullscreen. Whole-number scaling stays. Web key rules are in Input Schemes. Auto-pause on focus loss. Fullscreen toggle in Options, plus the itch fullscreen button. Size and performance per GDD Performance. HiDPI: the canvas backing size is the CSS size × devicePixelRatio, and the whole-number scale is picked from physical pixels (a 960×540 embed at DPR 1.5 runs at ×3). Below 480×270 physical pixels, the game fits the window with a fractional nearest-neighbour downscale, still letterboxed, and the gate and Pause tab suggest fullscreen. [ASSUMPTION — default, review] [Gate mock](mockups/key-web-gate.html). |
 | PC | Window at whole-number scale (M1 default ×3, 1440×810). Fullscreen is letterboxed. The minimum window size is 480×270, so PC never drops below ×1. HiDPI displays use physical pixels, as on web. [ASSUMPTION — default, review] |
-| Steam Deck | E1: a Deck-size legibility check (×2, 960×540 on a 7" panel or equivalent) while choosing the font. E7: the full Deck pass (GDD Platform-Specific Details). Uses gamepad glyphs. |
+| Steam Deck | E1: a Deck-size legibility check (×2, 960×540 on a 7" panel or equivalent) with Fusion Pixel Font 8px. E7: the full Deck pass (GDD Platform-Specific Details). Uses gamepad glyphs. |
 
-Room framing: rooms are framed for 360 px of visible width; wider rooms scroll horizontally.
+Room framing: rooms are framed for 360 px of visible width. Spine shafts are 22 tiles (352 px) and never scroll sideways; wider rooms (the Weaver arena, the hub) scroll horizontally (GDD Level Types).
 
 ## Localization
 
@@ -333,6 +337,7 @@ M2 leaves room for localization and ships English only.
 - All strings in a string table from day one.
 - Gutter labels are icons, so the HUD has no localised text and no text growth to plan for. Only numbers remain.
 - Menu, speech and journal text sits in the 360 px column. [OPEN] Tab widths by measure, and scripts that need more than 8 px (CJK).
+- Vietnamese is not needed now (log 2026-11-11). The Fusion 8 px build lacks stacked Vietnamese marks; a later localisation could use the Fusion 10 px or 12 px builds (DESIGN Typography).
 - Font and text-in-sprite rules are in DESIGN.md Typography.
 
 ## Inspiration & Anti-patterns
@@ -387,7 +392,7 @@ Failure path: the bite lands. An HP pip cracks and becomes an outline, the pips 
 ### J3 — Death and cache run (Normal)
 
 1. Son holds +30 embers and carries 40. A crawler hit and a lurker bite take the last HP.
-2. Short fade. The death card reads "Lurker. It waits where the light is dim. Watch for the red glow at the screen edge." Below it is the tier line "Embers left below. Once." The left gutter shows held embers lost and the 40 carried dropped as an Ember Cache ([death card mock](mockups/key-death-card.html)). Son is still holding X, so the card stays. After 0.6 s a fresh press could skip it; Son reads it and it advances at about 3 s.
+2. Short fade. The death card reads "Lurker. It waits where the light is dim. Watch the edge for an opening eye." Below it is the tier line "Embers left below. Once." The left gutter shows held embers lost and the 40 carried dropped as an Ember Cache ([death card mock](mockups/key-death-card.html)). Son is still holding X, so the card stays. After 0.6 s a fresh press could skip it; Son reads it and it advances at about 3 s.
 3. Son respawns at the last lit anchor with full HP.
 4. Son goes back down. The Cache glows amber in the world, and that glow has stirred nearby lurkers. Their edge cues show they are waiting.
 5. **Climax:** Son builds a chain for light and timing, then dives for the Cache. One touch restores the 40 to carried, and the lurkers start to hunt.
@@ -448,19 +453,19 @@ Failure path: Son has no cable. Son presses any key, and play resumes on the key
 
 | Epic | UX surfaces |
 |---|---|
-| E1 Kit v2 | Gutter HUD v2: gutter icons, HP pips with outlined empties, held/carried ember counter (flicker vs solid), chain number, chain meter, cling grace bar, flare notch, flare cost hatch, cling cue, alert frame + eye, off-screen edge cue with glow floor. Contrast floors and per-zone UI tokens. Font face chosen with the Deck-size check. Options with Game + Accessibility tabs (reduce flashing, screen shake, reduced motion, Light tap window [ASSUMPTION]). Pause tab (Resume / Options / Quit, bank summary, controls reference). Gamepad defaults, glyph swap, disconnect pause. Glyph prompts. Death card (timing, 3 tiers, layout). Placeholder station rest and station menu. Save/load with save-failure handling, autosave icon, difficulty step. Menu bindings (keys, repeat, wrap) and confirm step. String table. 960×540 embed with fullscreen suggestion. [ASSUMPTION] Title (with Load), slot picker and click-to-play gate also land here, since save/load does. |
+| E1 Kit v2 | Gutter HUD v2: gutter icons, HP pips with outlined empties, held/carried ember counter (flicker vs solid), chain number, chain meter, cling grace bar, flare notch, flare cost hatch, cling cue, alert frame + eye, off-screen edge cue with glow floor. Contrast floors and per-zone UI tokens. Fusion Pixel Font 8px integrated (OFL files shipped) and the Deck-size check run with it. Gutter outer rule. Options with Game + Accessibility tabs (reduce flashing, screen shake, reduced motion, Light tap window [ASSUMPTION], Cling toggle and Snuff toggle). Pause tab (Resume / Options / Quit, bank summary, controls reference). Gamepad defaults, glyph swap, disconnect pause. Glyph prompts. Death card (timing, 3 tiers, layout). Placeholder station rest and station menu. Save/load with save-failure handling, autosave icon, difficulty step. Menu bindings (keys, repeat, wrap) and confirm step. String table. 960×540 embed with fullscreen suggestion. [ASSUMPTION] Title (with Load), slot picker and click-to-play gate also land here, since save/load does. |
 | E2 Weaver prototype | Debug entry into the Weaver arena (dev only). Gutters in the arena. Diegetic Weaver health (no bar). |
 | E3 Audio | Options > Audio volume sliders. Stirring sound for the off-screen edge cue. |
-| E4 Layer 1 world | Map tab; full station menu with fast travel; journal objects read via ↓; zone-tinted UI across Dusk, Umber and Cold violet. Map tab: mock before build via gds-ux Update. |
+| E4 Layer 1 world | Map tab; full station menu with fast travel; journal objects read via ↓; zone-tinted UI across Dusk, Umber and Cold violet, with the 500 ms zone cross-fade. Map tab: mock before build via gds-ux Update. |
 | E5 Hub | Speech box, shop list, Guild records board, minimal Journal tab (creature entries, "new" marks for Naturalist payouts), fast travel to hub. Speech box, shop list and Journal tab: mock before build via gds-ux Update. |
 | E6 Weaver final | Post-boss return flow to hub; phase checkpoint; final fray-and-fall health visuals. |
-| E7 Slice polish and ship | Options Video and Controls tabs; rebinding; hold↔toggle; large HUD; text scale; timing assists; visual sound cues; full Journal tab (death log, lore, records, polish); HUD polish; Steam Deck pass; Credits with AI disclosure [ASSUMPTION]. |
+| E7 Slice polish and ship | Options Video and Controls tabs; rebinding; large HUD; text scale; timing assists; visual sound cues; full Journal tab (death log, lore, records, polish); HUD polish; Steam Deck pass; Credits with AI disclosure [ASSUMPTION]. |
 
 ## Notes for Other Docs
 
 | Tag | Note |
 |---|---|
-| [NOTE FOR LEVEL DESIGN] / [NOTE FOR ARCHITECTURE] | The M1 shaft was built for a 480 px view. Gutters leave 360 px. Camera and room widths must account for the gutters; wider rooms scroll horizontally. |
+| [NOTE FOR LEVEL DESIGN] / [NOTE FOR ARCHITECTURE] | The M1 shaft was built for a 480 px view. Gutters leave 360 px. Camera and room widths must account for the gutters. Resolved in the GDD 2026-11-11: shafts are 22 tiles (352 px); wider rooms scroll horizontally; E1 rebuilds the M1 shaft at 22 tiles. |
 | [NOTE FOR GDD] | Timing assists are separate settings, not difficulty. "Difficulty never changes telegraphs" still holds. Resolves the GDD open question on Easy assists. |
 | [NOTE FOR GDD] | The Ember Cache's amber glow draws nearby lurkers, so recovering it is a risk. Adopts the designer note in GDD Open Questions as a decision. |
 | [NOTE FOR ARCHITECTURE] | The GDD implies one profile; the save system must support 3 slots, plus a Load path from the title. |
@@ -472,11 +477,12 @@ Failure path: Son has no cable. Son presses any key, and play resumes on the key
 | [NOTE FOR GDD] | The Weaver has no health bar. Health reads from fraying, falling segments and sagging threads. |
 | [NOTE FOR GDD] | The itch embed is 960×540 (×2). GDD Platform-Specific Details and Performance should state ×2 as the web baseline. |
 | [NOTE FOR GDD] | A minimal Journal tab moves to E5 (creature entries, "new" marks); E7 keeps the death log, lore, records and polish. Update EP E5 and E7. |
-| [NOTE FOR GDD] | The Deck-size legibility check moves into E1 (with the font choice); the Deck pass stays in E7. Update EP E1. |
-| [NOTE FOR GDD] | E1 Accessibility gains a reduced-motion toggle (OS default on web) and the Light tap window. Update EP E1. |
+| [NOTE FOR GDD] | The Deck-size legibility check moves into E1 (run with Fusion Pixel Font 8px); the Deck pass stays in E7. Update EP E1. |
+| [NOTE FOR GDD] | E1 Accessibility gains a reduced-motion toggle (OS default on web), the Light tap window, and the Cling and Snuff hold→press toggles (moved from E7, O13). Update EP E1 and E7, Snuff toggle mode: Light = Flare Toss only; Snuff on its own key (Shift / LB), press to start and end (decided 2026-11-11). Applied to GDD Controls. |
 | [NOTE FOR ARCHITECTURE] | Death card lines are stored from E1 so the E7 Journal death log has them. |
 | [NOTE FOR ARCHITECTURE] | Saves must report failure to the UI (crossed icon, "Not saved", retry at next rest) and support slot delete. Web scaling picks the whole-number scale from physical pixels (devicePixelRatio). |
 | [NOTE FOR GDD] | Pause is Esc or P on keyboard, Start on gamepad. GDD Controls should list it. |
+| [NOTE FOR ARCHITECTURE] | The UI font is Fusion Pixel Font 8px (SIL OFL 1.1). Every build, web included, ships `OFL.txt` and the upstream `LICENSES/` folder, and the credits name the font. The font may not be sold on its own; a modified copy must drop the Reserved Font Name. |
 
 ## Open Questions
 
@@ -513,6 +519,14 @@ No longer open: pause key, off-screen edge eye, flare cost hatch, reduce-flashin
 - Bank popup: keep the M1 popup (DESIGN Components).
 - Mock coverage: key-screen mocks in `mockups/` cover the HUD, death card, title and slot picker, Pause and Options, station rest and menu, and the click-to-play gate. Map (E4), Journal, speech box and shop (E5) are mocked at epic start via gds-ux Update, once their open layout questions are decided. Quit confirm, controller-disconnected pause and credits stay spine-only.
 
+### Decided 2026-11-11 (update)
+
+- O1. Font: Fusion Pixel Font 8px, proportional (latin build), OFL 1.1; cap 6 / x-height 4 / descender 2 (DESIGN Typography). The Deck-size check still runs in E1.
+- O4. Zone change: gutter tint and UI colours cross-fade over 500 ms when the camera centre crosses a zone boundary; no flash; snaps under reduced motion (Game Feel & Juice, State Patterns).
+- O13. Motor access: Cling toggle and Snuff toggle (hold→press) ship in Options > Accessibility in E1; full rebinding stays in E7 (Options tabs).
+- O16. Copy rule: name the shape (eye, glow, frame), never the colour (Voice and Tone).
+- O17. Gutters get a 1 px outer rule in the zone's index-1 colour, matching the inner rule (DESIGN Layout & Spacing, Components).
+
 ### Assumptions
 
 - A1. [ASSUMPTION] Brightness may move into Options > Video before E7, since F1 is removed for web.
@@ -534,13 +548,12 @@ No longer open: pause key, off-screen edge eye, flare cost hatch, reduce-flashin
 
 ### Open, blocks E1
 
-- O1. [OPEN] Pixel font face (decided in E1 with the Deck-size check). Criteria and three candidates in DESIGN Typography.
+None (O1 decided 2026-11-11).
 
 ### Open, later epic
 
 - O2. [OPEN] Tutorial prompts in J1 step 3: spec them or use in-world signs (E4).
 - O3. [OPEN] Map room colours, icon art, pin controls (E4).
-- O4. [OPEN] How UI tokens change at zone boundaries while falling (E4).
 - O5. [OPEN] Speech box frame, reveal, pace and line length (E5).
 - O6. [OPEN] Shop buy confirm and can't-afford response (E5).
 - O7. [OPEN] Empty journal and map states; "new" mark art; Guild records board form (E4/E5).
@@ -548,12 +561,9 @@ No longer open: pause key, off-screen edge eye, flare cost hatch, reduce-flashin
 - O9. [OPEN] Hub and Layer 2 palettes (GDD open), their UI tokens and floor checks (E5/E6).
 - O10. [OPEN] Whether the Weaver's bite telegraph shows the alert frame; how the Swing unlock is shown; how a phase-2 respawn reaches the landing arena (E2/E6).
 - O11. [OPEN] Extra cue at chain cap (E7).
-- O12. [OPEN] Large HUD ember display above 3 digits; text scale layout for menus, speech and journal (E7).
-- O13. [OPEN] Motor access before E7 (cling toggle or keyboard rebinding) if web builds go public.
+- O12. [OPEN] Large HUD ember display above 4 digits; text scale layout for menus, speech and journal (E7).
 - O14. [OPEN] Hearing: mono audio and separate sliders (E3); the full list of visual sound cues (E7).
 - O15. [OPEN] An accessibility persona or test pass (colour-blind sim, sound off, ×2).
-- O16. [OPEN] Death line and cache copy without colour words, with counts.
-- O17. [OPEN] Near-black gutters against the letterbox.
 - O18. [OPEN] Tab widths and CJK glyph size for later localisation.
 - O19. [OPEN] Title logo art.
 - O20. [OPEN] If Snuff gains a cost (GDD Risks), the HUD must show it.

@@ -3,13 +3,15 @@ title: "The Unbroken Chain — Game Design Document"
 game_type: metroidvania (descent; action-platformer feel conventions)
 platforms: [PC Windows, PC Linux, web/itch.io for playtests]
 created: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-11
 status: final
 inputs:
   - _bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/
   - _bmad-output/implementation-artifacts/m1-playtest-findings.md
   - _bmad-output/brainstorming-session-2026-11-07.md
   - _bmad-output/planning-artifacts/research/domain-indie-pixel-art-pogo-descent-platformer-research-2026-11-07.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md
 ---
 
 # The Unbroken Chain - Game Design Document
@@ -109,6 +111,8 @@ In priority order. When two conflict, the higher one wins unless a ruling says o
 
 All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested; the rest are starting values to tune.
 
+The HUD sits in two side gutters of about 60 px each, so the visible play area is about 360 px wide (UX, 2026-11-10). See Level Design Framework.
+
 #### Movement (M1)
 
 | Parameter | Value |
@@ -142,7 +146,7 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 | Action | Chain | Held embers | Light |
 |---|---|---|---|
 | Landing | breaks | → carried | → 40 px |
-| Snuff (hold Light ≥ 0.12 s) | breaks | → carried | → 12 px while held |
+| Snuff (hold Light past the tap window; default 0.12 s) | breaks | → carried | → 12 px while held |
 | Wall cling | **paused**, 1.0 s per chain (a pogo hit refills it), then breaks | kept, then → carried | → 40 px while clinging |
 | Any hit (crawler, spiderling, boss, lurker, spikes) | breaks | → carried | → 40 px |
 | Flare Toss | −half (see below) | share → carried | shrinks to the new chain |
@@ -159,7 +163,7 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 
 #### Flare Toss (M2)
 
-- **Input:** tap Light (released before 0.12 s, the Snuff threshold).
+- **Input:** tap Light (released inside the Light tap window, the Snuff threshold). The window is a player setting: 0.12 s (default), 0.2 s or 0.3 s (UX, 2026-11-11).
 - **Requirement:** at least 2 links.
 - **Cost:** half the chain, rounded up. Example: 8 → 4, 5 → 2.
   - Held embers move to carried in proportion to the links spent.
@@ -195,8 +199,8 @@ All values are at 480×270, 1 tile = 16 px. Values marked **M1** were playtested
 #### Predators: Lurker (M1)
 
 - **Wakes:** when your light radius is ≥ 80 px (4 links), it is within radius × 1.6 of you, and it is **on screen**.
-- **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), you hear a quiet stirring panned to that side and see a faint red glow at that screen edge. It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*).
-- **Telegraph:** 0.9 s (never below 0.75 s). Its eyes open with an animation and pulse at 2 Hz, cast red light on the wall, and the HUD turns red.
+- **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), you hear a quiet stirring panned to that side. At the play-area edge, level with the lurker, a half-open eye appears and opens wider as it stirs, with a red glow that has a minimum strength. A faint glow alone is not enough (UX, 2026-11-11). It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*).
+- **Telegraph:** 0.9 s (never below 0.75 s). Its eyes open with an animation and pulse at 2 Hz, cast red light on the wall. Both HUD gutters show a pulsing red frame (≤ 2 Hz) and a small eye icon. HUD values are not recoloured (UX, 2026-11-11).
 - **Hunt:** 95 px/s straight at you, passing through walls. It **senses** you while your light radius is ≥ 80 px and you are within radius × 1.6. Once it can't sense you, it stops at once and is harmless, waits 0.6 s, then returns home.
 
 ### Controls and Input
@@ -209,10 +213,15 @@ Keyboard and gamepad, both from M2. Every action is a single button (no chords).
 | Jump | Z or ↑ | Jump (hold for full height) | At a wall while falling: **cling**; release to **kick off** |
 | Attack | X | Ground: slash. Air: **pogo** | — |
 | Dash | C | Air dash; within 56 px of a silk anchor: **grab** the rope (after the Weaver) | Stay on the rope: **swing** |
-| Light | V | **Flare Toss** (< 0.12 s) | **Snuff** (≥ 0.12 s) |
+| Light | V | **Flare Toss** (released inside the tap window; default 0.12 s) | **Snuff** (held past the tap window) |
+| Pause | Esc or P | Open the Pause menu. P is the web fallback, since Esc can leave browser fullscreen | — |
 
-- **Accessibility:** a "reduce flashing" toggle; screen shake can be turned off; a brightness setting with 4 levels (in M1 this is cycled with F1).
-- **Rebinding:** every action can be rebound in M2's settings menu.
+- **Options rollout** (UX, 2026-11-10/11). A small Options screen ships from E1, opened from the Pause menu, and grows by epic. Tabs that have not landed are hidden.
+  - **E1, Game:** difficulty, changeable any time.
+  - **E1, Accessibility:** reduce flashing; screen shake on/off; reduced motion (follows the OS setting on web); Light tap window (0.12 / 0.2 / 0.3 s); hold→press toggles for Cling and Snuff. Snuff toggle: when On, Light only throws Flare Tosses (any press, no tap window) and Snuff moves to its own key (default Shift; pad LB), pressed once to start and again to end. Snuff still ends the chain, so this is not a light you leave on. Quick Wick has no extra effect in this mode.
+  - **E3, Audio:** volume sliders.
+  - **E7:** Video (4 brightness levels, fullscreen, scale; the M1 F1 brightness hotkey is removed); Controls (rebinding); large HUD, text scale, timing assists and visual sound cues.
+- **Rebinding:** every action, keyboard and gamepad, can be rebound in Options > Controls (E7).
 
 ---
 
@@ -287,7 +296,7 @@ A small walkable village around the mouth of the pit. It is **2 screens wide**, 
 | NPC | Sells / does | M2 contents |
 |---|---|---|
 | **Cartographer** | maps and hints | Layer 1 map (60); 3 hints (25 each) that point to a side area, gate 2 and a Swing secret |
-| **Smith** | gear that **bends a rule** (always on; no slots or charms) | **Quick Wick:** Snuff hold 0.12 → 0.08 s (200). **Long Wick:** flare burns 4 → 6 s (250). **Steady Grip:** cling slide 18 → 10 px/s (300). Silk Grip (+0.25 s cling grace) is found in a Swing secret, not sold |
+| **Smith** | gear that **bends a rule** (always on; no slots or charms) | **Quick Wick:** instant Snuff. The light starts dimming the moment Light is pressed; if Light is released inside the tap window, the press becomes a Flare Toss as usual. The tap window itself does not change (200). **Long Wick:** flare burns 4 → 6 s (250). **Steady Grip:** cling slide 18 → 10 px/s (300). Silk Grip (+0.25 s cling grace) is found in a Swing secret, not sold |
 | **Naturalist** | reads journal entries | pays **10 embers per new entry**; sells 2 cosmetic palettes (75, 150) |
 | **Guild + Memorial Wall** | records and story, no shop | records: deepest depth, best chain, most embers banked in one chain, deaths. The Memorial Wall lists lost explorers' names; the Layer 1 Memorial clue adds the first name tied to the Last Explorer |
 
@@ -365,10 +374,11 @@ Pillar 3: progress through skills and chain mastery, never XP.
 **Lesson:** *restraint.* Chaining brute force fails here. You read the fight, then go dark, herd and strike.
 
 **Arena:**
-- A shaft section 30 tiles wide and 34 tall (one screen wide, two tall).
+- A shaft section 30 tiles wide and 34 tall (two screens tall). It is wider than the ~360 px view, so the camera scrolls horizontally.
 - **4 web strands** span it from wall to wall at different heights. Strands can be pogoed: each bounce adds 1 link and deals no damage.
 - Each strand has an **anchor** on both ends. Slashing an anchor 2 times **weakens** that strand, shown by a frayed sprite and a sag.
 - **HP:** 12. The Fall triggers at 6.
+- **No health bar.** Health reads in the world: segments fray and fall off, and threads sag (UX, 2026-11-11).
 
 **The loop (Snuff → Herd → Strike;** the brief's "Snuff, Lure, Strike", where going dark is the lure**):**
 
@@ -442,7 +452,9 @@ Three tracks, none of them XP (Pillar 3):
 
 **Across layers:** each layer twists a rule (depth ≠ darkness) rather than raising the numbers. Layer 2 is Bright Moon, where predators always see you up close. Freezing Magma flips the sanctuary rule: light is warmth.
 
-**Difficulty settings:** Easy, Normal and Hard change *only* what death costs you (see Economy). They never change damage, telegraph times or chain rules, so every player learns the same game.
+**Difficulty settings:** Easy, Normal and Hard change *only* what death costs you (see Economy). They never change damage, telegraph times or chain rules, so every player learns the same game. Difficulty is chosen at New Game and can be changed any time in Options.
+
+**Timing assists are separate settings, not difficulty** (UX, 2026-11-10). Game speed and timing assists live in Options > Accessibility (E7). They never change the difficulty rule above. Runs that use them are kept out of Guild records.
 
 [ASSUMPTION: attempt counts are targets to check in the M2 playtest, not measurements.]
 
@@ -459,7 +471,7 @@ Three tracks, none of them XP (Pillar 3):
 | Stage | How embers get here | On death |
 |---|---|---|
 | **Held** | Pogo hits on the current chain | **Lost** |
-| **Carried** | The chain ends safely (landing, Snuff, cling timeout, a crawler knock) | **Dropped** as an Ember Cache where you died. Touch it to recover it. If you die again before then, the cache is gone. |
+| **Carried** | The chain ends safely (landing, Snuff, cling timeout, a crawler knock) | **Dropped** as an Ember Cache where you died. Touch it to recover it. If you die again before then, the cache is gone. The cache glows amber and **draws nearby lurkers**, so recovering it is a risk (Pillar 1). |
 | **Deposited** | Rest at a Lift Station, or return to the hub | **Safe forever** |
 
 *Why three stages:* held embers make "one more hit" costly (Pillar 1). Carried embers make "can I reach the next station?" a real choice between stations (the session loop). A death always leaves a way back (Pillar 2).
@@ -493,7 +505,7 @@ Three tracks, none of them XP (Pillar 3):
 
 [ASSUMPTION: a Layer 1 dive between stations earns about 100–250 embers for a competent player. M2 playtests set the real prices.]
 
-[NOTE FOR DESIGNER: idea to consider. A dropped Ember Cache could glow like a small light and draw lurkers to it, so recovering it is itself a daring move (Pillar 1).]
+**Ember Cache glow** (decided in UX, 2026-11-10; was a designer note). The dropped cache glows like a small light and draws nearby lurkers, so recovering it is itself a daring move (Pillar 1). [ASSUMPTION: the glow radius and how it wakes lurkers are tuned in the E1 playtest.]
 
 ---
 
@@ -503,13 +515,15 @@ Three tracks, none of them XP (Pillar 3):
 
 | Type | Purpose | Rules |
 |---|---|---|
-| **Spine shaft** | the main descent; long chain runs | wide (26 tiles of open space); hoverers in rows with left/right choices; ledges every ≤ 1.5 s of fall; lurkers set in the walls |
+| **Spine shaft** | the main descent; long chain runs 22 tiles (352 px) of open space, so it fits the ~360 px view with no sideways scrolling; hoverers in rows with left/right choices; ledges every ≤ 1.5 s of fall; lurkers set in the walls |
 | **Narrow stretch** | the cling lesson | 6–10 tiles wide; no ledges; walls always within reach |
 | **Gate room** | chain gate | a run-up of hoverers placed so the required chain is reachable on the first try with plain movement (no dash) |
 | **Side area** | exploration and rewards | optional; may hold dense lurkers (Old Mine); always ends in a reward |
 | **Station room** | rest | no enemies within 2 screens; a lit lantern visible from the shaft above |
 | **Boss arena** | lesson test | one-way in; built by the boss (Weaver strands) |
 | **Hub** | home | no enemies, no chain, no platforming |
+
+**Framing for the gutters** (UX, 2026-11-10). The side gutters leave about 360 px (22.5 tiles) of visible width. Rooms are framed for 360 px; wider rooms scroll horizontally. The M1 shaft was built for a 480 px view, so the camera and room widths must account for the gutters. Spine shafts are 22 tiles (352 px) wide and never scroll sideways. The Weaver arena stays 30 tiles (480 px) wide and scrolls horizontally with the camera.
 
 ### Level Progression
 
@@ -528,13 +542,15 @@ Three tracks, none of them XP (Pillar 3):
 - 480×270 at integer scale.
 - Sprites of 16–24 px; bosses are built from segments.
 - Each palette zone has **4 colours**, plus the 2 reserved colours. Sprites are text pixel grids fed to the M1 pipeline.
+- **HUD:** two side gutters of about 60 px, tinted from the zone palette; the play area between them is about 360 px wide. Layout and colours: UX `DESIGN.md`.
+- **UI font:** Fusion Pixel Font 8px, proportional (latin build), OFL 1.1, on an 8 px grid (UX, 2026-11-11). Ship its licence files with the game.
 
 **Two reserved colours, used the same in every layer:**
 
 | Colour | Hex | Means | Rule |
 |---|---|---|---|
-| **Chain-light amber** | `#ffd27a` | *you*: light, embers, the flare, chain popups | never used for anything else |
-| **Predator red** | `#d9473f` | *danger that hunts by light*: lurker eyes, telegraphs, the alert HUD | never used for anything else |
+| **Chain-light amber** | `#ffd27a` | *you*: light, embers, the flare, chain popups; in menus, the selection cursor (menu light is your lantern, UX 2026-11-10) | never used for anything else |
+| **Predator red** | `#d9473f` | *danger that hunts by light*: lurker eyes, telegraphs, the HUD alert frame and eye | never used for anything else |
 
 - **Colour-blind safety:** every telegraph also has a shape and motion cue (eyes opening, a pulse, a shiver) and a sound. Colour is never the only signal.
 
@@ -632,17 +648,18 @@ Three tracks, none of them XP (Pillar 3):
 - **Hitstop and input:** input is read every frame; no frame of input is dropped during a 75 ms hitstop.
 - **Load time:** under 2 s from the hub to a Lift Station on the laptop.
 - **Memory:** ≤ 512 MB RAM on desktop, ≤ 300 MB in a web tab.
-- **Web build:** 60 FPS in desktop Chrome or Firefox on the laptop; download under 30 MB; playable within 10 s on a 50 Mbps link; pauses when the tab loses focus.
+- **Web build:** 60 FPS in desktop Chrome or Firefox on the laptop, at the 960×540 (×2) embed; download under 30 MB; playable within 10 s on a 50 Mbps link; pauses when the tab loses focus.
 
 ### Platform-Specific Details
 
 - **Engine:** Godot 4.7 (GDScript only), with the Compatibility renderer so web builds work.
 - **Targets:** PC Windows and Linux. Web/itch.io builds for playtests. The Steam vs itch.io decision is made with the M2 build.
 - **Input:** keyboard and gamepad from M2 (default mapping in E1). Every action is one button (no chords). Rebinding arrives in M2.
-- **Steam Deck:** a test pass in E7. At ×2 integer scaling (960×540, letterboxed) the HUD and text must be readable. "Verified" is the goal if Steam is chosen.
+- **Web baseline:** the itch.io embed is 960×540 (×2). If the window is still below ×2, the click-to-play gate suggests fullscreen (UX, 2026-11-11).
+- **Steam Deck:** a Deck-size legibility check in E1, done while choosing the font (UX, 2026-11-11); the full test pass in E7. At ×2 integer scaling (960×540, letterboxed) the HUD and text must be readable. "Verified" is the goal if Steam is chosen.
 - **Display:** integer scaling only (×2, ×3, ×4), nearest filtering, letterboxed.
-- **Saves:** automatic at every Lift Station rest, on the hub, and **when you quit at a lit lantern anchor**. Quitting at an anchor saves your position, so a long first descent can span two sessions. Carried embers stay at risk until a station. One profile in M2.
-- **Flash safety:** no more than 3 flashes per second anywhere. Settings include "reduce flashing", a screen-shake toggle and 4 brightness levels.
+- **Saves:** automatic at every Lift Station rest, on the hub, and **when you quit at a lit lantern anchor**. Quitting at an anchor saves your position, so a long first descent can span two sessions. Carried embers stay at risk until a station. **3 save slots** (UX, 2026-11-10): the slot picker shows depth, best chain, play time and difficulty; Continue loads the most recent slot; Load on the title opens the picker. A failed save is shown to the player.
+- **Flash safety:** no more than 3 flashes per second anywhere. Settings include "reduce flashing", a screen-shake toggle, reduced motion and 4 brightness levels (see Options rollout in Controls and Input).
 
 ### Asset Requirements
 
@@ -754,7 +771,6 @@ Not blocking M2 architecture; each is decided by the epic or pass named.
 | Respawn point for a phase-2 death (the landing station is broken until victory) | E6 |
 | Hub and Layer 2 landing palettes | E5 / E6 |
 | Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits) | architecture |
-| Assist options for Easy (the brief takes Celeste's assists) | E7 |
 | Ways to fail: Hard Landing and Grip Gives Out are dropped by M1 tuning (slow max fall, cling without stamina); Running Dry needs crafting (parked); Prey (a capture becomes an escape) | a later layer |
 | Peak moments: The Speck, Riding the Giant, Felling the Canopy, The Curious Companion | their layers |
 
@@ -775,3 +791,4 @@ Not blocking M2 architecture; each is decided by the epic or pass named.
 5. The hub palette (Art).
 6. Epic sizes and M2 duration (Epic Structure).
 7. Tester availability (above).
+8. Ember Cache glow radius and lurker pull (Economy).

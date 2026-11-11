@@ -49,7 +49,7 @@ colors:
   ui-rule-violet: '#2a2440'  # zone index 1, decorative
 typography:
   hud-value:
-    fontFamily: 'TBD in E1 (pixel font; mocks use Silkscreen as a placeholder)'
+    fontFamily: 'Fusion Pixel Font 8px, proportional (latin build)'  # decided 2026-11-11 (O1); OFL 1.1; Godot size 8; cap 6 / x-height 4 / descender 2
     fontSize: 8px
     lineHeight: 8px
   hud-value-large:
@@ -58,7 +58,7 @@ typography:
     lineHeight: 16px
   # Chain number: 0-2 links 24, 3-5 26, 6-9 28, 10+ 32. [ASSUMPTION — default, review]
   chain-number:
-    fontFamily: 'Chain numerals (digits 0-9 hand-pixelled at each height, matched to the UI font)'
+    fontFamily: 'Chain numerals (digits 0-9 hand-pixelled at each height, matched to Fusion Pixel Font)'
     fontSize: 24px
     lineHeight: 24px
   chain-number-step3:
@@ -91,9 +91,10 @@ spacing:
   embed-width: 960px
   embed-height: 540px
   gutter-width: 60px
-  gutter-usable: 59px
+  gutter-usable: 58px  # 60 minus the inner and outer 1 px rules (O17, 2026-11-11)
   play-area-width: 360px
   rule: 1px
+  outer-rule: 1px  # decided 2026-11-11 (O17): gutter edge facing the letterbox
   line-pitch: 12px
   gutter-icon: 7px
   ember-icon: 5px
@@ -172,7 +173,7 @@ spacing:
   station-total-top: 40px
 components:
   zone-roles:
-    note: 'One map per zone. Component fields below show Dusk; at runtime swap dusk for the active zone (umber, violet). Only chain-amber and predator-red stay constant.'
+    note: 'One map per zone. Component fields below show Dusk; at runtime swap dusk for the active zone (umber, violet), cross-fading over 500 ms at a zone boundary (EXPERIENCE Game Feel & Juice). Only chain-amber and predator-red stay constant.'
     dusk:
       hp: '{colors.ui-hp-dusk}'
       label: '{colors.ui-label-dusk}'
@@ -199,6 +200,9 @@ components:
     fill: '{components.zone-roles.dusk.gutter}'
     rule-width: '{spacing.rule}'
     rule-color: '{components.zone-roles.dusk.rule}'
+    outer-rule-width: '{spacing.outer-rule}'  # decided 2026-11-11 (O17)
+    outer-rule-color: '{components.zone-roles.dusk.rule}'  # same index-1 colour as the inner rule
+    zone-change: 'all zone-role colours cross-fade over 500 ms at a zone boundary; snap under reduced motion (EXPERIENCE Game Feel & Juice)'
   gutter-icon:
     set: 'heart (HP), ember (embers), chain link (chain)'
     size: '{spacing.gutter-icon}'
@@ -454,6 +458,7 @@ Exploration mocks record how decisions were made. They are not spec.
 - [HUD placement mock, variant C](.working/hud-chain-placement-2026-11-10.html): side-gutter HUD (chosen). Geometry source.
 - [UI colour themes mock, theme C](.working/ui-color-themes-2026-11-10.html): zone-matched colours (chosen). Colour source.
 - [Menu directions mock, direction B](.working/menu-directions-2026-11-10.html): ember cursor (chosen).
+- [Font candidates](.working/font-candidates-2026-11-11.html): four 8 px faces rendered in the gutter strip, the Dusk menu and at Deck size; Fusion Pixel Font 8px chosen (O1).
 
 ## Brand & Style
 
@@ -528,35 +533,33 @@ Rules and dividers stay at index 1 (1.3–2.4:1). [ASSUMPTION] They are decorati
 |---|---|
 | Fonts | One pixel font for HUD and menus |
 | Grid | 8 px grid; base size `{typography.hud-value.fontSize}` |
-| Face | [OPEN] Chosen in E1 while building HUD v2, with the Deck-size legibility check. Criteria below. |
+| Face | **Fusion Pixel Font 8px, proportional (latin build)**, `{typography.hud-value.fontFamily}` (decided 2026-11-11, O1). Godot font size 8, antialiasing and hinting off. Metrics: cap 6, x-height 4, descender 2 (6 + 2 fills the 8 px row). Digits are 5 px, uniform width, so counters do not jitter. The Deck-size check still runs in E1 with this face. |
 | Text blocks | `{typography.body-line}`: 8 px glyphs on a 12 px line pitch. Used by the death card, speech box, journal entries, slot details, controls reference and credits. |
 | Single lines | HUD values and menu items stay 8 / 8; menu rows sit at `{spacing.menu-row-pitch}`. |
-| Chain number | Digits 0–9 hand-pixelled at four heights, because an 8 px font scales cleanly only to 24 and 32. 0–2 links `{typography.chain-number}` (24 px), 3–5 `{typography.chain-number-step3}` (26 px), 6–9 `{typography.chain-number-step6}` (28 px), 10+ `{typography.chain-number-peak}` (32 px). Two digits at 32 px are about 42 px wide and fit the 59 px gutter. Glyphs are never scaled by fractions. At a step, the new size replaces the old in one frame, then the pop runs. Pop: on each link the number moves up `{spacing.chain-pop}` for 67 ms (4 frames at 60 fps), then returns. [ASSUMPTION — default, review] |
+| Chain number | Digits 0–9 hand-pixelled at four heights, because an 8 px font scales cleanly only to 24 and 32. 0–2 links `{typography.chain-number}` (24 px), 3–5 `{typography.chain-number-step3}` (26 px), 6–9 `{typography.chain-number-step6}` (28 px), 10+ `{typography.chain-number-peak}` (32 px). Two digits at 32 px are about 42 px wide and fit the 58 px usable gutter. Glyphs are never scaled by fractions. At a step, the new size replaces the old in one frame, then the pop runs. Pop: on each link the number moves up `{spacing.chain-pop}` for 67 ms (4 frames at 60 fps), then returns. [ASSUMPTION — default, review] |
 | Gutter text | None. Gutter labels are icons; only numbers remain. |
 | Text in sprites | None. All text is rendered from the string table. |
 
-**Font selection criteria** (for the E1 [OPEN] choice):
+**Measured widths** (Fusion 8 px, from the [font candidates page](.working/font-candidates-2026-11-11.html)) against the `{spacing.gutter-usable}` usable gutter:
 
-1. Readable at 8 px cap-plus-descender on the 8 px grid, at ×2 on a Deck-size panel (the E1 legibility check).
-2. Clear digits: 0/O, 1/l/I and 5/S distinct. Fixed-width (tabular) digits, so counters do not jitter.
-3. A bitmap or pixel-outline font that renders crisp in Godot with antialiasing and hinting off.
-4. At least Latin-1 plus Latin Extended-A now, with a path to Cyrillic and CJK later.
-5. OFL, CC0 or a similar free licence that allows embedding in a commercial game.
+| String | Width | Where | Fits |
+|---|---|---|---|
+| `0123456789` | 50 px | Any gutter number | Yes |
+| `+999` (held row) | about 20 px, from x 22 to x 42 | Left gutter | Yes |
+| `+1240` (held row) | about 25 px, to x 47 | Left gutter | Yes |
+| `x12 +24` (bank popup) | 33 px | Play area | Yes |
+| `EMBERS` (old text label) | 31 px | Not used; labels are icons | n/a |
 
-Candidates (verify licence and glyph coverage before adopting):
+Licence: SIL OFL 1.1. The font may ship inside the game but may not be sold on its own; `OFL.txt` and the upstream `LICENSES/` folder ship with every build (see the [NOTE FOR ARCHITECTURE] in EXPERIENCE.md Notes for Other Docs).
 
-| Candidate | Licence | Why |
-|---|---|---|
-| Fusion Pixel Font (8 px) | OFL-1.1 | Wide coverage including CJK, so one face can carry later localisation |
-| Pixel Operator | CC0 | Clean 8 px Latin with extended Latin, Greek and Cyrillic; easy to read |
-| m5x7 (Daniel Linssen) | Free, credit appreciated | Compact and well tested in indie games; Latin only, so localisation needs a fallback |
+Coverage: Latin-1 and Latin Extended-A are covered. The 8 px build lacks stacked Vietnamese marks (ầ ồ ở) and Cyrillic. Vietnamese is not needed now (English first, log 2026-11-11); a later localisation could use the Fusion 10 px or 12 px builds from the same release.
 
 **Text outline** [ASSUMPTION — default, review]: text and cues drawn over the play area get a `{spacing.text-outline}` outline on 4 sides (no diagonals) in the zone surface colour (`{components.text-outline.color}`). This covers the bank popup, death card text, the "Not saved" note and the cling cue. Glyph prompt labels sit on a backing, so they are exempt. Gutter and menu text sit on flat fills and get no outline.
 
 ## Layout & Spacing
 
 - Native canvas `{spacing.native-width}` × `{spacing.native-height}`. Whole-number scaling only (×2, ×3, ×4), nearest filtering, letterboxed (GDD Platform-Specific Details). The itch embed is `{spacing.embed-width}` × `{spacing.embed-height}` (×2).
-- Two side gutters of `{spacing.gutter-width}` frame a play area of `{spacing.play-area-width}`. Usable gutter width is `{spacing.gutter-usable}`, since the 1 px rule takes the last column. Gutters appear everywhere, including the hub and the Weaver arena.
+- Two side gutters of `{spacing.gutter-width}` frame a play area of `{spacing.play-area-width}`. Each gutter has two 1 px rules in the zone's index-1 colour: the inner rule on the play-area edge and the outer rule (`{spacing.outer-rule}`, decided 2026-11-11, O17) on the letterbox edge, so the frame reads against black letterboxing. Usable gutter width is `{spacing.gutter-usable}` (left gutter x 1–58, right gutter x 421–478). Gutters appear everywhere, including the hub and the Weaver arena.
 - Menus use the same 360 px column, from x = 60 to x = 420.
 
 ### Gutter HUD coordinates (native px)
@@ -577,9 +580,9 @@ Geometry comes from the [HUD mock C](.working/hud-chain-placement-2026-11-10.htm
 | Chain meter | Right | x 444; segment n top at y 258 − 9·(n − 1); segment 1 spans y 258–263, segment 20 top is y 87 |
 | Cling grace bar | Right | x 440–441, `{spacing.grace-bar-gap}` left of the meter, alongside the lit segments |
 | Flare notch | Right | x 458, beside segment 2 (y 249–254) |
-| Alert frame | Both | 1 px predator-red border around each gutter's edges |
+| Alert frame | Both | 1 px predator-red border around each gutter's edges, drawn over the inner and outer rules while it shows |
 
-[ASSUMPTION] This file sets these layout values: the 7 × 7 heart and chain link icons, the alert-eye spot, the 2 px grace bar and the 1 px frame. Default icon art is in Shapes and may be redrawn to match the font once chosen.
+[ASSUMPTION] This file sets these layout values: the 7 × 7 heart and chain link icons, the alert-eye spot, the 2 px grace bar and the 1 px frame. Default icon art is in Shapes and may be redrawn to match Fusion Pixel Font.
 
 ### In-world UI positions (native px) [ASSUMPTION — default, review]
 
@@ -627,9 +630,9 @@ An Accessibility option (EXPERIENCE.md). It doubles only numbers and icons. Pips
 | Alert eye | Right | ×2, centred x 450, top y 66 |
 | Meter, notch, grace bar | Right | As the default layout |
 
-[ASSUMPTION] "Numbers doubled" means the 8 px numbers. The chain number is already 24–32 px; doubled, `20` would be about 96 px wide and would not fit in 59 px.
+[ASSUMPTION] "Numbers doubled" means the 8 px numbers. The chain number is already 24–32 px; doubled, `20` would be about 96 px wide and would not fit in 58 px.
 
-At 16 px, `+999` is about 46 px and fits. Five characters (`+1240`) are about 60 px and do not. [OPEN] Ember display above 3 digits in the large HUD.
+Rechecked with Fusion's 5 px digits (2026-11-11): at 16 px, `+999` is about 40 px and `+1240` about 50 px; both fit the 58 px usable gutter. Six characters (`+12400`) are about 60 px and do not. [OPEN] Ember display above 4 digits in the large HUD (O12).
 
 ## Elevation & Depth
 
@@ -668,7 +671,7 @@ Visual specs only. EXPERIENCE.md Component Patterns gives behaviour and copy for
 
 | Component | Visual spec |
 |---|---|
-| Gutter | Flat `zone-roles.<zone>.gutter` strip, `{spacing.gutter-width}` wide, with a 1 px rule in `zone-roles.<zone>.rule` on the play-area edge. |
+| Gutter | Flat `zone-roles.<zone>.gutter` strip, `{spacing.gutter-width}` wide, with a 1 px rule in `zone-roles.<zone>.rule` on the play-area edge and a matching `{spacing.outer-rule}` outer rule on the letterbox edge (decided 2026-11-11, O17). Fill and rules cross-fade with the zone (EXPERIENCE Game Feel & Juice). |
 | Gutter icon | Heart (HP), ember (embers), chain link (chain), in the label colour. They replace the old HP / EMBERS / CHAIN text labels. Art in Shapes. No ember section icon: the held and carried row icons act as the header. [ASSUMPTION — default, review] |
 | Text outline | See Typography. [ASSUMPTION — default, review] |
 | HP pip | 4 squares of `{spacing.pip-size}` at `{spacing.pip-pitch}`, vertical. Full = filled in the HP colour. Empty = 1 px outline in the empty colour. No alert recolour. |
