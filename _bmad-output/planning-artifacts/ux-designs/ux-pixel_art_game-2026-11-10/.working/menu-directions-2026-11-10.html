@@ -1,0 +1,131 @@
+<title>Lantern Menu Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Inter:wght@400;600&display=swap">
+<style>
+/* Layout: one section per direction; each shows the pause menu at 480x270, with a live cursor driven by the arrow keys or the buttons. */
+:root {
+  --bg: #0d0c12; --panel: #16141d; --line: #2a2733; --fg: #d9d5e2; --muted: #8a8597;
+  --amber: #ffd27a;
+  --pixel: "Silkscreen", "Courier New", monospace; --body: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 48px; }
+main { max-width: 1000px; margin: 0 auto; display: grid; gap: 40px; }
+h1 { font-family: var(--pixel); font-weight: 400; font-size: 1.6rem; color: var(--amber); margin: 0; text-wrap: balance; }
+h2 { font-family: var(--pixel); font-weight: 400; font-size: 1.05rem; margin: 0; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); font-size: .9rem; }
+.intro, .dir { display: grid; gap: 12px; }
+.dir header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-family: var(--pixel); color: var(--bg); background: var(--amber); padding: 0 6px; font-size: .9rem; }
+canvas { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; display: block; image-rendering: pixelated; border: 1px solid var(--line); }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px; background: var(--panel); border: 1px solid var(--line); }
+.controls span { font-size: .85rem; color: var(--muted); }
+button { font: inherit; font-size: .85rem; background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+</style>
+
+<main>
+  <section class="intro">
+    <h1>Lantern menu directions</h1>
+    <p>Three ways to show "dark screens lit by a lantern glow", all drawn on the pause menu in the cold-violet zone. Each one has the bank summary, the tabs and the menu items you picked.</p>
+    <p class="muted">Use ↑ and ↓ (click the page first) or the buttons to move the selection. The selection eases over about 120 ms; with reduced motion it jumps.</p>
+  </section>
+  <div class="controls" role="group" aria-label="Move selection">
+    <span>Selection</span><button id="up">↑ Up</button><button id="down">↓ Down</button>
+  </div>
+
+  <article class="dir">
+    <header><span class="tag">A</span><h2>Lantern halo</h2></header>
+    <canvas id="dA" width="480" height="270"></canvas>
+    <p class="muted">A soft amber pool of light sits behind the selected item and glides to the next one. Other items stay dim in the zone's colours. It reads as you holding the lantern up to the menu.</p>
+  </article>
+  <article class="dir">
+    <header><span class="tag">B</span><h2>Ember cursor</h2></header>
+    <canvas id="dB" width="480" height="270"></canvas>
+    <p class="muted">A small flickering ember marks the selected item, and only that item's text turns bright. There's no glow, so amber stays tiny on the screen. Closest to Celeste.</p>
+  </article>
+  <article class="dir">
+    <header><span class="tag">C</span><h2>Light band</h2></header>
+    <canvas id="dC" width="480" height="270"></canvas>
+    <p class="muted">A horizontal band of warm light, like a lantern seen through a slot, lights the selected row from edge to edge. Strong and readable, but the most amber on screen.</p>
+  </article>
+</main>
+
+<script>
+const AMBER = "#ffd27a";
+const Z = ["#0d0b14", "#2a2440", "#4f5d75", "#a9b4c2"];
+const ITEMS = ["Resume", "Options", "Quit to title"];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let sel = 0, shown = 0, t0 = 0;
+
+function txt(ctx, s, x, y, size, color, align = "left") {
+  ctx.font = size + "px Silkscreen"; ctx.textAlign = align; ctx.textBaseline = "top";
+  ctx.fillStyle = color; ctx.fillText(s, x, y);
+}
+function base(ctx) {
+  ctx.fillStyle = Z[0]; ctx.fillRect(0, 0, 480, 270);
+  // tabs
+  ["Pause", "Map", "Journal"].forEach((t, i) => txt(ctx, t, 60 + i * 70, 18, 8, i === 0 ? Z[3] : Z[2]));
+  ctx.fillStyle = Z[3]; ctx.fillRect(60, 30, 34, 1);
+  ctx.fillStyle = Z[1]; ctx.fillRect(60, 36, 360, 1);
+  // bank summary panel (right)
+  const bx = 280;
+  txt(ctx, "BANK", bx, 56, 8, Z[2]);
+  [["Deposited", "312", Z[3]], ["Carried", "40", Z[3]], ["Held", "+24", AMBER]].forEach(([k, v, c], i) => {
+    txt(ctx, k, bx, 72 + i * 14, 8, Z[2]); txt(ctx, v, 420, 72 + i * 14, 8, c, "right");
+  });
+  ctx.fillStyle = Z[1]; ctx.fillRect(bx, 118, 140, 1);
+  [["Depth", "S3"], ["Best chain", "17"]].forEach(([k, v], i) => {
+    txt(ctx, k, bx, 126 + i * 14, 8, Z[2]); txt(ctx, v, 420, 126 + i * 14, 8, Z[3], "right");
+  });
+  // controls hint footer
+  txt(ctx, "Z select   X back   Arrows move", 240, 248, 8, Z[2], "center");
+}
+const rowY = i => 64 + i * 24;
+
+function drawA(ctx, y) {
+  base(ctx);
+  const g = ctx.createRadialGradient(100, y + 4, 2, 100, y + 4, 70);
+  g.addColorStop(0, "rgba(255,210,122,0.30)"); g.addColorStop(1, "rgba(255,210,122,0)");
+  ctx.fillStyle = g; ctx.fillRect(30, y - 60, 160, 130);
+  ITEMS.forEach((s, i) => txt(ctx, s, 64, rowY(i), 8, i === sel ? AMBER : Z[2]));
+}
+function drawB(ctx, y, now) {
+  base(ctx);
+  const flick = reduce ? 0 : Math.round(Math.sin(now / 90)) ;
+  ctx.fillStyle = AMBER;
+  ctx.fillRect(51, y + 1 + flick * 0, 3, 1); ctx.fillRect(50, y + 2, 5, 3); ctx.fillRect(51, y + 5, 3, 1);
+  if (flick > 0) ctx.fillRect(52, y, 1, 1);
+  ITEMS.forEach((s, i) => txt(ctx, s, 64, rowY(i), 8, i === sel ? Z[3] : Z[2]));
+}
+function drawC(ctx, y) {
+  base(ctx);
+  const g = ctx.createLinearGradient(0, y - 6, 0, y + 14);
+  g.addColorStop(0, "rgba(255,210,122,0)"); g.addColorStop(.5, "rgba(255,210,122,0.22)"); g.addColorStop(1, "rgba(255,210,122,0)");
+  ctx.fillStyle = g; ctx.fillRect(40, y - 6, 210, 20);
+  ITEMS.forEach((s, i) => txt(ctx, s, 64, rowY(i), 8, i === sel ? AMBER : Z[2]));
+}
+function frame(now) {
+  if (!t0) t0 = now;
+  const target = rowY(sel);
+  shown = reduce ? target : shown + (target - shown) * 0.35;
+  if (Math.abs(target - shown) < 0.5) shown = target;
+  const y = Math.round(shown);
+  drawA(document.getElementById("dA").getContext("2d"), y);
+  drawB(document.getElementById("dB").getContext("2d"), y, now);
+  drawC(document.getElementById("dC").getContext("2d"), y);
+  requestAnimationFrame(frame);
+}
+function move(d) { sel = (sel + d + ITEMS.length) % ITEMS.length; }
+document.getElementById("up").addEventListener("click", () => move(-1));
+document.getElementById("down").addEventListener("click", () => move(1));
+addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") { move(-1); e.preventDefault(); }
+  if (e.key === "ArrowDown") { move(1); e.preventDefault(); }
+});
+shown = rowY(0);
+(document.fonts ? document.fonts.load("8px Silkscreen").catch(() => {}) : Promise.resolve()).finally(() => requestAnimationFrame(frame));
+</script>

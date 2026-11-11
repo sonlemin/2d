@@ -1,0 +1,183 @@
+<title>Chain Counter Placement</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Inter:wght@400;600&display=swap">
+<style>
+/* Layout: one column of three 480x270 HUD mocks, each with a short trade-off note beside or below it. */
+:root {
+  --bg: #0d0c12;          /* shaft-dark ground, slight violet cast like the M1 ambient */
+  --panel: #16141d;
+  --line: #2a2733;
+  --fg: #d9d5e2;
+  --muted: #8a8597;
+  --amber: #ffd27a;       /* reserved: player / chain-light (GDD) */
+  --red: #d9473f;         /* reserved: predators / alert HUD (GDD) */
+  --pixel: "Silkscreen", "Courier New", monospace;
+  --body: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 48px; }
+main { max-width: 1000px; margin: 0 auto; display: grid; gap: 40px; }
+h1 { font-family: var(--pixel); font-weight: 400; font-size: 1.6rem; color: var(--amber); margin: 0; text-wrap: balance; }
+h2 { font-family: var(--pixel); font-weight: 400; font-size: 1.05rem; margin: 0; letter-spacing: .02em; }
+p { margin: 0; max-width: 65ch; }
+.intro { display: grid; gap: 10px; }
+.muted { color: var(--muted); font-size: .9rem; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; background: var(--panel); border: 1px solid var(--line); }
+.controls span { font-size: .85rem; color: var(--muted); margin-right: 4px; }
+button { font: inherit; font-size: .85rem; background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; }
+button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.variant { display: grid; gap: 12px; }
+.variant header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-family: var(--pixel); color: var(--bg); background: var(--amber); padding: 0 6px; font-size: .9rem; }
+.screen { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line); }
+canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.notes div { min-width: 0; }
+.notes b { display: block; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+ul { margin: 0; padding-left: 18px; }
+li { margin: 2px 0; }
+</style>
+
+<main>
+  <section class="intro">
+    <h1>Chain counter placement</h1>
+    <p>Three layouts at the game's native 480×270, scaled up with no smoothing. Each one shows HP (4), held and carried embers, and the chain counter in the same Downwell-like shaft.</p>
+    <p class="muted">Placeholders: the font (Silkscreen) and the HP colour aren't decided yet. Only the amber and red come from the GDD. Use the buttons to change the chain length and to turn on a lurker alert, which turns the HUD red.</p>
+  </section>
+
+  <div class="controls" role="group" aria-label="Preview state">
+    <span>Chain</span>
+    <button id="c0" data-chain="0">0</button>
+    <button id="c7" data-chain="7" aria-pressed="true">7</button>
+    <button id="c18" data-chain="18">18</button>
+    <span style="margin-left:12px">Lurker alert</span>
+    <button id="alert" aria-pressed="false">Off</button>
+  </div>
+
+  <article class="variant">
+    <header><span class="tag">A</span><h2>Top-centre, large</h2></header>
+    <div class="screen"><canvas id="vA" width="480" height="270"></canvas></div>
+    <div class="notes">
+      <div><b>Good</b><ul><li>The camera leads downward, so the top of the screen is mostly empty.</li><li>One fixed place to look, like a score.</li></ul></div>
+      <div><b>Cost</b><ul><li>Your eyes travel up and away from the action below.</li><li>Sits close to danger coming from above.</li></ul></div>
+    </div>
+  </article>
+
+  <article class="variant">
+    <header><span class="tag">B</span><h2>Beside the player</h2></header>
+    <div class="screen"><canvas id="vB" width="480" height="270"></canvas></div>
+    <div class="notes">
+      <div><b>Good</b><ul><li>Your eyes never leave the character.</li><li>Grows with the light radius, so it feels like the light itself.</li></ul></div>
+      <div><b>Cost</b><ul><li>Competes with pogo sparks and chain popups.</li><li>Moves with the player and can sit over walls and enemies.</li></ul></div>
+    </div>
+  </article>
+
+  <article class="variant">
+    <header><span class="tag">C</span><h2>Side gutters, Downwell-like</h2></header>
+    <div class="screen"><canvas id="vC" width="480" height="270"></canvas></div>
+    <div class="notes">
+      <div><b>Good</b><ul><li>The HUD never covers the shaft.</li><li>The chain number can be very large, and the vertical strip suits a descent.</li></ul></div>
+      <div><b>Cost</b><ul><li>Takes about 120 px of width from the play area.</li><li>Wider rooms (the hub, the Weaver arena) need a different layout.</li></ul></div>
+    </div>
+  </article>
+</main>
+
+<script>
+const AMBER = "#ffd27a", RED = "#d9473f", HP = "#e8e4ef", DIM = "#4a4656", ROCK = "#1b1922", ROCK2 = "#262330";
+let chain = 7, alert = false;
+
+function scene(ctx, x0, w) {
+  // shaft
+  ctx.fillStyle = "#07060a"; ctx.fillRect(0, 0, 480, 270);
+  ctx.fillStyle = ROCK;
+  ctx.fillRect(x0, 0, 24, 270); ctx.fillRect(x0 + w - 24, 0, 24, 270);
+  ctx.fillStyle = ROCK2;
+  [[x0 + 24, 70, 70], [x0 + w - 24 - 90, 150, 90], [x0 + 24, 228, 60]].forEach(([x, y, lw]) => ctx.fillRect(x, y, lw, 8));
+  // light radius 40 + 22*sqrt(links)
+  const px = x0 + w / 2, py = 118, r = 40 + 22 * Math.sqrt(chain);
+  const g = ctx.createRadialGradient(px, py, 2, px, py, r);
+  g.addColorStop(0, "rgba(255,210,122,0.35)"); g.addColorStop(1, "rgba(255,210,122,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  // player
+  ctx.fillStyle = "#cfc9da"; ctx.fillRect(px - 4, py - 6, 8, 12);
+  ctx.fillStyle = AMBER; ctx.fillRect(px - 1, py - 9, 2, 2);
+  // crawler below
+  ctx.fillStyle = "#6b6578"; ctx.fillRect(px - 30, 144, 12, 6);
+  // lurker eyes in wall
+  ctx.fillStyle = alert ? RED : "#3a2024";
+  ctx.fillRect(x0 + w - 20, 196, 3, 2); ctx.fillRect(x0 + w - 14, 196, 3, 2);
+  return { px, py };
+}
+
+function txt(ctx, s, x, y, size, color, align = "left") {
+  ctx.font = size + "px Silkscreen"; ctx.textAlign = align; ctx.textBaseline = "top";
+  ctx.fillStyle = "#05040a"; ctx.fillText(s, x + 1, y + 1);
+  ctx.fillStyle = color; ctx.fillText(s, x, y);
+}
+function hp(ctx, x, y, vertical) {
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i < 3 ? (alert ? RED : HP) : DIM;
+    vertical ? ctx.fillRect(x, y + i * 10, 7, 7) : ctx.fillRect(x + i * 10, y, 7, 7);
+  }
+}
+function ember(ctx, x, y, filled) {
+  ctx.fillStyle = filled ? AMBER : "#8a6f3c";
+  ctx.fillRect(x + 1, y, 3, 1); ctx.fillRect(x, y + 1, 5, 3); ctx.fillRect(x + 1, y + 4, 3, 1);
+}
+function embers(ctx, x, y, align) {
+  const held = "+" + (chain * 2), carried = "24";
+  if (align === "right") {
+    txt(ctx, held, x - 8, y, 8, alert ? RED : AMBER, "right"); ember(ctx, x - 6, y + 1, true);
+    txt(ctx, carried, x - 8, y + 11, 8, HP, "right"); ember(ctx, x - 6, y + 12, false);
+  } else {
+    ember(ctx, x, y + 1, true); txt(ctx, held, x + 8, y, 8, alert ? RED : AMBER);
+    ember(ctx, x, y + 12, false); txt(ctx, carried, x + 8, y + 11, 8, HP);
+  }
+}
+const chainColor = () => alert ? RED : (chain ? AMBER : DIM);
+const chainSize = () => chain >= 10 ? 32 : chain >= 3 ? 24 : 16;
+
+function drawA() {
+  const ctx = document.getElementById("vA").getContext("2d");
+  scene(ctx, 90, 300);
+  hp(ctx, 8, 8, false); embers(ctx, 472, 6, "right");
+  txt(ctx, "x" + chain, 240, 4, chainSize(), chainColor(), "center");
+}
+function drawB() {
+  const ctx = document.getElementById("vB").getContext("2d");
+  const { px, py } = scene(ctx, 90, 300);
+  hp(ctx, 8, 8, false); embers(ctx, 8, 20, "left");
+  if (chain) txt(ctx, "x" + chain, px + 10, py - 26, chain >= 10 ? 16 : 8, chainColor());
+}
+function drawC() {
+  const ctx = document.getElementById("vC").getContext("2d");
+  scene(ctx, 60, 360);
+  ctx.fillStyle = "#0a090e"; ctx.fillRect(0, 0, 60, 270); ctx.fillRect(420, 0, 60, 270);
+  ctx.fillStyle = "#1f1c27"; ctx.fillRect(59, 0, 1, 270); ctx.fillRect(420, 0, 1, 270);
+  txt(ctx, "HP", 30, 10, 8, HP, "center"); hp(ctx, 26, 24, true);
+  txt(ctx, "EMBERS", 30, 80, 8, HP, "center");
+  ember(ctx, 14, 96, true); txt(ctx, "+" + chain * 2, 22, 95, 8, alert ? RED : AMBER);
+  ember(ctx, 14, 108, false); txt(ctx, "24", 22, 107, 8, HP);
+  txt(ctx, "CHAIN", 450, 10, 8, HP, "center");
+  txt(ctx, String(chain), 450, 24, chain >= 10 ? 32 : 24, chainColor(), "center");
+  // vertical chain meter to the 20 cap
+  for (let i = 0; i < 20; i++) {
+    ctx.fillStyle = i < chain ? chainColor() : "#2a2733";
+    ctx.fillRect(444, 258 - i * 9, 12, 6);
+  }
+}
+function draw() { drawA(); drawB(); drawC(); }
+
+document.querySelectorAll("[data-chain]").forEach(b => b.addEventListener("click", () => {
+  chain = +b.dataset.chain;
+  document.querySelectorAll("[data-chain]").forEach(o => o.setAttribute("aria-pressed", o === b));
+  draw();
+}));
+document.getElementById("alert").addEventListener("click", e => {
+  alert = !alert; e.target.setAttribute("aria-pressed", alert); e.target.textContent = alert ? "On" : "Off"; draw();
+});
+(document.fonts ? document.fonts.load("8px Silkscreen").catch(() => {}) : Promise.resolve()).finally(draw);
+</script>

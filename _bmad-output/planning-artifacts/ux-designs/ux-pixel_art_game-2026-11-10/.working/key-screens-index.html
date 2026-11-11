@@ -1,0 +1,29 @@
+<title>Unbroken Chain Key Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a short index that links the four 480×270 key-screen mocks. */
+:root { --bg: #18100b; --panel: #2b1d14; --line: #6b4a2f; --fg: #d8c3a0; --muted: #b08a5a; --amber: #ffd27a;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 48px; }
+main { max-width: 760px; margin: 0 auto; display: grid; gap: 24px; }
+h1 { font-family: var(--mono); color: var(--amber); font-size: 1.5rem; margin: 0; }
+p { margin: 0; max-width: 65ch; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+li a { display: grid; gap: 4px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); color: var(--fg); text-decoration: none; }
+li a:hover, li a:focus-visible { border-color: var(--amber); outline: none; }
+li b { font-family: var(--mono); color: var(--amber); font-weight: 400; }
+li span { color: var(--muted); font-size: .9rem; }
+</style>
+<main>
+  <h1>Key screens</h1>
+  <p>Mocks at 480×270, drawn from the UX spines, shown at ×2. Each page lists the spine sections it illustrates and anything the renderer had to assume. The font is a placeholder until the face is picked in E1.</p>
+  <ul>
+    <li><a href="key-hud.html"><b>In-game HUD</b><span>Seven states: normal, lurker alert, cling, bank, Dusk zone, large-HUD assist, save failed.</span></a></li>
+    <li><a href="key-death-card.html"><b>Death card</b><span>Normal (cache dropped), Easy, Hard, and Normal after the cache is lost.</span></a></li>
+    <li><a href="key-title-slots.html"><b>Title and slot picker</b><span>Title with the ember cursor, the Load picker, and the delete confirm.</span></a></li>
+    <li><a href="key-pause-options.html"><b>Pause and Options</b><span>Pause in E1, the Accessibility tab, and the save-failure note.</span></a></li>
+    <li><a href="key-station-menu.html"><b>Station menu</b><span>Rest with the bank count-up, the station menu, and the Fast travel list.</span></a></li>
+    <li><a href="key-web-gate.html"><b>Web gate</b><span>Click to play at ×2, and the small-window fullscreen suggestion.</span></a></li>
+  </ul>
+</main>

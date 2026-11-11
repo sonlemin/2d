@@ -1,0 +1,138 @@
+<title>HUD Colour Themes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Inter:wght@400;600&display=swap">
+<style>
+/* Layout: one row per theme; each row shows the gutter HUD in the three Layer 1 palette zones (dusk, umber, cold violet). */
+:root {
+  --bg: #0d0c12; --panel: #16141d; --line: #2a2733; --fg: #d9d5e2; --muted: #8a8597;
+  --amber: #ffd27a; --red: #d9473f;
+  --pixel: "Silkscreen", "Courier New", monospace; --body: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 48px; }
+main { max-width: 1100px; margin: 0 auto; display: grid; gap: 40px; }
+h1 { font-family: var(--pixel); font-weight: 400; font-size: 1.6rem; color: var(--amber); margin: 0; text-wrap: balance; }
+h2 { font-family: var(--pixel); font-weight: 400; font-size: 1.05rem; margin: 0; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); font-size: .9rem; }
+.intro, .theme { display: grid; gap: 12px; }
+.theme header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.tag { font-family: var(--pixel); color: var(--bg); background: var(--amber); padding: 0 6px; font-size: .9rem; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+figure { margin: 0; display: grid; gap: 4px; min-width: 0; }
+figcaption { font-size: .8rem; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+canvas { width: 100%; aspect-ratio: 16 / 9; display: block; image-rendering: pixelated; border: 1px solid var(--line); }
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; font-size: .85rem; }
+.sw { display: flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.sw i { width: 14px; height: 14px; display: inline-block; border: 1px solid var(--line); }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px; background: var(--panel); border: 1px solid var(--line); }
+.controls span { font-size: .85rem; color: var(--muted); }
+button { font: inherit; font-size: .85rem; background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; }
+button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+</style>
+
+<main>
+  <section class="intro">
+    <h1>HUD colour themes</h1>
+    <p>Three palettes for the non-reserved UI colours (HP, labels, empty meter segments), shown on the side-gutter HUD you picked. Each theme appears in all three Layer 1 palette zones, and the gutters take their tint from the zone's darkest colour.</p>
+    <p class="muted">Amber and red are fixed by the GDD. The zone hexes come from the GDD Art Style section.</p>
+  </section>
+  <div class="controls" role="group" aria-label="Preview state">
+    <span>Lurker alert</span><button id="alert" aria-pressed="false">Off</button>
+    <span>HP</span><button id="hp4" data-hp="4">4</button><button id="hp2" data-hp="2" aria-pressed="true">2</button><button id="hp1" data-hp="1">1</button>
+  </div>
+  <div id="themes"></div>
+</main>
+
+<script>
+const AMBER = "#ffd27a", RED = "#d9473f";
+const ZONES = [
+  { name: "S1 / A · Dusk", c: ["#2b1d14", "#6b4a2f", "#b08a5a", "#d8c3a0"] },
+  { name: "S2–S3 · Umber", c: ["#1e1714", "#4a3a33", "#7d6a5c", "#a99a8c"] },
+  { name: "S4–S5 · Cold violet", c: ["#0d0b14", "#2a2440", "#4f5d75", "#a9b4c2"] },
+];
+const THEMES = [
+  { key: "A", name: "Bone", note: "Warm pale neutrals that stay the same in every zone. HP reads as bone, not light.",
+    hp: () => "#e8dcc4", label: () => "#b9ae9c", dim: () => "#4d453d" },
+  { key: "B", name: "Steel", note: "Cool silver-blue taken from the M1 ledge rim. Strongest contrast against the warm amber.",
+    hp: () => "#b8c3d1", label: () => "#8f9aab", dim: () => "#3a4150" },
+  { key: "C", name: "Zone-matched", note: "HP and labels use each zone's own lightest and mid colours, so the HUD shifts with the layer and only amber stays constant (Pillar 3: depth ≠ darkness).",
+    hp: z => z.c[3], label: z => z.c[2], dim: z => z.c[1] },
+];
+let alert = false, hpNow = 2;
+
+function txt(ctx, s, x, y, size, color, align = "center") {
+  ctx.font = size + "px Silkscreen"; ctx.textAlign = align; ctx.textBaseline = "top";
+  ctx.fillStyle = "#05040a"; ctx.fillText(s, x + 1, y + 1);
+  ctx.fillStyle = color; ctx.fillText(s, x, y);
+}
+function mix(hex, k) { // darken a zone colour for the gutter tint
+  const n = parseInt(hex.slice(1), 16); const f = v => Math.round(v * k);
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+function draw(cv, t, z) {
+  const ctx = cv.getContext("2d"), chain = 12;
+  ctx.fillStyle = mix(z.c[0], .55); ctx.fillRect(0, 0, 480, 270);
+  // play area
+  ctx.fillStyle = z.c[0]; ctx.fillRect(60, 0, 360, 270);
+  ctx.fillStyle = z.c[1]; ctx.fillRect(60, 0, 24, 270); ctx.fillRect(396, 0, 24, 270);
+  ctx.fillRect(84, 80, 70, 8); ctx.fillRect(306, 170, 90, 8);
+  const px = 240, py = 120, r = 40 + 22 * Math.sqrt(chain);
+  const g = ctx.createRadialGradient(px, py, 2, px, py, r);
+  g.addColorStop(0, "rgba(255,210,122,0.32)"); g.addColorStop(1, "rgba(255,210,122,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  ctx.fillStyle = z.c[3]; ctx.fillRect(px - 4, py - 6, 8, 12);
+  ctx.fillStyle = AMBER; ctx.fillRect(px - 1, py - 9, 2, 2);
+  // gutter rules
+  ctx.fillStyle = z.c[1]; ctx.fillRect(59, 0, 1, 270); ctx.fillRect(420, 0, 1, 270);
+  const alertOr = c => alert ? RED : c;
+  // left gutter
+  txt(ctx, "HP", 30, 10, 8, t.label(z));
+  for (let i = 0; i < 4; i++) { ctx.fillStyle = i < hpNow ? alertOr(t.hp(z)) : t.dim(z); ctx.fillRect(26, 24 + i * 10, 7, 7); }
+  txt(ctx, "EMBERS", 30, 80, 8, t.label(z));
+  ctx.fillStyle = AMBER; ctx.fillRect(15, 97, 3, 1); ctx.fillRect(14, 98, 5, 3); ctx.fillRect(15, 101, 3, 1);
+  txt(ctx, "+24", 22, 95, 8, alertOr(AMBER), "left");
+  ctx.fillStyle = t.hp(z); ctx.fillRect(15, 109, 3, 1); ctx.fillRect(14, 110, 5, 3); ctx.fillRect(15, 113, 3, 1);
+  txt(ctx, "40", 22, 107, 8, t.hp(z), "left");
+  // right gutter
+  txt(ctx, "CHAIN", 450, 10, 8, t.label(z));
+  txt(ctx, String(chain), 450, 24, 32, alertOr(AMBER));
+  for (let i = 0; i < 20; i++) {
+    ctx.fillStyle = i < chain ? alertOr(AMBER) : t.dim(z);
+    ctx.fillRect(444, 258 - i * 9, 12, 6);
+  }
+  ctx.fillStyle = t.label(z); ctx.fillRect(458, 258 - 1 * 9, 3, 6); // flare-ready notch at segment 2
+}
+function render() {
+  const host = document.getElementById("themes");
+  host.innerHTML = "";
+  THEMES.forEach(t => {
+    const sec = document.createElement("section"); sec.className = "theme";
+    sec.innerHTML = `<header><span class="tag">${t.key}</span><h2>${t.name}</h2></header><p class="muted">${t.note}</p>`;
+    const sw = document.createElement("div"); sw.className = "swatches";
+    const z = ZONES[2];
+    [["HP", t.hp(z)], ["Label", t.label(z)], ["Empty", t.dim(z)]].forEach(([n, c]) => {
+      sw.insertAdjacentHTML("beforeend", `<span class="sw"><i style="background:${c}"></i>${n} ${t.key === "C" ? "(per zone)" : c}</span>`);
+    });
+    sec.appendChild(sw);
+    const row = document.createElement("div"); row.className = "row";
+    ZONES.forEach(zz => {
+      const f = document.createElement("figure");
+      const cv = document.createElement("canvas"); cv.width = 480; cv.height = 270;
+      f.appendChild(cv); f.insertAdjacentHTML("beforeend", `<figcaption>${zz.name}</figcaption>`);
+      row.appendChild(f); draw(cv, t, zz);
+    });
+    sec.appendChild(row); host.appendChild(sec);
+  });
+}
+document.getElementById("alert").addEventListener("click", e => {
+  alert = !alert; e.target.setAttribute("aria-pressed", alert); e.target.textContent = alert ? "On" : "Off"; render();
+});
+document.querySelectorAll("[data-hp]").forEach(b => b.addEventListener("click", () => {
+  hpNow = +b.dataset.hp; document.querySelectorAll("[data-hp]").forEach(o => o.setAttribute("aria-pressed", o === b)); render();
+}));
+(document.fonts ? document.fonts.load("8px Silkscreen").catch(() => {}) : Promise.resolve()).finally(render);
+</script>

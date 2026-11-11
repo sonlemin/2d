@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Click-to-Play Gate</title>
+<style>
+/*
+Key screens: web click-to-play gate at x2, and below x2 with the fullscreen suggestion (Dusk, outside play).
+Governing spine sections:
+  DESIGN.md  Colors > Zone-matched UI roles (Dusk); Typography (body-line 8/12; face [OPEN]);
+             Layout & Spacing (native 480x270, embed 960x540, whole-number scaling, letterbox);
+             Components: Click-to-play gate, Menu screen (Dusk outside play, D13).
+  EXPERIENCE.md  IA (screen map, Click-to-play gate row); Component Patterns: Click-to-play gate; State Patterns: Web cold load;
+             Responsive & Platform (Web row: 960x540 embed, below x2 suggests fullscreen, HiDPI); Input Schemes (Web keys); E1 default D15.
+Font: system monospace is a PLACEHOLDER. The pixel face is [OPEN] (DESIGN Typography). textLength pins 5 px per glyph.
+Static mock: no JS, no network. Motion (cursor flicker and ease, ember fly-in, count-up) is described, not shown.
+The spines are the contract; where this mock and DESIGN.md / EXPERIENCE.md disagree, the spines win.
+*/
+
+:root {
+  --page: #120d0a; --panel: #1c1510; --line: #3a2c20; --fg: #e6dccb; --muted: #a8977f; --amber: #ffd27a;
+  --ui: ui-sans-serif, system-ui, sans-serif;
+  /* Placeholder: system monospace stands in for the pixel font. The face is [OPEN] (DESIGN Typography; chosen in E1 with the Deck-size check). */
+  --pixel: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--fg); font: 15px/1.5 var(--ui); padding: 32px 16px 48px; }
+main { max-width: 992px; margin: 0 auto; display: grid; gap: 40px; }
+h1 { font: 600 1.4rem/1.2 var(--ui); margin: 0; color: var(--amber); }
+h2 { font: 600 1.05rem/1.3 var(--ui); margin: 0; }
+h3 { font: 600 .85rem/1.3 var(--ui); margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+p, li { max-width: 75ch; }
+p { margin: 0; }
+ul { margin: 4px 0 0; padding-left: 20px; }
+.muted { color: var(--muted); font-size: .9rem; }
+section { display: grid; gap: 12px; }
+.win { width: 100%; max-width: 962px; border: 1px solid var(--line); background: #000; line-height: 0; }
+.win.small { max-width: 802px; }
+svg.px { width: 100%; height: auto; display: block; image-rendering: pixelated; shape-rendering: crispEdges; }
+svg.px text { font-family: var(--pixel); text-rendering: optimizeSpeed; -webkit-font-smoothing: none; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; background: var(--panel); border: 1px solid var(--line); padding: 12px 16px; font-size: .9rem; }
+code { font-family: var(--pixel); font-size: .85em; }
+</style>
+</head>
+<body>
+<main>
+<header style="display:grid;gap:8px">
+<h1>Web Click-to-Play Gate</h1>
+<p class="muted">Key screens for the web build (itch.io), E1, Dusk palette (menus outside play). Frame (a) is the 960×540 embed: 480×270 native at ×2. Frame (b) is an 800×450 browser window, too small for ×2, so the game runs at ×1 and letterboxes. The spines are the contract; these mocks illustrate. Items tagged [ASSUMPTION] are placements the spines do not give.</p>
+</header>
+<section><h2>(a) Gate at ×2</h2><p class="muted">The 960×540 itch embed on load: one body line in the HP colour on the Dusk surface. The first click (or key) gives focus and unlocks audio, then the title shows.</p><div class="win"><svg class="px" viewBox="0 0 480 270" width="960" height="540" shape-rendering="crispEdges" role="img" aria-label="Click-to-play gate at x2" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="480" height="270" fill="#2b1d14"/><text x="240" y="138" fill="#d8c3a0" font-size="8" text-anchor="middle" textLength="65" lengthAdjust="spacingAndGlyphs">Click to play</text></svg></div><div class="notes"><div><h3>Spine sections</h3><ul><li>DESIGN Components: Click-to-play gate (one body line, HP colour, menu surface), Menu screen (D13); Layout & Spacing: embed 960×540</li><li>EXPERIENCE IA: Click-to-play gate; Component Patterns: Click-to-play gate; State Patterns: Web cold load; Responsive & Platform: Web</li></ul></div><div><h3>[ASSUMPTION] placed here, not in the spines</h3><ul><li>Copy "Click to play" (the screen-map label). A key press also dismisses it; whether the line says so is not specified.</li><li>Line centred in the 480 px frame (x 240, top y 131). No gutters, logo or title shaft behind the gate (the title starts after the click).</li></ul></div></div></section><section><h2>(b) Gate below ×2</h2><p class="muted">An 800×450 browser window at devicePixelRatio 1: ×2 does not fit, so the game runs at ×1 (480×270, black letterbox) and the gate adds the fullscreen suggestion as a second body line. Shown at true size (not ×2), so the text is as small as the player sees it.</p><div class="win small"><svg class="px" viewBox="0 0 800 450" width="800" height="450" shape-rendering="crispEdges" role="img" aria-label="Click-to-play gate below x2" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="800" height="450" fill="#000"/><svg x="160" y="90" width="480" height="270" viewBox="0 0 480 270"><rect x="0" y="0" width="480" height="270" fill="#2b1d14"/><text x="240" y="132" fill="#d8c3a0" font-size="8" text-anchor="middle" textLength="65" lengthAdjust="spacingAndGlyphs">Click to play</text><text x="240" y="144" fill="#b08a5a" font-size="8" text-anchor="middle" textLength="145" lengthAdjust="spacingAndGlyphs">Small window. Try fullscreen.</text></svg></svg></div><div class="notes"><div><h3>Spine sections</h3><ul><li>EXPERIENCE Responsive & Platform: Web (below ×2 the gate suggests fullscreen; scale from physical pixels, D15); Component Patterns: Click-to-play gate</li><li>DESIGN Components: Click-to-play gate ("adds a fullscreen suggestion when the window is below ×2"); Typography: body-line 12 px pitch</li></ul></div><div><h3>[ASSUMPTION] placed here, not in the spines</h3><ul><li>Copy "Small window. Try fullscreen." in the voice of a field note; it does not name the itch button or a key.</li><li>Suggestion colour: label colour (the click line stays HP).</li><li>Two-line block centred: tops y 125 / 137 on the 12 px pitch.</li><li>Letterbox colour black ([OPEN] EXPERIENCE Open Questions O17).</li><li>Not drawn: windows below 480×270 physical px (fractional downscale, per D15) and the same suggestion in the Pause tab.</li></ul></div></div></section></main>
+</body>
+</html>
