@@ -3,7 +3,7 @@ title: "The Unbroken Chain — Game Design Document"
 game_type: metroidvania (descent; action-platformer feel conventions)
 platforms: [PC Windows, PC Linux, web/itch.io for playtests]
 created: 2026-11-10
-updated: 2026-11-11
+updated: 2026-11-12
 status: final
 inputs:
   - _bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/
@@ -150,7 +150,10 @@ The HUD sits in two side gutters of about 60 px each, so the visible play area i
 | Wall cling | **paused**, 1.0 s per chain (a pogo hit refills it), then breaks | kept, then → carried | → 40 px while clinging |
 | Any hit (crawler, spiderling, boss, lurker, spikes) | breaks | → carried | → 40 px |
 | Flare Toss | −half (see below) | share → carried | shrinks to the new chain |
+| Crossing a room exit (backstop; architecture ADR-2) | breaks, exactly like a landing | → carried | → 40 px |
 | Death | breaks | **lost** | n/a |
+
+The room-exit row is a runtime backstop: level design places exits behind a landing (no exit inside a chain run, bot-checked), so it should rarely fire. The Fall is the one scripted exception that keeps the chain across rooms.
 
 *Why Snuff is a button despite the research's "no hide button" advice:* *Last Light* testers found a light toggle on top of platforming overwhelming. Snuff is not a toggle you leave on: it **ends your chain**, so it works as a cash-out. The light stays automatic; Snuff is only an emergency exit (the brief's decision log also kept it). Two things to watch in playtests: whether tap vs hold on Light feels overwhelming mid-chain (E1), and whether an instant mid-air Snuff becomes a free bank every time a telegraph starts (see Risks).
 
@@ -202,6 +205,7 @@ The HUD sits in two side gutters of about 60 px each, so the visible play area i
 - **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), you hear a quiet stirring panned to that side. At the play-area edge, level with the lurker, a half-open eye appears and opens wider as it stirs, with a red glow that has a minimum strength. A faint glow alone is not enough (UX, 2026-11-11). It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*).
 - **Telegraph:** 0.9 s (never below 0.75 s). Its eyes open with an animation and pulse at 2 Hz, cast red light on the wall. Both HUD gutters show a pulsing red frame (≤ 2 Hz) and a small eye icon. HUD values are not recoloured (UX, 2026-11-11).
 - **Hunt:** 95 px/s straight at you, passing through walls. It **senses** you while your light radius is ≥ 80 px and you are within radius × 1.6. Once it can't sense you, it stops at once and is harmless, waits 0.6 s, then returns home.
+- **Retargeting:** if a lurker hunting a flare or the Ember Cache switches to you, it telegraphs again from the start (≥ 0.75 s) before it can hurt you. Every hunt of the player is telegraphed (Pillar 2). Switching from you to a flare needs no telegraph.
 
 ### Controls and Input
 
@@ -505,7 +509,7 @@ Three tracks, none of them XP (Pillar 3):
 
 [ASSUMPTION: a Layer 1 dive between stations earns about 100–250 embers for a competent player. M2 playtests set the real prices.]
 
-**Ember Cache glow** (decided in UX, 2026-11-10; was a designer note). The dropped cache glows like a small light and draws nearby lurkers, so recovering it is itself a daring move (Pillar 1). [ASSUMPTION: the glow radius and how it wakes lurkers are tuned in the E1 playtest.]
+**Ember Cache glow** (decided in UX, 2026-11-10; was a designer note). The dropped cache glows like a small light and draws nearby lurkers, so recovering it is itself a daring move (Pillar 1). The cache wakes lurkers by the same rule as your light: its glow radius must be **≥ 80 px**, and the lurker must be within radius × 1.6 and on screen (architecture, 2026-11-11). [ASSUMPTION: the glow radius itself is tuned in the E1 playtest; below 80 px the cache draws nothing.]
 
 ---
 
@@ -515,7 +519,7 @@ Three tracks, none of them XP (Pillar 3):
 
 | Type | Purpose | Rules |
 |---|---|---|
-| **Spine shaft** | the main descent; long chain runs 22 tiles (352 px) of open space, so it fits the ~360 px view with no sideways scrolling; hoverers in rows with left/right choices; ledges every ≤ 1.5 s of fall; lurkers set in the walls |
+| **Spine shaft** | the main descent; 22 tiles (352 px) wall to wall, side walls included, so both walls stay in view for cling; so it fits the ~360 px view with no sideways scrolling; hoverers in rows with left/right choices; ledges every ≤ 1.5 s of fall; lurkers set in the walls |
 | **Narrow stretch** | the cling lesson | 6–10 tiles wide; no ledges; walls always within reach |
 | **Gate room** | chain gate | a run-up of hoverers placed so the required chain is reachable on the first try with plain movement (no dash) |
 | **Side area** | exploration and rewards | optional; may hold dense lurkers (Old Mine); always ends in a reward |
@@ -523,7 +527,7 @@ Three tracks, none of them XP (Pillar 3):
 | **Boss arena** | lesson test | one-way in; built by the boss (Weaver strands) |
 | **Hub** | home | no enemies, no chain, no platforming |
 
-**Framing for the gutters** (UX, 2026-11-10). The side gutters leave about 360 px (22.5 tiles) of visible width. Rooms are framed for 360 px; wider rooms scroll horizontally. The M1 shaft was built for a 480 px view, so the camera and room widths must account for the gutters. Spine shafts are 22 tiles (352 px) wide and never scroll sideways. The Weaver arena stays 30 tiles (480 px) wide and scrolls horizontally with the camera.
+**Framing for the gutters** (UX, 2026-11-10). The side gutters leave about 360 px (22.5 tiles) of visible width. Rooms are framed for 360 px; wider rooms scroll horizontally. The M1 shaft was built for a 480 px view, so the camera and room widths must account for the gutters. Spine shafts are 22 tiles (352 px) wide wall to wall, side walls included, and never scroll sideways. The Weaver arena stays 30 tiles (480 px) wide and scrolls horizontally with the camera.
 
 ### Level Progression
 
@@ -770,7 +774,8 @@ Not blocking M2 architecture; each is decided by the epic or pass named.
 | How each side area exits back to the spine | E4 |
 | Respawn point for a phase-2 death (the landing station is broken until victory) | E6 |
 | Hub and Layer 2 landing palettes | E5 / E6 |
-| Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits) | architecture |
+| Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits). *Architecture, 2026-11-11:* bloom stays off until the E1 worst-case perf scene holds 60 FPS on web and the HD 620 target; otherwise it is faked with unshaded sprites | E1 perf scene |
+| A cap on simultaneous flares. The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs, so repeated tosses could crowd it (architecture, 2026-11-11) | E1 perf scene + playtest |
 | Ways to fail: Hard Landing and Grip Gives Out are dropped by M1 tuning (slow max fall, cling without stamina); Running Dry needs crafting (parked); Prey (a capture becomes an escape) | a later layer |
 | Peak moments: The Speck, Riding the Giant, Felling the Canopy, The Curious Companion | their layers |
 

@@ -18,7 +18,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - **Three ember stages:** held → carried → deposited. The Ember Cache drops on death and can be recovered once; its glow draws nearby lurkers. Easy, Normal and Hard differ only in death cost.
 - **Lift Station rest** (a placeholder station): full heal, deposit, enemies respawn.
 - **Saving:** autosave on rest; **3 save slots** with a slot picker, Continue and Load on the title.
-- **Resize the M1 shaft:** `game/scripts/shaft.gd` LAYOUT is 30 tiles (480 px) wide. Rebuild it at 22 tiles (352 px) to fit the gutter view, and set the camera limits so the shaft sits inside the play area.
+- **Resize the M1 shaft:** `game/scripts/shaft.gd` LAYOUT is 30 tiles (480 px) wide. Rebuild it at 22 tiles (352 px) wall to wall, side walls included, to fit the gutter view, and set the camera limits so the shaft sits inside the play area.
 - **HUD v2 in side gutters:** HP, held and carried embers, chain number and meter. The play area is about 360 px wide. Lurker alert = pulsing red gutter frame plus an eye icon.
 - **Font:** Fusion Pixel Font 8px (OFL), with the **Deck-size legibility check** (×2, 960×540) done alongside. The full Deck pass stays in E7.
 - **Options (small, from the Pause menu):** Game tab (difficulty) and Accessibility tab (reduce flashing, screen shake, reduced motion with the OS default on web, Light tap window 0.12 / 0.2 / 0.3 s, hold→press toggles for Cling and Snuff; with the Snuff toggle On, Light is Flare Toss only and Snuff moves to Shift / pad LB as a press-toggle).
@@ -120,7 +120,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 **Goal:** Edge of the Abyss, from the Lip to the Weaver's door.
 
 **In:**
-- Rooms and screen transitions; the camera leads downward. Spine shafts are 22 tiles (352 px) wide, with no sideways scrolling.
+- Rooms and screen transitions; the camera leads downward. Spine shafts are 22 tiles (352 px) wide wall to wall (side walls included), with no sideways scrolling.
 - The spine **S1–S5** (about 23 screens) and side areas **A Rope Works, B Old Mine, C Sky Ledge**.
 - **Chain gate 1 (≥ 4)** and **gate 2 (≥ 8)**, which opens the shortcut to the hub.
 - **Lift Stations:** Lip and Hollow (real ones). About 5 lantern anchors.

@@ -192,3 +192,14 @@ Source: `ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md` (Notes for Other
 - **Spine shafts narrow from 26 tiles (416 px) to 22 tiles (352 px),** so they fit the ~360 px view between the gutters with no sideways scrolling. The Weaver arena stays 30 tiles (480 px) and scrolls horizontally with the camera ("one screen wide" removed). Updated: Level Types, the gutter framing note, the Weaver arena, epics E2 and E4. The M1 findings give no shaft widths, so nothing there conflicts.
 
 - 2026-11-11 — Snuff toggle mode (from UX): with the Accessibility Snuff toggle On, Light only throws Flare Tosses and Snuff moves to its own key (default Shift; pad LB) as a press-toggle. It still ends the chain. Pillar 4's "no new buttons" holds for the default scheme; the extra key exists only in this accessibility mode.
+
+## 2026-11-12 — Follow-ups from the game architecture
+
+Source: `_bmad-output/game-architecture.md`, Validation → Follow-ups.
+
+- **Room-exit backstop:** crossing a room exit with a live chain banks it like a landing (ADR-2). Added as a row in the chain table, with a note that level design keeps exits out of chain runs and The Fall is the only exception.
+- **Retargeting needs a fresh telegraph:** a lurker that switches from a flare or cache to the player telegraphs again (≥ 0.75 s). Added to Predators: Lurker.
+- **Ember Cache wake rule:** the cache wakes lurkers only if its glow radius is ≥ 80 px (same notice rule as the player). Added to Economy; the radius stays an E1 tuning assumption.
+- **Spine width wording:** "22 tiles of open space" → "22 tiles wall to wall, side walls included". Updated: Level Types, the gutter framing note, epics E1 and E4.
+- **Open questions:** added a cap on simultaneous flares (E1 perf scene + playtest); the bloom question records the architecture's answer and moves to the E1 perf scene.
+- **Status:** stays `final`; `updated: 2026-11-12`.
