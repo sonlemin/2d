@@ -4,7 +4,7 @@ baseline_commit: d71497d
 
 # Story 1.4: State objects in the Game autoload
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -51,8 +51,8 @@ so that global, per-slot and per-dive state each have exactly one home.
 
 Run everything from `game/` and wrap every Godot run in `timeout`.
 
-- [ ] **Task 1: Baseline** (AC: 7)
-  - [ ] Run `timeout 500 ./run_tests.sh`. Expect these results (re-run at story creation on `d71497d`):
+- [x] **Task 1: Baseline** (AC: 7)
+  - [x] Run `timeout 500 ./run_tests.sh`. Expect these results (re-run at story creation on `d71497d`):
     - `test_chain_state`: `ALL PASS (69 checks)`
     - `test_log`: 7 `ok` + `PASS`
     - `test_clock`: 15 `ok` + `PASS`
@@ -60,23 +60,23 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
     - `test_deferred_owners`: 22 `ok` + `PASS`
     - `smoke_shaft`: 28 `ok` + `SMOKE PASS`
     - the last line: `== ALL GREEN`
-  - [ ] Record the counts in the Debug Log.
-  - [ ] Record whether the real settings file exists: `ls "$HOME/.local/share/godot/app_userdata/The Unbroken Chain (M1 prototype)/"`. At story creation there was none.
-- [ ] **Task 2: The three state classes** (AC: 1, 4, 6)
-  - [ ] Create `scripts/rules/settings.gd`, `slot_state.gd` and `dive_state.gd` per Dev Notes → *Settings*, *SlotState*, *DiveState* and D1–D4, D8, D9.
-  - [ ] Run `godot --headless --path . --import` so the new `class_name`s register (1.1 lesson: the cache goes stale).
-  - [ ] Create `tests/test_state.gd` with the pure cases and the purity case (Dev Notes → *test_state*).
-  - [ ] Add `test_state` to the `for t in …` list in `run_tests.sh`, after `test_tuning`.
-- [ ] **Task 3: `SaveStore` and `Game`** (AC: 2, 5)
-  - [ ] Create `scripts/core/save_store.gd` per Dev Notes → *SaveStore* (D5).
-  - [ ] Update `scripts/core/game.gd` per Dev Notes → *Game* (D6, D7).
-  - [ ] Add the `Game` cases and the settings-file cases to `test_state.gd`.
-- [ ] **Task 4: Migrate `shaft.gd`** (AC: 3)
-  - [ ] Follow Dev Notes → *shaft.gd migration* (D10).
-  - [ ] Hand-edit `scenes/shaft.tscn` to delete the `Controls` label node. Never re-save the scene in the editor.
-  - [ ] Run `run_tests.sh`. Expect the Task 1 counts plus `test_state`.
-- [ ] **Task 5: Docs and project-context** (fix facts only; the docs get regenerated later)
-  - [ ] `docs/architecture.md`:
+  - [x] Record the counts in the Debug Log.
+  - [x] Record whether the real settings file exists: `ls "$HOME/.local/share/godot/app_userdata/The Unbroken Chain (M1 prototype)/"`. At story creation there was none.
+- [x] **Task 2: The three state classes** (AC: 1, 4, 6)
+  - [x] Create `scripts/rules/settings.gd`, `slot_state.gd` and `dive_state.gd` per Dev Notes → *Settings*, *SlotState*, *DiveState* and D1–D4, D8, D9.
+  - [x] Run `godot --headless --path . --import` so the new `class_name`s register (1.1 lesson: the cache goes stale).
+  - [x] Create `tests/test_state.gd` with the pure cases and the purity case (Dev Notes → *test_state*).
+  - [x] Add `test_state` to the `for t in …` list in `run_tests.sh`, after `test_tuning`.
+- [x] **Task 3: `SaveStore` and `Game`** (AC: 2, 5)
+  - [x] Create `scripts/core/save_store.gd` per Dev Notes → *SaveStore* (D5).
+  - [x] Update `scripts/core/game.gd` per Dev Notes → *Game* (D6, D7).
+  - [x] Add the `Game` cases and the settings-file cases to `test_state.gd`.
+- [x] **Task 4: Migrate `shaft.gd`** (AC: 3)
+  - [x] Follow Dev Notes → *shaft.gd migration* (D10).
+  - [x] Hand-edit `scenes/shaft.tscn` to delete the `Controls` label node. Never re-save the scene in the editor.
+  - [x] Run `run_tests.sh`. Expect the Task 1 counts plus `test_state`.
+- [x] **Task 5: Docs and project-context** (fix facts only; the docs get regenerated later)
+  - [x] `docs/architecture.md`:
     - Line 32: `Game` holds `clock`, `tuning`, `settings`, `slot`, `dive` and `store`.
     - Lines 44, 50 and 59: the Debug layer has no Controls hint. `chain.banked` now calls `Game.dive.add_carried()`, and the Communication table row says so.
     - Lines 74–82, "Session state (survives death)": the statics table becomes the `Game` state objects (`Settings.brightness`, `SlotState.best_chain` / `deaths`, `DiveState.carried` and its respawn point), plus `settings.json`.
@@ -84,29 +84,29 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
     - Line 132: a death respawns at `P` with carried embers kept; held embers are still lost.
     - Line 159: F1 cycles `Settings.brightness`, which persists.
     - Gap table, lines 216–222: fix only the M1-column facts (respawn, F2, persistence is `settings.json` only).
-  - [ ] `docs/component-inventory.md`:
+  - [x] `docs/component-inventory.md`:
     - Shaft section (lines 98–109): no session statics; the `Debug/Controls` row is gone; the Player row says "spawned at `P`"; the hotkeys are F1 (brightness, saved in `settings.json`) and F3 (restart from the top).
     - Line 141: "F1–F3" becomes "F1 and F3".
     - Core table (line 115): update the `game.gd` row, and add rows for `Settings`, `SlotState`, `DiveState` and `SaveStore`.
-  - [ ] `docs/development-guide.md`:
+  - [x] `docs/development-guide.md`:
     - Line 28: the hotkeys (F2 is gone; F1 now persists).
     - The test list (around line 43): add `test_state.gd`.
     - Line 63, "Reset what you touch": add `Game.reset_for_tests()`. Also say that tests never call `Game.boot()`, and that a test that checks files points `Game.store.dir` at a temp folder it removes.
-  - [ ] `docs/source-tree-analysis.md`:
+  - [x] `docs/source-tree-analysis.md`:
     - The tree block: add `scripts/rules/{settings,slot_state,dive_state}.gd`, `scripts/core/save_store.gd` and `tests/test_state.gd`.
     - Line 26: drop "session statics" from `shaft.gd`.
     - Line 36: list `game.gd`'s refs.
-  - [ ] `docs/index.md` line 17 and `docs/project-overview.md` line 16: "static session state" becomes "session state in pure objects held by the `Game` autoload".
-  - [ ] `game/README.md`:
+  - [x] `docs/index.md` line 17 and `docs/project-overview.md` line 16: "static session state" becomes "session state in pure objects held by the `Game` autoload".
+  - [x] `game/README.md`:
     - Controls table: delete the F2 row. F1 reads "Cycle brightness (4 levels; remembered between launches)".
     - Line 27: dying respawns you at the top of the shaft, and F3 also restarts from the top.
     - Tests: add a `test_state.gd` line.
-  - [ ] `_bmad-output/project-context.md` → "Current State vs Target":
+  - [x] `_bmad-output/project-context.md` → "Current State vs Target":
     - Add one sentence after the 1.3 sentence: "Story 1.4 added `Settings`, `SlotState` and `DiveState` in `rules/` and `core/save_store.gd` (`settings.json`), held by `Game` (`boot()`, `reset_for_tests()`); `shaft.gd`'s statics moved into them, and its controls bar and F2 are gone."
     - In the next sentence, "(LAYOUT, statics, F1–F3, scene reload; retired in 1.7)" becomes "(LAYOUT, F1/F3, scene reload; retired in 1.7)".
     - Remove nothing else.
-  - [ ] `_bmad-output/game-architecture.md` → Data Persistence, the `settings.json` bullet (line 377). Append: "`Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; tests never boot, and point `Game.store.dir` at a temp folder when they test the file."
-- [ ] **Task 6: Verify** (AC: 1–7). Every grep below must print nothing, except the two `ls` lines and the final `cat`.
+  - [x] `_bmad-output/game-architecture.md` → Data Persistence, the `settings.json` bullet (line 377). Append: "`Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; tests never boot, and point `Game.store.dir` at a temp folder when they test the file."
+- [x] **Task 6: Verify** (AC: 1–7). Every grep below must print nothing, except the two `ls` lines and the final `cat`.
   ```bash
   REAL="$HOME/.local/share/godot/app_userdata/The Unbroken Chain (M1 prototype)/settings.json"
   godot --headless --path . --import 2>&1 | grep -E 'SCRIPT ERROR|ERROR:'
@@ -125,8 +125,8 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
   cat "$REAL"                       # {"settings": {"brightness": 1}, "version": 1}, tab-indented
   timeout 120 xvfb-run -a godot --path . --rendering-driver opengl3 --audio-driver Dummy res://tests/runner.tscn -- res://tests/screenshot.gd <scratchpad>/shots   # exit 0, two PNGs as before
   ```
-  - [ ] The raw per-test greps also catch exit-time leaks (`ERROR: … leaked at exit`), which print after the runner has finished.
-- [ ] **Task 7: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
+  - [x] The raw per-test greps also catch exit-time leaks (`ERROR: … leaked at exit`), which print after the runner has finished.
+- [x] **Task 7: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
   - `feat:` the three state classes and the pure half of `test_state` (Task 2)
   - `feat:` `SaveStore`, the `Game` refs, `boot()` and `settings.json`, with the `Game` and file cases (Task 3)
   - `refactor:` the shaft statics move into `Game`, and the controls bar and F2 go (Task 4)
@@ -621,14 +621,90 @@ The pattern: `feat:` / `refactor:` / `docs:` commits, each leaving `run_tests.sh
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`) via gds-dev-story, 2026-11-12.
+
 ### Debug Log References
+
+- **Baseline (Task 1, on `fb4ab8f`, i.e. `d71497d` + the story file):** `test_chain_state` ALL PASS (69 checks), `test_log` 7, `test_clock` 15, `test_tuning` 85, `test_deferred_owners` 22, `smoke_shaft` 28 + SMOKE PASS, `== ALL GREEN`. The real user folder held `logs/`, `objectdb_snapshots/` and `shader_cache/`, with **no `settings.json`**.
+- **Probes on 4.7.2 before writing `Game`:**
+  - `debug/gdscript/warnings/assert_always_false` exists at level 1 (warn). A bare `assert(false, …)` in each D7 setter would show 5 editor warnings, so each one carries `@warning_ignore("assert_always_false")`.
+  - `FileAccess.store_string()` returns `bool` (true), so `write_settings()` returns `ERR_FILE_CANT_WRITE` when it fails.
+- **Red phases:**
+  - `test_state.gd` failed to parse before each class existed (`SlotState`, `DiveState`, then `SaveStore` unknown).
+  - That is a weak red, so four mutants of `game.gd` were run against the finished test:
+    1. **`reset_for_tests()` without the disarm:** caught (2 FAIL). **It also created the real `user://settings.json`.** Teardown's `reset_for_tests()` pointed the store home while the mutant's write was still queued, and the write landed a frame later. The file was inspected (the defaults, written 20:06 by this run) and deleted, since the baseline had none. Teardown now keeps the store on `TMP` for a frame after the reset and checks that nothing was written. Re-run: caught (2 FAIL), and the real folder stayed clean.
+    2. **The one-write-per-frame guard removed:** **passed every spec'd check.** Both deferred writes flush in the same frame and leave the same file, so "delete it; a frame later it is still gone" can't see them. Added a `WriteCounter` Logger that counts `Log.format(Log.SAVE, "settings written")` lines. Re-run: caught (`2 writes`).
+    3. **`load_settings()` without the disarm:** caught (2 FAIL: the valid file is rewritten, and two changes write in the same frame).
+    4. **`load_settings()` ignoring `from_dict()`'s clean flag:** caught (2 FAIL). It also showed that `_tmp_holds()` compared `"bright" == 1`, which is a **SCRIPT ERROR on 4.7.2, not `false`**. The helper now checks types first.
+- **Runtime probe of D10** (a throwaway `tests/zz_probe_shaft.gd`, deleted, never committed): the shaft was made the current scene with `Game.store.dir` on a temp folder.
+  - The spawn at `P` is (72, 84). F1 changed the brightness from 1 to 2, the darkness changed, and the file was written.
+  - The player was moved to (200, 700), then `die()` → reload → the new shaft's player at (72, 84) == `P`.
+  - Deaths 1, carried 4 and best 3 all survive. The brightness stays 2, and the HUD label reads `Game`.
+  - `settings.changed` has 2 connections: `Game`'s own plus the new shaft's. The freed shaft's connection dropped.
+- **Task 6:**
+  - Import: clean.
+  - `REAL` absent before and after the seven raw per-test runs, and no `SCRIPT ERROR`/`ERROR:` line in any of them (so no exit-time leak).
+  - `run_tests.sh`: 69 / 7 / 15 / 85 / **test_state 111** / 22 / 28, `== ALL GREEN`.
+  - The `static var`, purity, `Controls`/`KEY_F2`/`_controls` and existing-tests greps print nothing.
+  - **The `parse_string|ConfigFile|make_dir` grep prints 2 lines, both `##` comments in `save_store.gd`** naming those APIs as the trap. That is the header text Dev Notes → *SaveStore* and D5 ask for. A code-only variant (comment lines dropped) prints nothing.
+  - `--quit-after 120`: no error, and it wrote `REAL` as `{"settings": {"brightness": 1}, "version": 1}`, tab-indented. That is the game's own boot, as expected, so **the server now has a real `settings.json`**.
+  - Screenshot: exit 0, two PNGs. The HUD reads `embers 0 (held +0) chain 0 (best 0) … deaths 0`, and the bottom controls bar is gone.
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-12. Ultimate context engine analysis completed - comprehensive developer guide created. The settings persistence path (`Game` + `SaveStore` + a `brightness`-only `Settings`) and every engine behaviour it relies on were dry-run on Godot 4.7.2 first (see "Verified on the server").
+- **Implemented as specified, with D1–D10 applied as written** (no veto came in):
+  - `Settings` (brightness only; `SCHEMA`, `set_value`, `_valid` with the type check first), `SlotState` (records, difficulty ids, sorted String flags) and `DiveState` (carried, the respawn point, killed enemies never saved), all pure `RefCounted`.
+  - `from_dict()` never asserts, returns whether the data was clean and takes whole floats as ints.
+  - Each class sets every field before emitting. A load or reset emits every value signal once, and `flag_set` fires per changed id.
+  - `SaveStore` (`Game.store`): `.tmp` then rename, never creates a folder, one warning on unusable data.
+  - `Game`: five guarded refs plus `store`; `boot()` once; `load_settings()` decides the rewrite from `from_dict()`'s result; at most one write per frame; `reset_for_tests()` in the spec's order.
+  - `shaft.gd` has no statics. It boots behind `current_scene == self`, records through `Game`, respawns at `P`, and F2 and the controls bar are gone.
+- **Beyond the letter of the spec (each one closes a gap found while testing):**
+  - `@warning_ignore("assert_always_false")` on the five D7 asserts.
+  - In `test_state`:
+    - the `WriteCounter` check ("written once, not once per change")
+    - teardown holds the store on `TMP` for a frame ("after reset_for_tests() nothing is written")
+    - `_tmp_holds()` checks types before comparing
+    - `(setup: …)` checks that make sure the probe request and gear really were active before the reset
+    - DiveState: a respawn room that isn't a string falls back
+  - The corrupt-file warning drops `get_error_line()`, which printed `line 0` for a one-line file.
+- **Commits** were made at each task boundary, so each one is green and `test_state.gd` grows in two steps:
+  - `15d6a2e` feat (Task 2)
+  - `31cb44c` feat (Task 3)
+  - `48397af` refactor (Task 4)
+  - `44a6a89` docs (Task 5)
+  - Every new `.gd.uid` is committed beside its script.
+- **Docs:**
+  - Every line listed in Task 5 was fixed.
+  - The `docs/architecture.md` diagram line lost its controls hint and is now 95 characters wide like its neighbours (it was 96 before).
+  - `docs/project-scan-report.json` still says "shaft statics". It is a dated scan log and isn't in Task 5, so it was left alone.
+  - The development guide's test list was already missing `test_tuning.gd` before this story; only `test_state.gd` was added.
+- **For the next story:** the real `user://settings.json` now exists on the server (Task 6's game boot). Tests never touch it.
+- **Tests green; needs a feel check on the laptop:** death now respawns at the top until anchors land in 1.24, brightness persists between launches, and the controls hint is gone. Gameplay numbers are unchanged.
 
 ### File List
+
+New:
+- `game/scripts/rules/settings.gd`, `game/scripts/rules/settings.gd.uid`
+- `game/scripts/rules/slot_state.gd`, `game/scripts/rules/slot_state.gd.uid`
+- `game/scripts/rules/dive_state.gd`, `game/scripts/rules/dive_state.gd.uid`
+- `game/scripts/core/save_store.gd`, `game/scripts/core/save_store.gd.uid`
+- `game/tests/test_state.gd`, `game/tests/test_state.gd.uid`
+
+Modified:
+- `game/scripts/core/game.gd`
+- `game/scripts/shaft.gd`
+- `game/scenes/shaft.tscn` (the `Controls` node removed by hand)
+- `game/run_tests.sh`
+- `game/README.md`
+- `docs/architecture.md`, `docs/component-inventory.md`, `docs/development-guide.md`, `docs/index.md`, `docs/project-overview.md`, `docs/source-tree-analysis.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-4-state-objects-in-the-game-autoload.md`
 
 ## Change Log
 
 - 2026-11-12: Story 1.4 created (ready-for-dev).
+- 2026-11-12: Implemented (`15d6a2e`, `31cb44c`, `48397af`, `44a6a89`). `Settings`, `SlotState` and `DiveState` added; `SaveStore` and `settings.json` added; `Game` holds the session state with guarded refs, `boot()` and `reset_for_tests()`; the shaft statics moved into `Game`; F2 and the controls bar are gone; the shaft respawns at `P`; docs updated. `test_state` (111 checks), hardened by four mutants. Status: review.
