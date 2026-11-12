@@ -4,7 +4,7 @@ baseline_commit: d71497d
 
 # Story 1.4: State objects in the Game autoload
 
-Status: review
+Status: done
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -38,7 +38,8 @@ so that global, per-slot and per-dive state each have exactly one home.
 5. **Settings persist to `user://settings.json`** (AR14, AR37, R15):
    - `Settings.set_value(&"key", v)` emits `changed(key)` when the value changes.
    - `core/save_store.gd` (`SaveStore`, held as `Game.store`) writes `settings.json` as `{"version": 1, "settings": {…}}`. It writes at most once per frame, into `Game.store.dir`. Tests redirect that folder, so they never touch the real file.
-   - A missing or corrupt file, a wrong `version`, or a missing or bad key falls back to the default, and the file is rewritten.
+   - A missing or corrupt file, or a missing or bad key, falls back to the default, and the file is rewritten. A `version` that isn't a number, or is below this build's, counts as corrupt.
+   - A file that can't be opened, or that has a newer `version`, also gives the defaults but is left untouched: one warning, and settings changes aren't written for that session. (Changed by the review on 2026-11-12, sonlm's decision; the original bullet rewrote any wrong `version`.)
    - Parsing uses `JSON.new().parse()`, which prints no engine error. A corrupt file gives one `push_warning`, never an `ERROR:` line.
    - The game loads the file through `Game.boot()`. The entry scene calls it once (`shaft.gd` for now). Tests never call it (D6).
 6. **State is written only through rule methods that emit typed signals** (AR18):
@@ -132,6 +133,75 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
   - `refactor:` the shaft statics move into `Game`, and the controls bar and F2 go (Task 4)
   - `docs:` (Task 5)
   - Commit each new `.gd.uid` beside its script.
+
+### Review Findings
+
+Code review 2026-11-12 (gds-code-review; Blind Hunter, Edge Case Hunter, Acceptance Auditor) of `d71497d..4cd18ae`. The story record and the sprint status were excluded.
+- The Auditor found no AC unmet. The reviewer's own `run_tests.sh` run is ALL GREEN (`test_state` 111 checks) and left the real `user://settings.json` untouched.
+- The findings are one design question on the settings file, test-strength gaps, a few unguarded load paths that no caller reaches yet, and doc accuracy.
+- Engine facts were checked, not assumed: the Windows rename against the 4.7 source, the rest by a probe on 4.7.2 (out-of-range `int()`, a dictionary changed while it is walked, `String` / `StringName` keys, an unreadable file, invalid UTF-8).
+- 9 were dismissed: spec decisions (D2, D3, D7, AC3's respawn at `P`), an item Story 1.21 already owns, and wording.
+- sonlm chose option 1 on the one decision, then "apply every patch". All ten are fixed in `4079fae`, and `run_tests.sh` stays ALL GREEN: `test_state` 145 checks (was 111), the new `smoke_shaft_state` 14, `test_deferred_owners` 24, the rest unchanged.
+- Sixteen mutants, each undoing one fix, were run on a scratch copy with its own `user://`. Every one fails the suite. The real `user://settings.json` kept its text and modified time through all of it.
+- `SaveStore.read_settings()` now returns `{found, settings}` with a `SaveStore.Found` value; Dev Notes → *SaveStore* and *Game* below still describe the pre-review `Variant` / `null` shape.
+- One trap for later tests: a lambda connected to a state object's signal that also captures that object keeps both alive, and the leak prints an engine `ERROR:` after the runner has exited 0. `_test_slot_handler_sets_a_flag` disconnects its handler for that reason.
+
+- [x] [Review][Patch] A settings file that exists but can't be used is overwritten with the defaults — `load_settings()` queues a rewrite whenever `read_settings()` returns `null` [game/scripts/core/game.gd:62-66, game/scripts/core/save_store.gd:30-32,41-43]
+  - **Decided by sonlm 2026-11-12 (was a Decision): option 1.** An unopenable or newer-version file is left untouched: defaults in memory, one warning, and writes stay disarmed for the session. AC5's third bullet changes to match.
+  - **Spec:** AC5 and Dev Notes → *SaveStore* prescribe this for every unusable file, a newer `version` included.
+  - **Effect:** a file that can't be opened for a moment (a lock, permissions) or that a newer build wrote is replaced a frame later (probe: a file with no read permission is unopenable, silently, and the rename then replaces it). Only `brightness` is at stake today; from Story 1.16 the file holds `reduce_flashing`.
+  - **Conflict:** Story 1.21 gives slots the opposite rule: a newer-version or damaged slot is "rejected and left untouched" and "never written over".
+  - **Options offered:** (1) for *unopenable* and *newer version*: defaults in memory, one warning, and writes stay disarmed for the session; a missing, corrupt or partly bad file is still rewritten. (2) Keep the spec's rule and hand the question to Story 1.36. (3) Keep it as it is.
+  - **Fix:** `read_settings()` tells the caller why nothing usable came back; `load_settings()` arms and rewrites only for a missing, corrupt or partly bad file. Two `test_state` cases: an unopenable file and a `version` 2 file both stay byte-for-byte as they were, and a later `set_value()` writes nothing.
+- [x] [Review][Patch] The shaft migration has no committed test [game/scripts/shaft.gd:146-155,228-250,266]
+  - **Cause:** AC3's only runtime evidence is a probe that was deleted. `smoke_shaft.gd` asserts nothing on `Game.dive`, `Game.slot` or `Game.settings`.
+  - **Effect:** dropping `_on_banked`, `_on_chain_changed` or `record_death()`, or breaking the brightness signal, passes the suite. Story 1.5 edits the shaft next.
+  - **Fix:** a new `tests/smoke_shaft_state.gd`, added to `run_tests.sh`: a bank raises `Game.dive.carried`, a chain raises `Game.slot.best_chain`, a death raises `Game.slot.deaths`, `set_value(&"brightness", …)` changes `$Darkness.color`, and a shaft added by a harness doesn't boot. It ends with `Game.reset_for_tests()`.
+- [x] [Review][Patch] Several `test_state` checks can't fail for what their message names [game/tests/test_state.gd:458,462,504,535]
+  - `:458` "through .tmp, renamed": a direct write to `settings.json` passes too.
+  - `:462` and `:504` "one warning": nothing counts warnings.
+  - `:504` the failed write: it passes when no write is attempted.
+  - `:535` the real file: it compares text only, and the real file now holds exactly the defaults, so a leaked default write is invisible.
+  - Not asserted: D2's "emit even when unchanged" for `Settings.reset()` and for `carried_changed` on `DiveState.from_dict()`; the `read_settings()` branches for a top-level array, a missing or string `version`, and a `settings` that isn't an object.
+  - **Fix:** plant a marker `.tmp` and check it is consumed; count warnings with a `Logger`; check that `write_settings()` returns an error for the missing folder; compare the real file's modified time too; add the missing D2 checks and fixtures.
+- [x] [Review][Patch] "Tests never boot" is written in four places, and `test_state.gd` boots [game/scripts/core/game.gd:7,71, docs/development-guide.md:64, _bmad-output/game-architecture.md:377]
+  - `test_state.gd:517-520` calls `Game.boot()` twice, as Dev Notes → *test_state* asks. AC5 says tests never call it, so the spec contradicts itself and the code followed the Dev Notes.
+  - `reset_for_tests()` leaves `_booted` true, so a case added after that one gets a silent no-op `boot()`.
+  - **Fix:** state the rule the Dev Notes give: a test may boot only after it points `store.dir` at a temp folder, the process stays booted, and that case runs last.
+- [x] [Review][Patch] The crash-safety comment is true on Linux only [game/scripts/core/save_store.gd:49-50]
+  - On Windows the engine's rename deletes an existing target and then moves the file (4.7 source, `drivers/windows/dir_access_windows.cpp`). A crash between the two leaves only `settings.json.tmp`, which nothing reads, so the next launch starts from the defaults.
+  - **Fix:** say so in the comment. That is acceptable for settings; slots get their `.bak` in Story 1.21 (see the deferred item).
+- [x] [Review][Patch] `DiveState.from_dict()` can load half a respawn point [game/scripts/rules/dive_state.gd:62-69]
+  - Room and entry fall back one by one, so a bad room with a good entry loads as (`""`, `anchor_m1_1`). `test_state.gd:343` builds that state and checks only the room.
+  - **Fix:** the point is one value: when either half has the wrong type, clear both, and check the entry in the test. No caller loads a dive yet.
+- [x] [Review][Patch] `_count()` has no upper bound, and an empty flag id loads as clean [game/scripts/rules/slot_state.gd:87-91,121-124, game/scripts/rules/dive_state.gd:88-91]
+  - A whole float beyond the int range (`1e30`, or `1e999` parsed as `inf`) passes `v == floorf(v)` and reaches `int(v)`. On x86-64 the cast gives the lowest int, so the field falls back to 0 by luck (probe); the web build wasn't probed and may clamp to the highest int, which would load as clean.
+  - `"flags": [""]` adds the flag `&""`, which then lives in the save.
+  - **Fix:** reject floats above 2^53 before `int()`; skip an empty id and mark the data unclean; one test case each.
+- [x] [Review][Patch] `SlotState._assign()` emits `flag_set` while it walks the live `_flags` [game/scripts/rules/slot_state.gd:113-115]
+  - A handler that sets a flag changes the dictionary mid-loop. The probe shows the new key is then visited too, so its `flag_set` fires twice. Nothing subscribes yet.
+  - **Fix:** `for id: StringName in _flags.keys():`.
+- [x] [Review][Patch] Nothing checks the `Settings` schema convention or pins its key type [game/scripts/rules/settings.gd:15-17,35-39, game/tests/test_state.gd:91]
+  - "One `SCHEMA` entry plus a typed var of the same name" is a convention only. A key with no var writes `null`, reads back unclean and is rewritten on every launch. Five later stories add keys.
+  - `to_dict()` returns `StringName` keys where the other two classes return `String`s. The test can't tell: `{&"brightness": 1} == {"brightness": 1}` is true (probe).
+  - **Fix:** a test that walks `SCHEMA` (the var exists, has the default's type, and the default is in `choices`); `d[String(key)]` in `to_dict()`, and a check that every key is a `String`.
+- [x] [Review][Patch] Doc facts left stale [docs/architecture.md:198,216,218, docs/project-overview.md:39]
+  - `docs/architecture.md:198` still says "Static vars on `shaft.gd` are the only persistence. Anything that must survive death goes there today."
+  - `docs/project-overview.md:39` still says "Respawn at the last ledge stood on", and `docs/architecture.md:216` still names "the floor poll".
+  - The test tables in `docs/architecture.md:178-185` and `docs/component-inventory.md:174-182` have no `test_state.gd` row.
+  - F1's end has three dates: `game/scripts/shaft.gd:16` "until Options (1.36)", `docs/architecture.md:218` "removed in E7", and the plan (Story 1.7 deletes the shaft; DevTools sets brightness until 1.36).
+  - `_bmad-output/project-context.md:107` still lists "statics, F1–F3"; line 30 says the statics "moved", which hides that the checkpoint was dropped.
+  - `_bmad-output/game-architecture.md:303,787` list `Game`'s refs without `store`.
+  - **Fix:** correct each line; facts only.
+- [x] [Review][Defer] Settings writes skip the checks that slot saves get [game/scripts/core/save_store.gd:51-64, game/scripts/core/game.gd:99-103] — deferred, belongs with the slot saves.
+  - No read-back of `.tmp` before the rename, so a write that fails at close can replace a good file.
+  - A failed write only warns: there is no signal, so no "Not saved" state.
+  - `_bmad-output/game-architecture.md:530` still shows a static `SaveStore.write(…)`; the store is an instance at `Game.store`.
+  - Proposed owner: Story 1.21 (see `deferred-work.md`).
+- [x] [Review][Defer] The `rules/` purity check has holes, and nothing stops a direct write to a state field [game/tests/test_state.gd:14-18,351, game/tests/test_tuning.gd:185] — deferred, pre-existing pattern.
+  - `\bNode\b` misses `Node2D`, `\bInput\b` misses `InputEventKey`, and `OS`, `Time` and `load(` aren't listed. The file list is kept by hand.
+  - `Game.settings.brightness = 2` compiles, emits nothing and is never saved.
+  - Proposed owner: Story 1.9 (see `deferred-work.md`).
 
 ## Dev Notes
 
@@ -704,7 +774,21 @@ Modified:
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/1-4-state-objects-in-the-game-autoload.md`
 
+Review (2026-11-12), new:
+- `game/tests/smoke_shaft_state.gd`, `game/tests/smoke_shaft_state.gd.uid`
+
+Review (2026-11-12), modified:
+- `game/scripts/core/game.gd`, `game/scripts/core/save_store.gd`
+- `game/scripts/rules/settings.gd`, `game/scripts/rules/slot_state.gd`, `game/scripts/rules/dive_state.gd`
+- `game/scripts/shaft.gd` (one comment)
+- `game/tests/test_state.gd`, `game/run_tests.sh`, `game/README.md`
+- `docs/architecture.md`, `docs/component-inventory.md`, `docs/development-guide.md`, `docs/project-overview.md`, `docs/source-tree-analysis.md`
+- `_bmad-output/project-context.md`, `_bmad-output/game-architecture.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md` (two items, owners proposed: Story 1.21 and Story 1.9)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`, and this file
+
 ## Change Log
 
 - 2026-11-12: Story 1.4 created (ready-for-dev).
 - 2026-11-12: Implemented (`15d6a2e`, `31cb44c`, `48397af`, `44a6a89`). `Settings`, `SlotState` and `DiveState` added; `SaveStore` and `settings.json` added; `Game` holds the session state with guarded refs, `boot()` and `reset_for_tests()`; the shaft statics moved into `Game`; F2 and the controls bar are gone; the shaft respawns at `P`; docs updated. `test_state` (111 checks), hardened by four mutants. Status: review.
+- 2026-11-12: Code review (gds-code-review). 1 decision (settings files that can't be opened or are from a newer build are now left untouched; AC5 edited), 10 patches applied, 2 deferred with proposed owners (Story 1.21, Story 1.9), 9 dismissed. `smoke_shaft_state` added; `test_state` 111 → 145 checks; `run_tests.sh` ALL GREEN. Status done.
