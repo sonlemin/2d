@@ -6,7 +6,7 @@ Tuning values are the M1 playtested values. The GDD Game Mechanics tables mirror
 
 ## Gameplay Components
 
-### ChainState — `scripts/chain_state.gd` (`RefCounted`, pure logic)
+### ChainState — `scripts/rules/chain_state.gd` (`RefCounted`, pure logic)
 
 The core rules: chain count, light radius, Blade Bloom and embers. It has no scene dependencies.
 
@@ -29,7 +29,7 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | `BASE_RADIUS` / `RADIUS_GAIN` / `SNUFF_RADIUS` | 40 / 22 per √link / 12 px |
 | `BASE_BLOOM` / `BLOOM_GAIN` | 1.0 / 0.18 per √link |
 
-### Player — `scripts/player.gd` + `scenes/player.tscn` (`CharacterBody2D`, `class_name Player`)
+### Player — `scripts/actors/player.gd` + `scenes/actors/player.tscn` (`CharacterBody2D`, `class_name Player`)
 
 **Signals:** `died`, `chain_changed(count)`. **Public:** `chain`, `is_dead`, `light_radius()`, `die()`. **Group:** `player`.
 
@@ -59,7 +59,7 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Damage | `knockback` (150, −150), `invuln_time` 0.6 |
 | Light key | `snuff_hold` 0.12 |
 
-### Crawler — `scripts/crawler.gd` + `scenes/enemies/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
+### Crawler — `scripts/actors/crawler.gd` + `scenes/actors/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
 
 "Chain fuel." Layer 4, mask 1, body 14×8, `EdgeRay` 10 px down. **Group:** `enemy`. **API:** `take_hit()` (spark burst + free), `reset_phase()`.
 
@@ -68,7 +68,7 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Walker (`c`) | Gravity; turns at a wall or a missing floor | `walk_speed` 25 |
 | Hoverer (`h`) | Ignores physics; sine drift around home; phase from position | `hover_drift` 10 px, `hover_period` 2.4 s |
 
-### Lurker — `scripts/lurker.gd` + `scenes/enemies/lurker.tscn` (`Area2D`, `class_name Lurker`)
+### Lurker — `scripts/actors/lurker.gd` + `scenes/actors/lurker.tscn` (`Area2D`, `class_name Lurker`)
 
 The light-drawn predator. Layer 8, circle radius 7, `monitoring = false`. **Group:** `predator`. **Public:** `state`, `senses(player)`.
 
@@ -105,7 +105,7 @@ Builds the level from `LAYOUT`, owns the session statics, draws the debug HUD an
 
 **Hotkeys:** F1 brightness · F2 controls hint · F3 restart from the top (clears the checkpoint). **Constants:** `TILE` 16, `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
 
-### Fx — `scripts/fx.gd` (static, `class_name Fx`)
+### Fx — `scripts/core/fx.gd` (static, `class_name Fx`)
 
 | Function | Effect |
 |---|---|
@@ -157,7 +157,7 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 
 | Script | Tests | Run |
 |---|---|---|
-| `tests/run_tests.gd` | 10 test functions on ChainState | headless |
+| `tests/test_chain_state.gd` | 10 test functions on ChainState | headless |
 | `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
 | `tests/screenshot.gd` | 2 screenshots | needs a renderer |
 

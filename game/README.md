@@ -31,5 +31,5 @@ Open this folder in Godot 4.7 and press F5.
 
 Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT=/path/to/godot ./run_tests.sh`.
 
-- **Chain rules** (`tests/run_tests.gd`): chain hits, landing, Snuff, the cap and the growth curves.
+- **Chain rules** (`tests/test_chain_state.gd`): chain hits, landing, Snuff, the cap and the growth curves.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the real level with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.

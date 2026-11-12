@@ -13,7 +13,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 
 - **Tech stack:** Godot 4.7 · GDScript · GL Compatibility · 480×270 integer-scaled · Python/Pillow sprite pipeline
 - **Entry point:** `game/scenes/shaft.tscn` → `game/scripts/shaft.gd`
-- **Core rules:** `game/scripts/chain_state.gd` (pure, unit-tested)
+- **Core rules:** `game/scripts/rules/chain_state.gd` (pure, unit-tested)
 - **Architecture pattern:** scene tree + node-free rules class + ASCII level + static session state
 - **Database / API:** none
 - **Deployment:** none yet (played from the editor); M2 targets Windows, Linux, web/itch.io
@@ -76,7 +76,7 @@ python3 tools/build_sprites.py
 
 ## For AI-Assisted Development
 
-- **Gameplay rule change** (chain, light, embers, Flare Toss): `architecture.md` → State Management, then `chain_state.gd` and `tests/run_tests.gd`. Keep `ChainState` free of nodes.
+- **Gameplay rule change** (chain, light, embers, Flare Toss): `architecture.md` → State Management, then `rules/chain_state.gd` and `tests/test_chain_state.gd`. Keep `ChainState` free of nodes.
 - **Feel or tuning:** `component-inventory.md` tuning tables; keep the GDD tables in sync.
 - **New enemy or predator:** `component-inventory.md` (Crawler/Lurker) and `development-guide.md` → Common Tasks. Respect the layers, groups and the `monitorable` kill rule.
 - **Level work:** `architecture.md` → Level Data. Run the smoke test's bot after changing the long run.

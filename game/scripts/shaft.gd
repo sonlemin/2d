@@ -6,8 +6,8 @@ extends Node2D
 ## A death reloads the scene, which resets the chain and every enemy.
 
 const TILE := 16
-const CrawlerScene := preload("res://scenes/enemies/crawler.tscn")
-const LurkerScene := preload("res://scenes/enemies/lurker.tscn")
+const CrawlerScene := preload("res://scenes/actors/crawler.tscn")
+const LurkerScene := preload("res://scenes/actors/lurker.tscn")
 const TileTexture := preload("res://art/tile.png")
 const RESPAWN_DELAY := 0.6
 ## Ambient brightness of the dark (CanvasModulate value). F1 cycles it in game.

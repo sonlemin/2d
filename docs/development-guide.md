@@ -38,7 +38,7 @@ Run one suite on its own:
 
 ```bash
 godot --headless --path game --import                                # once, so textures resolve
-godot --headless --path game --script res://tests/run_tests.gd       # ChainState unit tests
+godot --headless --path game --script res://tests/test_chain_state.gd   # ChainState unit tests
 godot --headless --path game --script res://tests/smoke_shaft.gd     # integration smoke test
 ```
 
@@ -51,7 +51,7 @@ xvfb-run -a godot --path game --rendering-driver opengl3 --script res://tests/sc
 ### Writing tests
 
 - Tests are plain `extends SceneTree` scripts with a local `check(cond, msg)`. There is no framework.
-- **Pure rules → `run_tests.gd`.** Add a `test_*` function and list it in `_init()`. Preload the script (`ChainStateScript`) rather than rely on `class_name` in `--script` mode.
+- **Pure rules → `test_chain_state.gd`.** Add a `test_*` function and list it in `_init()`. Preload the script (`ChainStateScript`) rather than rely on `class_name` in `--script` mode.
 - **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `_run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
 - Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
 - `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED`. Keep that output format.
