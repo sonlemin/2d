@@ -4,7 +4,7 @@ baseline_commit: 8961a22
 
 # Story 1.2: Log and a Clock that owns time
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -41,64 +41,64 @@ so that hitstop and later slow-mo stack predictably and freeze with the pause.
 
 Run everything from `game/` and wrap every Godot run in `timeout`. Story 1.1 found that a missed path can hang a test instead of failing it.
 
-- [ ] **Task 1: Baseline** (AC: 5)
-  - [ ] Run `timeout 300 ./run_tests.sh` and expect:
+- [x] **Task 1: Baseline** (AC: 5)
+  - [x] Run `timeout 300 ./run_tests.sh` and expect:
     - `test_chain_state`: `ALL PASS (69 checks)`
     - `test_deferred_owners`: 20 `ok` lines and `PASS` (18 rule checks, 1 proposed owner, the summary)
     - `smoke_shaft`: 28 `ok` lines and `SMOKE PASS`
     - the last line: `== ALL GREEN`
-  - [ ] Record the counts in the Debug Log. They are the regression bar for Task 2 and Task 7.
-- [ ] **Task 2: The runner, and the four tests ported onto it** (AC: 4, 5). Do this **before** anything references `Game`. Once `player.gd` names `Game`, `--script` can't compile `smoke_shaft` (verified), so the suite has to be on the runner first.
-  - [ ] Create `tests/runner.gd` and `tests/runner.tscn` per Dev Notes → *The scene runner*. Write the `.tscn` by hand, without `uid=`, like the M1 scenes. Don't save it in the editor.
-  - [ ] Port the four tests with exactly the harness edits in Dev Notes → *Porting table*. Every `check(...)` call keeps its condition and message byte for byte.
-  - [ ] In `run_tests.sh`, change `--script "res://tests/$t.gd"` to `res://tests/runner.tscn -- "res://tests/$t.gd"`. Change nothing else yet; Task 3 and Task 4 add their tests to the list.
-  - [ ] Run `timeout 300 ./run_tests.sh`. It must show the Task 1 counts exactly, ending `== ALL GREEN`. **Checkpoint:** the runner works on unchanged M1 code.
-  - [ ] Prove the runner's failure paths with throwaway tests named `tests/neg_*.gd`. That name is outside 1.9's `test_*` / `smoke_*` glob. Delete them, and their `.uid` files, before committing. Each case must exit 1:
+  - [x] Record the counts in the Debug Log. They are the regression bar for Task 2 and Task 7.
+- [x] **Task 2: The runner, and the four tests ported onto it** (AC: 4, 5). Do this **before** anything references `Game`. Once `player.gd` names `Game`, `--script` can't compile `smoke_shaft` (verified), so the suite has to be on the runner first.
+  - [x] Create `tests/runner.gd` and `tests/runner.tscn` per Dev Notes → *The scene runner*. Write the `.tscn` by hand, without `uid=`, like the M1 scenes. Don't save it in the editor.
+  - [x] Port the four tests with exactly the harness edits in Dev Notes → *Porting table*. Every `check(...)` call keeps its condition and message byte for byte.
+  - [x] In `run_tests.sh`, change `--script "res://tests/$t.gd"` to `res://tests/runner.tscn -- "res://tests/$t.gd"`. Change nothing else yet; Task 3 and Task 4 add their tests to the list.
+  - [x] Run `timeout 300 ./run_tests.sh`. It must show the Task 1 counts exactly, ending `== ALL GREEN`. **Checkpoint:** the runner works on unchanged M1 code.
+  - [x] Prove the runner's failure paths with throwaway tests named `tests/neg_*.gd`. That name is outside 1.9's `test_*` / `smoke_*` glob. Delete them, and their `.uid` files, before committing. Each case must exit 1:
     - a test with no `PASS` line
     - a runtime error before `PASS`
     - a missing file
     - a parse error
     - a runtime error inside a helper, after which `run()` still prints `PASS` (D3)
     - a hang (temporarily set `TIMEOUT` to 3 s, then set it back to 120)
-- [ ] **Task 3: `Log`** (AC: 1)
-  - [ ] Create `scripts/core/log.gd` per Dev Notes → *Log*.
-  - [ ] Create `tests/test_log.gd`. It covers:
+- [x] **Task 3: `Log`** (AC: 1)
+  - [x] Create `scripts/core/log.gd` per Dev Notes → *Log*.
+  - [x] Create `tests/test_log.gd`. It covers:
     - `format()` gives `[clock] msg`
     - every listed category is accepted
     - `enabled()` is false by default and true after `set_enabled([Log.CLOCK])`
     - `set_enabled([])` turns it off again
     - the test resets the enabled set before it finishes
     - the unknown-category `assert` is **not** unit-tested, because a failed assert would abort the test; code review checks it
-  - [ ] Add `test_log` to the `run_tests.sh` list.
-- [ ] **Task 4: `Game` and `Clock`** (AC: 2, 3)
-  - [ ] Create `scripts/core/clock.gd` and `scripts/core/game.gd` per Dev Notes → *Clock* and *Game*.
-  - [ ] Register the autoload by hand-editing `project.godot`: add `[autoload]` with `Game="*res://scripts/core/game.gd"` between `[application]` and `[display]`. That is the only `project.godot` change.
-  - [ ] Create `tests/test_clock.gd` per Dev Notes → *test_clock*. Use a fresh `Clock` per case, so no request leaks into the next case.
-  - [ ] Add `test_clock` to the `run_tests.sh` list.
-- [ ] **Task 5: Hitstop through the Clock** (AC: 2, 3)
-  - [ ] `player.gd` hitstop: `_freeze_frame()` becomes `Game.clock.request(&"hitstop", 0.05, hitstop)`. Keep its `if hitstop <= 0.0: return`. Drop the `await`: the Clock owns the timer now.
-  - [ ] `player.gd:338`: in `die()`, `Engine.time_scale = 1.0` becomes `Game.clock.clear()`.
-  - [ ] `player.gd:84-85`: delete `_exit_tree()`. M1 reset the time scale there because the hitstop timer lived in the player's own coroutine and died with it. Now the timer lives in the Clock, so a hitstop always ends by itself within 75 ms of real time. Death clears explicitly, and the Clock's own `_exit_tree` covers the rest.
-  - [ ] `tests/smoke_shaft.gd:230`: `Engine.time_scale = 1.0` becomes `Game.clock.clear()`. It is setup, not an assertion.
-  - [ ] Add the clear-on-death case to `test_clock.gd`. It instantiates `res://scenes/actors/player.tscn`, calls `Game.clock.request(&"hitstop", 0.05, 5.0)`, then `player.die()`, and expects `Engine.time_scale == 1.0`.
-  - [ ] Check: `grep -rn "Engine.time_scale *=" scripts tests` finds only `scripts/core/clock.gd`. Reads such as `delta / maxf(Engine.time_scale, 0.001)` in `player.gd:116` stay.
-- [ ] **Task 6: Docs, project-context and the deferred item** (fix paths and facts only; the docs get regenerated later)
-  - [ ] `docs/development-guide.md`:
+  - [x] Add `test_log` to the `run_tests.sh` list.
+- [x] **Task 4: `Game` and `Clock`** (AC: 2, 3)
+  - [x] Create `scripts/core/clock.gd` and `scripts/core/game.gd` per Dev Notes → *Clock* and *Game*.
+  - [x] Register the autoload by hand-editing `project.godot`: add `[autoload]` with `Game="*res://scripts/core/game.gd"` between `[application]` and `[display]`. That is the only `project.godot` change.
+  - [x] Create `tests/test_clock.gd` per Dev Notes → *test_clock*. Use a fresh `Clock` per case, so no request leaks into the next case.
+  - [x] Add `test_clock` to the `run_tests.sh` list.
+- [x] **Task 5: Hitstop through the Clock** (AC: 2, 3)
+  - [x] `player.gd` hitstop: `_freeze_frame()` becomes `Game.clock.request(&"hitstop", 0.05, hitstop)`. Keep its `if hitstop <= 0.0: return`. Drop the `await`: the Clock owns the timer now.
+  - [x] `player.gd:338`: in `die()`, `Engine.time_scale = 1.0` becomes `Game.clock.clear()`.
+  - [x] `player.gd:84-85`: delete `_exit_tree()`. M1 reset the time scale there because the hitstop timer lived in the player's own coroutine and died with it. Now the timer lives in the Clock, so a hitstop always ends by itself within 75 ms of real time. Death clears explicitly, and the Clock's own `_exit_tree` covers the rest.
+  - [x] `tests/smoke_shaft.gd:230`: `Engine.time_scale = 1.0` becomes `Game.clock.clear()`. It is setup, not an assertion.
+  - [x] Add the clear-on-death case to `test_clock.gd`. It instantiates `res://scenes/actors/player.tscn`, calls `Game.clock.request(&"hitstop", 0.05, 5.0)`, then `player.die()`, and expects `Engine.time_scale == 1.0`.
+  - [x] Check: `grep -rn "Engine.time_scale *=" scripts tests` finds only `scripts/core/clock.gd`. Reads such as `delta / maxf(Engine.time_scale, 0.001)` in `player.gd:116` stay.
+- [x] **Task 6: Docs, project-context and the deferred item** (fix paths and facts only; the docs get regenerated later)
+  - [x] `docs/development-guide.md`:
     - The run commands at lines 41–43 and 49 use the runner.
     - Rewrite the "Writing tests" section for the runner contract: `extends Node`, `func run()` that may `await`, `ok` / `FAIL` lines plus a final `PASS` / `FAILED` line, never `quit()`, and add the file to the `for t in …` list until 1.9's glob. Pure rules go in a new `tests/test_<subject>.gd`, never into `test_chain_state.gd`.
-  - [ ] `docs/source-tree-analysis.md`:
+  - [x] `docs/source-tree-analysis.md`:
     - In the tree block, add `scripts/core/{log,clock,game}.gd` and `tests/{runner.gd,runner.tscn,test_clock.gd,test_log.gd}`. The `test_chain_state.gd` line no longer says "SceneTree script".
     - Line 89 describes the runner instead of `--script`.
     - Line 108 says `Game` is the one autoload, instead of "No autoloads".
-  - [ ] `docs/architecture.md`:
+  - [x] `docs/architecture.md`:
     - The table at lines 30 and 32: the test runner is `tests/runner.tscn`, and the autoload is `Game`.
     - Lines 128 and 198: hitstop is `Game.clock.request(&"hitstop", 0.05, 0.075)`, and death clears it.
-  - [ ] `docs/project-overview.md:26`: tests are Node scripts run by `tests/runner.tscn`.
-  - [ ] `docs/component-inventory.md`: add rows for `Game`, `Clock` and `Log` where the core scripts are listed, and for `test_clock.gd` / `test_log.gd` in the tests table.
-  - [ ] Header comments: each ported test's `## Run:` line (and `screenshot.gd`'s usage line) names the runner command.
-  - [ ] `_bmad-output/project-context.md` → "Current State vs Target": tests now run through `tests/runner.tscn`; `Game`, `clock.gd` and `log.gd` exist. Remove those three from the "don't exist yet" list. The rest of the paragraph stays as it is.
-  - [ ] `_bmad-output/implementation-artifacts/deferred-work.md`: under "Dev guide 'Writing tests' is M1 guidance", add `  → **Closed (<date>): rewritten in Story 1.2.**`, and name it in your report.
-- [ ] **Task 7: Verify** (AC: 1–5). Every grep below must print nothing.
+  - [x] `docs/project-overview.md:26`: tests are Node scripts run by `tests/runner.tscn`.
+  - [x] `docs/component-inventory.md`: add rows for `Game`, `Clock` and `Log` where the core scripts are listed, and for `test_clock.gd` / `test_log.gd` in the tests table.
+  - [x] Header comments: each ported test's `## Run:` line (and `screenshot.gd`'s usage line) names the runner command.
+  - [x] `_bmad-output/project-context.md` → "Current State vs Target": tests now run through `tests/runner.tscn`; `Game`, `clock.gd` and `log.gd` exist. Remove those three from the "don't exist yet" list. The rest of the paragraph stays as it is.
+  - [x] `_bmad-output/implementation-artifacts/deferred-work.md`: under "Dev guide 'Writing tests' is M1 guidance", add `  → **Closed (<date>): rewritten in Story 1.2.**`, and name it in your report.
+- [x] **Task 7: Verify** (AC: 1–5). Every grep below must print nothing.
   ```bash
   godot --headless --path . --import 2>&1 | grep -E 'SCRIPT ERROR|ERROR:'
   timeout 60 godot --headless --path . --quit-after 120 2>&1 | grep -E 'SCRIPT ERROR|ERROR:'   # main scene boot with the Game autoload
@@ -108,9 +108,9 @@ Run everything from `game/` and wrap every Godot run in `timeout`. Story 1.1 fou
   timeout 300 ./run_tests.sh     # Task 1 counts + test_log + test_clock, ends "== ALL GREEN"
   timeout 120 xvfb-run -a godot --path . --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd /tmp/shots   # exit 0, two PNGs
   ```
-  - [ ] The runner now fails on errors (D3), but `run_tests.sh` still hides `ERROR:` lines printed outside the runner, at engine start or exit, until Story 1.9. That is why the raw greps above exist.
-  - [ ] Check that every ported test's diff touches only the harness lines in the porting table: `git diff -U0 tests/` and look for any changed `check(` line. There must be none.
-- [ ] **Task 8: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
+  - [x] The runner now fails on errors (D3), but `run_tests.sh` still hides `ERROR:` lines printed outside the runner, at engine start or exit, until Story 1.9. That is why the raw greps above exist.
+  - [x] Check that every ported test's diff touches only the harness lines in the porting table: `git diff -U0 tests/` and look for any changed `check(` line. There must be none.
+- [x] **Task 8: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
   - `test:` the runner, the four ports and `run_tests.sh` (Task 2)
   - `feat:` `Log` (Task 3)
   - `feat:` `Game`, `Clock`, the hitstop and `test_clock` (Tasks 4–5)
@@ -338,10 +338,63 @@ No game behaviour has changed since the M1 playtest, so Task 1's counts are M1's
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`) via gds-dev-story, 2026-11-12.
+
 ### Debug Log References
+
+- **Task 1 baseline (the regression bar):** `test_chain_state` `ALL PASS (69 checks)`; `test_deferred_owners` 20 `ok` + `PASS`; `smoke_shaft` 28 `ok` + `SMOKE PASS`; `== ALL GREEN`.
+- **Task 2 checkpoint:** through the runner, `run_tests.sh` output was byte-identical to the baseline (diffed).
+- **Runner failure paths** (throwaway `neg_*`, all deleted), every one exit 1:
+  - only `ok` lines → `FAILED (runner: no PASS line)`
+  - runtime error, sync or after an `await` → `FAILED (runner: 1 engine error(s))`, in ~0.4 s (a coroutine that errors still completes, so no watchdog wait)
+  - parse error, missing file → `FAILED (runner: cannot load test …)`
+  - helper error, then `PASS` (D3) → `PASS` then `FAILED (runner: 1 engine error(s))`
+  - a hang with the tree paused and time at ×0.05, `TIMEOUT` = 3 s → `FAILED (runner: no result after 3 s)` at 3.3 s; `TIMEOUT` restored to 120
+  - extra: a `RefCounted` test → `must extend Node and implement run()`; a test printing `FAIL`/`FAILED` → exit 1 with no extra line
+- **`Log` assert:** a throwaway `Log.info(&"nope", …)` gave `SCRIPT ERROR: Assertion failed: Log: unknown category 'nope'` and the runner failed it. `info()` still printed `[nope] x` after the failed assert: the D3 "error aborts only the callee" behaviour, caught by the runner.
+- **`test_clock` mutation checks:** each of these Clock defects fails exactly one case: no serial check (refresh case), timer obeys time scale (real-time case), timer runs while paused (pause case), `_exit_tree` doesn't clear (`_exit_tree` case).
+- **AC3 "a pogo still freezes for 75 ms":** a throwaway pogo in the real shaft measured the freeze at ×0.050 for 72.4 / 78.7 / 79.1 ms of wall time (3 runs).
+- **Flake found in Task 7, root-caused and fixed:** `test_clock`'s "hitstop is active at 0.03 s" failed 14/15 runs after Task 5 added `preload("player.tscn")`. Instrumented: `wait(0.03)` returned after 1.2 ms. Cause: the first frame's delta (~83 ms) includes the time `runner._ready()` spends loading the test and its preloads, and `process_frame` fires before that frame's timers advance. Every timer made before or in that frame jumps by the load time, so the 0.03 s wait and the 0.075 s hitstop expired in the same step, hitstop first. Tested 0 / 1 / 2 awaited frames before `run()`: only 2 gives a clean (0.3–0.5 ms) delta. The runner now waits 2 frames: 0/20 failures after. The fix is folded into the runner commit so `run_tests.sh` is green at every commit (each of the 4 commits verified in a fresh worktree).
+- **Pre-existing, not a regression:** under `xvfb-run` (non-headless) the engine prints `ERROR: … ERR_CANT_OPEN at init_output_device (audio_driver_alsa.cpp)` at startup, because the server has no sound card. M1's `--script` run prints the same line. It comes before the runner exists, so the runner doesn't count it, and `screenshot.gd` isn't in `run_tests.sh`. If a later story error-checks xvfb runs, add `--audio-driver Dummy`.
+- **Task 7 final:** every raw grep empty (import, 120-frame main-scene boot with `Game`, each of the 5 tests, `Engine.time_scale =` outside `clock.gd`, changed `check(` lines in the ported tests); `run_tests.sh` `== ALL GREEN` 3/3 with the Task 1 counts plus `test_log` 7 `ok` and `test_clock` 13 `ok`; screenshot exit 0 with both PNGs.
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-12. Ultimate context engine analysis completed - comprehensive developer guide created. The design was dry-run on Godot 4.7.2 in a scratch copy before writing (see "Verified on the server").
+- **Implemented:** `tests/runner.tscn` (the scene runner with a `Logger` verdict, 120 s watchdog and D3 error fail), the four tests ported with harness edits only, static `Log`, the `Game` autoload holding `Clock`, the player's hitstop and death through `Game.clock`, `test_log` and `test_clock`, and the doc/fact fixes.
+- **Deviations from the Dev Notes (all small, all deliberate):**
+  1. The runner waits two process frames before `run()` (root cause in the Debug Log).
+  2. `test_clock`'s re-request case uses 0.15 s requests, re-requested at 0.10 s and checked at 0.20 s, instead of 0.075 / 0.06 / 0.13 s. The original left 5 ms between the check and the refreshed expiry; this keeps ≥ 50 ms on each side. Same behaviour proven.
+  3. The clear-on-death case also checks `not Game.clock.is_active(&"hitstop")`. On M1 code `die()` already wrote 1.0, so checking only the scale would have passed before the change.
+  4. The runner also fails with a reason when no test path is given or the script isn't a `Node` with `run()`.
+  5. Deleting `_initialize()` in `smoke_shaft.gd` / `screenshot.gd` left 4 blank lines; trimmed to 2. No `check(` line changed (verified with `git diff -U0`).
+  6. Docs: also fixed the source-tree "Entry Points → Tests" row and the architecture "Addons / autoloads" row; the component inventory got a Core table for `Game` / `Clock` / `Log`.
+- **Deferred item closed:** "Dev guide 'Writing tests' is M1 guidance" → `Closed (2026-11-12): rewritten in Story 1.2.` The ledger still has one item with a proposed owner awaiting sonlm (bmad-loop ledger format → Story 1.9); it predates this story.
+- **Tests green; the pogo hitstop needs a quick feel check on the laptop (no change intended).** The one behaviour difference: a second pogo within 75 ms now refreshes the freeze instead of being cut short by the first timer's reset.
+- **On the laptop:** run `godot --headless --path game --import` after pulling, because `Log`, `Clock` and the `Game` autoload are new.
+- Commits: `afae546` (runner + ports), `03881df` (`Log`), `ac637ae` (`Game`, `Clock`, hitstop), `4809027` (docs), plus the story/status commit.
 
 ### File List
+
+New:
+- `game/tests/runner.gd`, `game/tests/runner.gd.uid`, `game/tests/runner.tscn`
+- `game/tests/test_log.gd`, `game/tests/test_log.gd.uid`
+- `game/tests/test_clock.gd`, `game/tests/test_clock.gd.uid`
+- `game/scripts/core/log.gd`, `game/scripts/core/log.gd.uid`
+- `game/scripts/core/clock.gd`, `game/scripts/core/clock.gd.uid`
+- `game/scripts/core/game.gd`, `game/scripts/core/game.gd.uid`
+
+Modified:
+- `game/project.godot` (the `[autoload]` section only)
+- `game/run_tests.sh`
+- `game/scripts/actors/player.gd`
+- `game/tests/test_chain_state.gd`, `game/tests/test_deferred_owners.gd`, `game/tests/smoke_shaft.gd`, `game/tests/screenshot.gd`
+- `docs/development-guide.md`, `docs/source-tree-analysis.md`, `docs/architecture.md`, `docs/project-overview.md`, `docs/component-inventory.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-2-log-and-a-clock-that-owns-time.md`
+
+## Change Log
+
+- 2026-11-12: Story 1.2 implemented. Every test runs as a scene through `tests/runner.tscn` (fails on no `PASS`, a 120 s timeout or any engine error); static `Log`; the `Game` autoload with a `Clock` that is the only writer of `Engine.time_scale`; the player's hitstop and death go through `Game.clock`; `test_log` and `test_clock` added; docs and project-context updated. Status → review.
