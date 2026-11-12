@@ -9,7 +9,7 @@ GODOT="${GODOT:-$(command -v godot || echo "$HOME/.local/bin/godot")}"
 LIMIT=150
 TIMEOUT="$(command -v timeout || true)"
 fail=0
-for t in test_chain_state test_log test_clock test_tuning test_deferred_owners smoke_shaft; do
+for t in test_chain_state test_log test_clock test_tuning test_state test_deferred_owners smoke_shaft; do
 	echo "== $t"
 	out=$(${TIMEOUT:+$TIMEOUT $LIMIT} "$GODOT" --headless --path . res://tests/runner.tscn -- "res://tests/$t.gd" 2>&1)
 	rc=$?
