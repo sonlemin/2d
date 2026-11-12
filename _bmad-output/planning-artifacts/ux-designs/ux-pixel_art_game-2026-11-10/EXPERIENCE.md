@@ -2,7 +2,7 @@
 title: "The Unbroken Chain — EXPERIENCE"
 status: final
 created: 2026-11-10
-updated: 2026-11-11
+updated: 2026-11-12
 sources:
   - ../../gdds/gdd-pixel_art_game-2026-11-10/gdd.md
   - ../../gdds/gdd-pixel_art_game-2026-11-10/epics.md
@@ -79,9 +79,9 @@ Quit in the Pause tab uses the confirm step: "Quit to title?" No / Yes, with No 
 | Tab | Settings | Lands |
 |---|---|---|
 | Game | Difficulty (changeable any time) | E1 |
-| Accessibility | Reduce flashing; screen shake on/off; reduced motion; Light tap window (0.12 / 0.2 / 0.3 s); Cling toggle; Snuff toggle (hold→press, both Off by default; decided 2026-11-11, O13) | E1 (tap window [ASSUMPTION] E1, since Flare Toss lands there; the toggles land in E1 so public web builds are playable before E7) |
+| Accessibility | Reduce flashing; screen shake on/off; reduced motion; Light tap window (0.12 / 0.2 / 0.3 s); Cling toggle; Snuff toggle (hold→press, both Off by default; decided 2026-11-11, O13); Brightness (4 levels; decided 2026-11-12, A1) | E1 (tap window [ASSUMPTION] E1, since Flare Toss lands there; the toggles land in E1 so public web builds are playable before E7) |
 | Audio | Volume sliders | E3 |
-| Video | Brightness (4 levels), fullscreen, scale | E7 [ASSUMPTION] brightness may move earlier, since the F1 hotkey is removed for web |
+| Video | Brightness (moves here from Accessibility), fullscreen, scale | E7 |
 | Controls | Rebinding | E7 |
 | Accessibility (E7 additions) | Large HUD; text scale; game-speed and timing assists; visual sound cues | E7 |
 
@@ -310,7 +310,7 @@ Reduce flashing (Accessibility, E1) changes these effects (log 2026-11-11):
 | Colour | Never the only signal (GDD Art Style). Alert = frame + pulse + eye. Empty = outline. Held = `+` and flicker; carried = solid icon. Toss cost = diagonal hatch. Save failed = crossed icon. | E1 |
 | Off-screen cue | Half-open eye that opens as the lurker stirs, plus the glow floor; never glow alone | E1 |
 | Death card | Held input ignored, skip lockout and auto-advance (Interaction Primitives); lines kept for the death log | E1 |
-| Brightness | 4 levels in Options > Video (M1 F1 hotkey removed) | E7 [ASSUMPTION] may move earlier |
+| Brightness | 4 levels in Options > Accessibility, replacing the M1 F1 hotkey; moves to Options > Video in E7. It changes only the world's ambient level: never light radii, what predators sense, the reserved colours or the HUD | E1 (decided 2026-11-12, A1) |
 | Rebinding | Every action, both devices | E7 |
 | Hold↔toggle | Cling toggle and Snuff toggle in Options > Accessibility (O13) | E1 |
 | Large HUD | Numbers and icons ×2, ember block stacked in the lower left gutter (DESIGN Layout & Spacing) | E7 |
@@ -529,7 +529,7 @@ No longer open: pause key, off-screen edge eye, flare cost hatch, reduce-flashin
 
 ### Assumptions
 
-- A1. [ASSUMPTION] Brightness may move into Options > Video before E7, since F1 is removed for web.
+- A1. ~~[ASSUMPTION] Brightness may move into Options > Video before E7, since F1 is removed for web.~~ **Decided 2026-11-12 (sonlm, epic planning R1):** Brightness ships in E1 under Accessibility and moves to Video in E7.
 - A2. [ASSUMPTION] Gutter fill = zone index 0 darkened to 55% (mock value).
 - A3. [ASSUMPTION] Title (with Load), slot picker and click-to-play gate land in E1 with save/load.
 - A4. [ASSUMPTION] Credits with AI disclosure land in E7.

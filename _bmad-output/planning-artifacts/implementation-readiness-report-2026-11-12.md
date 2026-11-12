@@ -732,6 +732,36 @@ Five Critical issues and the E1 Majors must be fixed before implementation start
 - 41 E1 stories, all with a Type line and Given/When/Then.
 - 28 within-epic forward references, all staging ("until Story X lands" or "reviewed in Story X"); none is a dependency.
 
+### 2026-11-12: optional doc fixes and an Epic 1 re-review
+
+**Document fixes**
+- **U1:** `EXPERIENCE.md` shows Brightness in E1 Accessibility, moving to Video in E7; A1 is marked decided; `updated:` 2026-11-12.
+- **U2:** the architecture and Story 1.36 say Brightness changes only the ambient level, and a test proves radii, `Sensing`, the reserved colours and the HUD are identical at every level.
+- **U4:** `DESIGN.md` Reserved allows in-world amber for lit anchors, hub lanterns and fading creature sparks; Story 1.24 cites it.
+
+**Independent re-review of Stories 1.1–1.41.** The reviewer confirmed 21 of the 26 claimed fixes and marked 5 partial or wrong. It also found one new Critical, verified here on Godot 4.7.2.
+
+- **F1 (Critical): fixed by R17 (sonlm).** Under `--script`, a test that touches the `Game` autoload fails to compile: it hangs (`preload`), or exits 0 with no output (`class_name` hint), which the M1 runner reports as green. Tests now extend `Node` and run as scenes through `tests/runner.tscn`, and a test with no `PASS` line or running over 120 s fails. Updated: Story 1.2, Story 1.9, AR47, Story 1.15 wording, project-context (Tests, Testing Rules, Screenshots), the architecture's test runner rule.
+- **F2: C1 fully closed.** The M1 smoke and screenshot tests are ported to `m1_shaft` at the end of Story 1.5, before 1.6 switches the lurker to `play_rect()`. Story 1.7 only deletes `shaft.gd` and `shaft.tscn`.
+- **F3:** a rest rebuilds the room (`enter_room(current room, station)`), so killed enemies come back. Kills are recorded with `mark_killed`, and a test covers a kill surviving a death and the loop (1.7, 1.24, AR25, architecture).
+- **F4:** Story 1.8 first adds the M1 movement checks that don't exist yet (run, coyote, buffer, air dash), then switches to intents.
+- **F5:** the respawn point is per dive and moves only when the new point is deeper. A rest sets it to the station (1.24).
+- **F6:** `death_log` stores `{cause, room}` everywhere (AR25, UX-DR86, the architecture), and the 1.41 schema guard checks the entry shape and the cache.
+- **F7:** `save_progress()` reports success or failure like `save_now()` and keeps the cache as of the last resume save. AR11 and UX-DR112 are updated.
+- **Minors:**
+  - F8: URL-query unit test, plus a Playwright `?room=` boot.
+  - F9: the real M1 colour sites (`shaft.gd`, `player.gd`).
+  - F10: `get_license_info()` added.
+  - F11: lint allows `print(` in `core/log.gd`.
+  - F12: injectable save directory for tests.
+  - F13: a `--glow` debug arg.
+  - F14: AR1, AR3, and the architecture lines on `ConfigFile`, `preload` of DevTools and re-saving scenes.
+  - F15: how the ledge-gap check measures.
+  - The first save skips the `.bak` copy, avoiding an engine error.
+- **Rejected:** the J6 step-count nit. J6 has 7 steps, so "steps 1 and 3–7" is correct.
+
+**Re-check.** All 41 E1 stories have a Type line and Given/When/Then. All 29 forward references are staging. **Epic 1 is ready for sprint planning and story creation.**
+
 ### Still open
 
 - **Before sprint planning:** nothing blocking. The E1 fixes are in.

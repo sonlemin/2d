@@ -22,7 +22,7 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 - **Renderer: GL Compatibility** (required for web). Check the docs before using any rendering feature; use Context7 (authenticate via `/mcp`) for current 4.7 APIs.
 - **Display:** 480×270 viewport, integer scaling only, nearest filter, `snap_2d_transforms_to_pixel`, 2D physics interpolation to be enabled in E1, kept only if the laptop feel check passes. Physics at **60 ticks/s**; all tuning assumes it.
 - **No addons. No `.tres`** (TileSet, Theme and materials are built in code). **Autoloads: `Game` and `Audio` only**; a third is an architecture change. Ask before adding an addon.
-- **Tests:** headless `SceneTree` scripts (no GUT/gdUnit). **Art:** Python 3 + Pillow 12, `tools/build_sprites.py`. **Web smoke:** Node 24 + Playwright (`tools/web_smoke/`, version pinned in its `package.json`).
+- **Tests:** headless test scripts extending `Node`, run as scenes by `tests/runner.tscn` (no GUT/gdUnit; under `--script` anything that touches the `Game` autoload fails to compile). **Art:** Python 3 + Pillow 12, `tools/build_sprites.py`. **Web smoke:** Node 24 + Playwright (`tools/web_smoke/`, version pinned in its `package.json`).
 - **UI font:** Fusion Pixel Font 8px proportional (OFL 1.1), size 8, antialiasing/hinting off; `OFL.txt` + `LICENSES/` ship in every build.
 
 ## Current State vs Target
@@ -60,7 +60,7 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 ### Code Organization Rules
 
 - **Layout** (Architecture → Project Structure): `game/scripts/` and `game/scenes/` share domain folders `core/ rules/ world/ actors/ objects/ moments/ ui/ audio/ dev/`. snake_case file + PascalCase `class_name` (autoloads have none). Scenes are thin prefabs; behaviour lives in scripts.
-- **Dependencies point one way:** `rules/ ← core/ ← world, actors, objects, moments ← ui, audio ← dev`. `rules/` never mentions `Node`, `Input`, `Engine` or `Game`. UI writes only `Settings`; it changes gameplay state through `Game` / `World` commands. Nothing outside `dev/` and `tests/` references `dev/`.
+- **Dependencies point one way:** `rules/ ← core/ ← world, actors, objects, moments ← ui, audio ← dev`. `rules/` never mentions `Node`, `Input`, `Engine` or `Game`. UI writes only `Settings`; it changes gameplay state through `Game` / `World` commands. Nothing outside `dev/` and `tests/` references `dev/`, except `world.gd`'s one path-string `load()` of DevTools inside `if OS.is_debug_build()`.
 - **Write state only through rule methods that emit signals** (`Game.slot.set_flag(id)`, `Game.dive.add_carried(n)`). Typed signals on the owner; **no event bus**.
 - **Tuning is data in `rules/tuning.gd`:** a `const` per value with a `##` unit + intent + "was X" comment, listed in `BASE`; actors read `Game.tuning.f(&"key")`. Gear is data in `rules/gear.gd` (`{id, stat, op, value}`); never `if has_gear`. Prices live in `rules/economy.gd`. **Change a value → update the matching GDD table.**
 - **Levels are text:** `game/rooms/<layer>/<room_id>.txt` (header + `---` + grid; spine rooms are 22 columns **including** walls). The legend lives only in `world/room_legend.gd` and `docs/rooms.md`. Persistent objects carry explicit header ids (`obj=anchor_s2_1@x,y`); ids are globally unique and never renamed once testers have saves.
@@ -75,14 +75,14 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 
 - **Before calling a change done: `cd game && ./run_tests.sh` → `== ALL GREEN`.** The runner globs `tests/test_*.gd` and `tests/smoke_*.gd` and **fails on any `SCRIPT ERROR` / `ERROR:` line**. Name new tests to match the glob or they never run.
 - **Headless tests can't judge feel.** Report "tests green; needs a feel check on the laptop", never "feels better". The user plays builds on the laptop; the server is headless.
-- **Pure rules → `tests/test_<subject>.gd`** (build fresh state objects per test; preload scripts rather than rely on `class_name`). **Room behaviour → `tests/smoke_*.gd`**, loading rooms **standalone** with `RoomLoader` + a test player; drive input with intents or `Input.action_press`, counting physics frames.
+- **Pure rules → `tests/test_<subject>.gd`** (build fresh state objects per test; each test extends `Node` and runs through `tests/runner.tscn`, so `preload`, `class_name` and `Game` all work). **Room behaviour → `tests/smoke_*.gd`**, loading rooms **standalone** with `RoomLoader` + a test player; drive input with intents or `Input.action_press`, counting physics frames.
 - **Design guarantees compare against `tests/spec.gd`** (thresholds with GDD citations), never against the tuning value under test. `smoke_rooms.gd` checks every room file; the bot checks chain ≥ 5 per spine room and every gate. **Never loosen a threshold to pass;** change the GDD first, with the user.
 - **`tests/test_lint.gd` enforces architecture rules** (no `Engine.time_scale =` outside `clock.gd`, no raw `Input` outside `PlayerInput`/UI kit, no `print(`, `.free()`, `"/root/`, `KEY_F`, stray `randf`, `rules/` purity). Fix the code, not the lint.
 - **Validators are pure and return error lists;** tests inspect the list instead of triggering `push_error`.
 - **Keep the output format:** `ok …` / `FAIL …` lines + final `PASS`/`FAILED`.
 - **Pick test targets by position/sort order**, not `get_nodes_in_group(...)[i]`.
 - **Save format changes ship a migration and a fixture** (`tests/fixtures/slot_vN.json`) that every later build must load.
-- **Screenshots** need a renderer: `xvfb-run -a godot --path game --rendering-driver opengl3 --script res://tests/screenshot.gd -- <out>`.
+- **Screenshots** need a renderer: `xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd <out>`.
 
 ### Platform & Build Rules
 

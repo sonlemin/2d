@@ -272,7 +272,7 @@ Taken in dependency order in step 4:
 | 1 | State management | Pure state objects (node-free `RefCounted`) per lifetime; one thin `Game` autoload holds refs | Godot 4.7.2 | Extends the proven `ChainState` pattern; testable without scenes; saves fall out of `to_dict` |
 | 2 | Scene structure | Persistent `World` scene; big rooms (one per spine segment / side area / arena); transitions only at chain-safe points | — | A cut mid-chain breaks the core loop; ~10–14 rooms is small enough for a solo dev |
 | 3 | Level authoring | Text room files (ASCII grid + header), built at load in code | — | Diffable, agent-authorable on the headless server; same text→asset spirit as sprites |
-| 4 | Data persistence | JSON slot files, atomic write + `.bak`, schema `version` + migration chain; settings in `ConfigFile` | — | Readable fixtures, no code execution on load, versioned across builds |
+| 4 | Data persistence | JSON slot files, atomic write + `.bak`, schema `version` + migration chain; settings in JSON (R15) | — | Readable fixtures, no code execution on load, versioned across builds |
 | 5 | Anchor quit | Save anchor id + carried embers + Ember Cache; killed enemies reset | — | Smallest snapshot that keeps the GDD rule "carried stays at risk until a station" |
 | 6 | Time | One `Clock` (in `Game`) is the only writer of `Engine.time_scale`; scale = product of active requests; pause = `SceneTree.paused` | — | Hitstop × slow-mo × assist compose instead of fighting |
 | 7 | Input | `PlayerInput` node turns actions into per-tick intents (Light tap/hold, toggles, real-time buffers) | — | Keeps the player script lean; tests can inject exact timings |
@@ -296,10 +296,10 @@ Taken in dependency order in step 4:
 |---|---|---|---|
 | Per-life | `Player` instance → `ChainState`, `Health`, `PlayerInput` | links, held embers, HP, invulnerability, input buffers | death (player re-instanced) |
 | Per-dive | `Game.dive : DiveState` | carried embers, killed enemies per room, current respawn point | rest at a Lift Station, arriving home, leaving the layer |
-| Per-slot | `Game.slot : SlotState` | world flags (gates, stations, anchors, hoards, secrets), Ember Cache (room, position, amount; survives rests and saves until recovered or the next death), deposited embers, abilities, gear owned, map visits, journal, records, death log lines, difficulty, play time, resume point | New Game / Load |
+| Per-slot | `Game.slot : SlotState` | world flags (gates, stations, anchors, hoards, secrets), Ember Cache (room, position, amount; survives rests and saves until recovered or the next death), deposited embers, abilities, gear owned, map visits, journal, records, death log (cause id + room id per death), difficulty, play time, resume point | New Game / Load |
 | Global | `Game.settings : Settings` | accessibility, tap window, toggles, volumes, video, bindings (E7), last-used slot | never (per machine) |
 
-- All four classes are `RefCounted`, node-free, with typed signals and `to_dict()` / `from_dict()`. Rules on them are unit-tested in `tests/run_tests.gd`, like `ChainState`.
+- All four classes are `RefCounted`, node-free, with typed signals and `to_dict()` / `from_dict()`. Rules on them are unit-tested in `tests/test_<subject>.gd`, like `ChainState` (`tests/test_chain_state.gd`).
 - `Game` (autoload) holds `settings`, `slot`, `dive`, `tuning` (rebuilt when the slot's gear changes), the `Clock` and device tracking. It contains **no gameplay rules**.
 - **Allowed autoloads:** `Game`, `Audio` (from E3). Adding another autoload is an architecture change.
 - **Death no longer reloads the scene.** `World` applies the death cost (difficulty tier rules on `DiveState`), rebuilds the respawn room and spawns a fresh `Player`. The M1 `static var`s on `shaft.gd` are retired when E1 touches them.
@@ -376,7 +376,7 @@ user://
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
 - `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`).
 - **Slot delete** removes `slot_N.json` and `.bak`.
-- Death-card lines are appended to `SlotState.death_log` from E1, for the E7 Journal.
+- Each death appends `{cause, room}` (a cause id, not text) to `SlotState.death_log` from E1, for the E7 Journal; the death card renders `DEATH_<CAUSE>_LINE` / `_TIP` from the cause id.
 
 ### Time Control
 
@@ -426,6 +426,7 @@ user://
 - **UI kit (E1):** MenuList, TabBar, EmberCursor, ConfirmStep, Toggle, Slider, GlyphPrompt; one Theme built in code (no `.tres`, consistent with M1).
 - **Strings:** every player-facing string goes through `tr()` from `game/text/strings.csv` (English only in M2). Commit the generated `.translation` and `.import` files with it.
 - **Accessibility gate:** `Settings` exposes `reduce_flashing`, `shake`, `reduced_motion`; `Fx`, camera shake, invulnerability blink and UI easing read only these flags. No per-effect toggles.
+- **Brightness** (readiness U2, 2026-11-12): `Settings.brightness` (4 levels; Options > Accessibility from E1, Video from E7; replaces M1's F1 `ambient_index`) scales only the world's ambient level (the darkness the lights cut through). It never changes light radii, `Sensing`, the reserved colours or anything on the UI `CanvasLayer`, so the gameplay rules and the contrast floors hold at every level.
 
 ### Audio (E3)
 
@@ -502,7 +503,7 @@ These patterns apply to ALL systems and must be followed by every implementation
 
 **Save triggers:** the resume saves (autosave points and the Quit menu) and the progress saves listed under Data Persistence (R14). Closing the window or tab is not a save trigger; on desktop, `NOTIFICATION_WM_CLOSE_REQUEST` runs the Quit path (including the anchor save).
 
-**Test runner rule:** `run_tests.sh` fails the run when Godot prints any `SCRIPT ERROR` or `ERROR:` line, not only on `FAIL`. Tests that check validators call the pure validator and inspect the returned list, so they never trigger `push_error()`.
+**Test runner rule:** `run_tests.sh` fails the run when Godot prints any `SCRIPT ERROR` or `ERROR:` line, not only on `FAIL`. Tests that check validators call the pure validator and inspect the returned list, so they never trigger `push_error()`. Tests are scripts extending `Node`, run as scenes by `tests/runner.tscn` (readiness R17: under `--script`, a test touching the `Game` autoload fails to compile and can hang or exit 0 silently); the runner also fails a test that prints no `PASS` line or runs longer than 120 s.
 
 **Example:**
 
@@ -624,7 +625,7 @@ func _on_exit_reached(target: StringName) -> void:
 # world.gd
 func _ready() -> void:
 	if OS.is_debug_build():
-		add_child(preload("res://scripts/dev_tools.gd").new())
+		add_child(load("res://scripts/dev/dev_tools.gd").new())  # path string, never preload: release exports exclude scripts/dev/
 ```
 
 ### Other Cross-cutting Rules
@@ -665,7 +666,7 @@ pixel_art_game/
 ├── game/                              # Godot project root (res://)
 │   ├── project.godot                  # autoloads: Game, Audio (E3) — nothing else
 │   ├── export_presets.cfg             # Windows, Linux, Web; include filter rooms/**/*.txt
-│   ├── run_tests.sh                   # globs tests/test_*.gd + tests/smoke_*.gd
+│   ├── run_tests.sh                   # globs tests/test_*.gd + tests/smoke_*.gd, each run via tests/runner.tscn
 │   ├── scripts/
 │   │   ├── core/                      # session plumbing, no gameplay rules
 │   │   │   ├── game.gd                # autoload Game: settings, slot, dive, tuning, clock, devices
@@ -777,7 +778,7 @@ pixel_art_game/
 
 **M1 migration (done in E1, with `git mv` so `.gd.uid` files move with their scripts):**
 `chain_state.gd` → `rules/`; `player.gd`, `crawler.gd`, `lurker.gd` → `actors/`; `fx.gd` → `core/`; `shaft.gd` is retired (its LAYOUT becomes `rooms/l1/m1_shaft.txt` at 22 tiles, its statics move into state objects); `scenes/enemies/*` → `scenes/actors/`; `tests/run_tests.gd` → `tests/test_chain_state.gd`.
-Do the moves in one commit, then run `godot --headless --path game --import` and re-save the moved scenes so `ext_resource` paths match their uids; update the autoload paths in `project.godot`; `run_tests.sh` must be green before anything else changes.
+Do the moves in one commit, then rewrite every moved `res://` path by hand (the M1 scenes carry no `uid=` attributes) and run `godot --headless --path game --import`; update the autoload paths in `project.godot`; `run_tests.sh` must be green before anything else changes.
 
 ### System Location Mapping
 
@@ -1031,11 +1032,11 @@ exit trigger (built from header `exits=`)
 
 death
   Player.died → DiveState/SlotState apply death cost by difficulty (held lost; carried → cache / kept / lost)
-  → SlotState.death_log.append(line) → ScreenRouter shows the death card
+  → SlotState.death_log.append({cause, room}) → ScreenRouter shows the death card
   → on advance: enter_room(respawn room, respawn object) → new Player (full HP)
 
 rest at a Lift Station
-  heal → deposit (dive.carried → slot.deposited) → dive.reset() (killed enemies respawn)
+  heal → deposit (dive.carried → slot.deposited) → dive.reset() → enter_room(current room, station) (killed enemies respawn)
   → save (autosave) → station menu
 ```
 
