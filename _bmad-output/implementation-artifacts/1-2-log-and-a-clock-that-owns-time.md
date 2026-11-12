@@ -4,7 +4,7 @@ baseline_commit: 8961a22
 
 # Story 1.2: Log and a Clock that owns time
 
-Status: review
+Status: done
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -116,6 +116,24 @@ Run everything from `game/` and wrap every Godot run in `timeout`. Story 1.1 fou
   - `feat:` `Game`, `Clock`, the hitstop and `test_clock` (Tasks 4–5)
   - `docs:` (Task 6)
   - Commit every new `.gd.uid` that the import generates beside its script.
+
+### Review Findings
+
+Code review 2026-11-12 (gds-code-review; Blind Hunter, Edge Case Hunter, Acceptance Auditor) of `8961a22..202666d`, story file excluded. All five ACs pass as written, and the six declared deviations are justified. The findings are hardening gaps in the runner and in test coverage. Edge reproduced the runner holes in scratch probes.
+
+- [x] [Review][Patch] Errors from the test's last frame and teardown are never counted [game/tests/runner.gd:87-99,103-110] — the verdict is read the moment `run()` returns, and `_finish()` removes the logger in that same frame. Anything the test queued then (`queue_free`'d nodes' `_exit_tree`, deferred calls) runs unwatched; e.g. `test_clock._test_death_clears()` ends with `player.queue_free()`. Probe: `push_error` in a test's `_exit_tree` gave exit 0. Fix: after `await test.run()`, `test.queue_free()`, await two `process_frame`s, then read `_capture.result()`.
+- [x] [Review][Patch] `run_tests.sh` has no wall-clock bound [game/run_tests.sh:10] — the 120 s watchdog is a `SceneTreeTimer`, so a synchronous infinite loop or a deadlock in load never lets it tick (probe: a 3 s watchdog never fired). The suite hangs instead of failing. Fix: `timeout 150 "$GODOT" …` (Story 1.1's lesson: wrap every Godot run in `timeout`).
+- [x] [Review][Patch] `test_clock`'s real-time checks flake on one long frame [game/tests/test_clock.gd:64-65,76-79] — a frame ≥ 45 ms expires the Clock's timer and the `wait()` timer in the same pass; the Clock's timer was created first, so it fires first and "active at 0.03 s" fails (Edge reproduced with a 100 ms stall). The runner's two-frame start fixes only the first frame. Fix: create the probe timer **before** the request so it fires first on a tie. Also document in the runner contract and the dev guide that `run()` starts two frames after the test enters the tree.
+- [x] [Review][Patch] A test that calls `quit()` itself bypasses the verdict [game/tests/runner.gd:9] — every pre-port test did, so a copied pattern would return. Probe: `push_error` then `get_tree().quit(0)` gave exit 0. Fix: in the runner's `_exit_tree`, if not `_done`, finish FAILED ("test quit on its own").
+- [x] [Review][Patch] No test proves a pogo hit requests the hitstop [game/tests/test_clock.gd] — AC3's "a pogo hit still freezes for 75 ms" rests on a throwaway measurement; deleting the `Game.clock.request` line in `_freeze_frame()` keeps every test green. Fix: a `test_clock` case that instantiates the player, calls `_on_pogo_hit()`, and checks `Game.clock.is_active(&"hitstop")` at scale 0.05.
+- [x] [Review][Patch] The verdict regexes see every printed line [game/tests/runner.gd:36-38] — an `ok` line containing the word `FAILED` fails the test with no reason printed; a `Log` line containing `PASS` (`[save] fixture PASS loaded`) passes a test that returned early (both probed). Fix: skip `ok` lines and `[`-prefixed `Log` lines for both regexes.
+- [x] [Review][Patch] `run_tests.sh` hides the error that failed a test [game/run_tests.sh:11] — D3 now fails on engine errors, but the display grep drops `SCRIPT ERROR` / `ERROR:` lines, so the output shows only `FAILED (runner: 1 engine error(s))`. Fix: add `SCRIPT ERROR|ERROR:` to the display grep (display only; failing on them outside the runner stays Story 1.9's).
+- [x] [Review][Patch] The refresh case never tests "the latest scale wins" [game/tests/test_clock.gd:75-78] — it re-requests with the same 0.5. Fix: re-request at 0.25 and expect 0.25 (stacking would give 0.125, keep-first 0.5).
+- [x] [Review][Patch] `test_log` doesn't test the default-off state [game/tests/test_log.gd:27-40] — `set_enabled([])` runs before "off by default" is checked; `check(true, …)` is unconditional; `Log.format(cat, "")` in the loop tests nothing. Fix: check `enabled()` before any `set_enabled`, drop the dead line, and say in the message that the runner's error count is the real signal.
+- [x] [Review][Patch] `Log.enabled()`'s cost comment is wrong [game/scripts/core/log.gd:33-36] — in release the empty `_check()` call stays and `OS.is_debug_build()` short-circuits: three calls, no lookup. Fix: put the `assert` inline in `enabled()` so release pays one call plus `is_debug_build()`, and correct the comment.
+- [x] [Review][Patch] `game-architecture.md` still says the Clock's timers run `PROCESS_MODE_ALWAYS` [_bmad-output/game-architecture.md:386] — contradicts the line above and AR36; epics.md:296 lists it to settle in the story that touches the Clock. Fix: drop "and the Clock's timers" from that line.
+- [x] [Review][Patch] Two test lists miss `test_log` / `test_clock` [game/README.md:32-36, docs/architecture.md:177-186] — facts, not regeneration. Add one row each.
+- [x] [Review][Defer] A pause mid-request holds `Engine.time_scale` at the reduced value [game/scripts/core/clock.gd:9-10] — deferred, latent. By design (AR36) the pause freezes the request, so the scale stays at e.g. 0.05 (hitstop) or 0.3 (E6 slow-mo) for the whole pause. `PROCESS_MODE_ALWAYS` UI is then slowed too, unless its tweens and animations ignore the time scale.
 
 ## Dev Notes
 
@@ -398,3 +416,4 @@ Modified:
 ## Change Log
 
 - 2026-11-12: Story 1.2 implemented. Every test runs as a scene through `tests/runner.tscn` (fails on no `PASS`, a 120 s timeout or any engine error); static `Log`; the `Game` autoload with a `Clock` that is the only writer of `Engine.time_scale`; the player's hitstop and death go through `Game.clock`; `test_log` and `test_clock` added; docs and project-context updated. Status → review.
+- 2026-11-12: Code review (gds-code-review). 12 patches applied: the runner frees the test and watches two more frames, fails a test that quits on its own, and ignores `ok` / `[category]` lines for the verdict; `run_tests.sh` adds a 150 s wall-clock `timeout` and shows error lines; `test_clock` creates its probes before the requests they must outlast (a 100 ms stall no longer flakes it), checks that the latest scale wins and that a pogo hit requests the hitstop (15 `ok`); `test_log` checks the default-off state first; `Log.enabled()` asserts inline; the architecture's Clock-timer line, the dev guide, `docs/architecture.md` and `game/README.md` are updated. 1 item deferred to the ledger (Owner proposed: Story 1.31). `run_tests.sh` `== ALL GREEN`; `test_clock` 10/10; raw error greps empty; screenshot exit 0. Status → done.

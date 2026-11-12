@@ -40,3 +40,8 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Closed (2026-11-12): rewritten in Story 1.2.**
 - **bmad-loop's canonical ledger format would switch off the owner gate** — `### DW-n` headings with `status:` lines contain no `- ` items, so after a `bmad-loop sweep --migrate` the scan in `tests/test_deferred_owners.gd` sees 0 items and prints PASS. Latent: only matters if bmad-loop is adopted.
   → **Owner (proposed): Story 1.9** — it builds the glob runner and the lint, where ledger-format checks belong.
+
+## Deferred from: code review of 1-2-log-and-a-clock-that-owns-time.md (2026-11-12)
+
+- **A pause mid-request holds `Engine.time_scale` at the reduced value** — `game/scripts/core/clock.gd`: AR36 makes requests freeze with the pause, so the scale stays at 0.05 (hitstop) or 0.3 (E6 slow-mo) for the whole pause. `PROCESS_MODE_ALWAYS` UI (pause tab, menus, focus-loss pause) then runs its default Tweens and AnimationPlayers 3–20× slower. Latent: nothing pauses until the UI stories.
+  → **Owner (proposed): Story 1.31** — the UI kit builds the shared easing and tweens, so it can make them ignore the time scale (as AR44's audio tweens already do).
