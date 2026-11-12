@@ -1,19 +1,45 @@
 extends Node
 ## The session state objects (AR10, AR14, AR18): Settings, SlotState and DiveState. Their API, the
 ## signal rules (Story 1.4 D2), the fallbacks on bad data (D3), the to_dict() shapes (D4), the
-## round trips in memory and through JSON, and rules/ purity.
+## round trips in memory and through JSON, and rules/ purity. Then `Game` (AR11): the same
+## instances all session, `reset_for_tests()`, and `settings.json` through `SaveStore` (R15).
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.gd
-## Each pure case builds fresh state objects.
+## Each pure case builds fresh state objects. Only the Game and file cases use Game, and they
+## end with `Game.reset_for_tests()`. The file cases point `Game.store.dir` at TMP first and
+## check at the end that the real user://settings.json is exactly as it was.
 ## Not tested here, because a failed assert aborts the test: the unknown-key, bad-value,
-## unknown-tier and negative-carried asserts. Code review checks them, as with Tuning's asserts.
+## unknown-tier and negative-carried asserts, and the Game ref guards (D7). Code review checks
+## them, as with Tuning's asserts.
 
 const PURE := [
 	"res://scripts/rules/settings.gd",
 	"res://scripts/rules/slot_state.gd",
 	"res://scripts/rules/dive_state.gd",
 ]
+const TMP := "user://test_state_tmp"
+const REAL := "user://settings.json"
 
 var _fail := 0
+
+
+## Counts SaveStore's "settings written" Log lines. Two writes in one frame leave the same file, so
+## the count is the only way to see them (a mutant without the write guard passed every file
+## check). Engine logging can arrive from any thread, hence the mutex, as in tests/runner.gd.
+class WriteCounter extends Logger:
+	var _lock := Mutex.new()
+	var _line := Log.format(Log.SAVE, "settings written")
+	var _count := 0
+
+	func _log_message(message: String, _error: bool) -> void:
+		_lock.lock()
+		_count += message.split("\n", false).count(_line)
+		_lock.unlock()
+
+	func total() -> int:
+		_lock.lock()
+		var n := _count
+		_lock.unlock()
+		return n
 
 
 func run() -> void:
@@ -36,6 +62,10 @@ func run() -> void:
 	_test_dive_round_trips()
 	_test_dive_fallbacks()
 	_test_purity()
+	_test_game_holds_state()
+	_test_game_same_instances()
+	_test_game_reset_for_tests()
+	await _test_settings_file()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -325,3 +355,181 @@ func _test_purity() -> void:
 		check(err == OK and src != "", "%s is readable (error %d)" % [path, err])
 		var hit := re.search(src)
 		check(hit == null, "%s mentions no Node, Input, Engine, Game. or file access (found: %s)" % [path, hit.get_string() if hit else ""])
+
+
+# --- Game (AR11) ---
+
+func _test_game_holds_state() -> void:
+	check(Game.settings is Settings and Game.slot is SlotState and Game.dive is DiveState, "Game holds a Settings, a SlotState and a DiveState")
+	check(Game.store is SaveStore and Game.store.dir == SaveStore.DEFAULT_DIR, "...and a SaveStore on user:// (got %s)" % Game.store.dir)
+
+
+## Subscribers hold on to these: a reset or a load must change them in place, never swap them.
+func _test_game_same_instances() -> void:
+	var before := [Game.settings, Game.slot, Game.dive, Game.tuning, Game.clock]
+	Game.reset_for_tests()
+	Game.settings.from_dict({"brightness": 2})
+	Game.slot.from_dict({"best_chain": 3, "deaths": 1, "difficulty": "hard", "flags": []})
+	Game.dive.from_dict({"carried": 4, "respawn_room": "", "respawn_entry": ""})
+	var after := [Game.settings, Game.slot, Game.dive, Game.tuning, Game.clock]
+	var same := range(before.size()).all(func(i: int) -> bool: return is_same(before[i], after[i]))
+	check(same, "reset_for_tests() and from_dict() keep all five Game refs the same instances")
+	Game.reset_for_tests()
+
+
+func _test_game_reset_for_tests() -> void:
+	Game.settings.set_value(&"brightness", 3)
+	Game.slot.set_flag(&"anchor_m1_1")
+	Game.slot.record_chain(9)
+	Game.slot.set_difficulty(&"hard")
+	Game.dive.add_carried(4)
+	Game.dive.mark_killed(&"m1_shaft", Vector2i(3, 4))
+	Game.dive.set_respawn(&"m1_shaft", &"anchor_m1_1")
+	var gear: Array[Dictionary] = [{id = &"probe_gear", stat = &"cling_slide", op = &"set", value = 1.0}]
+	Game.tuning.apply_gear([&"probe_gear"], gear)
+	Game.clock.request(&"probe", 0.5, 1.0)
+	Game.store.dir = TMP
+	check(Engine.time_scale == 0.5 and Game.tuning.f(&"cling_slide") == 1.0, "(setup: the probe request and gear are active)")
+	Game.reset_for_tests()
+	check(Game.settings.brightness == 1, "reset_for_tests(): brightness back to 1")
+	check(not Game.slot.has_flag(&"anchor_m1_1") and Game.slot.best_chain == 0 and Game.slot.deaths == 0 and Game.slot.difficulty == &"normal", "...the slot back to its defaults")
+	check(Game.dive.carried == 0 and Game.dive.respawn_room == &"" and not Game.dive.is_killed(&"m1_shaft", Vector2i(3, 4)), "...the dive back to its defaults")
+	check(Game.tuning.f(&"cling_slide") == Tuning.BASE[&"cling_slide"], "...tuning back to base (apply_gear([]))")
+	check(Engine.time_scale == 1.0 and not Game.clock.is_active(&"probe"), "...the clock cleared (time scale %s)" % Engine.time_scale)
+	check(Game.store.dir == SaveStore.DEFAULT_DIR, "...and the store pointed back at user:// (got %s)" % Game.store.dir)
+
+
+# --- settings.json (R15, D5, D6) ---
+
+func _tmp_file() -> String:
+	return TMP.path_join("settings.json")
+
+
+func _write_tmp(text: String) -> void:
+	var f := FileAccess.open(_tmp_file(), FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+## "" when missing: get_file_as_string() prints an error on a missing file (1.1 review).
+func _read_tmp() -> String:
+	return FileAccess.get_file_as_string(_tmp_file()) if FileAccess.file_exists(_tmp_file()) else ""
+
+
+## True when the temp file is a valid version-1 settings file holding this brightness. Types are
+## checked before comparing: on 4.7.2 `"bright" == 1` is a SCRIPT ERROR, not false.
+func _tmp_holds(brightness: int) -> bool:
+	var j := JSON.new()
+	if j.parse(_read_tmp()) != OK or not j.get_data() is Dictionary:
+		return false
+	var d: Dictionary = j.get_data()
+	var s: Variant = d.get("settings")
+	return d.get("version") is float and d.version == 1 \
+			and s is Dictionary and s.get("brightness") is float and s.brightness == brightness
+
+
+## Puts `text` in the file with another brightness in memory, so a load that falls back shows.
+## The await lets an armed write of that value land before the file is replaced.
+func _prime(text: String, in_memory: int) -> void:
+	Game.settings.set_value(&"brightness", in_memory)
+	await get_tree().process_frame
+	_write_tmp(text)
+
+
+func _remove_tmp() -> void:
+	for path: String in [_tmp_file(), _tmp_file() + ".tmp", TMP.path_join("missing"), TMP]:
+		DirAccess.remove_absolute(path)  # silent when missing
+
+
+func _test_settings_file() -> void:
+	_remove_tmp()  # leftovers from an aborted run
+	DirAccess.make_dir_recursive_absolute(TMP)
+	var real_had := FileAccess.file_exists(REAL)
+	var real_text := FileAccess.get_file_as_string(REAL) if real_had else ""
+	Game.store.dir = TMP
+
+	# A first launch: no file. Writes are still disarmed, so this value is never written.
+	Game.settings.set_value(&"brightness", 3)
+	Game.load_settings()
+	check(Game.settings.brightness == 1, "missing file: load_settings() gives the default brightness 1")
+	check(not FileAccess.file_exists(_tmp_file()), "...and writes nothing in the same frame")
+	await get_tree().process_frame
+	check(_tmp_holds(1), "...then a frame later writes version 1 with brightness 1 (got %s)" % _read_tmp().c_escape())
+	check(not FileAccess.file_exists(_tmp_file() + ".tmp"), "...through .tmp, renamed over the file")
+
+	await _prime("{not json", 2)
+	Game.load_settings()
+	check(Game.settings.brightness == 1 and _read_tmp() == "{not json", "corrupt file: the default, one warning and no ERROR (the runner checks), not yet rewritten")
+	await get_tree().process_frame
+	check(_tmp_holds(1), "...then rewritten as a valid file (got %s)" % _read_tmp().c_escape())
+
+	await _prime('{"version": 2, "settings": {"brightness": 2}}', 3)
+	Game.load_settings()
+	await get_tree().process_frame
+	check(Game.settings.brightness == 1 and _tmp_holds(1), "wrong version: the default, rewritten as version 1 (got %s)" % _read_tmp().c_escape())
+
+	await _prime('{"version": 1, "settings": {}}', 3)
+	Game.load_settings()
+	await get_tree().process_frame
+	check(Game.settings.brightness == 1 and _tmp_holds(1), "missing key: the default, rewritten with the key (got %s)" % _read_tmp().c_escape())
+
+	await _prime('{"version": 1, "settings": {"brightness": "bright"}}', 3)
+	Game.load_settings()
+	await get_tree().process_frame
+	check(Game.settings.brightness == 1 and _tmp_holds(1), "bad key: the default, rewritten (got %s)" % _read_tmp().c_escape())
+
+	await _prime('{"version": 1, "settings": {"brightness": 3}, "keep": true}', 0)
+	Game.load_settings()
+	check(Game.settings.brightness == 3 and typeof(Game.settings.brightness) == TYPE_INT, "valid file: brightness 3, as an int")
+	await get_tree().process_frame
+	check(_read_tmp().contains("\"keep\""), "...and the file is kept, not rewritten")
+
+	var writes := WriteCounter.new()
+	OS.add_logger(writes)
+	Game.settings.set_value(&"brightness", 0)
+	Game.settings.set_value(&"brightness", 2)
+	check(_read_tmp().contains("\"keep\""), "two changes in one frame write nothing in that frame")
+	await get_tree().process_frame
+	OS.remove_logger(writes)
+	check(_tmp_holds(2), "...a frame later the file holds the second value (got %s)" % _read_tmp().c_escape())
+	check(writes.total() == 1, "...written once, not once per change (%d writes)" % writes.total())
+	DirAccess.remove_absolute(_tmp_file())
+	await get_tree().process_frame
+	check(not FileAccess.file_exists(_tmp_file()), "...and nothing more is written a frame later")
+
+	# Writes are still armed. A folder that doesn't exist: the store never creates one (D5).
+	Game.store.dir = TMP.path_join("missing")
+	Game.settings.set_value(&"brightness", 1)
+	await get_tree().process_frame
+	check(Game.settings.brightness == 1 and not DirAccess.dir_exists_absolute(TMP.path_join("missing")), "failed write: one warning, no crash, no ERROR, no folder created, the value kept in memory")
+
+	# Tests that never load settings write nothing. Re-pointed at TMP first, so a bug here
+	# writes into the temp folder, never the real one.
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	Game.settings.set_value(&"brightness", 3)
+	await get_tree().process_frame
+	check(not FileAccess.file_exists(_tmp_file()), "unarmed (after reset_for_tests): a change writes nothing")
+
+	# Each test runs in its own Godot process, and the folder is redirected first, so this boot
+	# reads only the temp file.
+	_write_tmp('{"version": 1, "settings": {"brightness": 2}}')
+	Game.boot()
+	check(Game.settings.brightness == 2, "boot() loads settings.json (brightness 2)")
+	_write_tmp('{"version": 1, "settings": {"brightness": 3}}')
+	Game.boot()
+	check(Game.settings.brightness == 2, "...and runs once: a second boot() loads nothing (still 2)")
+
+	# Writes are armed again since boot(). reset_for_tests() points the store home, so hold it on
+	# TMP for a frame: a write that a broken reset failed to disarm then lands in the temp folder,
+	# never in the real file (a mutant that skipped the disarm wrote user://settings.json here).
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	DirAccess.remove_absolute(_tmp_file())
+	await get_tree().process_frame
+	check(not FileAccess.file_exists(_tmp_file()), "after reset_for_tests() nothing is written, even with writes armed before it")
+	Game.store.dir = SaveStore.DEFAULT_DIR
+	_remove_tmp()
+	check(not DirAccess.dir_exists_absolute(TMP), "the temp folder is gone")
+	var real_now := FileAccess.file_exists(REAL)
+	check(real_now == real_had and (not real_now or FileAccess.get_file_as_string(REAL) == real_text), "the real user://settings.json is exactly as it was (exists: %s)" % real_had)
