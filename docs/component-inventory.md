@@ -105,6 +105,14 @@ Builds the level from `LAYOUT`, owns the session statics, draws the debug HUD an
 
 **Hotkeys:** F1 brightness · F2 controls hint · F3 restart from the top (clears the checkpoint). **Constants:** `TILE` 16, `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
 
+### Core — `scripts/core/`
+
+| Script | Kind | Role |
+|---|---|---|
+| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules. Only `clock` so far; 1.3 and 1.4 add the rest |
+| `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)` |
+| `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
+
 ### Fx — `scripts/core/fx.gd` (static, `class_name Fx`)
 
 | Function | Effect |
@@ -158,6 +166,8 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | Script | Tests | Run |
 |---|---|---|
 | `tests/test_chain_state.gd` | 10 test functions on ChainState | headless |
+| `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
+| `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
 | `tests/screenshot.gd` | 2 screenshots | needs a renderer |

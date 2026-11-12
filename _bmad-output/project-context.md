@@ -27,7 +27,7 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 
 ## Current State vs Target
 
-**Story 1.1 moved the M1 files into the domain folders** (`scripts/rules/chain_state.gd`, `scripts/actors/{player,crawler,lurker}.gd`, `scripts/core/fx.gd`, `scenes/actors/`); **otherwise the code is still M1:** `shaft.gd`/`shaft.tscn` at the top level (LAYOUT, statics, F1–F3, scene reload; retired in 1.7), `tests/test_chain_state.gd` run with `--script`, and a hand-kept `for t in …` list in `run_tests.sh`. Rules below that name files which don't exist yet (`Game`, `clock.gd`, `tests/spec.gd`, `test_lint.gd`, room files) describe the **target**; the first E1 stories create them. Until the glob runner exists, add new test files to the `for t in …` loop. Never build new M2 work on the M1 patterns.
+**Story 1.1 moved the M1 files into the domain folders** (`scripts/rules/chain_state.gd`, `scripts/actors/{player,crawler,lurker}.gd`, `scripts/core/fx.gd`, `scenes/actors/`). **Story 1.2 added the `Game` autoload (holding only `clock`), `scripts/core/{clock,log}.gd`, and runs every test through `tests/runner.tscn`.** **Otherwise the code is still M1:** `shaft.gd`/`shaft.tscn` at the top level (LAYOUT, statics, F1–F3, scene reload; retired in 1.7), and a hand-kept `for t in …` list in `run_tests.sh`. Rules below that name files which don't exist yet (`tests/spec.gd`, `test_lint.gd`, room files) describe the **target**; the first E1 stories create them. Until the glob runner exists, add new test files to the `for t in …` loop. Never build new M2 work on the M1 patterns.
 
 ## Critical Implementation Rules
 

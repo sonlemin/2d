@@ -34,28 +34,33 @@ cd game
 ./run_tests.sh                 # imports, then runs unit + smoke tests; prints "== ALL GREEN" or exits 1
 ```
 
-Run one suite on its own:
+Run one suite on its own. Every test runs as a scene through `tests/runner.tscn`, so the `Game` autoload, `preload` and `class_name` all work:
 
 ```bash
 godot --headless --path game --import                                # first, and again after pulling moved or renamed scripts (rebuilds the class_name cache)
-godot --headless --path game --script res://tests/test_chain_state.gd   # ChainState unit tests
-godot --headless --path game --script res://tests/test_deferred_owners.gd   # every deferred-work.md item has an owner
-godot --headless --path game --script res://tests/smoke_shaft.gd     # integration smoke test
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_chain_state.gd      # ChainState unit tests
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_log.gd              # Log
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_clock.gd            # Game.clock and the hitstop
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd           # integration smoke test
 ```
 
 Screenshots (needs a renderer):
 
 ```bash
-xvfb-run -a godot --path game --rendering-driver opengl3 --script res://tests/screenshot.gd -- /some/out_dir
+xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd /some/out_dir
 ```
 
 ### Writing tests
 
-- Tests are plain `extends SceneTree` scripts with a local `check(cond, msg)`. There is no framework.
-- **Pure rules → `test_chain_state.gd`.** Add a `test_*` function and list it in `_init()`. Preload the script (`ChainStateScript`) rather than rely on `class_name` in `--script` mode.
-- **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `_run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
-- Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
-- `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED`. Keep that output format.
+- A test is a script that `extends Node` and implements `func run() -> void`, which may `await`. It has a local `check(cond, msg)`; there is no framework. Don't use `--script`: under it, anything that names `Game` fails to compile.
+- It prints `ok …` / `FAIL …` lines and a final line containing `PASS` or `FAILED`. It never calls `quit()`; the runner sets the exit code.
+- The runner fails a test that prints no `PASS` line, runs longer than 120 s, or logs any `SCRIPT ERROR` / `ERROR:` line, even if it printed `PASS` (a runtime error inside a helper aborts only the helper). `push_warning` is allowed.
+- Extra arguments after the test path reach the test as `OS.get_cmdline_user_args()[1..]` (`screenshot.gd` reads its output folder there).
+- **Pure rules → a new `tests/test_<subject>.gd`**, never into `test_chain_state.gd`. Build fresh state objects per case.
+- **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
+- Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
+- Add every new test file to the `for t in …` list in `run_tests.sh` until Story 1.9's glob runs `tests/test_*.gd` and `tests/smoke_*.gd` itself. `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED`, so keep that output format.
 
 ## Edit Art
 

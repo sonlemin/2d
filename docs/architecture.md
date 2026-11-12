@@ -27,9 +27,9 @@ The architecture is deliberately small:
 | Pixel rules | nearest filter, `snap_2d_transforms_to_pixel` | project-wide | No sub-pixel shimmer |
 | Lighting | `PointLight2D` + `CanvasModulate` | one shared 128 px gradient texture | The "light in the dark" pillar |
 | Physics | Godot 2D built-in | default 60 ticks/s | `CharacterBody2D` for actors |
-| Test runner | Godot headless + `SceneTree` scripts | no framework | Runs on the headless dev server |
+| Test runner | Godot headless + `tests/runner.tscn` (each test is a `Node` script) | no framework | Runs on the headless dev server |
 | Asset tool | Python 3 + Pillow | `tools/build_sprites.py` | Art as reviewable text |
-| Addons / autoloads | none | — | |
+| Addons / autoloads | autoload `Game` (holds `clock`); no addons | — | `Audio` joins in E3 |
 | CI / export presets | none | — | Builds are made from the editor on the laptop |
 
 ## Architecture Pattern
@@ -125,7 +125,7 @@ _tick_timers → _handle_snuff → _handle_cling ─(not clinging)→ _handle_ho
 2. Calls `chain.add_hit()` and flares the light by 18 px.
 3. Adds 2.5 px of shake and a stretch squash.
 4. Shows `Fx.chain_popup`.
-5. Freezes for 75 ms: `Engine.time_scale = 0.05`, with a timer that ignores time scale.
+5. Freezes for 75 ms: `Game.clock.request(&"hitstop", 0.05, 0.075)`. The Clock times it in real time and is the only writer of `Engine.time_scale`.
 
 ### Death and respawn
 
@@ -195,7 +195,7 @@ No export presets or CI. Builds are played in the Godot editor on the laptop (F5
 - **Keep ChainState free of nodes.** It is the unit-tested core. New chain rules (Flare Toss halving, hit → "carried") belong there, with tests.
 - **Static vars on `shaft.gd` are the only persistence.** Anything that must survive death goes there today. They also leak between test runs in one process.
 - **`reload_current_scene()` only when the shaft is the current scene.** Test harnesses add the shaft by hand, and `_on_player_died` checks this.
-- **Hitstop changes `Engine.time_scale`.** Use timers with `ignore_time_scale = true` for anything that must run during it, and reset the time scale on exit or death (`_exit_tree`, `die`).
+- **Hitstop goes through `Game.clock`.** Request it with `Game.clock.request(&"hitstop", 0.05, 0.075)`; never write `Engine.time_scale` yourself. Use timers with `ignore_time_scale = true` for anything that must run during it. `die()` calls `Game.clock.clear()`.
 - **Determinism:** no randomness in level behaviour. Hover phase comes from position, and `reset_phase()` exists so tests do not depend on order. Only the camera shake uses `randf`.
 - **Lurker lethality is `monitorable`.** It is false except in HUNT with the scent. Do not add other kill paths that skip this, or the rule "Snuff/landing in time always saves you" breaks.
 - **Polling, not `body_entered`, for crawler contact**, so a crawler still overlapping when invulnerability ends still hurts.

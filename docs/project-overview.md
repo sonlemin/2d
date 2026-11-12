@@ -23,7 +23,7 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 | Language | GDScript |
 | Display | 480×270 viewport, integer scaling, pixel snap, nearest filtering |
 | Lighting | `PointLight2D` + `CanvasModulate` |
-| Tests | Headless Godot `SceneTree` scripts (`run_tests.sh`) |
+| Tests | Headless Godot `Node` scripts run by `tests/runner.tscn` (`run_tests.sh`) |
 | Art pipeline | Python 3 + Pillow: text grids → PNG |
 | Targets (M2 plan) | Windows, Linux, web/itch.io |
 

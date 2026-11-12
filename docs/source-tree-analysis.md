@@ -31,10 +31,16 @@ pixel_art_game/
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
 │   │   ├── core/
+│   │   │   ├── game.gd           # The Game autoload: refs to session state (only `clock` so far), no rules
+│   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
+│   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
-│   │   ├── test_chain_state.gd   # Unit tests for ChainState (SceneTree script, headless)
+│   │   ├── runner.gd / runner.tscn # Runs one test as a scene; fails on no PASS, a timeout or any engine error
+│   │   ├── test_chain_state.gd   # Unit tests for ChainState
+│   │   ├── test_log.gd           # Unit tests for Log
+│   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── smoke_shaft.gd        # Integration smoke test: real shaft, simulated input, bot run
 │   │   └── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
@@ -86,7 +92,7 @@ Thin prefabs: node trees, collision shapes and textures. Behaviour lives in the 
 
 ### `game/tests/`
 
-Headless `SceneTree` scripts, run with `godot --headless --script`. There is no test framework (no GUT, no gdUnit). See [Development Guide](./development-guide.md#testing).
+`extends Node` scripts, each run as a scene by `tests/runner.tscn` (`godot --headless --path game res://tests/runner.tscn -- res://tests/<test>.gd`), so the `Game` autoload works in tests. There is no test framework (no GUT, no gdUnit). See [Development Guide](./development-guide.md#testing).
 
 ### `game/art/` and `tools/sprites/`
 
@@ -97,7 +103,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 | What | Where |
 |---|---|
 | Game | `game/scenes/shaft.tscn` (`run/main_scene`) → `scripts/shaft.gd::_ready()` |
-| Tests | `game/run_tests.sh` → `tests/test_chain_state.gd`, `tests/smoke_shaft.gd` |
+| Tests | `game/run_tests.sh` → `tests/runner.tscn` → each test in its `for t in …` list |
 | Screenshots | `tests/screenshot.gd` (manual, needs a display or xvfb) |
 | Sprites | `python3 tools/build_sprites.py` (from the repo root) |
 
@@ -105,7 +111,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 
 - **Script per scene:** `scenes/<domain>/X.tscn` ↔ `scripts/<domain>/X.gd`. Both trees use the same domain folder names; scripts live under `scripts/`, not next to their scene, and `scenes/` has only the domains that have scenes. `shaft.gd`/`shaft.tscn` stay at the top level until Story 1.7.
 - **Enemies** live with the player in `scenes/actors/` and `scripts/actors/`.
-- **No autoloads, no addons, no resources (`.tres`).** Tilesets and materials are built in code.
+- **One autoload (`Game`), no addons, no resources (`.tres`).** Tilesets and materials are built in code. `Audio` is the only other autoload the architecture allows (E3).
 - **Tuning lives in code:** `@export` vars on node scripts (Player, Crawler, Lurker) and `const`s in `ChainState` and `Shaft`.
 
 ## Configuration Files
