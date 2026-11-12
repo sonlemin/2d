@@ -4,7 +4,7 @@ baseline_commit: ec561bb03864f238a5176736746b25b6a3c620fb
 
 # Story 1.1: Move M1 into the M2 folder layout
 
-Status: review
+Status: done
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green)
 **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
@@ -85,6 +85,21 @@ so that every later story builds on the architecture's layout instead of extendi
 - [x] **Task 7: One commit** (AC: 1, 2). Put everything from Tasks 2–6 in one commit:
   - [x] Subject: `refactor: move M1 into the M2 folder layout`. The body lists the 15 moves and rewrites 1–8 from Task 3, so AC2's full path list is in the commit message.
   - [x] Before committing, confirm the staged diff still shows the 15 files as renames: `git diff --cached -M --name-status`.
+
+### Review Findings
+
+Code review 2026-11-12 (gds-code-review; Blind Hunter, Edge Case Hunter, Acceptance Auditor) of `ec561bb..9ecb68c`. The story's own move (`aaf5f22`) passes every AC. Most findings are in `9ecb68c` (`tests/test_deferred_owners.gd`), which the review covered at sonlm's request. Every false pass below was reproduced in a scratch probe.
+
+- [x] [Review][Patch] Items appended at the end of the ledger inherit the last section's owner [game/tests/test_deferred_owners.gd:54-69] — `scan()` gives any column-0 marker line in a section to every item in that section, wherever the line sits. `deferred-work.md` ends with "Mechanic ideas", which has a section-level owner paragraph, so anything `bmad-build` (flat `- source_spec:` blocks) or `gds-quick-dev` appends without a heading counts as owned (probe: 9 items, 0 unowned, PASS). A column-0 `**Closed…**` note placed after a list owns the whole list the same way. **Decided by sonlm 2026-11-12: per-item owners only.** Remove section-level ownership from `scan()`, and give each of the 5 open Mechanic ideas its own `→ **Owner (2026-11-12): the M2 retrospective**` line (the sixth is already Closed). The section-owner test case becomes "a paragraph owner covers nothing".
+- [x] [Review][Patch] Owner markers match in the wrong places and miss `(proposed)` [game/tests/test_deferred_owners.gd:38-39,56-61] — four cases: a bold title like `**Closed captions: Deck**` or a backticked `` `**Owner: TBD**` `` makes an item own itself; placeholder values `**Owner: TBD**`, `none` and `?` count as owned; `**Owner: E3 (proposed)**` and `**Closed (proposed): x**` count as confirmed; and the common `**Owner:** E3` style is reported as unowned. Fix: accept a marker only at the start of a line (indent, optional `→`), ignore backticked text, reject placeholder values, detect `(proposed` anywhere inside an Owner or Closed marker, and accept the value after the bold.
+- [x] [Review][Patch] Items in other list styles are invisible [game/tests/test_deferred_owners.gd:47-55] — `* `, `+ ` and `1. ` bullets are never counted (items=0, PASS). Lines starting with `#` or `- ` inside fenced code blocks become fake headings and items. Fix: treat `^([-*+]|\d+[.)])\s` as an item, skip fenced blocks, and detect headings with `^#{1,6}\s`.
+- [x] [Review][Patch] An unreadable ledger passes [game/tests/test_deferred_owners.gd:118-130] — `get_file_as_string` returns `""` (Edge reproduced this with `chmod 000`), so the scan finds 0 items and the test prints PASS. Also: the not-found message prints `res://../_bmad-output/…`, which is not a real path, and `FAILED (n)` counts one extra failure because the summary check fails as well. Fix: check `FileAccess.get_open_error()`, print the globalized path, and run the summary check only when the list is clean.
+- [x] [Review][Patch] A parser regression can skip the rule checks and still pass [game/tests/test_deferred_owners.gd:93,103] — `r.unowned[0]` and `r.unowned[1]` are indexed without a size check. Probe: an out-of-bounds index aborts `_test_scan_rules`, `_test_real_ledger` still runs, the test prints `PASS` and exits 0, and `run_tests.sh` hides the `SCRIPT ERROR` line. Fix: guard both indexes with the list size.
+- [x] [Review][Patch] Rewritten layout bullet is garbled and contradicts D1 [docs/source-tree-analysis.md:102] — "share domain folders (`core/ rules/ actors/` …), not next to each other". The original said "not next to their scene", and listing `core/ rules/` implies a `scenes/rules/` folder, which D1 rules out. The "(retired in Story 1.7)" notes on the shaft lines are accurate, so leave them.
+- [x] [Review][Patch] Running a single suite after pulling the move fails on a stale cache [docs/development-guide.md:41] — the guide says to run `--import` "once, so textures resolve". With a pre-move `.godot/` cache, a direct `--script` run fails with "Could not find script for class Player" (reproduced by Edge). Fix the comment: re-run the import after pulling moved or renamed scripts, because it rebuilds the `class_name` cache.
+- [x] [Review][Patch] The docs don't list `test_deferred_owners.gd` [docs/development-guide.md:39-43, game/README.md:34] — `run_tests.sh` now runs it and it can fail on a ledger edit alone, but no test table or run command names it. Add one row and the single-suite command.
+- [x] [Review][Defer] The dev guide's "Writing tests" section is M1 guidance [docs/development-guide.md:53-54] — deferred, pre-existing. It says tests are `extends SceneTree` and that pure rules go into `test_chain_state.gd`; project-context says `tests/test_<subject>.gd` on `runner.tscn`.
+- [x] [Review][Defer] The bmad-loop canonical ledger format would switch the gate off [game/tests/test_deferred_owners.gd:47-55] — deferred, latent. `### DW-n` headings with `status:` lines contain no `- ` items, so a `bmad-loop sweep --migrate` leaves 0 items and the test prints PASS.
 
 ## Dev Notes
 
@@ -199,3 +214,4 @@ All under the repo root; committed in `aaf5f22` unless marked.
 ### Change Log
 
 - 2026-11-12: implemented Story 1.1. M1 moved into the M2 domain folders in one commit (`aaf5f22`) with no behaviour change. Tests are green at the baseline counts. Status set to review.
+- 2026-11-12: code review (`ec561bb..9ecb68c`). 1 decision (per-item owners only) and 7 patches applied, nearly all to `tests/test_deferred_owners.gd`: owner markers anchored to the line start, placeholders and `(proposed)` anywhere, all bullet styles, fenced code, unreadable ledger, guarded indexes. Also 5 owner lines added to `deferred-work.md` and 3 doc fixes. 2 items deferred with proposed owners (Stories 1.2 and 1.9). `run_tests.sh` → 69 checks, 21 owner checks, `SMOKE PASS`, `== ALL GREEN`. Status set to done.
