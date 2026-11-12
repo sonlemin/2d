@@ -374,7 +374,7 @@ user://
 - **New Game** writes the slot immediately after the difficulty step (an overwrite takes effect at once).
 - **Retry:** a failed save retries at the next autosave trigger and on quit to title.
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
-- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`).
+- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; tests never boot, and point `Game.store.dir` at a temp folder when they test the file.
 - **Slot delete** removes `slot_N.json` and `.bak`.
 - Each death appends `{cause, room}` (a cause id, not text) to `SlotState.death_log` from E1, for the E7 Journal; the death card renders `DEATH_<CAUSE>_LINE` / `_TIP` from the cause id.
 

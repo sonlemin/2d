@@ -29,7 +29,7 @@ The architecture is deliberately small:
 | Physics | Godot 2D built-in | default 60 ticks/s | `CharacterBody2D` for actors |
 | Test runner | Godot headless + `tests/runner.tscn` (each test is a `Node` script) | no framework | Runs on the headless dev server |
 | Asset tool | Python 3 + Pillow | `tools/build_sprites.py` | Art as reviewable text |
-| Addons / autoloads | autoload `Game` (holds `clock`); no addons | — | `Audio` joins in E3 |
+| Addons / autoloads | autoload `Game` (holds `clock`, `tuning`, `settings`, `slot`, `dive` and `store`); no addons | — | `Audio` joins in E3 |
 | CI / export presets | none | — | Builds are made from the editor on the laptop |
 
 ## Architecture Pattern
@@ -41,13 +41,13 @@ The architecture is deliberately small:
               │  Darkness (CanvasModulate)   Background (ColorRect)   Walls (TileMapLayer)    │
               │  Player (player.tscn) ── owns ──► ChainState (RefCounted)                     │
               │  Crawler × N, Lurker × N   (instanced from LAYOUT at _ready)                  │
-              │  ledge rims (ColorRect × N)   Debug (CanvasLayer: Label HUD, Controls hint)    │
+              │  ledge rims (ColorRect × N)   Debug (CanvasLayer: Label HUD)                  │
               └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **ChainState** is a `RefCounted` with no node dependencies. It owns the count, snuffed/clinging flags and held embers. It computes the light radius and Blade Bloom, and emits `changed(count)` and `banked(amount)`.
 - **Player** owns one `ChainState` (`player.chain`) and turns input and collisions into calls on it (`add_hit`, `break_chain`, `set_snuffed`, `set_clinging`, `lose`). It then applies the results to its nodes (light texture scale, hitbox scale).
-- **Shaft** reads the player's state for the HUD and checkpointing, and listens to `chain.banked` to grow the session haul.
+- **Shaft** reads the player's state for the HUD. On `chain.banked` it calls `Game.dive.add_carried()`, and on `chain.changed` `Game.slot.record_chain()`, so the haul and the records live in `Game`.
 - **Lurkers** poll the player each physics frame through `player.light_radius()`.
 
 ### Communication between parts
@@ -56,8 +56,8 @@ The architecture is deliberately small:
 |---|---|
 | Player → ChainState | direct method calls |
 | ChainState → Player | signals `changed`, `banked` |
-| ChainState → Shaft | signal `banked` (adds to `Shaft.banked_embers`) |
-| Player → Shaft | signal `died` (respawn); Shaft polls `chain`, `is_on_floor()`, `position` every frame |
+| ChainState → Shaft | signal `banked` (calls `Game.dive.add_carried()`); signal `changed` (calls `Game.slot.record_chain()`) |
+| Player → Shaft | signal `died` (`Game.slot.record_death()`, then respawn); Shaft polls `chain` and `position` every frame for the HUD |
 | Player → Crawler | `Pogo`/`Slash` area overlap → duck-typed `body.take_hit()` |
 | Crawler → Player | Player's `Hurtbox` polls overlapping bodies in group `enemy` → knockback |
 | Lurker → Player | `get_first_node_in_group("player")` → `light_radius()`, `is_dead`, position |
@@ -68,18 +68,17 @@ The architecture is deliberately small:
 
 ## State Management
 
-There are three kinds of state. None is saved to disk.
+There are three kinds of state. Only `Settings` is saved to disk, as `user://settings.json`.
 
 1. **Chain state (per life):** `ChainState` on the player — `count`, `held`, `snuffed`, `clinging`. Reset by the scene reload on death.
-2. **Session state (survives death):** `static var`s on `shaft.gd`. A death calls `reload_current_scene()`, which rebuilds every node, but static vars live on the script class:
+2. **Session state (survives death):** pure objects held by the `Game` autoload (Story 1.4). A death calls `reload_current_scene()`, which rebuilds every node, but `Game` and its objects live all session and are reset in place, never replaced:
 
-   | Static | Meaning |
+   | State | Meaning |
    |---|---|
-   | `banked_embers` | the haul: embers banked so far this session |
-   | `checkpoint` | last floor position stood on (respawn point); `Vector2.INF` = top. F3 clears it |
-   | `best_chain`, `deaths` | playtest stats shown on the HUD |
-   | `ambient_index` | F1 brightness level (index into `AMBIENT_LEVELS`) |
-   | `show_controls` | F2 controls-hint toggle |
+   | `Game.dive.carried` (`DiveState`) | the haul: embers banked so far (M1 "banked" = M2 "carried") |
+   | `Game.dive.respawn_room` / `respawn_entry` | the respawn point; nothing sets it until anchors and stations (Story 1.24), so the shaft respawns at `P` |
+   | `Game.slot.best_chain`, `Game.slot.deaths` (`SlotState`) | records shown on the HUD |
+   | `Game.settings.brightness` (`Settings`) | F1 brightness level (index into `AMBIENT_LEVELS`), saved in `user://settings.json` by `core/save_store.gd`; `Game.boot()` (called once by the shaft as the entry scene) loads it |
 
 3. **Actor state:** private vars on each node (timers, the lurker's FSM `state`). Each reload resets it.
 
@@ -102,7 +101,7 @@ Full catalogue with fields and tuning: [Component Inventory](./component-invento
 - **Player** (`CharacterBody2D`) — run, variable jump, coyote/buffer, air dash, wall cling and kick, ground slash, air pogo, hitstop, light easing, camera shake and look-ahead, knockback and death.
 - **Crawler** (`CharacterBody2D`) — walker (patrols, turns at walls and edges) or hoverer (sine drift, phase set by position for determinism). Dies to any hit.
 - **Lurker** (`Area2D`) — `IDLE → TELEGRAPH (0.9 s) → HUNT → RETURN`. It notices only a light ≥ 80 px, within radius × 1.6, **and** while on screen. It is lethal only while it is hunting *and* has the scent.
-- **Shaft** — level builder, HUD, input hotkeys (F1–F3), checkpointing, respawn.
+- **Shaft** — level builder, HUD, input hotkeys (F1 and F3), respawn at `P`. No checkpointing.
 - **Fx** — unshaded particles and labels that read in the dark.
 
 ## Key Runtime Flows
@@ -129,7 +128,7 @@ _tick_timers → _handle_snuff → _handle_cling ─(not clinging)→ _handle_ho
 
 ### Death and respawn
 
-`die()` → `chain.lose()` (a "−N lost" popup) → `died` → Shaft adds a death and waits 0.6 s (real time). If it is still the current scene, it calls `reload_current_scene()`. Static vars survive, so the player spawns at `checkpoint` with the haul intact.
+`die()` → `chain.lose()` (a "−N lost" popup) → `died` → Shaft records a death (`Game.slot.record_death()`) and waits 0.6 s (real time). If it is still the current scene, it calls `reload_current_scene()`. `Game` survives the reload, so the player respawns at `P` with carried embers kept; held embers are still lost.
 
 ## Level Data
 
@@ -156,7 +155,7 @@ At build time, every wall tile with open space above gets a 1 px unshaded **ledg
 
 ## Rendering and Light
 
-- `CanvasModulate` darkens everything. Its colour is `AMBIENT_LEVELS[i] × AMBIENT_TINT` (violet cast), with 4 levels cycled by F1.
+- `CanvasModulate` darkens everything. Its colour is `AMBIENT_LEVELS[i] × AMBIENT_TINT` (violet cast), with 4 levels. F1 cycles `Settings.brightness`, which persists in `settings.json`.
 - The player's `PointLight2D` uses `light.png` (128 px). Its `texture_scale = shown_radius / 64`, and `shown_radius` eases toward `chain.light_radius()`.
 - The lurker's eyes and the slash/pogo sprites, Fx and ledge rims use `LIGHT_MODE_UNSHADED`, so they read at any brightness. The lurker's red `PointLight2D` glow tracks the eye alpha.
 - Flash safety: the invulnerability blink is 2.5 Hz and the eye pulse 2 Hz, both under the 3 flashes/s cap.
@@ -213,13 +212,13 @@ Observations from comparing this code with GDD v1.0 and the UX spines (2026-11-1
 | Play width | Shaft is 30 tiles (480 px), full-width view, no gutters | ~60 px HUD gutters, ~360 px view; spine shafts 22 tiles (352 px); wider rooms scroll horizontally (GDD Level Design, UX) | Camera limits/viewport split; rebuild the shaft at 22 tiles (E1) |
 | Scene structure | One scene, level as a const string array | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | A room/level format and a scene-transition layer |
 | Damage | Crawler = knockback only; hunting lurker = instant death | 4 HP; crawler 1, lurker 2, spikes 1; heal at stations (GDD Health) | Health component; lurker contact deals damage instead of calling `die()` |
-| Embers | held → banked (session static) → lost on death | held → **carried** → **deposited** at a Lift Station/hub (GDD Economy) | Rename and extend ChainState/economy; deposit flow |
-| Respawn | Last floor position (`checkpoint` static) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Checkpoint service separate from the floor poll |
+| Embers | held → banked (`Game.dive.carried`) → held lost on death | held → **carried** → **deposited** at a Lift Station/hub (GDD Economy) | Rename and extend ChainState/economy; deposit flow |
+| Respawn | The shaft's spawn `P` (`DiveState` has an unused respawn point) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Checkpoint service separate from the floor poll |
 | Light key | Hold V = Snuff; a tap does nothing | Tap = Flare Toss (needs ≥ 2 links, halves the chain); tap window 0.12/0.2/0.3 s setting; optional Snuff toggle key (GDD Controls) | Light input state machine; Flare entity that predators sense |
-| Input | Keyboard only; F1–F3 debug hotkeys | Gamepad from M2; Pause (Esc/P); rebinding in E7; F1 brightness removed in E7 | Input map + settings; remove the debug hotkeys |
-| HUD | Debug `Label` line + controls hint | Gutter HUD, Fusion Pixel Font 8px (OFL files must ship), alert frame in the gutters (UX DESIGN) | Real HUD scene; font licence files in builds |
+| Input | Keyboard only; F1 and F3 debug hotkeys | Gamepad from M2; Pause (Esc/P); rebinding in E7; F1 brightness removed in E7 | Input map + settings; remove the debug hotkeys |
+| HUD | Debug `Label` line | Gutter HUD, Fusion Pixel Font 8px (OFL files must ship), alert frame in the gutters (UX DESIGN) | Real HUD scene; font licence files in builds |
 | Lurker warning | On-screen telegraph only | Off-screen "stir": panned audio + half-open eye at the edge (GDD Lurker) | Needs audio and an edge indicator |
-| Persistence | None (session statics) | 3 save slots, autosave at stations/hub/anchor quit, visible save failure (GDD Saves, UX) | Save system |
+| Persistence | `settings.json` only (brightness); session state in `Game`, not saved | 3 save slots, autosave at stations/hub/anchor quit, visible save failure (GDD Saves, UX) | Save system |
 | Audio | None | SFX + chain-reactive music (E3) | Audio bus layout |
 | Death feedback | "−N lost" popup | Death card lines stored from E1 for the E7 Journal (UX); Field Journal line (deferred-work) | Record the death cause |
 | Builds | Editor only | Windows, Linux, web/itch.io 960×540; 60 FPS on HD 620 class (GDD Performance) | Export presets; a perf test |

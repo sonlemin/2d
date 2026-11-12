@@ -23,19 +23,23 @@ pixel_art_game/
 │   │       ├── crawler.tscn      # Crawler prefab (CharacterBody2D + edge ray)
 │   │       └── lurker.tscn       # Lurker prefab (Area2D + eyes + red glow light)
 │   ├── scripts/
-│   │   ├── shaft.gd              # ★ Level: ASCII LAYOUT, tileset built in code, spawns, debug HUD, session statics (retired in Story 1.7)
+│   │   ├── shaft.gd              # ★ Level: ASCII LAYOUT, tileset built in code, spawns, debug HUD (retired in Story 1.7)
 │   │   ├── rules/
 │   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
-│   │   │   └── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
+│   │   │   ├── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
+│   │   │   ├── settings.gd       # Settings: global settings (brightness so far), set_value() + changed
+│   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags
+│   │   │   └── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
 │   │   ├── actors/
 │   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, contact and death
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
 │   │   ├── core/
-│   │   │   ├── game.gd           # The Game autoload: refs to session state (`clock`, `tuning` so far), no rules
+│   │   │   ├── game.gd           # The Game autoload: refs to session state (`settings`, `slot`, `dive`, `tuning`, `clock`, `store`), boot(), no rules
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
+│   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
@@ -44,6 +48,7 @@ pixel_art_game/
 │   │   ├── test_log.gd           # Unit tests for Log
 │   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
 │   │   ├── test_tuning.gd        # Tuning API, gear order, rules/ purity, the 44 M1 exports regression fixture
+│   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── smoke_shaft.gd        # Integration smoke test: real shaft, simulated input, bot run
 │   │   └── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)

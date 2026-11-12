@@ -13,8 +13,7 @@ Open this folder in Godot 4.7 and press F5.
 | X in the air | **Pogo**: strike down, bounce off an enemy and add 1 to the chain |
 | C | Air dash (refilled by each pogo) |
 | Hold V | **Snuff** (hold about 0.12 s; a quick tap does nothing): go dark. Breaks the chain, and lurkers lose you |
-| F1 | Cycle brightness (4 levels) |
-| F2 | Show or hide the on-screen controls |
+| F1 | Cycle brightness (4 levels; remembered between launches) |
 
 ## The loop
 
@@ -24,7 +23,7 @@ Open this folder in Godot 4.7 and press F5.
 - A big light wakes the **lurkers**: red eyes pulse in the dark for about a second, then they hunt you. Contact with a hunting lurker kills you.
 - To shake a lurker off, **land or Snuff**. Both break the chain.
 - Touching a crawler knocks you back and breaks the chain, but doesn't kill you.
-- Dying respawns you on the **last ledge you stood on**. Press **F3** to restart from the top.
+- Dying respawns you at the **top of the shaft**; banked embers are kept. **F3** also restarts from the top.
 - A lurker that loses your scent (you land or Snuff) is harmless at once, even point-blank.
 
 ## Tests
@@ -35,5 +34,6 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **Log** (`tests/test_log.gd`): the `[category] message` format and the debug-category switches.
 - **Clock** (`tests/test_clock.gd`): time-scale requests multiply, refresh, run on real time, pause with the game and clear on death; a pogo hit freezes for 75 ms.
 - **Tuning** (`tests/test_tuning.gd`): gear modifiers apply in a fixed order, and every M1 tuning value still holds after the move to `scripts/rules/tuning.gd`.
+- **State** (`tests/test_state.gd`): settings, slot and dive state, their save shapes and `settings.json` (a missing or broken file falls back to the defaults).
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the real level with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.

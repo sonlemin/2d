@@ -95,28 +95,31 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 
 ### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, main scene)
 
-Builds the level from `LAYOUT`, owns the session statics, draws the debug HUD and handles hotkeys. See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
+Builds the level from `LAYOUT`, draws the debug HUD from `Game` state and handles hotkeys. It has no session statics: what survives a death lives in `Game` (Story 1.4). See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
 
 | Node | Type | Role |
 |---|---|---|
-| Darkness | CanvasModulate | Ambient darkness (F1 cycles 4 levels) |
+| Darkness | CanvasModulate | Ambient darkness: 4 levels, picked by `Settings.brightness` (F1 cycles it) |
 | Background | ColorRect | 480×1680, z −10, palette `#2a2440` |
 | Walls | TileMapLayer | Tileset assigned in code |
-| Player | player.tscn | Spawned at `P` or at `checkpoint` |
+| Player | player.tscn | Spawned at `P` |
 | Debug/Label | Label | HUD: `embers, held, chain (best), light, SNUFF, depth, alert, deaths`; turns red while a lurker is awake |
-| Debug/Controls | Label | One-line controls hint (F2 hides it) |
 
-**Hotkeys:** F1 brightness · F2 controls hint · F3 restart from the top (clears the checkpoint). **Constants:** `TILE` 16, `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
+**Hotkeys:** F1 brightness (saved in `settings.json`) · F3 restart from the top. **Constants:** `TILE` 16, `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
 
 ### Core — `scripts/core/`
 
 | Script | Kind | Role |
 |---|---|---|
-| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `clock` and `tuning` so far; 1.4 adds the rest |
+| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `settings`, `slot`, `dive`, `tuning`, `clock` (same instances all session; replacing one asserts) and `store`. `boot()` (once, from the entry scene) loads `settings.json` and arms its writes, at most one per frame; `reset_for_tests()` resets everything in place |
+| `save_store.gd` | `class_name SaveStore` (`RefCounted`), at `Game.store` | The only code that reads or writes the player's files: `read_settings()` / `write_settings()` for `user://settings.json` (`{"version": 1, "settings": {…}}`, `.tmp` then rename). Redirectable `dir`; never creates folders |
 | `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)` |
 | `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
 | `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
 | `rules/gear.gd` | `class_name Gear` (pure data) | `TABLE` of `{id, stat, op, value}` rows (`set` / `add` / `mul` / `flag`); empty until E5 |
+| `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices |
+| `rules/slot_state.gd` | `class_name SlotState` (`RefCounted`, pure); `Game.slot` | Per-slot state: `best_chain`, `deaths`, `difficulty` (`&"easy"`/`&"normal"`/`&"hard"`), story flags (`set_flag()` / `has_flag()`). `to_dict()` becomes save format `slot_v1` at 1.41 |
+| `rules/dive_state.gd` | `class_name DiveState` (`RefCounted`, pure); `Game.dive` | Per-dive state: `carried` embers (`add_carried()`), the respawn point (`set_respawn()`), killed enemies (`mark_killed()` / `is_killed()`, never saved) |
 
 ### Fx — `scripts/core/fx.gd` (static, `class_name Fx`)
 
@@ -138,7 +141,7 @@ Everything is unshaded and frees itself.
 | `dash` | C |
 | `light` | V |
 
-Keyboard only, bound by physical keycode. F1–F3 are read directly in `Shaft._unhandled_input`, not through actions.
+Keyboard only, bound by physical keycode. F1 and F3 are read directly in `Shaft._unhandled_input`, not through actions.
 
 ## Asset Inventory
 

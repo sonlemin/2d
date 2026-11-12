@@ -14,7 +14,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - **Tech stack:** Godot 4.7 · GDScript · GL Compatibility · 480×270 integer-scaled · Python/Pillow sprite pipeline
 - **Entry point:** `game/scenes/shaft.tscn` → `game/scripts/shaft.gd`
 - **Core rules:** `game/scripts/rules/chain_state.gd` (pure, unit-tested)
-- **Architecture pattern:** scene tree + node-free rules class + ASCII level + static session state
+- **Architecture pattern:** scene tree + node-free rules class + ASCII level + session state in pure objects held by the `Game` autoload
 - **Database / API:** none
 - **Deployment:** none yet (played from the editor); M2 targets Windows, Linux, web/itch.io
 

@@ -13,7 +13,7 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 - **Repository type:** monolith
 - **Project type:** game
 - **Languages:** GDScript (game), Python (asset tool)
-- **Pattern:** Godot scene tree; rules in a node-free `ChainState`; level from an ASCII array; session state in static vars
+- **Pattern:** Godot scene tree; rules in a node-free `ChainState`; level from an ASCII array; session state in pure objects held by the `Game` autoload
 
 ## Technology Stack Summary
 

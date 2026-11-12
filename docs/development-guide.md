@@ -25,7 +25,7 @@ No package manager, addons or environment variables are needed. Optional: set `G
 
 Open `game/` in Godot 4.7 and press **F5**. The main scene is `scenes/shaft.tscn`. The controls are in [`game/README.md`](../game/README.md).
 
-Debug hotkeys in M1: **F1** brightness (4 levels), **F2** show or hide the controls hint, **F3** restart from the top.
+Debug hotkeys in M1: **F1** brightness (4 levels, saved in `user://settings.json` and remembered between launches), **F3** restart from the top.
 
 ## Testing
 
@@ -41,6 +41,7 @@ godot --headless --path game --import                                # first, an
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_chain_state.gd      # ChainState unit tests
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_log.gd              # Log
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_clock.gd            # Game.clock and the hitstop
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.gd            # Settings, SlotState, DiveState, Game and settings.json
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd           # integration smoke test
 ```
@@ -60,7 +61,7 @@ xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn
 - Extra arguments after the test path reach the test as `OS.get_cmdline_user_args()[1..]` (`screenshot.gd` reads its output folder there).
 - **Pure rules → a new `tests/test_<subject>.gd`**, never into `test_chain_state.gd`. Build fresh state objects per case.
 - **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
-- Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
+- Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`; a test that changes `Game` state ends with `Game.reset_for_tests()`. Tests never call `Game.boot()`, so they never load or write the real `user://settings.json`; a test that checks the file points `Game.store.dir` at a temp folder it creates and removes (see `test_state.gd`). A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
 - Add every new test file to the `for t in …` list in `run_tests.sh` until Story 1.9's glob runs `tests/test_*.gd` and `tests/smoke_*.gd` itself. `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED` (plus error lines and their `at:` traces), so keep that output format. It also kills a run after 150 s of wall-clock time, which catches a test that blocks the main loop, where the runner's watchdog can't fire.
 
 ## Edit Art
