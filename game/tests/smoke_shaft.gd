@@ -222,7 +222,7 @@ func test_bot_chains_long_run() -> void:
 
 func test_lurker_telegraph_hunt_lose() -> void:
 	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
-	Engine.time_scale = 1.0
+	Game.clock.clear()
 	_player.set_physics_process(false)  # freeze the player so only the lurker acts
 	place(lurker.global_position + Vector2(100, 0))
 	for i in 8:

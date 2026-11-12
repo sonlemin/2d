@@ -81,10 +81,6 @@ func _ready() -> void:
 	_cling_left = cling_time
 
 
-func _exit_tree() -> void:
-	Engine.time_scale = 1.0  # never leave the world frozen if we vanish mid-hitstop
-
-
 func light_radius() -> float:
 	return chain.light_radius()
 
@@ -264,12 +260,11 @@ func _on_pogo_hit() -> void:
 	_freeze_frame()
 
 
+## FR4: the Clock times the 75 ms in real time and ends it, even if this player is freed mid-freeze.
 func _freeze_frame() -> void:
 	if hitstop <= 0.0:
 		return
-	Engine.time_scale = 0.05
-	await get_tree().create_timer(hitstop, true, false, true).timeout
-	Engine.time_scale = 1.0
+	Game.clock.request(&"hitstop", 0.05, hitstop)
 
 
 func _set_swing_visible(on: bool) -> void:
@@ -335,7 +330,7 @@ func die() -> void:
 		return
 	is_dead = true
 	_end_cling()
-	Engine.time_scale = 1.0
+	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen
 	var lost := chain.lose()  # unbanked embers die with you
 	if lost > 0:
 		Fx.popup(get_parent(), global_position + Vector2(0, -10), "-%d lost" % lost, Color(1, 0.35, 0.3), 10)
