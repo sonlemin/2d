@@ -1,0 +1,210 @@
+# generated: 2026-11-12T12:16:27+07:00
+# last_updated: 2026-11-12T12:16:27+07:00
+# project: pixel_art_game
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Story source: _bmad-output/planning-artifacts/epics.md (story types, human gates and
+#   dependencies live there, not here). Re-run gds-sprint-planning after adding stories.
+
+generated: "2026-11-12T12:16:27+07:00"
+last_updated: "2026-11-12T12:16:27+07:00"
+project: pixel_art_game
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # Epic 1: Kit v2: Fair Deaths, Full Move Set
+  epic-1: backlog
+  1-1-move-m1-into-the-m2-folder-layout: backlog
+  1-2-log-and-a-clock-that-owns-time: backlog
+  1-3-tuning-as-data: backlog
+  1-4-state-objects-in-the-game-autoload: backlog
+  1-5-rooms-as-text-the-m1-shaft-at-22-tiles: backlog
+  1-6-the-world-scene-replaces-the-m1-shaft: backlog
+  1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd: backlog
+  1-8-playerinput-intents: backlog
+  1-9-glob-test-runner-spec-and-the-architecture-lint: backlog
+  1-10-room-smoke-tests-and-the-reachability-bot: backlog
+  1-11-devtools-entry-args-and-overlays: backlog
+  1-12-worst-case-performance-scene: backlog
+  1-13-export-pipeline-and-web-boot-smoke: backlog
+  1-14-display-scaling-and-web-input: backlog
+  1-15-cp1-gate-feel-check-and-performance-verdict: backlog
+  1-16-effects-accessibility-gate-and-flash-cap: backlog
+  1-17-string-table-pixel-font-and-theme: backlog
+  1-18-palette-tokens-contrast-and-the-deck-size-check: backlog
+  1-19-health-4-hp-and-the-damage-table: backlog
+  1-20-light-sensing-for-predators: backlog
+  1-21-save-store: backlog
+  1-22-three-ember-stages-the-ember-cache-and-difficulty-tiers: backlog
+  1-23-flare-toss: backlog
+  1-24-interact-lantern-anchors-and-lift-station-rest: backlog
+  1-25-gutter-hud-v2-frame-hp-and-embers: backlog
+  1-26-gutter-hud-v2-chain-number-meter-and-cling-cues: backlog
+  1-27-alert-frame-off-screen-stirring-and-flare-cost: backlog
+  1-28-death-card-voice-anchors: backlog
+  1-29-death-card-and-the-field-journal-death-line: backlog
+  1-30-cp2-gate-the-kit-playtest: backlog
+  1-31-ui-kit-and-menu-bindings: backlog
+  1-32-placeholder-station-menu: backlog
+  1-33-web-gate-and-title-screen: backlog
+  1-34-pause-tab: backlog
+  1-35-cling-and-snuff-hold-press-toggles: backlog
+  1-36-options-game-accessibility-and-brightness: backlog
+  1-37-gamepad-glyph-swap-and-disconnect-pause: backlog
+  1-38-slot-picker-and-difficulty-step: backlog
+  1-39-save-failure-feedback-and-web-persistence: backlog
+  1-40-review-the-ux-defaults-in-the-build: backlog
+  1-41-freeze-save-format-v1-and-close-e1: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Weaver Prototype: The Restraint Fight Is Fun
+  epic-2: backlog
+  2-1-weaver-test-arena-and-debug-entry: backlog
+  2-2-strands-and-anchors: backlog
+  2-3-weaver-movement-and-light-shy-states: backlog
+  2-4-bite-telegraph: backlog
+  2-5-spiderlings: backlog
+  2-6-light-burst-stun-and-diegetic-boss-health: backlog
+  2-7-flare-herding: backlog
+  2-8-strand-drop: backlog
+  2-9-re-weave: backlog
+  2-10-phase-stub-fight-reset-and-the-weavers-death-lines: backlog
+  2-11-winnability-guarantee: backlog
+  2-12-e2-playtest-with-blind-outside-players: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Audio: Hear the Chain and the Hunters
+  epic-3: backlog
+  3-1-sfx-script-pipeline: backlog
+  3-2-the-audio-autoload-and-the-core-sfx-set: backlog
+  3-3-pogo-pitch-crescendo: backlog
+  3-4-positional-lurker-cues: backlog
+  3-5-sketch-the-motif-and-the-placeholder-stems: backlog
+  3-6-chain-reactive-music-stems-and-layer-1-ambience: backlog
+  3-7-ducking-and-mix: backlog
+  3-8-options-audio-tab: backlog
+  3-9-e3-playtest: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Layer 1: Edge of the Abyss
+  epic-4: backlog
+  4-1-save-format-v2: backlog
+  4-2-ux-update-map-tab-and-tutorial-prompts: backlog
+  4-3-voice-anchors-for-odas-hand-and-the-documents: backlog
+  4-4-story-flag-registry-and-lurker-met: backlog
+  4-5-layer-1-tileset-palette-zones-and-the-zone-cross-fade: backlog
+  4-6-layer-1-creature-and-object-sprites: backlog
+  4-7-room-to-room-flow-across-layer-1: backlog
+  4-8-final-lift-station-fast-travel-and-a-placeholder-hub: backlog
+  4-9-s1-the-lip: backlog
+  4-10-s2-scaffold-drop: backlog
+  4-11-the-chain-gate: backlog
+  4-12-s3-the-lantern-door: backlog
+  4-13-teaching-half-checkpoint: backlog
+  4-14-ember-hoards-and-the-economy-rules: backlog
+  4-15-journal-objects-and-the-document-screen: backlog
+  4-16-s4-explorers-grave: backlog
+  4-17-the-last-entry: backlog
+  4-18-the-lost-islander-documents-and-the-memorial-name-list: backlog
+  4-19-s5-weavers-hollow: backlog
+  4-20-the-map-tab: backlog
+  4-21-a-rope-works: backlog
+  4-22-b-old-mine: backlog
+  4-23-c-sky-ledge-and-the-shortcut-home: backlog
+  4-24-full-layer-bot-and-softlock-pass: backlog
+  4-25-npc-voice-anchors: backlog
+  4-26-e4-playtest: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Abyss Island: Come Home and Spend
+  epic-5: backlog
+  5-1-save-format-v3: backlog
+  5-2-ux-update-the-hub-surfaces: backlog
+  5-3-abyss-island-village: backlog
+  5-4-the-lift-ride: backlog
+  5-5-hub-npc-sprites-and-the-npc-object: backlog
+  5-6-npc-dialogue-framework: backlog
+  5-7-flag-and-length-validators: backlog
+  5-8-hub-writing: backlog
+  5-9-shop-framework: backlog
+  5-10-the-smith-and-gear: backlog
+  5-11-the-cartographer: backlog
+  5-12-the-naturalist-journal-payouts-and-the-minimal-journal-tab: backlog
+  5-13-the-guild-records-board-and-the-memorial-wall: backlog
+  5-14-odas-house-and-the-new-game-opening: backlog
+  5-15-the-watching-departure: backlog
+  5-16-price-tuning-pass: backlog
+  5-17-e5-playtest: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: The Weaver and Swing: The Complete Slice
+  epic-6: backlog
+  6-1-save-format-v4: backlog
+  6-2-apply-the-e2-prototype-findings: backlog
+  6-3-weaver-art-and-animation: backlog
+  6-4-the-final-arena-and-the-weavers-introduction: backlog
+  6-5-the-layer-2-landing-arena: backlog
+  6-6-the-fall: backlog
+  6-7-phase-2: backlog
+  6-8-phase-checkpoint-and-the-respawn-route: backlog
+  6-9-defeat-weaver-silk-and-the-repaired-station: backlog
+  6-10-swing: backlog
+  6-11-the-partners-name-and-the-closing-lines: backlog
+  6-12-the-three-swing-secrets: backlog
+  6-13-the-m2-closing-beat: backlog
+  6-14-full-slice-loop-and-guarantee-pass: backlog
+  6-15-e6-playtest: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Slice Polish and Ship: The First Shared Build
+  epic-7: backlog
+  7-1-save-format-v5: backlog
+  7-2-options-video: backlog
+  7-3-options-controls-rebinding: backlog
+  7-4-large-hud-and-text-scale: backlog
+  7-5-timing-assists: backlog
+  7-6-visual-sound-cues: backlog
+  7-7-the-full-field-journal: backlog
+  7-8-hud-polish-and-the-chain-cap-cue: backlog
+  7-9-player-animation-set: backlog
+  7-10-hub-and-layer-2-landing-palette-pass: backlog
+  7-11-title-logo-and-credits: backlog
+  7-12-composed-music: backlog
+  7-13-performance-pass: backlog
+  7-14-steam-deck-and-accessibility-test-passes: backlog
+  7-15-final-builds: backlog
+  7-16-the-tester-round: backlog
+  7-17-the-distribution-decision: backlog
+  epic-7-retrospective: optional
