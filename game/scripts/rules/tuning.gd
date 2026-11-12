@@ -1,7 +1,8 @@
 class_name Tuning
 extends RefCounted
-## Every gameplay number a rule could bend, in one pure table (AR15). The session's instance lives
-## in `core/game.gd`; actors read it with `f(&"key")` each tick and never keep a value across frames.
+## The gameplay numbers that gear, assists and playtests bend, in one pure table (AR15). The
+## session's instance lives in `core/game.gd`. Actors read `f(&"key")` where they use a value: a
+## countdown may start from the current value, but no value is kept for reuse on a later frame.
 ## Gear bends the values through `apply_gear()` (AR16): set → add → mul, whatever order the gear
 ## comes in. Change a value → update the matching GDD table.
 ##
@@ -11,56 +12,58 @@ extends RefCounted
 ## - presentation numbers (camera, light easing, eye animation), local consts on their actors;
 ## - the sensing rule, which moves to Sensing in Story 1.20;
 ## - the Light tap window, which is a Settings value (Story 1.8), never a tuning key.
+## Not here yet: M1 literals that never were exports, such as the crawler's 400 px/s fall cap and
+## the lurker's ×2 brake once it loses you. The story that needs to bend one moves it here.
 
 signal changed
 
 # --- Movement (GDD Movement (M1), FR1) ---
-const RUN_SPEED := 110.0  ## px/s top run speed (GDD Movement, FR1; M1 player.run_speed). M1 value, unchanged.
-const RUN_ACCEL := 900.0  ## px/s² toward the run speed on the ground (GDD Movement "ground accel", FR1; M1 player.run_accel). M1 value, unchanged.
+const RUN_SPEED := 110.0  ## px/s; top run speed, on the ground and in the air (GDD Movement, FR1; M1 player.run_speed). M1 value, unchanged.
+const RUN_ACCEL := 900.0  ## px/s²; how fast the run reaches top speed on the ground (GDD Movement "ground accel", FR1; M1 player.run_accel). M1 value, unchanged.
 const AIR_ACCEL := 1500.0  ## px/s²; snappier steering in the air, to line up the next pogo (GDD Movement, FR1; M1 player.air_accel). M1 value, unchanged.
-const GRAVITY := 900.0  ## px/s² while rising (GDD Movement, FR1; M1 player.gravity). M1 value, unchanged.
+const GRAVITY := 900.0  ## px/s²; pull while rising, which with JUMP_VELOCITY sets the ≈ 60 px apex (GDD Movement, FR1; M1 player.gravity). M1 value, unchanged.
 const MAX_FALL := 210.0  ## px/s terminal fall; slowed so a dive reads and ledges come in time (GDD Movement, FR1; M1 player.max_fall). Was 330.
 const FALL_GRAVITY_SCALE := 0.6  ## × gravity while falling; rising is unchanged, so a dive floats (GDD Movement, FR1; M1 player.fall_gravity_scale). M1 value, unchanged.
-const JUMP_VELOCITY := -330.0  ## px/s launch, apex ≈ 60 px (3.75 tiles) (GDD Movement, FR1; M1 player.jump_velocity). Was -270 (apex ≈ 40 px).
-const JUMP_CUT := 0.45  ## × upward velocity when Jump is released early, so a tap is a short hop (GDD Movement, FR1; M1 player.jump_cut). M1 value, unchanged.
-const COYOTE_TIME := 0.08  ## s after leaving a ledge that a jump still counts (GDD Movement, FR1; M1 player.coyote_time). M1 value, unchanged.
-const JUMP_BUFFER := 0.10  ## s an early Jump press waits for the ground instead of being lost (GDD Movement, FR1; M1 player.jump_buffer). M1 value, unchanged.
+const JUMP_VELOCITY := -330.0  ## px/s launch; apex ≈ 60 px (3.75 tiles) with GRAVITY (GDD Movement, FR1; M1 player.jump_velocity). Was -270 (apex ≈ 40 px).
+const JUMP_CUT := 0.45  ## × upward velocity on an early Jump release; a tap is a short hop, a hold the full jump (GDD Movement, FR1; M1 player.jump_cut). M1 value, unchanged.
+const COYOTE_TIME := 0.08  ## s; a jump still counts this long after leaving a ledge, so a late press isn't eaten (GDD Movement, FR1; M1 player.coyote_time). M1 value, unchanged.
+const JUMP_BUFFER := 0.10  ## s; an early Jump press waits this long for the ground instead of being lost (GDD Movement, FR1; M1 player.jump_buffer). M1 value, unchanged.
 
 # --- Dash (GDD Movement "Air dash", FR2) ---
-const DASH_SPEED := 260.0  ## px/s horizontal, ignoring gravity; once per airtime (GDD Movement "Air dash", FR2; M1 player.dash_speed). M1 value, unchanged.
-const DASH_TIME := 0.12  ## s per dash, ≈ 31 px (GDD Movement "Air dash", FR2; M1 player.dash_time). M1 value, unchanged.
+const DASH_SPEED := 260.0  ## px/s; a horizontal burst that ignores gravity, once per airtime, refilled by a pogo hit (GDD Movement "Air dash", FR2; M1 player.dash_speed). M1 value, unchanged.
+const DASH_TIME := 0.12  ## s per dash; ≈ 31 px at DASH_SPEED (GDD Movement "Air dash", FR2; M1 player.dash_time). M1 value, unchanged.
 
 # --- Cling (GDD Wall cling (M1) and the chain-end table, FR6/FR7) ---
 const CLING_GRACE := 1.0  ## s of paused chain per cling; a pogo hit refills it (GDD Wall cling, FR6/FR7; M1 player.cling_time). Silk Grip +0.25 (E6). M1 value, unchanged.
 const CLING_SLIDE := 18.0  ## px/s slow slide while clinging; clinging never climbs (GDD Wall cling, FR7; M1 player.cling_slide). Steady Grip sets 10 (E5). M1 value, unchanged.
-const WALL_KICK_X := 150.0  ## px/s away from the wall when Jump is released mid-cling (GDD Wall cling, FR7; M1 player.wall_kick.x). M1 value, unchanged.
-const WALL_KICK_Y := -260.0  ## px/s up on the same kick (GDD Wall cling, FR7; M1 player.wall_kick.y). M1 value, unchanged.
-const KICK_LOCK := 0.15  ## s of no steering after a kick, so it actually carries you off the wall (GDD Wall cling, FR7; M1 player.kick_lock). M1 value, unchanged.
+const WALL_KICK_X := 150.0  ## px/s; push away from the wall when Jump is released mid-cling (GDD Wall cling, FR7; M1 player.wall_kick.x). M1 value, unchanged.
+const WALL_KICK_Y := -260.0  ## px/s; the upward part of the same kick (GDD Wall cling, FR7; M1 player.wall_kick.y). M1 value, unchanged.
+const KICK_LOCK := 0.15  ## s; no steering after a kick, so it actually carries you off the wall (GDD Wall cling, FR7; M1 player.kick_lock). M1 value, unchanged.
 
 # --- Attack (GDD Attack, pogo and chain (M1), FR4) ---
-const POGO_VELOCITY := -300.0  ## px/s bounce on a pogo hit, apex ≈ 50 px: hang time to steer to the next target (GDD Attack, FR4; M1 player.pogo_velocity). Was -260.
-const SLASH_ACTIVE := 0.12  ## s a ground slash stays active (GDD Attack "Slash active 0.12 s", FR4; M1 player.swing_active). M1 value, unchanged.
-const POGO_ARMED := 0.22  ## s a pogo stays armed, longer than a slash so a slightly early press still hits (GDD Attack "armed 0.22 s", FR4; M1 player.air_swing_active). M1 value, unchanged.
-const ATTACK_COOLDOWN := 0.22  ## s before the next attack, slash and pogo alike (GDD Attack "cooldown 0.22 s", FR4; M1 player.swing_cooldown). M1 value, unchanged.
-const HITSTOP := 0.075  ## s of real time the world freezes on a pogo hit (GDD Attack "75 ms", FR4; M1 player.hitstop). Was 0.045.
+const POGO_VELOCITY := -300.0  ## px/s bounce on a pogo hit; apex ≈ 50 px, hang time to steer to the next target (GDD Attack, FR4; M1 player.pogo_velocity). Was -260.
+const SLASH_ACTIVE := 0.12  ## s; how long a ground slash can hit (GDD Attack "Slash active 0.12 s", FR4; M1 player.swing_active). M1 value, unchanged.
+const POGO_ARMED := 0.22  ## s; how long a pogo can hit, longer than a slash so a slightly early press still connects (GDD Attack "armed 0.22 s", FR4; M1 player.air_swing_active). M1 value, unchanged.
+const ATTACK_COOLDOWN := 0.22  ## s; wait before the next attack, slash and pogo alike (GDD Attack "cooldown 0.22 s", FR4; M1 player.swing_cooldown). M1 value, unchanged.
+const HITSTOP := 0.075  ## s of real time; the freeze frame on each pogo hit, the chain's hit feedback (GDD Attack "75 ms", FR4; M1 player.hitstop). Was 0.045.
 
 # --- Damage (GDD Health and damage (M2), Story 1.19) ---
-const KNOCKBACK_X := 150.0  ## px/s away from a crawler on contact (GDD Health and damage; M1 player.knockback.x). M1 value, unchanged.
-const KNOCKBACK_Y := -150.0  ## px/s up on the same knock (GDD Health and damage; M1 player.knockback.y). M1 value, unchanged.
-const INVULN_TIME := 0.6  ## s invulnerable (blinking) after a hit (GDD Health and damage, Combat "Defense"; M1 player.invuln_time). M1 value, unchanged.
+const KNOCKBACK_X := 150.0  ## px/s; push away from a crawler on contact (GDD Health and damage; M1 player.knockback.x). M1 value, unchanged.
+const KNOCKBACK_Y := -150.0  ## px/s; the upward part of the same knock (GDD Health and damage; M1 player.knockback.y). M1 value, unchanged.
+const INVULN_TIME := 0.6  ## s; invulnerable and blinking after a hit, so one contact can't hit twice in a row (GDD Health and damage, Combat "Defense"; M1 player.invuln_time). M1 value, unchanged.
 
 # --- Crawler (GDD Combat System, enemy table, FR58) ---
-const CRAWLER_WALK_SPEED := 25.0  ## px/s walker patrol; no number in the GDD yet (GDD Combat, walker row; M1 crawler.walk_speed). M1 value, unchanged.
+const CRAWLER_WALK_SPEED := 25.0  ## px/s; a walker's patrol pace along its ledge; no number in the GDD yet (GDD Combat, walker row; M1 crawler.walk_speed). M1 value, unchanged.
 const CRAWLER_GRAVITY := 900.0  ## px/s² for walkers; not in a GDD table yet (M1 crawler.gravity). M1 value, unchanged.
-const CRAWLER_HOVER_DRIFT := 10.0  ## px amplitude of a hoverer's side-to-side drift (GDD Combat "drifts 10 px", FR58; M1 crawler.hover_drift). M1 value, unchanged.
-const CRAWLER_HOVER_PERIOD := 2.4  ## s per drift cycle (GDD Combat "over 2.4 s", FR58; M1 crawler.hover_period). M1 value, unchanged.
+const CRAWLER_HOVER_DRIFT := 10.0  ## px; amplitude of a hoverer's side-to-side drift, so a dive can string them together (GDD Combat "drifts 10 px", FR58; M1 crawler.hover_drift). M1 value, unchanged.
+const CRAWLER_HOVER_PERIOD := 2.4  ## s; one drift cycle, its phase set by position so the shaft plays the same every time (GDD Combat "over 2.4 s", FR58; M1 crawler.hover_period). M1 value, unchanged.
 
 # --- Lurker (GDD Predators: Lurker (M1)) ---
 const LURKER_TELEGRAPH_TIME := 0.9  ## s of eyes-open warning before a hunt; never below 0.75 (Pillar 2, GDD Lurker; Spec.TELEGRAPH_MIN from 1.9; M1 lurker.telegraph_time). M1 value, unchanged.
-const LURKER_LOSE_TRACK_TIME := 0.6  ## s a lurker that lost you waits before it heads home (GDD Lurker "waits 0.6 s"; M1 lurker.lose_track_time). M1 value, unchanged.
-const LURKER_HUNT_SPEED := 95.0  ## px/s straight at you, through walls (GDD Lurker "95 px/s"; M1 lurker.hunt_speed). M1 value, unchanged.
+const LURKER_LOSE_TRACK_TIME := 0.6  ## s; a lurker that lost you waits this long, harmless, before it heads home (GDD Lurker "waits 0.6 s"; M1 lurker.lose_track_time). M1 value, unchanged.
+const LURKER_HUNT_SPEED := 95.0  ## px/s; the hunt, straight at you and through walls (GDD Lurker "95 px/s"; M1 lurker.hunt_speed). M1 value, unchanged.
 const LURKER_HUNT_ACCEL := 220.0  ## px/s² toward the hunt speed; it brakes at twice this once it loses you; not in the GDD (M1 lurker.hunt_accel). M1 value, unchanged.
-const LURKER_RETURN_SPEED := 40.0  ## px/s drifting back home after a hunt; not in the GDD (M1 lurker.return_speed). M1 value, unchanged.
+const LURKER_RETURN_SPEED := 40.0  ## px/s; the slow drift back home after a hunt; not in the GDD (M1 lurker.return_speed). M1 value, unchanged.
 
 ## Every key `f()` knows, with its base value.
 const BASE := {
@@ -119,9 +122,11 @@ func _init() -> void:
 ## `table` is Gear.TABLE except in tests, which inject fixture rows. Ids not in the table are ignored.
 ## Values are computed here, once, so `f()` stays a lookup: actors call it many times per tick.
 func apply_gear(gear_ids: Array[StringName], table: Array[Dictionary] = Gear.TABLE) -> void:
-	var rows := table.filter(func(row: Dictionary) -> bool: return StringName(row.id) in gear_ids)
-	for row in rows:
+	# Every row, owned or not, and before the filter reads `id`: the session's instance applies []
+	# at boot, so a bad Gear.TABLE row fails the first debug run, not the day someone owns it.
+	for row in table:
 		_check_row(row)
+	var rows := table.filter(func(row: Dictionary) -> bool: return StringName(row.get("id", &"")) in gear_ids)
 	_values = BASE.duplicate()
 	_flags = {}
 	var was_set := {}

@@ -1131,7 +1131,7 @@ func _apply(i: int) -> void:
 | Bot | `tests/smoke_bot.gd` | plain movement, no dash: chain ≥ 5 in every spine room, the required chain at every gate, the exit backstop never fires on the bot's line |
 
 **Rules:**
-- Tests compare against `spec.gd`, never against the tuning value under test (`assert(lurker.telegraph_time >= Spec.TELEGRAPH_MIN)`), so loosening tuning fails the suite.
+- Tests compare against `spec.gd`, never against the tuning value under test (`assert(Game.tuning.f(&"lurker_telegraph_time") >= Spec.TELEGRAPH_MIN)`), so loosening tuning fails the suite.
 - Changing a guarantee means changing the GDD first, with the user, then `spec.gd`.
 - Per-room guarantees run on every room automatically; adding a room adds its checks.
 
@@ -1151,7 +1151,7 @@ for path in _all_room_files():
 	_check(room != null, "%s builds" % path)
 	var lurkers := room.find_children("*", "", true, false).filter(func(n): return n is Lurker)
 	for lurker in _sorted_by_position(lurkers):
-		_check(lurker.telegraph_time >= Spec.TELEGRAPH_MIN, "%s telegraph ≥ %.2f" % [path, Spec.TELEGRAPH_MIN])
+		_check(Game.tuning.f(&"lurker_telegraph_time") >= Spec.TELEGRAPH_MIN, "%s telegraph ≥ %.2f" % [path, Spec.TELEGRAPH_MIN])
 ```
 
 **Usage:** every new design guarantee in the GDD gets a `Spec` constant and a test before the feature is called done.

@@ -85,6 +85,7 @@ func run() -> void:
 	_test_gear_table_empty()
 	_test_game_holds_tuning()
 	_test_purity()
+	_test_key_literals()
 	_test_m1_fixture()
 	_test_fr_values()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
@@ -113,7 +114,7 @@ func _test_base() -> void:
 	check(_moved(t).is_empty(), "a fresh Tuning returns every BASE value (moved: %s)" % [_moved(t)])
 
 
-## AR16: set → add → mul whatever order the gear comes in. Any other order gives 3, 5 or 7.
+## AR16: set → add → mul whatever order the gear comes in. From base 18, any other order gives 1, 3 or 5.
 func _test_order() -> void:
 	var perms := [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
 	for p: Array in perms:
@@ -188,6 +189,38 @@ func _test_purity() -> void:
 		check(err == OK and src != "", "%s is readable (error %d)" % [path, err])
 		var hit := re.search(src)
 		check(hit == null, "%s mentions no Node, Input, Engine or Game. (found: %s)" % [path, hit.get_string() if hit else ""])
+
+
+## Story 1.3 traded compile-checked export names for key literals, so a typo or a key no code reads
+## would only show when that branch is played, in a debug build (code review of 1.3).
+func _test_key_literals() -> void:
+	var re := RegEx.create_from_string("\\bf\\(&\"(\\w+)\"\\)")
+	var files := _gd_files("res://scripts")
+	var used := {}
+	var bad := []
+	for path: String in files:
+		var src := FileAccess.get_file_as_string(path)
+		if FileAccess.get_open_error() != OK:
+			bad.append("%s unreadable" % path)
+			continue
+		for line in src.split("\n"):
+			for m in re.search_all(line.get_slice("#", 0)):  # code only: comments may quote f(&"key")
+				used[StringName(m.get_string(1))] = true
+				if not Tuning.BASE.has(StringName(m.get_string(1))):
+					bad.append("%s: %s" % [path.get_file(), m.get_string(1)])
+	check(files.size() >= 6 and not used.is_empty() and bad.is_empty(), "every f(&\"…\") key in scripts/ is a BASE key (%d files, %d keys; bad: %s)" % [files.size(), used.size(), bad])
+	var unread := Tuning.BASE.keys().filter(func(k: StringName) -> bool: return not used.has(k))
+	check(unread.is_empty(), "every BASE key is read somewhere in scripts/ (unread: %s)" % [unread])
+
+
+func _gd_files(dir: String) -> Array[String]:
+	var out: Array[String] = []
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".gd"):
+			out.append(dir.path_join(f))
+	for d in DirAccess.get_directories_at(dir):
+		out.append_array(_gd_files(dir.path_join(d)))
+	return out
 
 
 func _script_vars(script: Script) -> Array:
