@@ -226,3 +226,15 @@ Source: `_bmad-output/narrative-design.md` (gds-create-narrative, complete), Pro
 - **Chain-bending upgrades:** closed, absorbed by always-on Smith gear and the parked Dive Boons.
 - **Death line and HUD polish:** marked as owned by E1 in the ledger.
 - **UX O15 accessibility pass and O19 title logo:** added to E7.
+
+## 2026-11-12 — Epic-planning follow-ups
+
+Source: `planning-artifacts/epics.md` (gds-create-epics-and-stories, complete), follow-up 1.
+
+- **E1 grows M → L** (the M1 migration plus the CP1–CP3 foundations). Updated: Epic Structure.
+- **M2 estimate 44–88 weeks (about 10–20 months):** the sum of the size bands for four L epics and three M. Corrects "36–72", which predated E5's M → L. The "≈ 40–80" in `planning-artifacts/epics.md` (the sum before E1 grew) is corrected to match.
+- **Playtest "no" rule changed:** a "no" blocks only the epics that build on that answer; its fix becomes the first story of the next dependent epic; independent epics proceed. **Replaces** "fix it before starting the next epic". Updated: Epic Structure, Risks, `epics.md` intro.
+- **Dependencies added** to Epic Structure: E1 → every epic · E2 → E3 (the Weaver sounds and the test-arena theme) and E6 · E4 → E5, E6 · E5 → E6 · E1–E6 → E7. E3 blocks nothing before E7. Updated: `epics.md` E3.
+- **Brightness ships in E1** (R1, decided by sonlm 2026-11-12; UX A1): 4 levels in the Accessibility tab, replacing the M1 F1 hotkey that E1 removes; it moves to the Video tab in E7. Fixes the earlier text that had F1 removed in E7. Updated: Options rollout, `epics.md` E1 and E7.
+- **Not changed here:** UX `EXPERIENCE.md` still lists Brightness as an E7 assumption (A1). Left for the readiness check or a UX update.
+- **Status:** stays `final`; `updated: 2026-11-12`.

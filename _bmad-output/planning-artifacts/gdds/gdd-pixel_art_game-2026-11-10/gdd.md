@@ -223,9 +223,9 @@ Keyboard and gamepad, both from M2. Every action is a single button (no chords).
 
 - **Options rollout** (UX, 2026-11-10/11). A small Options screen ships from E1, opened from the Pause menu, and grows by epic. Tabs that have not landed are hidden.
   - **E1, Game:** difficulty, changeable any time.
-  - **E1, Accessibility:** reduce flashing; screen shake on/off; reduced motion (follows the OS setting on web); Light tap window (0.12 / 0.2 / 0.3 s); hold→press toggles for Cling and Snuff. Snuff toggle: when On, Light only throws Flare Tosses (any press, no tap window) and Snuff moves to its own key (default Shift; pad LB), pressed once to start and again to end. Snuff still ends the chain, so this is not a light you leave on. Quick Wick has no extra effect in this mode.
+  - **E1, Accessibility:** reduce flashing; screen shake on/off; reduced motion (follows the OS setting on web); Light tap window (0.12 / 0.2 / 0.3 s); hold→press toggles for Cling and Snuff; Brightness (4 levels), which replaces the M1 F1 brightness hotkey that E1 removes (decided 2026-11-12). Snuff toggle: when On, Light only throws Flare Tosses (any press, no tap window) and Snuff moves to its own key (default Shift; pad LB), pressed once to start and again to end. Snuff still ends the chain, so this is not a light you leave on. Quick Wick has no extra effect in this mode.
   - **E3, Audio:** volume sliders.
-  - **E7:** Video (4 brightness levels, fullscreen, scale; the M1 F1 brightness hotkey is removed); Controls (rebinding); large HUD, text scale, timing assists and visual sound cues.
+  - **E7:** Video (Brightness, moved here from Accessibility; fullscreen; scale); Controls (rebinding); large HUD, text scale, timing assists and visual sound cues.
 - **Rebinding:** every action, keyboard and gamepad, can be rebound in Options > Controls (E7).
 
 ---
@@ -700,7 +700,7 @@ Three tracks, none of them XP (Pillar 3):
 
 | # | Epic | Playable deliverable | Playtest question | Size |
 |---|---|---|---|---|
-| E1 | Kit v2 | the M1 shaft with the full M2 move set | Do HP, Flare Toss and lantern anchors keep deaths fair? | M |
+| E1 | Kit v2 | the M1 shaft with the full M2 move set | Do HP, Flare Toss and lantern anchors keep deaths fair? | L |
 | E2 | Weaver prototype | a rough Weaver fight in a test arena | Is the restraint fight (dark → herd → strike) fun? | M |
 | E3 | Audio | the shaft with SFX and chain-reactive music | Does sound make the pogo feel great and telegraphs readable? | M |
 | E4 | Layer 1 world | Layer 1 from the Lip to the Weaver's door | Do players learn each move, and want gates and side areas? | L |
@@ -710,9 +710,11 @@ Three tracks, none of them XP (Pillar 3):
 
 **Sequence:** E1 → E2 → E3 → E4 → E5 → E6 → E7. E3 can run alongside E4 if motivation calls for it.
 
-**Rule:** if an epic's playtest answer is "no", fix it before starting the next epic.
+**Dependencies:** E1 → every epic · E2 → E3 (the Weaver sounds and the test-arena theme) and E6 · E4 → E5, E6 · E5 → E6 · E1–E6 → E7. E3 blocks nothing before E7, so it can interleave with E4, and an E3 "no" becomes fix work at the head of E7's music.
 
-[ASSUMPTION: size S ≈ 2–4 weeks, M ≈ 4–8 weeks, L ≈ 8–16 weeks at 5–10 h/week. That puts M2 at roughly 36–72 weeks (8–17 months). No epic is size S.]
+**Rule:** a playtest "no" blocks only the epics that build on that answer (see Dependencies). Its fix becomes the first story of the next dependent epic; independent epics may proceed.
+
+[ASSUMPTION: size S ≈ 2–4 weeks, M ≈ 4–8 weeks, L ≈ 8–16 weeks at 5–10 h/week. With four L epics and three M, that puts M2 at roughly 44–88 weeks (about 10–20 months). No epic is size S.]
 
 ---
 
@@ -759,7 +761,7 @@ Solo project, so these come from playtest notes, not telemetry. For the M2 share
 | Risk | Mitigation |
 |---|---|
 | **Burnout** on a solo project lasting years | every epic ends playable; post a short devlog or private build after each epic, and share publicly at M2 (brief: "each milestone is a finished thing") |
-| **The loop stops being fun** as systems pile up | each epic carries one playtest question; a "no" is fixed before the next epic |
+| **The loop stops being fun** as systems pile up | each epic carries one playtest question; a "no" blocks the epics that build on it until it is fixed |
 | **Snuff weakens greed:** an instant mid-air Snuff banks held embers, so it could become a free cash-out the moment eyes open | watch for it in the E1 playtest. If players Snuff on every telegraph, add a cost (for example, Snuff banks only half the held embers) |
 | **Scope creep:** M2 adds many systems at once | the brief's rule: anything the current epic's question doesn't need waits for a later epic |
 | **Flash safety** | ≤ 3 flashes/s cap and the "reduce flashing" toggle from **E1** (brief: "from day one"), with a check for every new effect |

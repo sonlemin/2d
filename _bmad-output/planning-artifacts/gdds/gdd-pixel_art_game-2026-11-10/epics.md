@@ -1,6 +1,6 @@
 # The Unbroken Chain — Milestone 2 Epics
 
-Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md`, Epic Rollout. Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer is fixed before the next epic starts. **After each epic, post a short devlog or private build** (the brief's burnout mitigation). The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
+Source: `gdd.md` (2026-11-10; UX update 2026-11-11; epic-planning update 2026-11-12). UX surfaces per epic: `ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md`, Epic Rollout. Order is risk-first. Every epic ends with something playable and a playtest question; a "no" answer blocks only the epics that build on it (see `gdd.md` → Development Epics, Dependencies), and its fix becomes the first story of the next dependent epic. **After each epic, post a short devlog or private build** (the brief's burnout mitigation). The stories below are high-level and are broken down later by `gds-create-epics-and-stories`.
 
 ---
 
@@ -21,7 +21,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 - **Resize the M1 shaft:** `game/scripts/shaft.gd` LAYOUT is 30 tiles (480 px) wide. Rebuild it at 22 tiles (352 px) wall to wall, side walls included, to fit the gutter view, and set the camera limits so the shaft sits inside the play area.
 - **HUD v2 in side gutters:** HP, held and carried embers, chain number and meter. The play area is about 360 px wide. Lurker alert = pulsing red gutter frame plus an eye icon.
 - **Font:** Fusion Pixel Font 8px (OFL), with the **Deck-size legibility check** (×2, 960×540) done alongside. The full Deck pass stays in E7.
-- **Options (small, from the Pause menu):** Game tab (difficulty) and Accessibility tab (reduce flashing, screen shake, reduced motion with the OS default on web, Light tap window 0.12 / 0.2 / 0.3 s, hold→press toggles for Cling and Snuff; with the Snuff toggle On, Light is Flare Toss only and Snuff moves to Shift / pad LB as a press-toggle).
+- **Options (small, from the Pause menu):** Game tab (difficulty) and Accessibility tab (reduce flashing, screen shake, reduced motion with the OS default on web, Light tap window 0.12 / 0.2 / 0.3 s, hold→press toggles for Cling and Snuff, Brightness at 4 levels replacing the M1 F1 hotkey; with the Snuff toggle On, Light is Flare Toss only and Snuff moves to Shift / pad LB as a press-toggle).
 - **Web:** 960×540 (×2) itch embed.
 - **Flash safety from day one:** the ≤ 3 flashes/s cap is checked for every effect, and the "reduce flashing" toggle ships in E1.
 - **Field Journal death line:** one line on death naming what killed you and how to avoid it (Pillar 2; deferred from M1). Written in the narrative voice after sonlm approves the death-card voice anchors (`narrative-design.md` → Dialogue Framework); island idiom may colour the cause, the avoidance is always plain.
@@ -98,7 +98,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 
 **Out:** final composed music (placeholder stems are fine); hub and boss themes.
 
-**Depends on:** E1. E2 for the Weaver sounds.
+**Depends on:** E1 and E2 (the Weaver sounds and the test-arena theme).
 
 **Playable:** the M1 shaft and the Weaver test arena, with sound.
 
@@ -237,7 +237,7 @@ Source: `gdd.md` (2026-11-10; UX update 2026-11-11). UX surfaces per epic: `ux-d
 **Goal:** the first build to share with outside testers.
 
 **In:**
-- **Settings:** Video tab (4 brightness levels, fullscreen, scale) and Controls tab (rebinding). Accessibility adds large HUD, text scale, timing assists (separate from difficulty) and visual sound cues. (The E1 Options and the E3 volume sliders already shipped.)
+- **Settings:** Video tab (Brightness, moved here from Accessibility; fullscreen; scale) and Controls tab (rebinding). Accessibility adds large HUD, text scale, timing assists (separate from difficulty) and visual sound cues. (The E1 Options and the E3 volume sliders already shipped.)
 - **Full Field Journal:** death log, lore, records and polish (the death line ships in E1; the minimal Journal tab in E5).
 - **HUD polish.**
 - **Art pass:** player animations (about 10), plus the hub and Layer 2 landing palettes.

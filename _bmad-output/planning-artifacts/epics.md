@@ -1242,11 +1242,11 @@ Milestone 2 (the vertical slice), in risk-first order. Numbering matches the GDD
 - **Tune after play (sonlm):** for calls that need a playable build (party review, 2026-11-12), the dev agent ships the stated default as a `Tuning` option with tests for every option; the story is code-done when tests pass and design-done when sonlm's choice after playing is recorded in the GDD.
 - **Playtest records:** every `playtest` story writes `implementation-artifacts/playtests/<story-key>.md` with: the question(s), who played (sonlm / outside players, blind or not), the build version, the answer (yes / no / mixed), evidence (notes, deaths, attempts), and the follow-up stories it creates.
 
-**Estimate:** E1 L, E2 M, E3 M, E4 L, E5 L, E6 L, E7 M ≈ 40–80 weeks at 5–10 h/week (GDD follow-up: update the Epic Structure table, E1 M → L).
+**Estimate:** E1 L, E2 M, E3 M, E4 L, E5 L, E6 L, E7 M ≈ 44–88 weeks at 5–10 h/week (the GDD's size bands: M ≈ 4–8 weeks, L ≈ 8–16 weeks).
 
-**Follow-ups before `gds-check-implementation-readiness`** (owner: sonlm, next session)
-1. Update the GDD with `gds-gdd` (Update mode): the Epic Structure table (E1 M → L; M2 ≈ 40–80 weeks); the rule that a playtest "no" blocks only the epics that depend on it; the dependency E2 → E3; Brightness in the E1 Options (R1).
-2. Customize `gds-create-story` with `bmad-customize` so its inputs load `_bmad-output/game-architecture.md` and the nested GDD and UX spines listed under Source documents.
+**Follow-ups before `gds-check-implementation-readiness`** (owner: sonlm; both done 2026-11-12)
+1. **Done 2026-11-12.** Update the GDD with `gds-gdd` (Update mode): the Epic Structure table (E1 M → L; M2 ≈ 44–88 weeks, corrected from the pre-resize 40–80); the rule that a playtest "no" blocks only the epics that depend on it; the dependency E2 → E3; Brightness in the E1 Options (R1).
+2. **Done 2026-11-12.** Customize `gds-create-story` with `bmad-customize` so its inputs load `_bmad-output/game-architecture.md` and the nested GDD and UX spines listed under Source documents (`_bmad/custom/gds-create-story.toml`, commit 81480d1).
 
 ### Epic 1: Kit v2: Fair Deaths, Full Move Set
 
