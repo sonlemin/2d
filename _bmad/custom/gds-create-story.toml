@@ -1,0 +1,26 @@
+# Team override for gds-create-story (committed).
+#
+# Why: the skill's Input Files globs only look directly under {planning_artifacts}.
+# This project keeps the architecture and narrative at the _bmad-output root and the
+# GDD/UX spines in dated sub-folders, so gdd, architecture and ux all resolve empty
+# and narrative is not an input at all. customize.toml can't change the Input Files
+# table, so a persistent fact redirects Step 2 to exact paths.
+# Source: planning-artifacts/epics.md → "Source documents" and follow-up 2.
+#
+# Exact paths (not broader globs) on purpose: the UX folder also holds review-*.md and
+# validation-report.* (~105 KB of audit records) that must not be loaded as spec.
+# If a dated folder is renamed, update the paths here.
+
+[workflow]
+
+persistent_facts = [
+  """Input Files override for this project. In Step 2, when following discover-inputs.md, use these exact paths instead of the default glob patterns in the Input Files table. Keep the SELECTIVE_LOAD strategy: load the sections the story needs, and when in doubt read the section.
+- gdd: {project-root}/_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md, plus decision-log.md (the why behind GDD calls) and epics.md (the high-level epic plan, NOT the story source) in the same folder.
+- architecture: {project-root}/_bmad-output/game-architecture.md
+- ux: {project-root}/_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md and EXPERIENCE.md only. The review-*.md and validation-report.* files beside them are audit records, not spec.
+- narrative (extra input): {project-root}/_bmad-output/narrative-design.md, for any story that writes or places player-facing story text.
+- deferred (extra input): {project-root}/_bmad-output/implementation-artifacts/deferred-work.md, only when the story cites a deferred item.
+- epics and project_context: the defaults already resolve ({planning_artifacts}/epics.md is the story source; {project-root}/_bmad-output/project-context.md).
+If any path above is missing, report it in the discovery results and ask; never fall back to the default globs silently.""",
+  "file:{project-root}/_bmad-output/implementation-artifacts/m1-playtest-findings.md",
+]
