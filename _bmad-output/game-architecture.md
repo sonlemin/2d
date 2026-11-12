@@ -406,7 +406,7 @@ user://
 - `LightSource` node (group `light_source`) on the player, a thrown flare and the Ember Cache. It exposes `radius()`, `kind` (`player`, `flare`, `cache`) and `global_position`.
 - `Sensing` is a node-free helper with the pure maths: notice (radius ≥ 80 px, distance ≤ radius × 1.6, inside the play rect), sense, and target choice. It is unit-tested.
 - Lurkers query `light_source` each physics tick and hunt the chosen target; the lethal-only-while-`monitorable` rule is unchanged. A flare is sensed like the player; the cache's glow radius is a tuning value (E1 playtest).
-- The Weaver uses the same query and flees (brightest light within radius × 1.5).
+- The Weaver uses the same query and flees the brightest burning flare whose radius × 1.5 reaches it, with no 80 px notice minimum (readiness R20); a flare cancels a bite in telegraph (R19). It ignores Ember Caches; its bright/dark bands read the player's radius directly.
 
 ### Gameplay Rules and Tuning
 

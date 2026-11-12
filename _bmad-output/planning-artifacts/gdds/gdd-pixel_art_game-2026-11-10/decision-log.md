@@ -247,3 +247,13 @@ Source: `planning-artifacts/implementation-readiness-report-2026-11-12.md` (verd
 - **R15 Settings as JSON (sonlm):** `user://settings.json` replaces `settings.cfg`, parsed with the silent `JSON.new().parse()`. Godot 4.7.2 prints an engine `ERROR:` on a corrupt `ConfigFile`, which fails the test runner. Architecture and project-context only; no GDD text named the file.
 - **R16 E1 shaft loop (sonlm):** the rebuilt M1 shaft's bottom exit leads to its own top entry, banking the chain like a landing, so the E1 kit build can rest, deposit and redive at the placeholder station. E1 only; Layer 1 (E4) is unaffected.
 - **Status:** stays `final`; `updated: 2026-11-12`.
+
+## 2026-11-12 — Implementation-readiness decisions (Epic 2 fixes)
+
+Recorded as R18–R20 in `planning-artifacts/epics.md`.
+
+- **R18 Strand drop (sonlm):** a weakened strand drops only while the Weaver stands on it; slashing the second anchor otherwise does nothing. Without this, dropping all 4 strands before 9 HP was a softlock (no pogo fuel, no stun, no damage). Updated: Weaver loop table.
+- **R19 Flare vs bite (sonlm):** a flare the Weaver senses cancels a bite that is in telegraph, and it flees. Updated: Weaver loop table.
+- **R20 Flare size (sonlm):** the Weaver flees any burning flare (a chain-2 flare is 71 px), with no 80 px minimum; it ignores the Ember Cache. Updated: Weaver loop table; architecture Light Sensing.
+- **Also fixed in the stories (no GDD change):** HP damage clamps at the 9 and 6 thresholds and ends a stun in progress; hits outside a stun deal 0 (a deflect); the bite reach is a tuned value (default 24 px).
+- **Status:** stays `final`; `updated: 2026-11-12`.

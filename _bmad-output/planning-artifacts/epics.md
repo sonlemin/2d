@@ -112,9 +112,9 @@ FR39: The M1 shaft is rebuilt at 22 tiles (352 px) wall to wall, side walls incl
 FR40: Arena: 30 × 34 tiles (two screens tall), scrolling horizontally inside the ~360 px view; 4 web strands span it wall to wall at different heights. Strands can be pogoed (+1 link, no damage). Each strand has an anchor at both ends; slashing an anchor twice weakens that strand (frayed sprite, sag). [E2 → E6]
 FR41: Light-shy states: Bright (light ≥ 80 px) → retreats to the ceiling anchor at 120 px/s and drops a spiderling every 2.0 s (at most 3 alive). Dark (light ≤ 40 px: base, Snuff or cling) → descends along the strands at 70 px/s and bites (0.9 s telegraph: legs rear up, eyes glow; 1 damage). Behaviour at 62–78 px of light (1–3 links) is decided in the E2 prototype. [E2]
 FR42: Light-burst stun: reaching chain 3 within 96 px of the Weaver stuns it for 2.5 s; hits deal 1 each, at most 3 per stun. [E2]
-FR43: Strand drop: if the Weaver stands on a weakened strand and the player slashes its second anchor, the strand drops: 2 damage plus a 2.5 s stun (hits during it count). [E2]
+FR43: Strand drop: if the Weaver stands on a weakened strand and the player slashes its second anchor, the strand drops: 2 damage plus a 2.5 s stun (hits during it count). With the Weaver elsewhere, nothing drops (R18). [E2]
 FR44: HP 12. Re-Weave at 9 HP: a 3.0 s telegraph (silk threads glow along the new paths), then every strand is rebuilt in a new pattern and weakened strands are restored; the player is not harmed; spiderlings keep dropping. No health bar: health reads in the world (segments fray and fall off, threads sag). E2 stubs The Fall: the fight ends at 6 HP. [E2]
-FR45: Flare herding: the Weaver flees a flare along the strands to the farthest point inside the flare's radius × 1.5, at 110 px/s (exact flee target decided in E2). [E2]
+FR45: Flare herding: the Weaver flees a flare along the strands to the farthest point inside the flare's radius × 1.5, at 110 px/s (exact flee target decided in E2). Any burning flare counts, with no 80 px minimum (R20), and a flare cancels a bite in telegraph (R19). [E2]
 FR46: Spiderling: drops from the Weaver while the player is bright; falls slowly, then crawls; 1 HP, 1 contact damage; chain fuel. [E2]
 FR47: The Fall (at 6 HP): the Weaver cuts its anchors and the web floor gives way; 0.5 s at ×0.3; about 6 s of free fall with debris and web clumps to pogo (the chain is kept across the room change: the one scripted exception; it pays embers); the player lands in the Layer 2 landing arena (one screen, Bright Moon palette). [E6]
 FR48: Phase 2 (6 → 0 HP, landing arena): 2 strands; bite telegraph 0.75 s; descent 90 px/s; Re-Weave at 3 HP rebuilds the 2 strands. The Bright Moon rule is off in the landing arena. [E6]
@@ -1133,6 +1133,9 @@ Conflicts found between the input documents while extracting requirements, and h
 | R15 | Readiness check: Godot 4.7.2 prints an engine `ERROR:` on a corrupt `ConfigFile` (load and parse), which fails the test runner | **sonlm:** settings are stored as `user://settings.json`, parsed with the silent `JSON.new().parse()` like the slots (AR14, AR37) |
 | R16 | Readiness check: the E1 shaft is one-way, so after the first anchor the player can't return to the top station to rest, deposit or save | **sonlm:** the shaft's bottom exit loops to its own top entry; crossing it banks the chain like a landing (Stories 1.5, 1.7, 1.24) |
 | R17 | Readiness re-review (verified on Godot 4.7.2): under `--script`, a test that touches the `Game` autoload (directly, via `preload` or a `class_name` hint) fails to compile and can hang or exit 0 with no output, so the M1 runner would report green | **sonlm:** tests extend `Node` and run as scenes through `tests/runner.tscn`; a test with no `PASS` line or running > 120 s fails (Story 1.2, AR47) |
+| R18 | Readiness (E2): a strand could be dropped with no Weaver on it and stay down, so dropping all 4 before 9 HP left no pogo fuel, no stun, no damage and no exit (a softlock) | **sonlm:** a weakened strand drops only while the Weaver stands on it (the GDD's wording); otherwise the anchor shudders and nothing drops (FR43, Story 2.8) |
+| R19 | Readiness (E2): no rule for a flare landing during the Weaver's bite telegraph | **sonlm:** a flare the Weaver senses cancels a bite in telegraph and it flees (FR45, Stories 2.3, 2.4, 2.7) |
+| R20 | Readiness (E2): a flare burns at the pre-toss radius, so chain-2/3 flares are 70–78 px, below the lurker's 80 px notice minimum | **sonlm:** the Weaver flees any burning flare whose radius × 1.5 reaches it, with no 80 px minimum; it ignores Ember Caches (FR45, Story 2.7) |
 
 ### FR Coverage Map
 
@@ -2379,6 +2382,8 @@ So that testers' saves survive every update from here on.
 
 The player fights a rough Weaver in a test arena and wins by going dark, herding with flares and striking with a light burst. The fight is proven fun and readable before any content is built around it. Placeholder art; The Fall is stubbed; no save-format change. 1–2 outside players test it blind.
 
+Placeholder art (sprites, the segmented placeholder body) may be committed without sonlm's approval, since Story 6.3 replaces it. The arena layout (strand heights and anchor positions) is level design: Claude drafts it and sonlm approves it before commit. Damage causes for the death card: `weaver_bite`, `spiderling`.
+
 ### Story 2.1: Weaver test arena and debug entry
 
 **Type:** dev
@@ -2404,7 +2409,7 @@ So that I can iterate on the Weaver fight without descending Layer 1.
 
 ### Story 2.2: Strands and anchors
 
-**Type:** dev
+**Type:** dev, content
 
 As a player,
 I want web strands I can pogo off and anchors I can cut,
@@ -2423,6 +2428,7 @@ So that the arena itself is my chain fuel and my weapon.
 **Given** the strand layout
 **When** the arena builds
 **Then** strand positions come from a fixed layout in the overlay (no randomness, NFR11), and strands and anchors are owned by the Weaver set piece, not by `World`
+**And** the layout (heights, anchor positions) is drafted by Claude and approved by sonlm before commit
 
 ### Story 2.3: Weaver movement and light-shy states
 
@@ -2436,7 +2442,7 @@ So that I learn the fight is about when to shine.
 
 **Acceptance Criteria:**
 
-**Given** `actors/weaver/weaver.gd` (FSM with `BRIGHT_RETREAT` and `DARK_DESCEND` here; `enum State` + `match` + `_enter`, public `state`) reading lights through the same `light_source` query and `Sensing` as the lurker
+**Given** `actors/weaver/weaver.gd` (FSM with `BRIGHT_RETREAT` and `DARK_DESCEND` here; `enum State` + `match` + `_enter`, public `state`) reading lights through the same `light_source` query as the lurker: its bright/dark bands read the player's light radius directly (not the lurker's notice rule), and it flees flares by the Story 2.7 rule
 **When** the player's light radius is ≥ 80 px
 **Then** the Weaver retreats along the strands to the ceiling anchor at 120 px/s, out of reach (FR41, AR32)
 
@@ -2449,6 +2455,11 @@ So that I learn the fight is about when to shine.
 **Then** it uses the default (slow descent), selectable in `rules/tuning.gd` among hold position, slow descent and slow retreat, with tests for each option; after sonlm plays it, the choice and reason are recorded in the GDD Open Questions row "Weaver at 62–78 px" (closing it)
 **And** a placeholder segmented body (body, 8 legs) shows its movement; tests cover each state transition by light radius
 
+**Given** the Weaver's state table (this story starts it; Stories 2.4–2.9 add their states)
+**When** two conditions hold at once
+**Then** one priority decides: `RE_WEAVE` > `STUNNED` > `FLEE` > `BITE_TELEGRAPH` > the light bands; `STUNNED` and `RE_WEAVE` ignore light and flares; a flare sensed during `BITE_TELEGRAPH` cancels the bite and starts `FLEE` (R19); damage that would cross an HP threshold (9, 6) clamps at it, and a stun in progress ends at once so the threshold's event starts
+**And** each later story adds a test for every state pair it introduces
+
 ### Story 2.4: Bite telegraph
 
 **Type:** dev
@@ -2459,19 +2470,21 @@ So that every bite I take is one I could have avoided.
 
 **Decide before dev (sonlm):** UX O10: does the bite telegraph also show the gutter alert frame and eye?
 
+**Tune after play (sonlm):** the bite reach. Default: 24 px from the Weaver's head to the player's hurtbox.
+
 **Acceptance Criteria:**
 
-**Given** the Weaver in `DARK_DESCEND` within bite reach of the player
+**Given** the Weaver in `DARK_DESCEND` within bite reach of the player (`Tuning` `weaver_bite_reach`)
 **When** it starts a bite
-**Then** it enters `BITE_TELEGRAPH` for 0.9 s (legs rear up, eyes glow), and only then bites; a bite that lands deals 1 (boss attack) with the usual knockback and invulnerability (FR41, FR10)
+**Then** it enters `BITE_TELEGRAPH` for 0.9 s (legs rear up, eyes glow), and only then bites; a bite that lands deals 1 (boss attack, cause `weaver_bite`) with the usual knockback and invulnerability (FR41, FR10)
 
-**Given** the player brightens to ≥ 80 px or leaves reach during the telegraph
+**Given** the player brightens to ≥ 80 px or leaves reach during the telegraph (or, once Story 2.7 lands, a flare is sensed; R19)
 **When** the telegraph ends
-**Then** the bite does not land
+**Then** the bite does not land; tests cover reach and reach + 1 px
 
 **Given** a guarantee test
 **When** it scans every bite in a scripted fight
-**Then** every bite was preceded by a telegraph ≥ `Spec.TELEGRAPH_MIN` (NFR10)
+**Then** every bite was preceded by a telegraph ≥ `Spec.TELEGRAPH_MIN` during which the Weaver stayed inside `World.play_rect()`; a telegraph never starts while the Weaver is off screen (NFR10)
 **And** UX O10 is decided and recorded in `EXPERIENCE.md`: whether the bite telegraph also shows the gutter alert frame and eye
 
 ### Story 2.5: Spiderlings
@@ -2484,13 +2497,13 @@ So that staying bright costs me, but also gives me chain fuel.
 
 **Acceptance Criteria:**
 
-**Given** the Weaver in `BRIGHT_RETREAT`
+**Given** the Weaver in `BRIGHT_RETREAT` (or, from Story 2.9, `RE_WEAVE`: spiderlings keep dropping during a Re-Weave)
 **When** 2.0 s pass
 **Then** it drops one spiderling (`actors/spiderling.gd`, spawned with `room.spawn`), up to 3 alive at once (FR41, FR46, AR33)
 
 **Given** a spiderling
 **When** it drops
-**Then** it falls slowly, lands, then crawls like a walker; it has 1 HP, deals 1 on contact (polled) and can be pogoed for a link
+**Then** it falls slowly, lands, then crawls like a walker; it has 1 HP, deals 1 on contact (polled; cause `spiderling`) and can be pogoed for a link
 **And** spiderlings are room children and disappear with the room
 
 ### Story 2.6: Light-burst stun and diegetic boss health
@@ -2508,11 +2521,16 @@ So that the payoff of going dark is a well-timed flash.
 **Given** the player reaches chain 3 within 96 px of the Weaver
 **When** the burst happens
 **Then** the Weaver enters `STUNNED` for 2.5 s; each player hit during the stun deals 1, at most 3 per stun (FR42)
+**And** the burst is an `Fx` effect that honours reduce flashing (a steady glow) and the flash cap; 96 px is measured from the player's centre to the Weaver's body centre
+
+**Given** the Weaver not stunned
+**When** the player hits it
+**Then** the hit deals 0 and shows a deflect (a spark and a recoil, no flash): brute force fails (GDD Weaver lesson)
 
 **Given** the Weaver's 12 HP
 **When** it takes damage
 **Then** its health reads in the world only (body segments fray and fall off, threads sag), with no health bar (FR44, UX-DR99)
-**And** the trigger mode is a `Tuning` option (default: the hit that brings the chain to 3); tests cover both modes, the stun threshold (chain 3 at 96 px vs 97 px), the 3-hit cap and the HP bookkeeping; sonlm's choice after playing is recorded in the GDD
+**And** the trigger mode is a `Tuning` option (default: the hit that brings the chain to 3); in the "chain ≥ 3" mode the burst re-arms only after the chain breaks or drops below 3, so it can never stun-lock; damage that would cross 9 or 6 clamps at the threshold (Story 2.3); tests cover both modes, the stun threshold (chain 3 at 96 px vs 97 px), the 3-hit cap and the HP bookkeeping; sonlm's choice after playing is recorded in the GDD
 
 ### Story 2.7: Flare herding
 
@@ -2526,10 +2544,11 @@ So that I can herd it where I want it.
 
 **Acceptance Criteria:**
 
-**Given** a burning flare the Weaver senses
+**Given** a burning flare whose radius × 1.5 reaches the Weaver (any flare, even a chain-2 flare of 71 px: the lurker's 80 px notice minimum does not apply; R20)
 **When** it reacts
 **Then** it enters `FLEE` and moves along the strands at 110 px/s to the farthest reachable point inside the flare's radius × 1.5 (FR45)
-**And** the Weaver is repelled by flares, the one exception to "predators treat a flare as the player" (FR16)
+**And** the Weaver is repelled by flares, the one exception to "predators treat a flare as the player" (FR16); it ignores Ember Caches entirely
+**And** `FLEE` ends when the flare burns out (on arrival it holds there until then); with several flares it flees the brightest, ties broken by position; a flare sensed during `BITE_TELEGRAPH` cancels the bite (R19); tests cover each case
 
 **Given** several possible flee points
 **When** the target is chosen
@@ -2550,10 +2569,11 @@ So that herding it onto the right strand pays off.
 **When** the player slashes that strand's second anchor
 **Then** the strand drops, the Weaver takes 2 damage and is stunned for 2.5 s; hits during this stun count (FR43)
 
-**Given** the Weaver is not on the strand
-**When** the second anchor is slashed
-**Then** the strand drops without damage (it stays dropped until a Re-Weave)
-**And** tests cover both cases
+**Given** the Weaver is not on the weakened strand
+**When** its second anchor is slashed
+**Then** nothing drops: the anchor shudders, so no strand can be wasted and the fight can't softlock (R18)
+**And** one slash on the second anchor drops a strand the Weaver stands on; the Weaver falls to the arena floor stunned, then climbs the nearest strand when the stun ends (default, reviewed in the E2 playtest)
+**And** tests cover both cases, and a test slashes every anchor with the Weaver on no strand and finds all 4 strands still up
 
 ### Story 2.9: Re-Weave
 
@@ -2565,13 +2585,13 @@ So that the fight changes shape and I have to read it again.
 
 **Acceptance Criteria:**
 
-**Given** the Weaver drops to 9 HP
+**Given** the Weaver's HP first reaches 9 (clamped there, with a stun in progress ended; Story 2.3)
 **When** the Re-Weave starts
 **Then** it enters `RE_WEAVE` with a 3.0 s telegraph in which silk threads glow along the new paths, then rebuilds every strand in a new pattern and restores weakened and dropped strands (FR44)
 
 **Given** the Re-Weave
 **When** it runs
-**Then** the player is not harmed, spiderlings keep dropping, and the new pattern comes from a fixed list (no randomness, NFR11)
+**Then** the player is not harmed, spiderlings keep dropping, the Weaver takes no damage and ignores light and flares, and the new pattern comes from a fixed list (no randomness, NFR11)
 **And** the glow honours reduce flashing (no flashing; a steady glow) through the Fx gate; the prototype follows the J5 flow so far: one-way arena, gutters stay, no boss bar, fray-and-fall health, 3 s Re-Weave glow (UX-DR109)
 
 ### Story 2.10: Phase stub, fight reset and the Weaver's death lines
@@ -2584,13 +2604,14 @@ So that every attempt starts the same way and teaches me something.
 
 **Acceptance Criteria:**
 
-**Given** the Weaver reaches 6 HP
+**Given** the Weaver's HP reaches 6 (clamped there, with a stun in progress ended; Story 2.3)
 **When** The Fall would start
-**Then** the stub ends phase 1: the Weaver withdraws, a placeholder "phase 1 complete" note shows, and the arena can be restarted (The Fall is E6)
+**Then** the stub ends phase 1: the Weaver withdraws, a placeholder note (string key `DEV_WEAVER_STUB_DONE`) shows, and pressing ↓ (interact) at the arena entry restarts the fight; the arena has no other exit (The Fall is E6)
 
 **Given** the player dies in the arena
 **When** they respawn
 **Then** they return to the arena entry (standing in for the Hollow Station) with full HP and the fight fully reset: Weaver HP 12, strands rebuilt to the first pattern, spiderlings cleared (FR49)
+**And** an Ember Cache dropped in the arena sits at the last safe ground (Story 1.22) and survives the reset; the Weaver ignores it (R20)
 
 **Given** the new death causes
 **When** their lines are written
@@ -2598,7 +2619,7 @@ So that every attempt starts the same way and teaches me something.
 
 **Given** the player enters the arena
 **When** the fight begins
-**Then** a placeholder staging shows the Weaver glimpsed above before it engages, without locking input longer than the moment needs (NR12, NR18)
+**Then** a placeholder staging shows the Weaver glimpsed above before it engages, with full player control (no input lock), adding no time, and only on the first entry per session (NR12, NR18); a test checks that intents are processed during it
 
 ### Story 2.11: Winnability guarantee
 
@@ -2617,6 +2638,7 @@ So that a later tuning change can never make the fight unwinnable.
 **Given** the same test with the bite guarantee
 **When** it runs
 **Then** every bite in the run was telegraphed ≥ `Spec.TELEGRAPH_MIN`, and the test picks targets by position, never by group index
+**And** the scripted win runs once per tune-after-play option (Story 2.3's three 62–78 px behaviours, Story 2.6's two trigger modes, Story 2.4's bite reach); an option the win path fails under can't be chosen
 
 ### Story 2.12: E2 playtest with blind outside players
 
@@ -2628,14 +2650,14 @@ So that "the fight teaches restraint" is tested by someone who didn't design it.
 
 **Acceptance Criteria:**
 
-**Given** a private web build with the arena entry (`?room=weaver_test`)
+**Given** a private debug web build (the arena and its entry arg are debug-only), opened at `?room=weaver_test` with the overlays off
 **When** 1–2 outside players play it
 **Then** they are told the art is placeholder and are never told the fight is "about restraint" (FR41–FR45)
 
 **Given** their sessions and sonlm's own
 **When** they are reviewed
-**Then** the answers to "is go dark → herd → strike fun and readable?" and "do they describe it as about restraint unprompted?" are recorded in `implementation-artifacts/`, together with the decisions from Stories 2.3, 2.4 and 2.7
-**And** a devlog or private build is posted; a "no" becomes the first stories of E6 (the epic that builds on it)
+**Then** the answers to "is go dark → herd → strike fun and readable?" and "do they describe it as about restraint unprompted?" are recorded in `implementation-artifacts/playtests/<story-key>.md`, together with the decisions from Stories 2.3, 2.4, 2.6, 2.7 and 2.8 (62–78 px behaviour, bite reach, trigger mode, flee rule, post-drop behaviour)
+**And** a devlog or private build is posted; a "no" becomes the first stories of E6, and also of E3 if it changes the Weaver's states or sounds (E3 builds the Weaver SFX on E2)
 
 ## Epic 3: Audio: Hear the Chain and the Hunters
 

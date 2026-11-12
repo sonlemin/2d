@@ -762,10 +762,34 @@ Five Critical issues and the E1 Majors must be fixed before implementation start
 
 **Re-check.** All 41 E1 stories have a Type line and Given/When/Then. All 29 forward references are staging. **Epic 1 is ready for sprint planning and story creation.**
 
+### 2026-11-12: Epic 2 fixed
+
+**Decisions (sonlm), recorded as R18–R20 in `epics.md`, the GDD Weaver table and its decision log**
+- **R18:** a weakened strand drops only while the Weaver stands on it. Otherwise the anchor shudders and nothing drops, which closes the 2.8 softlock.
+- **R19:** a flare cancels a bite already in telegraph.
+- **R20:** the Weaver flees any burning flare, with no 80 px minimum, and ignores Ember Caches. Architecture L409 is fixed to match ("brightest burning flare", not "brightest light").
+
+**Story fixes**
+- **State table (2.3):** priority `RE_WEAVE` > `STUNNED` > `FLEE` > `BITE_TELEGRAPH` > light bands. `STUNNED` and `RE_WEAVE` ignore light and flares. Each later story tests its state pairs.
+- **HP thresholds (2.3, 2.6, 2.9, 2.10):** damage clamps at 9 and 6, and a stun in progress ends at once.
+- **Bite (2.4):** reach is `weaver_bite_reach` (tune after play, default 24 px) with boundary tests. The telegraph must stay inside `play_rect()` (the on-screen half of NFR10). Cause id `weaver_bite`.
+- **Spiderlings (2.5):** they also drop during `RE_WEAVE`. Cause id `spiderling`.
+- **Stun (2.6):** the burst goes through `Fx` (reduce flashing, flash cap); 96 px is measured centre to centre; mode 2 can't stun-lock; hits outside a stun deal 0, with a deflect.
+- **Flee (2.7):** `FLEE` ends at burnout; it holds on arrival; with several flares it flees the brightest; tests cover each case.
+- **Strand drop (2.8):** one slash on the second anchor; post-drop behaviour is a reviewed default; a no-softlock test.
+- **Stub, reset and staging (2.10):** a stub string key; restart by ↓ at the entry; an arena cache survives the reset; the intro staging has full control, adds no time, and plays on the first entry only (NR12).
+- **Winnability (2.11):** the scripted win runs once per tune-after-play option.
+- **Playtest (2.12):** a debug web build; the record goes in `playtests/<story-key>.md`; all five tune decisions are listed; a "no" also reaches E3's Weaver SFX.
+- **Content typing:** placeholder art is exempt (Story 6.3 replaces it). The arena layout is `dev, content` with sonlm's approval (2.2).
+
+**Re-check.** All 12 E2 stories have a Type line and Given/When/Then. Every forward reference is staging.
+
+**Carry-over to E6:** apply the same threshold rule at 6 and 3 in Stories 6.6–6.8, which replaces the E6 punch list's "The Fall starts when the stun ends".
+
 ### Still open
 
 - **Before sprint planning:** nothing blocking. The E1 fixes are in.
-- **Before E2's first story:**
+- ~~**Before E2's first story:**~~ **Done 2026-11-12** (see above). Was:
   - the E2 punch list (2.8 softlock, FSM priority, HP thresholds, flare sensing below 80 px plus architecture L409, bite reach, winnability per option, stun-lock, staging input, arena cache, content typing);
   - U2: Brightness changes only the ambient level, and the architecture should mention Brightness.
 - **Before E3, E4, E5, E6 and E7:** each epic's punch list in Epic Quality Review, plus:

@@ -393,8 +393,8 @@ Pillar 3: progress through skills and chain mastery, never XP.
 | **Bright** (light ≥ 80 px) | retreats up to the ceiling anchor, out of reach; drops spiderlings | retreats at 120 px/s; 1 spiderling every 2.0 s, at most 3 alive |
 | **Dark** (light ≤ 40 px: base, Snuff or cling) | descends toward you along the strands and bites | descends at 70 px/s; bite telegraph 0.9 s (legs rear up, eyes glow); bite deals 1 |
 | **Strike: light burst** | if you reach chain 3 within 96 px of it, the sudden light **stuns** it | stun 2.5 s; your hits deal 1 each, at most 3 per stun |
-| **Herd: flare** | flees the flare; flees along strands to the farthest point inside the flare's radius × 1.5 | flee speed 110 px/s |
-| **Strand drop** | if it stands on a *weakened* strand and you slash the second anchor, the strand drops | 2 damage plus a stun of 2.5 s (hits during it count) |
+| **Herd: flare** | flees the flare; flees along strands to the farthest point inside the flare's radius × 1.5. Any burning flare counts (no 80 px minimum), and a flare cancels a bite in telegraph (readiness, 2026-11-12) | flee speed 110 px/s |
+| **Strand drop** | if it stands on a *weakened* strand and you slash the second anchor, the strand drops; with the Weaver elsewhere nothing drops, so strands can't be wasted (readiness, 2026-11-12) | 2 damage plus a stun of 2.5 s (hits during it count) |
 
 **Phase events:**
 - **The Re-Weave (at 9 HP):**
