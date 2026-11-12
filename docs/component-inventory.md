@@ -158,6 +158,7 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | Script | Tests | Run |
 |---|---|---|
 | `tests/test_chain_state.gd` | 10 test functions on ChainState | headless |
+| `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
 | `tests/screenshot.gd` | 2 screenshots | needs a renderer |
 

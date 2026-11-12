@@ -37,8 +37,9 @@ cd game
 Run one suite on its own:
 
 ```bash
-godot --headless --path game --import                                # once, so textures resolve
+godot --headless --path game --import                                # first, and again after pulling moved or renamed scripts (rebuilds the class_name cache)
 godot --headless --path game --script res://tests/test_chain_state.gd   # ChainState unit tests
+godot --headless --path game --script res://tests/test_deferred_owners.gd   # every deferred-work.md item has an owner
 godot --headless --path game --script res://tests/smoke_shaft.gd     # integration smoke test
 ```
 

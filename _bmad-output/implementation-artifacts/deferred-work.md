@@ -17,13 +17,25 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Lurker parry (top candidate after M2)** — a tightly timed attack into a hunting lurker makes it recoil;
   the chain survives (maybe +1 link). Turns the danger into temptation. Needs a big flash/freeze payoff.
+  → **Owner (2026-11-12): the M2 retrospective**
 - **Phase dash** — the air dash passes through enemies briefly, at a cost (light or one link).
+  → **Owner (2026-11-12): the M2 retrospective**
 - **Cash in the chain** — spend links to heal or open sealed doors: bank it now or keep it growing.
+  → **Owner (2026-11-12): the M2 retrospective**
 - **Chain-bending upgrades** — power-ups per run that change chain rules
   (e.g., "survive one landing", "Snuff doesn't break the chain").
   → **Closed (2026-11-12): absorbed.** Rule-bending moved to always-on Smith gear (GDD); per-run power-ups
   are the parked "Dive Boons". "Snuff doesn't break the chain" contradicts Snuff as a cash-out.
 - **More pogo directions** — diagonal pogo; pogo off spikes and lurker projectiles, not only crawlers.
+  → **Owner (2026-11-12): the M2 retrospective**
 - **Wall-jump climbing (earned upgrade)** — M1 cling only slides down (a pause, not a route).
   Climbing comes back later as an ability you find, gating areas in Metroidvania style
   (Pillar 3: progress by skills, not XP). Variant to test: climbing costs chain links.
+  → **Owner (2026-11-12): the M2 retrospective**
+
+## Deferred from: code review of 1-1-move-m1-into-the-m2-folder-layout.md (2026-11-12)
+
+- **Dev guide "Writing tests" is M1 guidance** — `docs/development-guide.md:53-54` says tests are `extends SceneTree` and pure rules go into `test_chain_state.gd`; project-context says a new `tests/test_<subject>.gd` run through `tests/runner.tscn`. Pre-existing; agents that read `docs/` first would put unrelated rules into the chain test.
+  → **Owner (proposed): Story 1.2** — it moves every test onto `runner.tscn`, so it rewrites this section anyway.
+- **bmad-loop's canonical ledger format would switch off the owner gate** — `### DW-n` headings with `status:` lines contain no `- ` items, so after a `bmad-loop sweep --migrate` the scan in `tests/test_deferred_owners.gd` sees 0 items and prints PASS. Latent: only matters if bmad-loop is adopted.
+  → **Owner (proposed): Story 1.9** — it builds the glob runner and the lint, where ledger-format checks belong.
