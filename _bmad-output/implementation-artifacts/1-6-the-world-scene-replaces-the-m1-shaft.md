@@ -1,6 +1,9 @@
+---
+baseline_commit: dd1b510
+---
 # Story 1.6: The World scene replaces the M1 shaft
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -24,36 +27,36 @@ so that respawns are instant and the HUD has its own space.
 
 Run everything from `game/` and wrap every Godot run in `timeout`.
 
-- [ ] **Task 1: Baseline** (AC: 7)
-  - [ ] Run `timeout 600 ./run_tests.sh` on `4c5929e`. Expected (re-run at story creation, 2026-11-13): `test_chain_state` `ALL PASS (69 checks)`; `test_log`, `test_clock`, `test_tuning`, `test_state`, `test_room_loader` (57 `ok`) and `test_deferred_owners` `PASS`; `smoke_shaft` `SMOKE PASS` (30 `ok`) and `smoke_shaft_state` `SMOKE PASS` (14 `ok`); `== ALL GREEN`.
-- [ ] **Task 2: The camera rig** (AC: 4, 1)
-  - [ ] `scripts/world/camera_rig.gd` as in D2.
-  - [ ] Take the camera out of `player.gd` and `player.tscn` (D2). The player gains `signal pogo_hit`.
-- [ ] **Task 3: World, gutters, router** (AC: 1, 3, 6)
-  - [ ] `scripts/world/world.gd` + `scenes/world/world.tscn` (D1, D3, D4).
-  - [ ] `scripts/ui/gutters.gd`, `scripts/ui/screen_router.gd` (D7). Build the nodes in the scene or in code, but keep the tree and its order as in D1.
-  - [ ] `project.godot`: `run/main_scene="res://scenes/world/world.tscn"`.
-  - [ ] Player popups go to the current room (D8).
-  - [ ] Run `godot --headless --path . --import` after adding the `class_name`s. Commit the generated `.gd.uid` files and never write one by hand.
-- [ ] **Task 4: The lurker reads the play rect** (AC: 2, 3)
-  - [ ] `lurker.gd` `_on_screen()` reads `World.play_rect()` (D5).
-  - [ ] The lurker drops a dead or freed target at once (D6).
-- [ ] **Task 5: Tests** (AC: 2, 3, 4, 5, 6, 7)
-  - [ ] `tests/room_harness.gd`: a `CameraRig` instead of the player's camera, and a stub `current_room()` (D9).
-  - [ ] `tests/smoke_shaft.gd` and `tests/screenshot.gd` follow the camera move (D9). `smoke_shaft` keeps its 30 checks word for word.
-  - [ ] New `tests/smoke_world.gd` (D10). Delete `tests/smoke_shaft_state.gd` and its `.uid` with `git rm`.
-  - [ ] `run_tests.sh`: replace `smoke_shaft_state` with `smoke_world` in the `for t in …` list.
-  - [ ] Run `screenshot.gd` under `xvfb-run` and look at both PNGs: gutters on both sides, the room centred between them, the darkness.
-- [ ] **Task 6: Docs** (AC: 1)
-  - [ ] Update the facts that change (D11). Facts only.
-- [ ] **Task 7: Verify** (AC: 7, 4, 5)
-  - [ ] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
-  - [ ] `grep -rn "randf" scripts/` lists only `scripts/world/camera_rig.gd`.
-  - [ ] `grep -rn "get_viewport_rect" scripts/actors/` finds nothing.
-  - [ ] `grep -rln "shaft.tscn\|shaft.gd" tests/ project.godot` finds nothing.
-  - [ ] `grep -rn "reload_current_scene" scripts/ --include=*.gd | grep -v "^scripts/shaft.gd"` finds nothing.
-  - [ ] Every new `.gd` has its `.gd.uid` staged.
-  - [ ] Report "tests green; needs a feel check on the laptop" and give sonlm D12's list of what to look at.
+- [x] **Task 1: Baseline** (AC: 7)
+  - [x] Run `timeout 600 ./run_tests.sh` on `4c5929e`. Expected (re-run at story creation, 2026-11-13): `test_chain_state` `ALL PASS (69 checks)`; `test_log`, `test_clock`, `test_tuning`, `test_state`, `test_room_loader` (57 `ok`) and `test_deferred_owners` `PASS`; `smoke_shaft` `SMOKE PASS` (30 `ok`) and `smoke_shaft_state` `SMOKE PASS` (14 `ok`); `== ALL GREEN`.
+- [x] **Task 2: The camera rig** (AC: 4, 1)
+  - [x] `scripts/world/camera_rig.gd` as in D2.
+  - [x] Take the camera out of `player.gd` and `player.tscn` (D2). The player gains `signal pogo_hit`.
+- [x] **Task 3: World, gutters, router** (AC: 1, 3, 6)
+  - [x] `scripts/world/world.gd` + `scenes/world/world.tscn` (D1, D3, D4).
+  - [x] `scripts/ui/gutters.gd`, `scripts/ui/screen_router.gd` (D7). Build the nodes in the scene or in code, but keep the tree and its order as in D1.
+  - [x] `project.godot`: `run/main_scene="res://scenes/world/world.tscn"`.
+  - [x] Player popups go to the current room (D8).
+  - [x] Run `godot --headless --path . --import` after adding the `class_name`s. Commit the generated `.gd.uid` files and never write one by hand.
+- [x] **Task 4: The lurker reads the play rect** (AC: 2, 3)
+  - [x] `lurker.gd` `_on_screen()` reads `World.play_rect()` (D5).
+  - [x] The lurker drops a dead or freed target at once (D6).
+- [x] **Task 5: Tests** (AC: 2, 3, 4, 5, 6, 7)
+  - [x] `tests/room_harness.gd`: a `CameraRig` instead of the player's camera, and a stub `current_room()` (D9).
+  - [x] `tests/smoke_shaft.gd` and `tests/screenshot.gd` follow the camera move (D9). `smoke_shaft` keeps its 30 checks word for word.
+  - [x] New `tests/smoke_world.gd` (D10). Delete `tests/smoke_shaft_state.gd` and its `.uid` with `git rm`.
+  - [x] `run_tests.sh`: replace `smoke_shaft_state` with `smoke_world` in the `for t in …` list.
+  - [x] Run `screenshot.gd` under `xvfb-run` and look at both PNGs: gutters on both sides, the room centred between them, the darkness.
+- [x] **Task 6: Docs** (AC: 1)
+  - [x] Update the facts that change (D11). Facts only.
+- [x] **Task 7: Verify** (AC: 7, 4, 5)
+  - [x] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
+  - [x] `grep -rn "randf" scripts/` lists only `scripts/world/camera_rig.gd`.
+  - [x] `grep -rn "get_viewport_rect" scripts/actors/` finds nothing.
+  - [x] `grep -rln "shaft.tscn\|shaft.gd" tests/ project.godot` finds nothing.
+  - [x] `grep -rn "reload_current_scene" scripts/ --include=*.gd | grep -v "^scripts/shaft.gd"` finds nothing.
+  - [x] Every new `.gd` has its `.gd.uid` staged.
+  - [x] Report "tests green; needs a feel check on the laptop" and give sonlm D12's list of what to look at.
 
 ## Dev Notes
 
@@ -382,10 +385,54 @@ These are story-author decisions; sonlm can veto any of them before dev. **D7's 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-13.
+
 ### Debug Log References
+
+- Baseline at `dd1b510` (story-file commit on top of `4c5929e`): `== ALL GREEN`, counts as listed in Task 1.
+- First `smoke_world` run: case 8 failed with state IDLE instead of RETURN. The test lurker hunted from its home, so RETURN reached home in the same frame and went on to IDLE. The check now accepts RETURN or IDLE: both mean the hunt was dropped. Without D6 it stays in HUNT for 0.6 s, so the check still fails without the fix.
+- Red check: with `lurker.gd` restored from HEAD, `smoke_world` fails cases 7 (A telegraphs, state 1), 8 (state 2 = HUNT) and the `get_viewport_rect` source check. With the new lurker it passes.
+- First full run: `test_tuning` failed 2 rows. Its M1 regression fixture pinned `player.SHAKE` / `player.LOOK_AHEAD`, which D2 moves to `CameraRig`; the story did not list this file. Fix: the fixture rows gain an optional `home` script (`camera_rig.gd`, consts `POGO_SHAKE` / `LOOK_AHEAD`), with the values still copied from M1 (2.5, 70.0), still 44 rows, and the player is still checked to have no such var. No threshold changed.
+- `xvfb-run` screenshot run prints one engine `ERROR: … ERR_CANT_OPEN` from the ALSA audio driver at startup (no sound device on the server; falls back to the dummy driver). It comes before the runner starts and is not ours.
+- Task 7 grep `grep -rln "shaft.tscn\|shaft.gd" tests/ project.godot` lists `tests/smoke_shaft.gd` only because its own filename contains `shaft.gd` (its run comment, line 4). Nothing loads `shaft.*`.
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-13. Ultimate context engine analysis completed - comprehensive developer guide created. Baseline re-run at `4c5929e`: `== ALL GREEN`.
+- **World** (`scripts/world/world.gd`, `scenes/world/world.tscn`) is `run/main_scene`, with the tree from D1: Darkness, RoomHolder, Player (spawned in code, right after RoomHolder), Camera, then UI (layer 10, ALWAYS) holding Gutters then ScreenRouter. It boots `Game` only as the current scene, loads `START_ROOM`, sets the limits, and spawns through one `_spawn_player()` path that emits `player_spawned`. A death records it and starts a pausable, time-scale-free timer connected to `_respawn()` (no `await`). `_respawn()` clears the Clock, `remove_child` + `queue_free`s the old player, spawns at the `DiveState` respawn point (else the room's `spawn`), binds the player with methods and bound callables, then `follow` + `snap`. The out-of-room death moved here. The brightness ambient moved from `shaft.gd`.
+- **CameraRig** follows the player as D2 specifies; `world.tscn` sets smoothing 8. It is the only `randf` under `scripts/`. `play_rect()` for `m1_shaft` spans x −4 … 356; limits are −64 / 416 / 0 / 1680.
+- **Player:** no camera node or consts; new `signal pogo_hit`; `_fx_parent()` puts the three popups under `World.current_room()`.
+- **Lurker:** `_on_screen()` reads `World.play_rect()` (false with no World); a TELEGRAPH/HUNT on a dead or freed target goes to RETURN at once (D6).
+- **Gutters / ScreenRouter** as in D7. No HUD, no function keys.
+- **Tests:** the harness uses a `CameraRig` and a stub with `current_room()`. `smoke_shaft` still has its 30 checks; only `place()` changed, to `_parts.camera.snap()`. New `smoke_world` (45 checks) replaces `smoke_shaft_state` (removed with `git rm`, `run_tests.sh` updated). `screenshot.gd` instances `world.tscn`, and its copied ambient formula is gone. `test_tuning`'s fixture follows the camera consts to `camera_rig.gd` (see Debug Log).
+- **Screenshots** (`xvfb-run`): gutters on both sides (#07060b), room centred, darkness, a lurker telegraphing in shot 2. **Fixed on sonlm's call (not in the tasks):** the play area is 360 px and the room 352 px, so a 4 px band at screen x 60–64 and 416–420 showed Godot's default clear colour (grey 0.3, 77/77/77). `project.godot` now sets `rendering/environment/defaults/default_clear_color` to the gutter violet `#07060b`. Re-shot: those columns read (7, 6, 11), the same as the gutters. `project.godot` can't hold a comment (the editor strips it), so the reason is in `docs/architecture.md` → Level Data. Story 1.18's per-zone gutter fill must set the clear colour to match.
+- **D7 brightness gap:** I took the story's default (no F1). Brightness keeps the saved level until DevTools (1.11).
+- Verification: `./run_tests.sh` → `== ALL GREEN` (`test_chain_state` 69, `smoke_shaft` 30 `ok`, `smoke_world` 45 `ok`); no `ERROR`/leak lines in the raw output of either smoke test. `randf` appears only in `scripts/world/camera_rig.gd`. No `get_viewport_rect` remains in `scripts/actors/`. No `reload_current_scene` outside `shaft.gd`. Every new `.gd.uid` is staged.
+- Tests green; needs a feel check on the laptop (D12).
 
 ### File List
+
+- game/project.godot (modified: main scene; default clear colour = gutter violet)
+- game/run_tests.sh (modified: smoke_world replaces smoke_shaft_state)
+- game/README.md (modified)
+- game/scenes/world/world.tscn (new)
+- game/scenes/actors/player.tscn (modified: Camera node removed)
+- game/scripts/world/world.gd (new) + world.gd.uid
+- game/scripts/world/camera_rig.gd (new) + camera_rig.gd.uid
+- game/scripts/ui/gutters.gd (new) + gutters.gd.uid
+- game/scripts/ui/screen_router.gd (new) + screen_router.gd.uid
+- game/scripts/actors/player.gd (modified)
+- game/scripts/actors/lurker.gd (modified)
+- game/tests/room_harness.gd (modified)
+- game/tests/smoke_shaft.gd (modified: place() snaps the rig)
+- game/tests/screenshot.gd (modified)
+- game/tests/test_tuning.gd (modified: camera rows' `home`)
+- game/tests/smoke_world.gd (new) + smoke_world.gd.uid
+- game/tests/smoke_shaft_state.gd + .uid (deleted)
+- docs/architecture.md, docs/component-inventory.md, docs/development-guide.md, docs/source-tree-analysis.md, docs/index.md, docs/rooms.md (modified)
+- _bmad-output/project-context.md (modified: Current State vs Target)
+- _bmad-output/implementation-artifacts/1-6-the-world-scene-replaces-the-m1-shaft.md, sprint-status.yaml (status)
+
+### Change Log
+
+- 2026-11-13: Story 1.6 implemented. World scene with CameraRig, gutters and ScreenRouter replaces the shaft as main scene; respawn without reload; lurkers read `World.play_rect()` and drop a hunt on death; `smoke_world` replaces `smoke_shaft_state`; docs updated. Status → review.
