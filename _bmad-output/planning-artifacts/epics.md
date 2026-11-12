@@ -1381,6 +1381,7 @@ So that hitstop and later slow-mo stack predictably and freeze with the pause.
 **Given** `Game` as the first autoload
 **When** headless tests run
 **Then** each test is a script extending `Node`, run as a scene by `tests/runner.tscn` (`godot --headless --path . res://tests/runner.tscn -- res://tests/<test>.gd`), so `Game`, `preload` and `class_name` work as in game code (under `--script` a test that touches `Game` fails to compile and can hang or exit 0 with no output); the runner prints the test's `ok` / `FAIL` lines and `PASS` / `FAILED`, exits non-zero on a failure, and fails a test that prints no `PASS` line or runs longer than 120 s (R17)
+**And** the runner also fails a test whose run printed any `SCRIPT ERROR` or `ERROR:` line (it sees them through a Godot `Logger`; sonlm, 2026-11-12); Story 1.9's `run_tests.sh` check still covers errors outside the runner
 **And** `test_chain_state.gd`, `test_deferred_owners.gd`, `smoke_shaft.gd` and `screenshot.gd` move onto the runner in this story with no assertion changes, and `run_tests.sh` runs its listed tests through it
 
 ### Story 1.3: Tuning as data
