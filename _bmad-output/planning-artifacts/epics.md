@@ -1244,6 +1244,10 @@ Milestone 2 (the vertical slice), in risk-first order. Numbering matches the GDD
 
 **Estimate:** E1 L, E2 M, E3 M, E4 L, E5 L, E6 L, E7 M ≈ 40–80 weeks at 5–10 h/week (GDD follow-up: update the Epic Structure table, E1 M → L).
 
+**Follow-ups before `gds-check-implementation-readiness`** (owner: sonlm, next session)
+1. Update the GDD with `gds-gdd` (Update mode): the Epic Structure table (E1 M → L; M2 ≈ 40–80 weeks); the rule that a playtest "no" blocks only the epics that depend on it; the dependency E2 → E3; Brightness in the E1 Options (R1).
+2. Customize `gds-create-story` with `bmad-customize` so its inputs load `_bmad-output/game-architecture.md` and the nested GDD and UX spines listed under Source documents.
+
 ### Epic 1: Kit v2: Fair Deaths, Full Move Set
 
 The player dives the rebuilt 22-tile shaft with the full M2 kit (4 HP, Flare Toss, lantern anchors, the three ember stages and the Ember Cache, difficulty tiers), dies fairly and learns why from the death card, saves in 3 slots, and plays on keyboard or gamepad, on desktop and in the browser. Under the hood, the M1 prototype moves onto the M2 architecture.
@@ -1861,7 +1865,7 @@ So that "one more hit" and "can I reach the station?" are both real choices.
 **Then** Easy moves held to carried and keeps carried (no cache); Hard loses both; difficulty lives in `SlotState`, is not a tuning modifier and changes nothing but death cost, never telegraphs, damage or chain rules (FR25, UX-DR67)
 **And** DevTools gains `--difficulty=easy|normal|hard`
 
-**Given** `objects/ember_cache.gd` (a `LightSource` of kind `cache`, amber glow, radius from `Tuning`)
+**Given** `objects/ember_cache.gd` (a `LightSource` of kind `cache`, amber glow, radius from `Tuning`, starting at 80 px and tuned at the CP2 gate)
 **When** `enter_room` builds a room whose id matches `slot.cache.room`
 **Then** the cache spawns there; it wakes lurkers only if its radius is ≥ 80 px (tested at 79 and 80); a lurker hunting the cache is harmless; the cache survives rests and saves (FR24, AR24)
 **And** if the player died inside a hazard or out of reach, the cache is placed at the last safe ground position in that room
@@ -2050,6 +2054,8 @@ As the designer,
 I want to play the full kit build and record whether deaths feel fair,
 So that the Weaver prototype is built on a kit I trust.
 
+**Tune after play (sonlm):** the Ember Cache glow radius (start: 80 px, the minimum that can wake a lurker) and the bank-heal threshold (start: chain 10), GDD assumptions A8 and A1.
+
 **Acceptance Criteria:**
 
 **Given** the GDD's E1 watch items
@@ -2059,6 +2065,10 @@ So that the Weaver prototype is built on a kit I trust.
 **Given** the HUD defaults D1 (chain number steps), D3 (cling cue and grace bar), D4 (icon art), D8 (alert hold on overlap) and D11 (autosave icon)
 **When** sonlm reviews them in the kit build with `DESIGN.md` open
 **Then** each is marked keep or change; small changes are fixed before CP3, and the spine tags are updated with the decision and date
+
+**Given** GDD assumptions A1 (bank-heal at chain ≥ 10) and A8 (Ember Cache glow radius)
+**When** sonlm plays the kit build
+**Then** both are confirmed or retuned in `rules/tuning.gd` with "was X" comments, and the GDD assumption index marks them closed (FR12, FR24)
 
 **Given** CP2 is complete (Stories 1.16–1.29)
 **When** sonlm plays the kit build
@@ -3321,7 +3331,7 @@ So that the hub follows a reviewed design.
 
 **Given** `gds-ux` in Update mode
 **When** the update runs
-**Then** it settles: Oda's house and the opening sequence; lift-ride timing (mocked together with the speech box); the speech box frame, height, name tag, reveal, skip rules and line length (O5); the shop layout, buy confirm and can't-afford response (O6); the Journal tab layout, "new" mark art, empty states and the Guild records board form (O7); the gutters during The Watching Departure (O8) (UX-DR91, UX-DR92, UX-DR95, UX-DR97)
+**Then** it settles: Oda's house and the opening sequence; lift-ride timing (mocked together with the speech box); the speech box frame, height, name tag, reveal, skip rules and line length (O5); the shop layout, buy confirm and can't-afford response (O6); the Journal tab layout, "new" mark art, empty states and the Guild records board form (O7); the gutters during scripted moments, both The Watching Departure and The Fall (O8) (UX-DR91, UX-DR92, UX-DR95, UX-DR97)
 
 **Given** the hub palette (O9)
 **When** it is designed (bright, warm, low contrast)
@@ -3349,6 +3359,10 @@ So that coming back up feels like coming home.
 **When** the lift (or the gate-2 shortcut) reaches the hub
 **Then** all carried embers are deposited, HP is full, the layer's enemies reset and the slot autosaves (FR12, FR29, FR64)
 **And** the placeholder hub room is removed and its references point here
+
+**Given** the hub's soundscape
+**When** the player is in the hub
+**Then** boiler hiss, the winch and distant voices play through `Audio` as organic-world ambience, with no chain-reactive music (the placeholder hub theme from Story 3.5 may play) (NR15)
 
 ### Story 5.4: The lift ride
 
@@ -3749,6 +3763,7 @@ So that the fight's climax is a free-fall chain that pays.
 **Given** the hand-off
 **When** the fall ends
 **Then** `World.scripted_cut(&"landing_arena", entry)` moves the player without the exit backstop, so the chain survives the room change (the one exception), and the player lands in the landing arena (AR24, AR56)
+**And** the gutters follow the O8 decision from Story 5.2
 **And** the moment honours reduced motion and reduce flashing, and never writes `Engine.time_scale` directly
 
 ### Story 6.7: Phase 2
