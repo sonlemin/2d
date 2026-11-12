@@ -1,5 +1,6 @@
 extends Node
-## Tuning (AR15) and Gear (AR16): the API, the fixed set → add → mul order, and rules/ purity.
+## Tuning (AR15) and Gear (AR16): the API, the fixed set → add → mul order, rules/ purity, and
+## the Story 1.3 regression fixture: every M1 @export default still holds, wherever it now lives.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_tuning.gd
 ## Each API case builds a fresh Tuning; only the Game case reads Game.tuning.
 ## Not tested here, because a failed assert aborts the test: the unknown-key, unknown-flag,
@@ -14,6 +15,61 @@ const FIXTURE: Array[Dictionary] = [
 	{id = &"g_flag", stat = &"instant_snuff", op = &"flag", value = true},
 ]
 const PURE := ["res://scripts/rules/tuning.gd", "res://scripts/rules/gear.gd"]
+const PlayerScene := preload("res://scenes/actors/player.tscn")
+const ACTORS := {
+	"player": "res://scripts/actors/player.gd",
+	"crawler": "res://scripts/actors/crawler.gd",
+	"lurker": "res://scripts/actors/lurker.gd",
+}
+
+## The 44 M1 @export defaults (baseline 85bb1ed), copied from the M1 code, never from Tuning.
+## A row is moved to Tuning (`keys`), kept as a local const (`local`), or per instance (`instance`).
+const M1: Array[Dictionary] = [
+	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
+	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
+	{m1 = "player.air_accel", value = 1500.0, keys = [&"air_accel"]},
+	{m1 = "player.gravity", value = 900.0, keys = [&"gravity"]},
+	{m1 = "player.max_fall", value = 210.0, keys = [&"max_fall"]},
+	{m1 = "player.fall_gravity_scale", value = 0.6, keys = [&"fall_gravity_scale"]},
+	{m1 = "player.jump_velocity", value = -330.0, keys = [&"jump_velocity"]},
+	{m1 = "player.jump_cut", value = 0.45, keys = [&"jump_cut"]},
+	{m1 = "player.coyote_time", value = 0.08, keys = [&"coyote_time"]},
+	{m1 = "player.jump_buffer", value = 0.10, keys = [&"jump_buffer"]},
+	{m1 = "player.dash_speed", value = 260.0, keys = [&"dash_speed"]},
+	{m1 = "player.dash_time", value = 0.12, keys = [&"dash_time"]},
+	{m1 = "player.cling_time", value = 1.0, keys = [&"cling_grace"]},
+	{m1 = "player.cling_slide", value = 18.0, keys = [&"cling_slide"]},
+	{m1 = "player.wall_kick", value = Vector2(150, -260), keys = [&"wall_kick_x", &"wall_kick_y"]},
+	{m1 = "player.kick_lock", value = 0.15, keys = [&"kick_lock"]},
+	{m1 = "player.pogo_velocity", value = -300.0, keys = [&"pogo_velocity"]},
+	{m1 = "player.swing_active", value = 0.12, keys = [&"slash_active"]},
+	{m1 = "player.air_swing_active", value = 0.22, keys = [&"pogo_armed"]},
+	{m1 = "player.swing_cooldown", value = 0.22, keys = [&"attack_cooldown"]},
+	{m1 = "player.hitstop", value = 0.075, keys = [&"hitstop"]},
+	{m1 = "player.shake", value = 2.5, local = "SHAKE"},
+	{m1 = "player.look_ahead", value = 70.0, local = "LOOK_AHEAD"},
+	{m1 = "player.light_kick", value = 18.0, local = "LIGHT_KICK"},
+	{m1 = "player.knockback", value = Vector2(150, -150), keys = [&"knockback_x", &"knockback_y"]},
+	{m1 = "player.invuln_time", value = 0.6, keys = [&"invuln_time"]},
+	{m1 = "player.snuff_hold", value = 0.12, local = "SNUFF_HOLD"},
+	{m1 = "player.light_lerp", value = 10.0, local = "LIGHT_LERP"},
+	{m1 = "crawler.hover", value = false, instance = true},
+	{m1 = "crawler.walk_speed", value = 25.0, keys = [&"crawler_walk_speed"]},
+	{m1 = "crawler.gravity", value = 900.0, keys = [&"crawler_gravity"]},
+	{m1 = "crawler.hover_drift", value = 10.0, keys = [&"crawler_hover_drift"]},
+	{m1 = "crawler.hover_period", value = 2.4, keys = [&"crawler_hover_period"]},
+	{m1 = "lurker.notice_min_radius", value = 80.0, local = "NOTICE_MIN_RADIUS"},
+	{m1 = "lurker.notice_factor", value = 1.6, local = "NOTICE_FACTOR"},
+	{m1 = "lurker.telegraph_time", value = 0.9, keys = [&"lurker_telegraph_time"]},
+	{m1 = "lurker.lose_track_time", value = 0.6, keys = [&"lurker_lose_track_time"]},
+	{m1 = "lurker.hunt_speed", value = 95.0, keys = [&"lurker_hunt_speed"]},
+	{m1 = "lurker.hunt_accel", value = 220.0, keys = [&"lurker_hunt_accel"]},
+	{m1 = "lurker.return_speed", value = 40.0, keys = [&"lurker_return_speed"]},
+	{m1 = "lurker.eye_pulse_hz", value = 2.0, local = "EYE_PULSE_HZ"},
+	{m1 = "lurker.screen_margin", value = 8.0, local = "SCREEN_MARGIN"},
+	{m1 = "lurker.glow_energy", value = 1.3, local = "GLOW_ENERGY"},
+	{m1 = "lurker.eye_open_time", value = 0.2, local = "EYE_OPEN_TIME"},
+]
 
 var _fail := 0
 
@@ -29,6 +85,8 @@ func run() -> void:
 	_test_gear_table_empty()
 	_test_game_holds_tuning()
 	_test_purity()
+	_test_m1_fixture()
+	_test_fr_values()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -130,3 +188,61 @@ func _test_purity() -> void:
 		check(err == OK and src != "", "%s is readable (error %d)" % [path, err])
 		var hit := re.search(src)
 		check(hit == null, "%s mentions no Node, Input, Engine or Game. (found: %s)" % [path, hit.get_string() if hit else ""])
+
+
+func _script_vars(script: Script) -> Array:
+	return script.get_script_property_list().map(func(p: Dictionary) -> String: return p.name)
+
+
+## Story 1.3 is a pure refactor: each of the 44 M1 defaults keeps its number in its new home.
+func _test_m1_fixture() -> void:
+	var per_actor := {}
+	for row: Dictionary in M1:
+		var actor: String = row.m1.get_slice(".", 0)
+		per_actor[actor] = per_actor.get(actor, 0) + 1
+	check(M1.size() == 44 and per_actor == {"player": 28, "crawler": 5, "lurker": 11}, "the fixture has the 44 M1 exports: 28 player, 5 crawler, 11 lurker (got %s)" % [per_actor])
+	var t := Tuning.new()
+	var seen := {}  # Tuning key -> how many rows name it
+	for row: Dictionary in M1:
+		var actor: String = row.m1.get_slice(".", 0)
+		var prop: String = row.m1.get_slice(".", 1)
+		var script: Script = load(ACTORS[actor])
+		var vars := _script_vars(script)
+		if row.has("keys"):
+			var keys: Array = row.keys
+			for k: StringName in keys:
+				seen[k] = seen.get(k, 0) + 1
+			var got: Variant = t.f(keys[0]) if keys.size() == 1 else Vector2(t.f(keys[0]), t.f(keys[1]))
+			check(got == row.value and not vars.has(prop), "%s = %s is Tuning %s (got %s) and gone from %s.gd" % [row.m1, row.value, keys, got, actor])
+		elif row.has("local"):
+			var got: Variant = script.get_script_constant_map().get(row.local)
+			check(got == row.value and not vars.has(prop), "%s = %s stays local as %s.%s (got %s), no longer a var" % [row.m1, row.value, actor, row.local, got])
+		else:
+			var c := Crawler.new()
+			check(vars.has(prop) and c.hover == row.value, "%s stays a per-instance var, default %s (got %s)" % [row.m1, row.value, c.hover])
+			c.queue_free()
+	var orphans := Tuning.BASE.keys().filter(func(k: StringName) -> bool: return seen.get(k, 0) != 1)
+	check(orphans.is_empty(), "every BASE key comes from exactly one M1 export (not: %s)" % [orphans])
+
+
+## The playtested FR numbers that never were exports: the boxes, the chain curve and the hitstop
+## depth (GDD Attack, pogo and chain (M1)). The GDD rounds the curve, hence the tolerances.
+func _test_fr_values() -> void:
+	check(ChainState.MAX_CHAIN == 20, "the chain caps at 20 links (got %d)" % ChainState.MAX_CHAIN)
+	check(ChainState.BASE_RADIUS == 40.0 and ChainState.SNUFF_RADIUS == 12.0, "light is 40 px with no chain, 12 px snuffed (got %s / %s)" % [ChainState.BASE_RADIUS, ChainState.SNUFF_RADIUS])
+	var want_radius := {0: 40.0, 4: 84.0, 10: 110.0, 20: 138.0}
+	for links: int in want_radius:
+		var r := ChainState.radius_for(links)
+		check(absf(r - want_radius[links]) < 0.5, "light radius 40 + 22·√links is %s px at %d links (got %.1f)" % [want_radius[links], links, r])
+	check(ChainState.bloom_for(0) == 1.0, "Blade Bloom is x1.0 with no chain (got %s)" % ChainState.bloom_for(0))
+	var top := ChainState.bloom_for(ChainState.MAX_CHAIN)
+	check(absf(top - 1.8) < 0.01 and ChainState.bloom_for(ChainState.MAX_CHAIN + 5) == top, "Blade Bloom 1 + 0.18·√links tops out at x1.8 (got %.3f)" % top)
+	check(Player.HITSTOP_SCALE == 0.05, "the pogo hitstop freezes time to x0.05 (got %s)" % Player.HITSTOP_SCALE)
+	# Read from an instance outside the tree, so _ready never runs; freed, or its RIDs leak at exit.
+	var p: Node = PlayerScene.instantiate()
+	var want_box := {"Body": Vector2(10, 20), "Hurtbox/Shape": Vector2(8, 18), "Slash/Shape": Vector2(22, 16), "Pogo/Shape": Vector2(26, 24)}
+	for path: String in want_box:
+		var rect := (p.get_node(path) as CollisionShape2D).shape as RectangleShape2D
+		var got: Variant = rect.size if rect else null
+		check(got == want_box[path], "player %s box is %s px (got %s)" % [path, want_box[path], got])
+	p.queue_free()

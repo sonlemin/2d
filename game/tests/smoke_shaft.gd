@@ -92,7 +92,7 @@ func test_snuff_needs_hold() -> void:
 func test_wall_cling() -> void:
 	var y: float = _hovers()[2].global_position.y
 	place(Vector2(2 * 16 + 5.5, y))  # body (10 px wide) touching the left wall, mid-air
-	_player._cling_left = _player.cling_time
+	_player._cling_left = Game.tuning.f(&"cling_grace")
 	for i in 6:
 		_player.chain.add_hit()
 	var held: int = _player.chain.held
@@ -264,7 +264,7 @@ func test_snuff_escape_point_blank() -> void:
 		_player.chain.add_hit()
 	lurker.global_position = _player.global_position + Vector2(-18, 0)
 	lurker._enter(Lurker.State.HUNT)
-	lurker._velocity = Vector2(lurker.hunt_speed, 0)
+	lurker._velocity = Vector2(Game.tuning.f(&"lurker_hunt_speed"), 0)
 	await frames(1)
 	_player.chain.set_snuffed(true)
 	await seconds(1.2)

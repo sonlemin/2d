@@ -7,37 +7,14 @@ extends CharacterBody2D
 signal died
 signal chain_changed(count: int)
 
-# --- Movement tuning ---
-@export var run_speed := 110.0
-@export var run_accel := 900.0
-@export var air_accel := 1500.0          ## snappier steering in the air, to line up the next pogo
-@export var gravity := 900.0
-@export var max_fall := 210.0            ## was 330; slowed for the first playtests
-@export var fall_gravity_scale := 0.6   ## gravity multiplier while falling (rising is unchanged)
-@export var jump_velocity := -330.0       ## apex ~60 px (~3.8 tiles); was -270 (~40 px)
-@export var jump_cut := 0.45            ## velocity multiplier when Jump is released early
-@export var coyote_time := 0.08
-@export var jump_buffer := 0.10
-@export var dash_speed := 260.0
-@export var dash_time := 0.12
-@export var cling_time := 1.0           ## chain grace per chain while clinging (refilled by a pogo), then it breaks
-@export var cling_slide := 18.0         ## px/s slow slide while clinging
-@export var wall_kick := Vector2(150, -260)  ## release Jump while clinging = kick off the wall
-@export var kick_lock := 0.15           ## s of no steering after a kick, so it actually carries you away
-# --- Combat tuning ---
-@export var pogo_velocity := -300.0      ## apex ~50 px: hang time to steer to the next target (was -260)
-@export var swing_active := 0.12
-@export var air_swing_active := 0.22    ## a pogo stays armed longer: pressing X a bit early still hits
-@export var swing_cooldown := 0.22
-@export var hitstop := 0.075            ## freeze frame on pogo hit (seconds, real time; was 0.045)
-@export var shake := 2.5                ## px camera kick on a pogo hit
-@export var look_ahead := 70.0          ## px the camera leads downward while falling (see ledges sooner)
-@export var light_kick := 18.0          ## px the light flares on a pogo hit
-@export var knockback := Vector2(150, -150)
-@export var invuln_time := 0.6
-@export var snuff_hold := 0.12         ## Light must be HELD this long to Snuff: a tap or brush never breaks the chain
-@export var light_lerp := 10.0          ## how fast the visible light eases to its target radius
-
+# Gameplay numbers live in rules/tuning.gd and are read through Game.tuning each tick (AR15).
+# These stay local because no system bends them (Story 1.3 D1).
+const SHAKE := 2.5  ## px camera kick on a pogo hit; presentation, moves to camera_rig.gd in 1.6 (M1 player.shake).
+const LOOK_AHEAD := 70.0  ## px the camera leads downward while falling, to see ledges sooner (GDD Movement "Camera", FR3); moves to camera_rig.gd in 1.6 (M1 player.look_ahead).
+const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads chain.light_radius(), never this (M1 player.light_kick).
+const LIGHT_LERP := 10.0  ## 1/s easing of the visible light toward its target radius; presentation (M1 player.light_lerp).
+const SNUFF_HOLD := 0.12  ## s Light must be held to Snuff, so a tap never breaks the chain; becomes Settings.light_tap_window in 1.8, never a Tuning key (M1 player.snuff_hold).
+const HITSTOP_SCALE := 0.05  ## time scale during a pogo hitstop: it only makes the freeze a freeze; its length is Tuning hitstop (Story 1.3 D3).
 const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px
 
 var chain := ChainState.new()
@@ -78,7 +55,7 @@ func _ready() -> void:
 	_hurtbox.area_entered.connect(_on_hurt_area)
 	_set_swing_visible(false)
 	_apply_bloom()
-	_cling_left = cling_time
+	_cling_left = Game.tuning.f(&"cling_grace")
 
 
 func light_radius() -> float:
@@ -97,8 +74,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if is_on_floor():
 		_end_cling()
-		_cling_left = cling_time
-		_coyote = coyote_time
+		_cling_left = Game.tuning.f(&"cling_grace")
+		_coyote = Game.tuning.f(&"coyote_time")
 		_can_dash = true
 		_jumping = false
 		chain.break_chain()  # Landing breaks the chain; the ground is a sanctuary.
@@ -114,7 +91,7 @@ func _process(delta: float) -> void:
 	_shake = move_toward(_shake, 0.0, 20.0 * real)
 	_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 	# Lead the view downward while falling; ease back when standing or rising.
-	var lead := look_ahead if velocity.y > 40.0 and not is_on_floor() else 0.0
+	var lead := LOOK_AHEAD if velocity.y > 40.0 and not is_on_floor() else 0.0
 	_camera.position.y = move_toward(_camera.position.y, lead, 140.0 * real)
 
 
@@ -129,7 +106,7 @@ func _tick_timers(delta: float) -> void:
 ## Hold = Snuff (the design's tap on Light is reserved for Flare Toss, later).
 func _handle_snuff(delta: float) -> void:
 	_light_held = _light_held + delta if Input.is_action_pressed("light") else 0.0
-	var snuff := _light_held >= snuff_hold
+	var snuff := _light_held >= SNUFF_HOLD
 	if snuff != chain.snuffed:
 		chain.set_snuffed(snuff)
 
@@ -138,6 +115,7 @@ func _handle_snuff(delta: float) -> void:
 ## Release Jump = kick off the wall; Down = drop. Grace runs out -> the chain breaks (banks).
 ## Returns true while clinging (normal movement is skipped).
 func _handle_cling(delta: float) -> bool:
+	var t := Game.tuning
 	if not _clinging:
 		if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not Input.is_action_pressed("jump"):
 			return false
@@ -148,10 +126,10 @@ func _handle_cling(delta: float) -> bool:
 		chain.set_clinging(true)
 	if not Input.is_action_pressed("jump"):
 		_end_cling()
-		velocity = Vector2(-_cling_side * wall_kick.x, wall_kick.y)
+		velocity = Vector2(-_cling_side * t.f(&"wall_kick_x"), t.f(&"wall_kick_y"))
 		_facing = -_cling_side
 		_sprite.flip_h = _facing < 0
-		_kick_left = kick_lock
+		_kick_left = t.f(&"kick_lock")
 		_jumping = false
 		return true
 	if Input.is_action_pressed("move_down") or _wall_side() != _cling_side:
@@ -160,7 +138,7 @@ func _handle_cling(delta: float) -> bool:
 	_cling_left -= delta
 	if _cling_left <= 0.0:
 		chain.break_chain()  # grace is over: the chain ends safely, embers bank
-	velocity = Vector2(0.0, cling_slide)
+	velocity = Vector2(0.0, t.f(&"cling_slide"))
 	return true
 
 
@@ -179,6 +157,7 @@ func _wall_side() -> int:
 
 
 func _handle_horizontal(delta: float) -> void:
+	var t := Game.tuning
 	var dir := Input.get_axis("move_left", "move_right")
 	if dir != 0.0:
 		_facing = int(signf(dir))
@@ -186,44 +165,45 @@ func _handle_horizontal(delta: float) -> void:
 		_slash.scale.x = absf(_slash.scale.x) * _facing
 	if _dash_left > 0.0:
 		_dash_left -= delta
-		velocity.x = dash_speed * _dash_dir  # direction is locked when the dash starts
+		velocity.x = t.f(&"dash_speed") * _dash_dir  # direction is locked when the dash starts
 		return
 	if Input.is_action_just_pressed("dash") and _can_dash and not is_on_floor():
 		_can_dash = false
-		_dash_left = dash_time
+		_dash_left = t.f(&"dash_time")
 		_dash_dir = _facing
 		_jumping = false
-		velocity = Vector2(dash_speed * _dash_dir, 0.0)
+		velocity = Vector2(t.f(&"dash_speed") * _dash_dir, 0.0)
 		return
-	var accel := run_accel if is_on_floor() else air_accel
+	var accel := t.f(&"run_accel") if is_on_floor() else t.f(&"air_accel")
 	if _kick_left > 0.0:
 		_kick_left -= delta
 		return
-	velocity.x = move_toward(velocity.x, dir * run_speed, accel * delta)
+	velocity.x = move_toward(velocity.x, dir * t.f(&"run_speed"), accel * delta)
 
 
 func _handle_vertical(delta: float) -> void:
 	if _dash_left > 0.0:
 		return  # dash ignores gravity
-	var g := gravity * (fall_gravity_scale if velocity.y > 0.0 else 1.0)
-	velocity.y = minf(velocity.y + g * delta, max_fall)
+	var t := Game.tuning
+	var g := t.f(&"gravity") * (t.f(&"fall_gravity_scale") if velocity.y > 0.0 else 1.0)
+	velocity.y = minf(velocity.y + g * delta, t.f(&"max_fall"))
 	if Input.is_action_just_pressed("jump"):
-		_buffer = jump_buffer
+		_buffer = t.f(&"jump_buffer")
 	if _buffer > 0.0 and _coyote > 0.0:
-		velocity.y = jump_velocity
+		velocity.y = t.f(&"jump_velocity")
 		_jumping = true
 		_buffer = 0.0
 		_coyote = 0.0
 	if Input.is_action_just_released("jump") and _jumping and velocity.y < 0.0:
-		velocity.y *= jump_cut
+		velocity.y *= t.f(&"jump_cut")
 
 
 func _handle_attack() -> void:
 	if not Input.is_action_just_pressed("attack") or _swing_cd > 0.0:
 		return
 	_swing_is_pogo = not is_on_floor()  # in the air, Attack always pogoes (one key, still timed)
-	_swing_left = air_swing_active if _swing_is_pogo else swing_active
-	_swing_cd = swing_cooldown
+	_swing_left = Game.tuning.f(&"pogo_armed") if _swing_is_pogo else Game.tuning.f(&"slash_active")
+	_swing_cd = Game.tuning.f(&"attack_cooldown")
 	_swing_hit = false
 	_set_swing_visible(true)
 
@@ -247,14 +227,14 @@ func _process_swing() -> void:
 
 
 func _on_pogo_hit() -> void:
-	velocity.y = pogo_velocity
+	velocity.y = Game.tuning.f(&"pogo_velocity")
 	_jumping = false
 	_dash_left = 0.0
 	_can_dash = true  # pogo refreshes the air dash: keeps the chain steerable
-	_cling_left = cling_time
+	_cling_left = Game.tuning.f(&"cling_grace")
 	chain.add_hit()
-	_shown_radius += light_kick
-	_shake = shake
+	_shown_radius += LIGHT_KICK
+	_shake = SHAKE
 	_sprite.scale = Vector2(0.75, 1.3)  # stretch up out of the bounce
 	Fx.chain_popup(get_parent(), global_position, chain.count, ChainState.ember_value(chain.count))
 	_freeze_frame()
@@ -262,9 +242,10 @@ func _on_pogo_hit() -> void:
 
 ## FR4: the Clock times the 75 ms in real time and ends it, even if this player is freed mid-freeze.
 func _freeze_frame() -> void:
-	if hitstop <= 0.0:
+	var seconds := Game.tuning.f(&"hitstop")
+	if seconds <= 0.0:
 		return
-	Game.clock.request(&"hitstop", 0.05, hitstop)
+	Game.clock.request(&"hitstop", HITSTOP_SCALE, seconds)
 
 
 func _set_swing_visible(on: bool) -> void:
@@ -290,7 +271,7 @@ func _apply_bloom() -> void:
 
 func _update_light(delta: float) -> void:
 	var target := chain.light_radius()
-	_shown_radius = lerpf(_shown_radius, target, clampf(light_lerp * delta, 0.0, 1.0))
+	_shown_radius = lerpf(_shown_radius, target, clampf(LIGHT_LERP * delta, 0.0, 1.0))
 	_light.texture_scale = _shown_radius / LIGHT_TEXTURE_HALF
 
 
@@ -311,10 +292,11 @@ func _check_contact() -> void:
 
 func _take_knockback(body: Node2D) -> void:
 	_end_cling()
-	_invuln = invuln_time
+	var t := Game.tuning
+	_invuln = t.f(&"invuln_time")
 	_jumping = false
 	var away := signf(global_position.x - body.global_position.x)
-	velocity = Vector2(knockback.x * (away if away != 0.0 else -_facing), knockback.y)
+	velocity = Vector2(t.f(&"knockback_x") * (away if away != 0.0 else -_facing), t.f(&"knockback_y"))
 	_dash_left = 0.0
 	chain.break_chain()
 
