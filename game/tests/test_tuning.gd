@@ -24,6 +24,8 @@ const ACTORS := {
 
 ## The 44 M1 @export defaults (baseline 85bb1ed), copied from the M1 code, never from Tuning.
 ## A row is moved to Tuning (`keys`), kept as a local const (`local`), or per instance (`instance`).
+## A `local` row whose const moved to another script names it in `home` (Story 1.6: the camera
+## consts moved to world/camera_rig.gd).
 const M1: Array[Dictionary] = [
 	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
 	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
@@ -46,8 +48,8 @@ const M1: Array[Dictionary] = [
 	{m1 = "player.air_swing_active", value = 0.22, keys = [&"pogo_armed"]},
 	{m1 = "player.swing_cooldown", value = 0.22, keys = [&"attack_cooldown"]},
 	{m1 = "player.hitstop", value = 0.075, keys = [&"hitstop"]},
-	{m1 = "player.shake", value = 2.5, local = "SHAKE"},
-	{m1 = "player.look_ahead", value = 70.0, local = "LOOK_AHEAD"},
+	{m1 = "player.shake", value = 2.5, local = "POGO_SHAKE", home = "res://scripts/world/camera_rig.gd"},
+	{m1 = "player.look_ahead", value = 70.0, local = "LOOK_AHEAD", home = "res://scripts/world/camera_rig.gd"},
 	{m1 = "player.light_kick", value = 18.0, local = "LIGHT_KICK"},
 	{m1 = "player.knockback", value = Vector2(150, -150), keys = [&"knockback_x", &"knockback_y"]},
 	{m1 = "player.invuln_time", value = 0.6, keys = [&"invuln_time"]},
@@ -248,8 +250,9 @@ func _test_m1_fixture() -> void:
 			var got: Variant = t.f(keys[0]) if keys.size() == 1 else Vector2(t.f(keys[0]), t.f(keys[1]))
 			check(got == row.value and not vars.has(prop), "%s = %s is Tuning %s (got %s) and gone from %s.gd" % [row.m1, row.value, keys, got, actor])
 		elif row.has("local"):
-			var got: Variant = script.get_script_constant_map().get(row.local)
-			check(got == row.value and not vars.has(prop), "%s = %s stays local as %s.%s (got %s), no longer a var" % [row.m1, row.value, actor, row.local, got])
+			var home: String = row.get("home", ACTORS[actor])
+			var got: Variant = (load(home) as Script).get_script_constant_map().get(row.local)
+			check(got == row.value and not vars.has(prop), "%s = %s stays local as %s.%s (got %s), no longer a var" % [row.m1, row.value, home.get_file().get_basename(), row.local, got])
 		else:
 			var c := Crawler.new()
 			check(vars.has(prop) and c.hover == row.value, "%s stays a per-instance var, default %s (got %s)" % [row.m1, row.value, c.hover])

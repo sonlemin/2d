@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="The Unbroken Chain (M1 prototype)"
-run/main_scene="res://scenes/shaft.tscn"
+run/main_scene="res://scenes/world/world.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
@@ -75,3 +75,4 @@ textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 2d/snap/snap_2d_transforms_to_pixel=true
+environment/defaults/default_clear_color=Color(0.027451, 0.0235294, 0.0431373, 1)

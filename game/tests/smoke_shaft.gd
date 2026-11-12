@@ -50,7 +50,7 @@ func run() -> void:
 func place(pos: Vector2) -> void:
 	_player.global_position = pos
 	_player.velocity = Vector2.ZERO
-	(_player.get_node("Camera") as Camera2D).reset_smoothing()
+	_parts.camera.snap()
 
 
 func _build() -> void:

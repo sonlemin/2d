@@ -6,11 +6,11 @@ extends CharacterBody2D
 
 signal died
 signal chain_changed(count: int)
+## A pogo landed: World kicks its CameraRig, which owns the shake (AR27).
+signal pogo_hit
 
 # Gameplay numbers live in rules/tuning.gd and are read through Game.tuning each tick (AR15).
 # These stay local because no system bends them (Story 1.3 D1).
-const SHAKE := 2.5  ## px camera kick on a pogo hit; presentation, moves to camera_rig.gd in 1.6 (M1 player.shake).
-const LOOK_AHEAD := 70.0  ## px the camera leads downward while falling, to see ledges sooner (GDD Movement "Camera", FR3); moves to camera_rig.gd in 1.6 (M1 player.look_ahead).
 const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads chain.light_radius(), never this (M1 player.light_kick).
 const LIGHT_LERP := 10.0  ## 1/s easing of the visible light toward its target radius; presentation (M1 player.light_lerp).
 const SNUFF_HOLD := 0.12  ## s Light must be held to Snuff, so a tap never breaks the chain; becomes Settings.light_tap_window in 1.8, never a Tuning key (M1 player.snuff_hold).
@@ -33,7 +33,6 @@ var _swing_is_pogo := false
 var _swing_hit := false                 ## a swing connects at most once for the chain
 var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
-var _shake := 0.0
 var _light_held := 0.0
 var _clinging := false
 var _cling_side := 0
@@ -45,7 +44,6 @@ var _kick_left := 0.0
 @onready var _slash: Area2D = $Slash
 @onready var _pogo: Area2D = $Pogo
 @onready var _hurtbox: Area2D = $Hurtbox
-@onready var _camera: Camera2D = $Camera
 
 
 func _ready() -> void:
@@ -84,15 +82,10 @@ func _physics_process(delta: float) -> void:
 	_update_light(delta)
 
 
-## Real-time juice (runs during hitstop too): squash recovers, camera kick decays.
+## Real-time juice (runs during hitstop too): the squash recovers. The camera lives in CameraRig.
 func _process(delta: float) -> void:
 	var real := delta / maxf(Engine.time_scale, 0.001)
 	_sprite.scale = _sprite.scale.lerp(Vector2.ONE, clampf(12.0 * real, 0.0, 1.0))
-	_shake = move_toward(_shake, 0.0, 20.0 * real)
-	_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-	# Lead the view downward while falling; ease back when standing or rising.
-	var lead := LOOK_AHEAD if velocity.y > 40.0 and not is_on_floor() else 0.0
-	_camera.position.y = move_toward(_camera.position.y, lead, 140.0 * real)
 
 
 func _tick_timers(delta: float) -> void:
@@ -234,9 +227,9 @@ func _on_pogo_hit() -> void:
 	_cling_left = Game.tuning.f(&"cling_grace")
 	chain.add_hit()
 	_shown_radius += LIGHT_KICK
-	_shake = SHAKE
 	_sprite.scale = Vector2(0.75, 1.3)  # stretch up out of the bounce
-	Fx.chain_popup(get_parent(), global_position, chain.count, ChainState.ember_value(chain.count))
+	pogo_hit.emit()
+	Fx.chain_popup(_fx_parent(), global_position, chain.count, ChainState.ember_value(chain.count))
 	_freeze_frame()
 
 
@@ -255,7 +248,18 @@ func _set_swing_visible(on: bool) -> void:
 
 func _on_banked(amount: int) -> void:
 	if not is_dead:
-		Fx.popup(get_parent(), global_position + Vector2(0, -10), "+%d banked" % amount, Color(1, 0.93, 0.7), 10)
+		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), "+%d banked" % amount, Color(1, 0.93, 0.7), 10)
+
+
+## Runtime spawns belong to the room, never to World (AR23, D8): the room frees them with itself.
+## A bare test player with no World falls back to its parent.
+func _fx_parent() -> Node:
+	var world := get_tree().get_first_node_in_group("world")
+	if world != null and world.has_method("current_room"):
+		var room: Node = world.current_room()
+		if room != null:
+			return room
+	return get_parent()
 
 
 func _on_chain_changed(count: int) -> void:
@@ -315,7 +319,7 @@ func die() -> void:
 	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen
 	var lost := chain.lose()  # unbanked embers die with you
 	if lost > 0:
-		Fx.popup(get_parent(), global_position + Vector2(0, -10), "-%d lost" % lost, Color(1, 0.35, 0.3), 10)
+		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), "-%d lost" % lost, Color(1, 0.35, 0.3), 10)
 	velocity = Vector2.ZERO
 	_set_swing_visible(false)
 	died.emit()

@@ -17,7 +17,7 @@ enum State { IDLE, TELEGRAPH, HUNT, RETURN }
 # The sensing rule stays here until Story 1.20 moves it into rules/sensing.gd:
 const NOTICE_MIN_RADIUS := 80.0  ## px of light before it can notice you, chain ~4 with the default curve (GDD Lurker); Sensing in 1.20 (M1 lurker.notice_min_radius).
 const NOTICE_FACTOR := 1.6  ## × the light radius it senses from (GDD Lurker "radius × 1.6"); Sensing in 1.20 (M1 lurker.notice_factor).
-const SCREEN_MARGIN := 8.0  ## px: only notice this far inside the visible screen, so the telegraph is seen; Sensing in 1.20 (M1 lurker.screen_margin).
+const SCREEN_MARGIN := 8.0  ## px: only notice this far inside the play rect (between the gutters), so the telegraph is seen; Sensing in 1.20 (M1 lurker.screen_margin).
 # Presentation, which no system bends:
 const EYE_PULSE_HZ := 2.0  ## smooth sine; accessibility caps pulses at 2 Hz, so nothing may raise it (M1 lurker.eye_pulse_hz).
 const GLOW_ENERGY := 1.3  ## red light the eyes cast on the wall around them; presentation (M1 lurker.glow_energy).
@@ -53,15 +53,25 @@ func senses(player: Node2D) -> bool:
 
 
 ## Pillar 2 beats off-screen ambushes: a lurker only notices when its telegraph will be seen.
+## AR20: "seen" means inside World.play_rect(), never the viewport, since a gutter hides what
+## is behind it. No World means no screen, so it never notices.
 func _on_screen() -> bool:
-	var rect := get_viewport_rect().grow(-SCREEN_MARGIN)
-	return rect.has_point(get_global_transform_with_canvas().origin)
+	var world := get_tree().get_first_node_in_group("world")
+	if world == null:
+		return false
+	return world.play_rect().grow(-SCREEN_MARGIN).has_point(global_position)
 
 
 func _physics_process(delta: float) -> void:
 	var t := Game.tuning
 	_t += delta
-	if _player == null or not is_instance_valid(_player):
+	# D6, Pillar 2: a hunt never carries over a death. The old player stays in the tree until the
+	# respawn; without this a lurker could refetch the new one and keep HUNT (and monitorable) on
+	# a target that never saw a telegraph.
+	var gone := _player == null or not is_instance_valid(_player)
+	if (state == State.TELEGRAPH or state == State.HUNT) and (gone or _player.get("is_dead")):
+		_enter(State.RETURN)
+	if gone:
 		_player = get_tree().get_first_node_in_group("player") as Node2D
 	var sensed := senses(_player)
 	match state:

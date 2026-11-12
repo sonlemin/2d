@@ -75,7 +75,3 @@ monitorable = false
 [node name="Shape" type="CollisionShape2D" parent="Hurtbox"]
 position = Vector2(0, 2)
 shape = SubResource("hurt_shape")
-
-[node name="Camera" type="Camera2D" parent="."]
-position_smoothing_enabled = true
-position_smoothing_speed = 8.0
