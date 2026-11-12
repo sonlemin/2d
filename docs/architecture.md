@@ -181,7 +181,9 @@ tools/sprites/<name>.txt ───────┼─► python3 tools/build_spri
 | Unit | `tests/test_log.gd` | `Log`: `[category] message` format, the fixed categories, debug categories off by default and toggled by `set_enabled()` |
 | Unit | `tests/test_clock.gd` | `Clock`: ids multiply, a re-request refreshes (latest scale wins, never stacks), real-time expiry, pause freezes requests, `_exit_tree` and player death clear them, a pogo hit requests the 75 ms hitstop |
 | Unit | `tests/test_tuning.gd` | `Tuning`: `f()` / `flag()`, gear modifiers apply set → add → mul in every order, one `changed` per `apply_gear()`, reset in place, `rules/` purity; a regression fixture pins all 44 M1 `@export` defaults in their new homes, plus the player boxes, the chain curve, Blade Bloom and the hitstop depth |
+| Unit | `tests/test_state.gd` | `Settings`, `SlotState` and `DiveState`: the signal rules, the fallbacks on bad data, the `to_dict()` shapes, round trips in memory and through JSON, `rules/` purity. `Game`: the same instances all session, `reset_for_tests()`. `settings.json` through `SaveStore`: a missing, corrupt or partly bad file is rewritten, a file that can't be opened or is from a newer build is left untouched, one write per frame, and the warnings are counted |
 | Integration (headless) | `tests/smoke_shaft.gd` | Loads the real shaft and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
+| Integration (headless) | `tests/smoke_shaft_state.gd` | Loads the real shaft and checks its state wiring: a bank raises `Game.dive.carried`, a chain raises `Game.slot.best_chain`, a death raises `Game.slot.deaths`, `Settings.brightness` repaints the darkness, a shaft added by a test never boots `Game`, and a new shaft keeps all of it and spawns at `P` |
 | Visual (manual) | `tests/screenshot.gd` | Two PNGs (spawn; chain 10 with a telegraph). Needs a renderer: `xvfb-run` on the server |
 
 Design rules are encoded as tests: the telegraph is never under 0.75 s, there is no off-screen ambush, and a Snuff in time always saves you. Change these rules in the GDD first, then in the test.
@@ -195,7 +197,7 @@ No export presets or CI. Builds are played in the Godot editor on the laptop (F5
 ## Conventions and Gotchas (for anyone changing the code)
 
 - **Keep ChainState free of nodes.** It is the unit-tested core. New chain rules (Flare Toss halving, hit → "carried") belong there, with tests.
-- **Static vars on `shaft.gd` are the only persistence.** Anything that must survive death goes there today. They also leak between test runs in one process.
+- **Session state lives in `Game`, never in statics.** Anything that must survive a death goes into `Game.slot`, `Game.dive` or `Game.settings`, through their methods. A test that changes them ends with `Game.reset_for_tests()`.
 - **`reload_current_scene()` only when the shaft is the current scene.** Test harnesses add the shaft by hand, and `_on_player_died` checks this.
 - **Hitstop goes through `Game.clock`.** Request it with `Game.clock.request(&"hitstop", 0.05, 0.075)`; never write `Engine.time_scale` yourself. Use timers with `ignore_time_scale = true` for anything that must run during it. `die()` calls `Game.clock.clear()`.
 - **Determinism:** no randomness in level behaviour. Hover phase comes from position, and `reset_phase()` exists so tests do not depend on order. Only the camera shake uses `randf`.
@@ -213,9 +215,9 @@ Observations from comparing this code with GDD v1.0 and the UX spines (2026-11-1
 | Scene structure | One scene, level as a const string array | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | A room/level format and a scene-transition layer |
 | Damage | Crawler = knockback only; hunting lurker = instant death | 4 HP; crawler 1, lurker 2, spikes 1; heal at stations (GDD Health) | Health component; lurker contact deals damage instead of calling `die()` |
 | Embers | held → banked (`Game.dive.carried`) → held lost on death | held → **carried** → **deposited** at a Lift Station/hub (GDD Economy) | Rename and extend ChainState/economy; deposit flow |
-| Respawn | The shaft's spawn `P` (`DiveState` has an unused respawn point) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Checkpoint service separate from the floor poll |
+| Respawn | The shaft's spawn `P` (`DiveState` has an unused respawn point) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Anchors and stations call `DiveState.set_respawn()` (Story 1.24); a last-safe-ledge tracker for hazards (Story 1.19) |
 | Light key | Hold V = Snuff; a tap does nothing | Tap = Flare Toss (needs ≥ 2 links, halves the chain); tap window 0.12/0.2/0.3 s setting; optional Snuff toggle key (GDD Controls) | Light input state machine; Flare entity that predators sense |
-| Input | Keyboard only; F1 and F3 debug hotkeys | Gamepad from M2; Pause (Esc/P); rebinding in E7; F1 brightness removed in E7 | Input map + settings; remove the debug hotkeys |
+| Input | Keyboard only; F1 and F3 debug hotkeys | Gamepad from M2; Pause (Esc/P); rebinding in E7; F1 goes with the shaft in Story 1.7, then DevTools sets brightness until Options (Story 1.36) | Input map + settings; remove the debug hotkeys |
 | HUD | Debug `Label` line | Gutter HUD, Fusion Pixel Font 8px (OFL files must ship), alert frame in the gutters (UX DESIGN) | Real HUD scene; font licence files in builds |
 | Lurker warning | On-screen telegraph only | Off-screen "stir": panned audio + half-open eye at the edge (GDD Lurker) | Needs audio and an edge indicator |
 | Persistence | `settings.json` only (brightness); session state in `Game`, not saved | 3 save slots, autosave at stations/hub/anchor quit, visible save failure (GDD Saves, UX) | Save system |

@@ -4,8 +4,8 @@ extends Node
 ## subscribers hold on to them: gear changes call `tuning.apply_gear()`, never a new Tuning, and
 ## replacing a ref is an assert (Story 1.4 D7). `devices` arrives with Story 1.37.
 ## Starting up touches no file (D6): the entry scene calls `boot()` once, which loads
-## `settings.json` and arms its writes. Tests never boot; a test that checks the file points
-## `store.dir` at a temp folder first and ends with `reset_for_tests()`.
+## `settings.json` and arms its writes. A test never boots against the real folder: one that
+## checks the file points `store.dir` at a temp folder first and ends with `reset_for_tests()`.
 
 var settings := Settings.new():  ## AR14: global, per machine; UI writes only these
 	set(_value):
@@ -57,18 +57,25 @@ func boot() -> void:
 ## gives the defaults for what is unusable, and is rewritten (R15). That is decided by
 ## `from_dict()`'s result, never by comparing dictionaries: JSON numbers come back as floats, and
 ## {"a": 1} != {"a": 1.0}.
+## A file that can't be opened, or that a newer build wrote, also gives the defaults but is never
+## written over: it may be whole (1.4 review; Story 1.21 gives slots the same rule). Writes then
+## stay off, so a setting changed in that session lasts only until the game closes.
 func load_settings() -> void:
 	_settings_armed = false  # from_dict() emits changed for every key; a load is no edit to write
-	var stored: Variant = store.read_settings()
-	var clean := settings.from_dict(stored if stored is Dictionary else {})
+	var read := store.read_settings()
+	var stored: Dictionary = read.settings
+	var clean := settings.from_dict(stored)
+	if read.found == SaveStore.Found.UNREADABLE or read.found == SaveStore.Found.NEWER:
+		return
 	_settings_armed = true
-	if stored == null or not clean:
+	if read.found != SaveStore.Found.USABLE or not clean:
 		_queue_settings_write()
 
 
 ## Every test that touches `Game` ends with this: defaults back on the same instances, settings
 ## writes disarmed and the store pointed home, so nothing reaches the player's files. Leaves
-## `_booted` alone: tests never boot.
+## `_booted` alone: only `test_state` boots, on a temp folder, as its last case, and each test
+## file runs in its own process.
 func reset_for_tests() -> void:
 	_settings_armed = false
 	settings.reset()

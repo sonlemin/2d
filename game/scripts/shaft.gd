@@ -13,7 +13,7 @@ const LurkerScene := preload("res://scenes/actors/lurker.tscn")
 const TileTexture := preload("res://art/tile.png")
 const RESPAWN_DELAY := 0.6
 ## Ambient brightness of the dark (CanvasModulate value). `Settings.brightness` picks the level;
-## F1 cycles it until Options (1.36).
+## F1 cycles it until Story 1.7 retires the shaft; DevTools sets it from then until Options (1.36).
 ## Lower = more tension; too low and darkness turns into confusion (Pillar 2).
 const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
 const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette

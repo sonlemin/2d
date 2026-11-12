@@ -17,6 +17,10 @@ signal difficulty_changed(difficulty: StringName)
 ## Story 1.22. StringName ids match DevTools' --difficulty and the TIER_* string keys (D8).
 const DIFFICULTIES: Array[StringName] = [&"easy", &"normal", &"hard"]
 const DEFAULT_DIFFICULTY := &"normal"
+## 2^53. Above it a float no longer holds every whole number, so a JSON number that large was
+## never a count this game wrote, and `int()` of a float beyond the int range differs by
+## platform (1.4 review).
+const WHOLE_FLOAT_MAX := 9007199254740992.0
 
 var best_chain := 0  ## longest chain on this slot (Guild records, GDD Hub)
 var deaths := 0  ## deaths on this slot (Guild records, GDD Hub)
@@ -85,7 +89,8 @@ func from_dict(d: Dictionary) -> bool:
 	var flags: Array[StringName] = []
 	if list is Array:
 		for id: Variant in list:
-			if id is String or id is StringName:
+			# An empty id names nothing, and a loaded flag is save data from then on.
+			if (id is String or id is StringName) and not String(id).is_empty():
 				flags.append(StringName(id))
 			else:
 				clean = false
@@ -110,15 +115,18 @@ func _assign(best: int, died: int, tier: StringName, flags: Array[StringName]) -
 	for id: StringName in old:
 		if not _flags.has(id):
 			flag_set.emit(id, false)
-	for id: StringName in _flags:
+	# keys() is a copy: a handler may set a flag, and a key added mid-loop would be walked too
+	# and emit twice.
+	for id: StringName in _flags.keys():
 		if not old.has(id):
 			flag_set.emit(id, true)
 	records_changed.emit()
 	difficulty_changed.emit(difficulty)
 
 
-## A whole number ≥ 0, or -1. JSON numbers come back as floats, so a whole float counts.
+## A whole number ≥ 0, or -1. JSON numbers come back as floats, so a whole float counts, up to
+## WHOLE_FLOAT_MAX.
 static func _count(v: Variant) -> int:
-	if typeof(v) == TYPE_FLOAT and v == floorf(v):
+	if typeof(v) == TYPE_FLOAT and v == floorf(v) and absf(v) <= WHOLE_FLOAT_MAX:
 		v = int(v)
 	return v if typeof(v) == TYPE_INT and v >= 0 else -1

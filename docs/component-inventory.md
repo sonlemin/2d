@@ -111,8 +111,8 @@ Builds the level from `LAYOUT`, draws the debug HUD from `Game` state and handle
 
 | Script | Kind | Role |
 |---|---|---|
-| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `settings`, `slot`, `dive`, `tuning`, `clock` (same instances all session; replacing one asserts) and `store`. `boot()` (once, from the entry scene) loads `settings.json` and arms its writes, at most one per frame; `reset_for_tests()` resets everything in place |
-| `save_store.gd` | `class_name SaveStore` (`RefCounted`), at `Game.store` | The only code that reads or writes the player's files: `read_settings()` / `write_settings()` for `user://settings.json` (`{"version": 1, "settings": {…}}`, `.tmp` then rename). Redirectable `dir`; never creates folders |
+| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `settings`, `slot`, `dive`, `tuning`, `clock` (same instances all session; replacing one asserts) and `store`. `boot()` (once, from the entry scene) loads `settings.json` and arms its writes, at most one per frame (a file that can't be opened or is from a newer build is left untouched, and writes stay off for the session); `reset_for_tests()` resets everything in place |
+| `save_store.gd` | `class_name SaveStore` (`RefCounted`), at `Game.store` | The only code that reads or writes the player's files: `read_settings()` / `write_settings()` for `user://settings.json` (`{"version": 1, "settings": {…}}`, `.tmp` then rename). `read_settings()` returns `{found, settings}`; `found` is a `SaveStore.Found` (USABLE, MISSING, CORRUPT, UNREADABLE, NEWER), which tells `Game` whether it may rewrite the file. Redirectable `dir`; never creates folders |
 | `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)` |
 | `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
 | `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
@@ -177,8 +177,10 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
 | `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
 | `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), `rules/` purity, and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
+| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 145 checks) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
+| `tests/smoke_shaft_state.gd` | The shaft's state wiring: carried embers, the best chain, deaths and brightness go through `Game` and survive a new shaft (14 checks) | headless |
 | `tests/screenshot.gd` | 2 screenshots | needs a renderer |
 
 Helpers in `smoke_shaft.gd` worth reusing: `place(pos)` (teleport and snap the camera), `frames(n)` / `seconds(s)` (physics-frame waits), `set_lurkers_active(on)`, `_hovers()` (hovering crawlers sorted by depth).

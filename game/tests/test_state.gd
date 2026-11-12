@@ -42,8 +42,35 @@ class WriteCounter extends Logger:
 		return n
 
 
+## Counts the push_warning calls of SaveStore and of Game's settings write, so "one warning" is
+## checked and not only promised (1.4 review). Other warnings don't count. A push_warning's text
+## arrives as `code` (probed on 4.7.2).
+class WarningCounter extends Logger:
+	var _lock := Mutex.new()
+	var _count := 0
+
+	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != ERROR_TYPE_WARNING:
+			return
+		if not (code.begins_with("SaveStore:") or code.begins_with("Game: settings")):
+			return
+		_lock.lock()
+		_count += 1
+		_lock.unlock()
+
+	## How many arrived since the last take().
+	func take() -> int:
+		_lock.lock()
+		var n := _count
+		_count = 0
+		_lock.unlock()
+		return n
+
+
 func run() -> void:
 	_test_settings_defaults()
+	_test_settings_schema()
 	_test_settings_set_value()
 	_test_settings_reset()
 	_test_settings_round_trips()
@@ -56,6 +83,7 @@ func run() -> void:
 	_test_slot_flags_sorted()
 	_test_slot_fallbacks()
 	_test_slot_load_signals()
+	_test_slot_handler_sets_a_flag()
 	_test_dive_carried()
 	_test_dive_killed()
 	_test_dive_reset()
@@ -88,7 +116,20 @@ func _through_json(d: Dictionary) -> Dictionary:
 func _test_settings_defaults() -> void:
 	var s := Settings.new()
 	check(s.brightness == 1, "Settings: brightness defaults to 1, the M1 level (got %s)" % s.brightness)
-	check(s.to_dict() == {&"brightness": 1}, "...and to_dict() is {brightness: 1} (got %s)" % s.to_dict())
+	check(s.to_dict() == {"brightness": 1}, "...and to_dict() is {brightness: 1} (got %s)" % s.to_dict())
+	# {&"k": 1} == {"k": 1} is true, so the comparison above can't tell the key type.
+	check(s.to_dict().keys().all(func(k: Variant) -> bool: return k is String), "...with String keys, as SlotState and DiveState give (D4)")
+
+
+## Each story adds its key as one SCHEMA entry plus a typed var of the same name. Nothing but this
+## holds the two together: a key with no var would write null and be rewritten on every launch.
+func _test_settings_schema() -> void:
+	var s := Settings.new()
+	for key: StringName in Settings.SCHEMA:
+		var spec: Dictionary = Settings.SCHEMA[key]
+		check(key in s and typeof(s.get(key)) == typeof(spec.default) and s.get(key) == spec.default, "SCHEMA '%s' has a var of that name holding its default, same type (got %s)" % [key, var_to_str(s.get(key))])
+		check(spec.default in spec.choices, "...and its default %s is one of its choices %s" % [spec.default, spec.choices])
+	check(s.to_dict().size() == Settings.SCHEMA.size(), "to_dict() has one entry per SCHEMA key")
 
 
 func _test_settings_set_value() -> void:
@@ -108,6 +149,8 @@ func _test_settings_reset() -> void:
 	s.changed.connect(func(key: StringName) -> void: got.append(key))
 	s.reset()
 	check(s.brightness == 1 and got == [&"brightness"], "reset() restores brightness 1 in place and emits changed (D2; got %s, %s)" % [s.brightness, got])
+	s.reset()
+	check(got == [&"brightness", &"brightness"], "...and a reset that changes nothing still emits (D2; got %s)" % [got])
 
 
 func _test_settings_round_trips() -> void:
@@ -229,6 +272,8 @@ func _test_slot_fallbacks() -> void:
 		[{"best_chain": 4, "deaths": "x", "difficulty": "hard", "flags": []}, "a record that isn't a number", "deaths"],
 		[{"best_chain": 4.5, "deaths": 2, "difficulty": "hard", "flags": []}, "a fractional record", "best_chain"],
 		[{"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": "anchor_m1_1"}, "flags that aren't an array", "flags"],
+		# 1e17 is whole and fits an int, so only the 2^53 limit turns it down, on every platform.
+		[{"best_chain": 1e17, "deaths": 2, "difficulty": "hard", "flags": []}, "a record too big for a JSON number to hold exactly", "best_chain"],
 	]
 	var want := {"best_chain": 0, "deaths": 0, "difficulty": &"normal", "flags": []}
 	for c: Array in cases:
@@ -240,6 +285,8 @@ func _test_slot_fallbacks() -> void:
 	var clean := s.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", 7, null]})
 	check(not clean and s.to_dict().flags == ["met_glim"], "a non-string flag entry is skipped and makes the data unclean (got %s)" % [s.to_dict().flags])
 	check(s.best_chain == 4 and s.deaths == 2 and s.difficulty == &"hard", "...while the good fields still load")
+	var blank := SlotState.new()
+	check(not blank.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", ""]}) and blank.to_dict().flags == ["met_glim"] and not blank.has_flag(&""), "an empty flag id is skipped and makes the data unclean (got %s)" % [blank.to_dict().flags])
 	var e := SlotState.new()
 	check(not e.from_dict({}) and _same_slot(e, SlotState.new()), "from_dict({}) is unclean and gives the defaults")
 
@@ -264,6 +311,24 @@ func _test_slot_load_signals() -> void:
 	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": ["anchor_m1_1", "met_glim"]})
 	check(flags == [[&"anchor_m1_1", true]], "from_dict() emits flag_set(id, true) for each new flag, nothing for one it keeps (got %s)" % [flags])
 	check(n.records == 1 and n.tier == 1, "...and records_changed and difficulty_changed once each, even unchanged (got %d / %d)" % [n.records, n.tier])
+
+
+## A subscriber may set a flag from its flag_set handler (a derived flag). A load walks the flags
+## to emit them, so it must walk a copy: the flag added mid-walk would otherwise emit twice.
+func _test_slot_handler_sets_a_flag() -> void:
+	var s := SlotState.new()
+	var got := []
+	var handler := func(id: StringName, value: bool) -> void:
+		got.append([id, value])
+		if id == &"anchor_m1_1":
+			s.set_flag(&"derived")
+	s.flag_set.connect(handler)
+	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": ["anchor_m1_1"]})
+	check(got == [[&"anchor_m1_1", true], [&"derived", true]], "a handler that sets a flag during a load: each flag_set fires once (got %s)" % [got])
+	check(s.has_flag(&"anchor_m1_1") and s.has_flag(&"derived"), "...and both flags are set")
+	# The handler holds `s` and `s` holds the handler: without this the pair leaks at exit, which
+	# prints an engine ERROR after the runner has finished.
+	s.flag_set.disconnect(handler)
 
 
 # --- DiveState ---
@@ -320,13 +385,15 @@ func _test_dive_round_trips() -> void:
 	keys.sort()
 	check(keys == ["carried", "respawn_entry", "respawn_room"], "to_dict() is carried + the respawn point, no killed enemies (D4, decision 5; got %s)" % [keys])
 	var respawn := []
+	var carried := []
 	var e := _filled_dive()
 	e.mark_killed(&"m1_shaft", Vector2i(9, 9))
 	e.respawn_changed.connect(func(room: StringName, entry: StringName) -> void: respawn.append([room, entry]))
+	e.carried_changed.connect(func(c: int) -> void: carried.append(c))
 	var clean := e.from_dict(d.to_dict())
 	check(clean and e.carried == 7 and e.respawn_room == &"m1_shaft" and e.respawn_entry == &"anchor_m1_1", "from_dict(to_dict()) is clean and keeps carried and the respawn point")
 	check(not e.is_killed(&"m1_shaft", Vector2i(3, 4)) and not e.is_killed(&"m1_shaft", Vector2i(9, 9)), "...and clears the killed enemies (they are never saved)")
-	check(respawn == [[&"m1_shaft", &"anchor_m1_1"]], "...and emits respawn_changed even unchanged (D2; got %s)" % [respawn])
+	check(respawn == [[&"m1_shaft", &"anchor_m1_1"]] and carried == [7], "...and emits respawn_changed and carried_changed even unchanged (D2; got %s, %s)" % [respawn, carried])
 	var f := _filled_dive()
 	clean = f.from_dict(_through_json(d.to_dict()))
 	check(clean and f.carried == 7 and typeof(f.carried) == TYPE_INT, "...through JSON too, carried as an int (got %s, type %d)" % [f.carried, typeof(f.carried)])
@@ -335,12 +402,16 @@ func _test_dive_round_trips() -> void:
 
 
 func _test_dive_fallbacks() -> void:
-	for bad: Variant in [-3, 2.5, "7", null]:
+	# 1e17 is whole and fits an int, so only the 2^53 limit turns it down, on every platform.
+	for bad: Variant in [-3, 2.5, "7", null, 1e17]:
 		var d := _filled_dive()
 		var clean := d.from_dict({"carried": bad, "respawn_room": "m1_shaft", "respawn_entry": "anchor_m1_1"})
 		check(not clean and d.carried == 0 and d.respawn_room == &"m1_shaft", "DiveState: carried %s is unclean and gives 0, the other fields still load (D3; got %s)" % [var_to_str(bad), d.carried])
+	# The respawn point is one value: half of one never loads.
 	var d := _filled_dive()
-	check(not d.from_dict({"carried": 4, "respawn_room": 12, "respawn_entry": "anchor_m1_1"}) and d.respawn_room == &"" and d.carried == 4, "a respawn room that isn't a string is unclean and gives none")
+	check(not d.from_dict({"carried": 4, "respawn_room": 12, "respawn_entry": "anchor_m1_1"}) and d.respawn_room == &"" and d.respawn_entry == &"" and d.carried == 4, "a respawn room that isn't a string is unclean and clears the whole point (got '%s' / '%s')" % [d.respawn_room, d.respawn_entry])
+	var f := _filled_dive()
+	check(not f.from_dict({"carried": 4, "respawn_room": "m1_shaft"}) and f.respawn_room == &"" and f.respawn_entry == &"" and f.carried == 4, "...and so does a missing entry (got '%s' / '%s')" % [f.respawn_room, f.respawn_entry])
 
 
 # --- rules/ purity ---
@@ -405,10 +476,28 @@ func _tmp_file() -> String:
 	return TMP.path_join("settings.json")
 
 
-func _write_tmp(text: String) -> void:
-	var f := FileAccess.open(_tmp_file(), FileAccess.WRITE)
+func _write_file(path: String, text: String) -> void:
+	var f := FileAccess.open(path, FileAccess.WRITE)
 	f.store_string(text)
 	f.close()
+
+
+func _write_tmp(text: String) -> void:
+	_write_file(_tmp_file(), text)
+
+
+## Takes every permission off the temp file, so it exists but can't be opened. False where that
+## can't be done (Windows has no such permissions, and root opens anything): the caller skips.
+func _lock_tmp() -> bool:
+	if OS.get_name() == "Windows":
+		return false
+	FileAccess.set_unix_permissions(_tmp_file(), 0)
+	return FileAccess.open(_tmp_file(), FileAccess.READ) == null
+
+
+func _unlock_tmp() -> void:
+	if OS.get_name() != "Windows":
+		FileAccess.set_unix_permissions(_tmp_file(), FileAccess.UNIX_READ_OWNER | FileAccess.UNIX_WRITE_OWNER)
 
 
 ## "" when missing: get_file_as_string() prints an error on a missing file (1.1 review).
@@ -446,27 +535,69 @@ func _test_settings_file() -> void:
 	DirAccess.make_dir_recursive_absolute(TMP)
 	var real_had := FileAccess.file_exists(REAL)
 	var real_text := FileAccess.get_file_as_string(REAL) if real_had else ""
+	var real_time := FileAccess.get_modified_time(REAL) if real_had else 0
 	Game.store.dir = TMP
+	var warnings := WarningCounter.new()
+	OS.add_logger(warnings)
 
 	# A first launch: no file. Writes are still disarmed, so this value is never written.
+	# The marker shows the write goes through .tmp: a write straight to settings.json would leave
+	# the marker where it is.
+	_write_file(_tmp_file() + ".tmp", "marker")
 	Game.settings.set_value(&"brightness", 3)
 	Game.load_settings()
 	check(Game.settings.brightness == 1, "missing file: load_settings() gives the default brightness 1")
 	check(not FileAccess.file_exists(_tmp_file()), "...and writes nothing in the same frame")
 	await get_tree().process_frame
 	check(_tmp_holds(1), "...then a frame later writes version 1 with brightness 1 (got %s)" % _read_tmp().c_escape())
-	check(not FileAccess.file_exists(_tmp_file() + ".tmp"), "...through .tmp, renamed over the file")
+	check(not FileAccess.file_exists(_tmp_file() + ".tmp"), "...through .tmp, renamed over the file (the marker .tmp is used up)")
+	check(warnings.take() == 0, "...with no warning: a first launch is not an error")
 
-	await _prime("{not json", 2)
-	Game.load_settings()
-	check(Game.settings.brightness == 1 and _read_tmp() == "{not json", "corrupt file: the default, one warning and no ERROR (the runner checks), not yet rewritten")
-	await get_tree().process_frame
-	check(_tmp_holds(1), "...then rewritten as a valid file (got %s)" % _read_tmp().c_escape())
+	# Unusable and safe to replace: the default, one warning, then a rewrite (R15).
+	var corrupt := {
+		"corrupt file": "{not json",
+		"a top-level array": "[1, 2]",
+		"no version": '{"settings": {"brightness": 2}}',
+		"a version that isn't a number": '{"version": "1", "settings": {"brightness": 2}}',
+		"a version below this build's": '{"version": 0, "settings": {"brightness": 2}}',
+		"settings that are no object": '{"version": 1, "settings": [2]}',
+	}
+	for what: String in corrupt:
+		await _prime(corrupt[what], 3)
+		warnings.take()
+		Game.load_settings()
+		check(Game.settings.brightness == 1 and _read_tmp() == corrupt[what], "%s: the default, not yet rewritten" % what)
+		check(warnings.take() == 1, "...one warning, and no ERROR (the runner checks)")
+		await get_tree().process_frame
+		check(_tmp_holds(1), "...then rewritten as a valid file (got %s)" % _read_tmp().c_escape())
 
-	await _prime('{"version": 2, "settings": {"brightness": 2}}', 3)
+	# Unusable but maybe whole: a newer build's file, or one that can't be opened. It is never
+	# written over, and writes stay off for the session (1.4 review; the slot rule of Story 1.21).
+	var newer := '{"version": 2, "settings": {"brightness": 2}}'
+	await _prime(newer, 3)
+	warnings.take()
 	Game.load_settings()
+	check(Game.settings.brightness == 1 and warnings.take() == 1, "newer version: the default and one warning")
 	await get_tree().process_frame
-	check(Game.settings.brightness == 1 and _tmp_holds(1), "wrong version: the default, rewritten as version 1 (got %s)" % _read_tmp().c_escape())
+	Game.settings.set_value(&"brightness", 0)
+	await get_tree().process_frame
+	check(_read_tmp() == newer and not FileAccess.file_exists(_tmp_file() + ".tmp"), "...the file is left as it was, by the load and by a later change (got %s)" % _read_tmp().c_escape())
+	check(Game.settings.brightness == 0, "...and the change still holds in memory")
+
+	var whole := '{"version": 1, "settings": {"brightness": 2}}'
+	await _prime(whole, 3)
+	if _lock_tmp():
+		warnings.take()
+		Game.load_settings()
+		check(Game.settings.brightness == 1 and warnings.take() == 1, "unopenable file: the default (not the file's 2), one warning and no ERROR")
+		await get_tree().process_frame
+		Game.settings.set_value(&"brightness", 0)
+		await get_tree().process_frame
+		_unlock_tmp()
+		check(_read_tmp() == whole and not FileAccess.file_exists(_tmp_file() + ".tmp"), "...the file is left as it was, by the load and by a later change (got %s)" % _read_tmp().c_escape())
+	else:
+		_unlock_tmp()
+		print("ok   (unopenable file: not checked here; this platform or user can open a file with no permissions)")
 
 	await _prime('{"version": 1, "settings": {}}', 3)
 	Game.load_settings()
@@ -499,9 +630,12 @@ func _test_settings_file() -> void:
 
 	# Writes are still armed. A folder that doesn't exist: the store never creates one (D5).
 	Game.store.dir = TMP.path_join("missing")
+	check(Game.store.write_settings({"brightness": 1}) != OK, "failed write: write_settings() returns an error")
+	warnings.take()
 	Game.settings.set_value(&"brightness", 1)
 	await get_tree().process_frame
-	check(Game.settings.brightness == 1 and not DirAccess.dir_exists_absolute(TMP.path_join("missing")), "failed write: one warning, no crash, no ERROR, no folder created, the value kept in memory")
+	check(warnings.take() == 1, "...and Game warns once for its own failed write: no crash, no ERROR")
+	check(Game.settings.brightness == 1 and not DirAccess.dir_exists_absolute(TMP.path_join("missing")), "...no folder created, the value kept in memory")
 
 	# Tests that never load settings write nothing. Re-pointed at TMP first, so a bug here
 	# writes into the temp folder, never the real one.
@@ -512,7 +646,8 @@ func _test_settings_file() -> void:
 	check(not FileAccess.file_exists(_tmp_file()), "unarmed (after reset_for_tests): a change writes nothing")
 
 	# Each test runs in its own Godot process, and the folder is redirected first, so this boot
-	# reads only the temp file.
+	# reads only the temp file. Keep it the last case: reset_for_tests() leaves the process
+	# booted, so a boot() after this one loads nothing.
 	_write_tmp('{"version": 1, "settings": {"brightness": 2}}')
 	Game.boot()
 	check(Game.settings.brightness == 2, "boot() loads settings.json (brightness 2)")
@@ -529,7 +664,11 @@ func _test_settings_file() -> void:
 	await get_tree().process_frame
 	check(not FileAccess.file_exists(_tmp_file()), "after reset_for_tests() nothing is written, even with writes armed before it")
 	Game.store.dir = SaveStore.DEFAULT_DIR
+	OS.remove_logger(warnings)
 	_remove_tmp()
 	check(not DirAccess.dir_exists_absolute(TMP), "the temp folder is gone")
+	# The modified time too: the real file may hold exactly the defaults, and then a leaked write
+	# of the defaults would leave the same text.
 	var real_now := FileAccess.file_exists(REAL)
-	check(real_now == real_had and (not real_now or FileAccess.get_file_as_string(REAL) == real_text), "the real user://settings.json is exactly as it was (exists: %s)" % real_had)
+	var real_same := real_now == real_had and (not real_now or (FileAccess.get_file_as_string(REAL) == real_text and FileAccess.get_modified_time(REAL) == real_time))
+	check(real_same, "the real user://settings.json is exactly as it was: same text, same modified time (exists: %s)" % real_had)

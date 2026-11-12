@@ -57,16 +57,16 @@ func to_dict() -> Dictionary:
 
 
 ## Save data may be hand-edited or corrupt, an environment error, so this never asserts (D3): a
-## missing or bad field takes its default. Always clears the killed enemies. Returns true when
-## every field was present and valid.
+## missing or bad field takes its default. The respawn point is one value: when either half is
+## bad, both are cleared, so half a point never loads. Always clears the killed enemies. Returns
+## true when every field was present and valid.
 func from_dict(d: Dictionary) -> bool:
 	var n := _count(d.get("carried"))
 	var room: Variant = d.get("respawn_room")
 	var entry: Variant = d.get("respawn_entry")
-	var room_ok := room is String or room is StringName
-	var entry_ok := entry is String or entry is StringName
-	_assign(maxi(n, 0), StringName(room) if room_ok else &"", StringName(entry) if entry_ok else &"")
-	return n >= 0 and room_ok and entry_ok
+	var point_ok := (room is String or room is StringName) and (entry is String or entry is StringName)
+	_assign(maxi(n, 0), StringName(room) if point_ok else &"", StringName(entry) if point_ok else &"")
+	return n >= 0 and point_ok
 
 
 func reset() -> void:
@@ -84,8 +84,9 @@ func _assign(n: int, room_id: StringName, entry: StringName) -> void:
 	respawn_changed.emit(respawn_room, respawn_entry)
 
 
-## A whole number ≥ 0, or -1. JSON numbers come back as floats, so a whole float counts.
+## A whole number ≥ 0, or -1. JSON numbers come back as floats, so a whole float counts, up to
+## 2^53 (see SlotState.WHOLE_FLOAT_MAX).
 static func _count(v: Variant) -> int:
-	if typeof(v) == TYPE_FLOAT and v == floorf(v):
+	if typeof(v) == TYPE_FLOAT and v == floorf(v) and absf(v) <= SlotState.WHOLE_FLOAT_MAX:
 		v = int(v)
 	return v if typeof(v) == TYPE_INT and v >= 0 else -1

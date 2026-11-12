@@ -36,7 +36,7 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 - **Snuff** (hold Light): go dark and break the chain to escape
 - **Crawlers** (walkers and hoverers) as chain fuel
 - **Lurkers**: notice big lights on screen, telegraph 0.9 s, hunt, and give up when they lose the scent
-- Respawn at the last ledge stood on; debug HUD; 4 brightness levels
+- Respawn at the shaft's spawn (`P`) until anchors and stations arrive (Story 1.24); debug HUD; 4 brightness levels
 
 ## Architecture Highlights
 

@@ -300,7 +300,7 @@ Taken in dependency order in step 4:
 | Global | `Game.settings : Settings` | accessibility, tap window, toggles, volumes, video, bindings (E7), last-used slot | never (per machine) |
 
 - All four classes are `RefCounted`, node-free, with typed signals and `to_dict()` / `from_dict()`. Rules on them are unit-tested in `tests/test_<subject>.gd`, like `ChainState` (`tests/test_chain_state.gd`).
-- `Game` (autoload) holds `settings`, `slot`, `dive`, `tuning` (rebuilt when the slot's gear changes), the `Clock` and device tracking. It contains **no gameplay rules**.
+- `Game` (autoload) holds `settings`, `slot`, `dive`, `tuning` (rebuilt when the slot's gear changes), the `Clock`, the `SaveStore` (`store`, Story 1.4) and device tracking. It contains **no gameplay rules**.
 - **Allowed autoloads:** `Game`, `Audio` (from E3). Adding another autoload is an architecture change.
 - **Death no longer reloads the scene.** `World` applies the death cost (difficulty tier rules on `DiveState`), rebuilds the respawn room and spawns a fresh `Player`. The M1 `static var`s on `shaft.gd` are retired when E1 touches them.
 - **Entity identity:** persistent world objects (gates, anchors, stations, hoards, secrets, journal objects) carry **explicit ids declared in the room header**; saves reference only these ids, so editing a room's layout never orphans a flag. Enemies use `room_id + grid cell` (per-dive only, never in long-term saves).
@@ -374,7 +374,7 @@ user://
 - **New Game** writes the slot immediately after the difficulty step (an overwrite takes effect at once).
 - **Retry:** a failed save retries at the next autosave trigger and on quit to title.
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
-- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; tests never boot, and point `Game.store.dir` at a temp folder when they test the file.
+- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten; a file that can't be opened, or that a newer build wrote, also falls back to defaults but is left untouched, and settings writes stay off for that session (Story 1.4 review, the same rule as a newer or damaged slot) (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; a test never boots against the real folder, and points `Game.store.dir` at a temp folder before it tests the file.
 - **Slot delete** removes `slot_N.json` and `.bak`.
 - Each death appends `{cause, room}` (a cause id, not text) to `SlotState.death_log` from E1, for the E7 Journal; the death card renders `DEATH_<CAUSE>_LINE` / `_TIP` from the cause id.
 
@@ -784,7 +784,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 
 | System | Location | Responsibility |
 |---|---|---|
-| Session state holder | `scripts/core/game.gd` (autoload `Game`) | holds `settings`, `slot`, `dive`, `tuning`, `clock`, `devices`; new game / load / save commands; no gameplay rules |
+| Session state holder | `scripts/core/game.gd` (autoload `Game`) | holds `settings`, `slot`, `dive`, `tuning`, `clock`, `store`, `devices`; new game / load / save commands; no gameplay rules |
 | Time authority | `scripts/core/clock.gd` | named time-scale requests, pause-aware |
 | Saves | `scripts/core/save_store.gd`, `scripts/rules/migrations.gd` | slot files, atomic write, `.bak`, versioning |
 | Logging | `scripts/core/log.gd` | static `Log` |

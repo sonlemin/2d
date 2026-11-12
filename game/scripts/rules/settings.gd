@@ -31,11 +31,12 @@ func set_value(key: StringName, v: Variant) -> void:
 	changed.emit(key)
 
 
-## JSON-ready (D4); SaveStore wraps it as {"version": 1, "settings": {…}}.
+## JSON-ready (D4), with String keys as SlotState and DiveState give; SaveStore wraps it as
+## {"version": 1, "settings": {…}}.
 func to_dict() -> Dictionary:
 	var d := {}
 	for key: StringName in SCHEMA:
-		d[key] = get(key)
+		d[String(key)] = get(key)
 	return d
 
 

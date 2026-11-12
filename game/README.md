@@ -37,3 +37,4 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **State** (`tests/test_state.gd`): settings, slot and dive state, their save shapes and `settings.json` (a missing or broken file falls back to the defaults).
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the real level with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.
+- **Shaft state smoke test** (`tests/smoke_shaft_state.gd`): banked embers, the best chain, deaths and brightness live in `Game`, so they survive the reload after a death.
