@@ -4,7 +4,7 @@ baseline_commit: 85bb1ed
 
 # Story 1.3: Tuning as data
 
-Status: review
+Status: done
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -104,6 +104,43 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
   - `refactor:` the actor migration, the two `smoke_shaft` lines and the regression fixture (Task 4)
   - `docs:` (Task 5)
   - Commit each new `.gd.uid` beside its script.
+
+### Review Findings
+
+Code review 2026-11-12 (gds-code-review; Blind Hunter, Edge Case Hunter, Acceptance Auditor) of `6b7ca37..9fa8ba3`. The story record and the sprint status were excluded.
+- The Auditor found no AC violation and re-ran the Task 6 checks green.
+- The findings are validation and test-strength gaps, plus doc accuracy.
+- sonlm chose "apply every patch". All six were fixed in `feb14e5`, and `run_tests.sh` stays ALL GREEN (`test_tuning` 85 checks, `test_deferred_owners` 22).
+- A probe confirmed that an id-less gear row now raises one clear `_check_row` assert. Mutation checks confirmed that a misspelled key fails both literal-scan checks.
+- 17 were dismissed: spec decisions, non-issues verified by grep, or items owned by later stories.
+
+- [x] [Review][Patch] A gear row is validated only when owned, and a row with no `id` never reaches the check [game/scripts/rules/tuning.gd:121-124,161-170]
+  - **Cause:** the filter reads `row.id` before `_check_row()` runs.
+  - **Effect:** an id-less row prints a SCRIPT ERROR and is silently dropped (Auditor probe on 4.7.2). A malformed row in `Gear.TABLE` stays hidden until someone owns that gear.
+  - **Fix:** run `_check_row()` over every row of `table` before filtering. `Game.tuning`'s `_init` calls `apply_gear([])`, so a bad `Gear.TABLE` row then fails every debug run at boot, test runner included, and can't reach a release build.
+- [x] [Review][Patch] 23 of the 34 const comments have no intent clause [game/scripts/rules/tuning.gd:18-63]
+  - **Rule:** Dev Notes → *Const comments* requires `## <unit>; <intent> (<source>). Was X.`
+  - **Examples:** `RUN_SPEED`, `GRAVITY`, `WALL_KICK_Y`, `SLASH_ACTIVE`, `HITSTOP`, `KNOCKBACK_X` / `_Y`, `CRAWLER_HOVER_PERIOD` and `LURKER_HUNT_SPEED` only name the quantity. Units, sources and was-values are correct on all 34.
+  - **Fix:** add the `; intent` part, taken from the GDD or the M1 comments, never invented.
+- [x] [Review][Patch] The `Tuning` header overclaims [game/scripts/rules/tuning.gd:3-13]
+  - "Never keep a value across frames" contradicts the countdowns the spec allows: `_coyote`, `_buffer`, `_dash_left`, `_cling_left` and the rest start from a value.
+  - "Every gameplay number a rule could bend" isn't true while the spec keeps M1 literals in place: the crawler's 400 px/s fall cap and the lurker's ×2 lost-scent brake.
+  - **Fix:** say "read where used; a countdown may start from the current value, but no value is kept for reuse", and list the unmoved literals under "Not here". The Dev record's countdown list also misses `_coyote` and `_buffer`.
+- [x] [Review][Patch] Nothing checks the `f(&"…")` key literals [game/scripts/actors/*.gd, game/tests/test_tuning.gd]
+  - The refactor swapped compile-checked identifiers for `StringName` literals.
+  - A typo or an unwired key in a branch no test drives (dash, knockback, coyote, jump buffer) fails only when played, and only in a debug build.
+  - **Fix:** a `test_tuning` case that scans `res://scripts/` for `f(&"…")`. Every literal must be a `BASE` key, and every `BASE` key must be read at least once.
+- [x] [Review][Patch] The order comment's arithmetic is wrong [game/tests/test_tuning.gd:116]
+  - From base 18, the five wrong orders give 5, 3, 1, 3, 1, not "3, 5 or 7" (the spec's wording, copied).
+  - **Fix:** "Any other order gives 1, 3 or 5."
+- [x] [Review][Patch] `game-architecture.md` still names the removed `lurker.telegraph_time` [_bmad-output/game-architecture.md:1134,1154]
+  - Story 1.9 builds its Spec check from these lines.
+  - **Fix:** use `Game.tuning.f(&"lurker_telegraph_time")`.
+- [x] [Review][Defer] No floor holds once gear bends a value [game/scripts/rules/tuning.gd:126-145] — deferred, latent.
+  - The editor-only `@export_range(0.75, 3.0)` was the telegraph's only guard.
+  - A gear `set` / `mul` row could push `lurker_telegraph_time` under 0.75 s (Pillar 2), or `crawler_hover_period` to 0 (NaN drift).
+  - Unreachable while `Gear.TABLE` is empty.
+  - Proposed owner: Story 1.9 (see `deferred-work.md`).
 
 ## Dev Notes
 
@@ -474,7 +511,7 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-12.
   - `player.gd`: 28 exports gone. It reads 25 Tuning keys and has 6 local consts: `SHAKE`, `LOOK_AHEAD`, `LIGHT_KICK`, `LIGHT_LERP`, `SNUFF_HOLD` and the new `HITSTOP_SCALE`. `_freeze_frame()` keeps its `<= 0.0` guard.
   - `crawler.gd`: 5 exports gone; `hover` is a plain per-instance var.
   - `lurker.gd`: 11 exports gone; 6 local consts, 5 Tuning keys.
-  - Functions take `var t := Game.tuning` and read keys each tick. Only timers and seeds are taken at a moment: `_cling_left`, `_dash_left`, `_swing_left`, `_swing_cd`, `_invuln`, `_kick_left`, the lurker's `_timer` and the crawler phase seed.
+  - Functions take `var t := Game.tuning` and read keys each tick. Only timers and seeds are taken at a moment: `_cling_left`, `_coyote`, `_buffer`, `_dash_left`, `_swing_left`, `_swing_cd`, `_invuln`, `_kick_left`, the lurker's `_timer` and the crawler phase seed (`_coyote` and `_buffer` added by the code review).
   - Group notes above the local consts are plain `#` comments. A `##` block above a member would become that member's doc comment.
 - **`tests/test_tuning.gd`** (83 checks):
   - API: BASE size and values, all 6 gear orders = 9 (the table order is permuted along with the ids, because `apply_gear` filters the table in table order), other stats untouched, unknown ids ignored, flag on/off/reset, one `changed` per call, reset in place, an empty `Gear.TABLE`, and `Game.tuning`.
@@ -505,6 +542,8 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-12.
 - `docs/source-tree-analysis.md`
 - `docs/architecture.md`
 - `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md` (code review: Spec example reads `Game.tuning`)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (code review: one deferred item)
 - `_bmad-output/implementation-artifacts/1-3-tuning-as-data.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
@@ -512,3 +551,4 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-12.
 
 - 2026-11-12: Story 1.3 created (ready-for-dev).
 - 2026-11-12: Implemented (gds-dev-story). Added `Tuning` and `Gear` in `rules/` and `Game.tuning`; migrated the 44 M1 exports (34 Tuning keys, 11 local consts, 1 per-instance var); added `test_tuning` (API, purity, M1 regression fixture, FR values); updated the docs. No value changed. Status → review.
+- 2026-11-12: Code review (gds-code-review): 6 patches applied (`feb14e5`), 1 item deferred to Story 1.9 (proposed), 17 dismissed. Status → done.
