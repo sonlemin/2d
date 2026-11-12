@@ -656,7 +656,7 @@ Glim is silent. Player agency is expressed through play (Characters: Glim).
   `weaver_defeated`, `bought_map`, `bought_wick`, `first_entry_sold`; set
   through rule methods on `Game.slot`.
 - **String keys:** `NPC_<WHO>_<FLAG>_<n>`, `NPC_<WHO>_IDLE_<n>`,
-  `DEATH_<CAUSE>`, `JOURNAL_<ID>_BODY` (architecture example).
+  `DEATH_<CAUSE>_LINE` + `DEATH_<CAUSE>_TIP` (cause, then plain tip), `JOURNAL_<ID>_BODY` (architecture example).
 - **Length validator:** a pure validator measures every speech string in the UI
   font against the 2-row limit and returns errors; `tools/export.sh` refuses to
   build on any error.

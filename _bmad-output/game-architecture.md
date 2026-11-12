@@ -360,7 +360,7 @@ exits=up:s1_lip@x12, down:s3_gate@x9
 
 ```
 user://
-├── settings.cfg          Settings (ConfigFile)
+├── settings.json         Settings (JSON, parsed with JSON.new().parse())
 ├── slot_1.json           {"version": N, "meta": {...}, "slot": {...}, "dive": {...}|null}
 ├── slot_1.json.bak       previous good save
 └── slot_2.json, slot_3.json
@@ -369,12 +369,12 @@ user://
 - **Write:** `slot_N.json.tmp` → re-read and parse to verify → rename over `slot_N.json`, keeping the previous file as `.bak`. Load falls back to `.bak` if the main file fails to parse.
 - **Version:** an integer `version`. Older saves go through `migrate_vN_to_vN1()` functions in order; a newer-than-known save is rejected and left untouched. A checked-in old-save fixture (`tests/fixtures/slot_v1.json`) is loaded by every later build's tests.
 - **Meta** (for the slot picker without a full load): depth, best chain, play time, difficulty, last saved.
-- **Triggers:** Lift Station rest, arriving home, quitting at a lit anchor. Anchor quit also writes `dive` (anchor id, carried embers); the Ember Cache is already in `slot`; killed enemies are not saved.
+- **Triggers** (readiness R14, 2026-11-12): **resume saves** at a Lift Station rest, arriving home and quitting at a lit anchor. Anchor quit also writes `dive` (anchor id, carried embers); the Ember Cache is already in `slot`; killed enemies are not saved. **Progress saves** (`Game.save_progress()`) at progress moments (difficulty change, purchase, story flag, phase checkpoint, boss defeat) rewrite the slot's world progress but keep the last resume point and `dive` snapshot unchanged, so they never move where you wake or make carried embers safe.
 - **Failure:** the save call returns an `Error`; `Game` emits `save_failed` / `save_succeeded`; the UI shows the crossed icon and "Not saved", and the next rest retries. On web, `OS.is_userfs_persistent()` is checked at boot and before each save; if false, the failure state shows immediately.
 - **New Game** writes the slot immediately after the difficulty step (an overwrite takes effect at once).
 - **Retry:** a failed save retries at the next autosave trigger and on quit to title.
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
-- `settings.cfg` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten.
+- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`).
 - **Slot delete** removes `slot_N.json` and `.bak`.
 - Death-card lines are appended to `SlotState.death_log` from E1, for the E7 Journal.
 
@@ -492,7 +492,7 @@ These patterns apply to ALL systems and must be followed by every implementation
 |---|---|---|
 | **Programmer error** | negative link count, null state ref, impossible FSM state | `assert(cond, "message")`. Debug builds and tests only (asserts are stripped from release). |
 | **Content error** | malformed room file, unknown legend char, missing string key, missing sprite, unknown gear stat | Validators are pure and **return a list of errors**; the loader calls `push_error()` for each (with `file:row:col` where it applies) and **refuses to build** the thing. Works in release builds too. Tests catch these before a build ships. |
-| **Environment error** | save write/read fails, web storage not persistent, corrupt `settings.cfg`, gamepad lost | Return `Error` / `bool`; never crash, and never pause *because of an error* (the pauses UX defines, like "Controller disconnected", still happen). Surface through a state signal to the UX state that owns it (crossed save icon, "Controller disconnected" pause, settings defaults). `push_warning()` once per occurrence for discrete failures (each failed save), once per session for standing conditions (non-persistent web storage). |
+| **Environment error** | save write/read fails, web storage not persistent, corrupt `settings.json`, gamepad lost | Return `Error` / `bool`; never crash, and never pause *because of an error* (the pauses UX defines, like "Controller disconnected", still happen). Surface through a state signal to the UX state that owns it (crossed save icon, "Controller disconnected" pause, settings defaults). `push_warning()` once per occurrence for discrete failures (each failed save), once per session for standing conditions (non-persistent web storage). |
 
 **Content errors never reach players:** `tools/export.sh` validates every room file and every string key first; any error stops the build. At runtime, a room that fails to build cancels the swap and the player stays in the current room.
 
@@ -500,7 +500,7 @@ These patterns apply to ALL systems and must be followed by every implementation
 
 **Freeing nodes:** never `free()`; always `queue_free()` (a handler may be running on the node).
 
-**Save triggers:** only the autosave points and the Quit menu. Closing the window or tab is not a save trigger; on desktop, `NOTIFICATION_WM_CLOSE_REQUEST` runs the Quit path (including the anchor save).
+**Save triggers:** the resume saves (autosave points and the Quit menu) and the progress saves listed under Data Persistence (R14). Closing the window or tab is not a save trigger; on desktop, `NOTIFICATION_WM_CLOSE_REQUEST` runs the Quit path (including the anchor save).
 
 **Test runner rule:** `run_tests.sh` fails the run when Godot prints any `SCRIPT ERROR` or `ERROR:` line, not only on `FAIL`. Tests that check validators call the pure validator and inspect the returned list, so they never trigger `push_error()`.
 
@@ -570,7 +570,7 @@ if Log.enabled(Log.LURKER):
 | Balancing / tuning values | `tuning.gd`: `const` base values, each with a `##` unit + intent comment and "was X" history; GDD table updated with any change | `Tuning` → effective values after gear modifiers |
 | Gear definitions | data in `tuning.gd` / gear table: `{id, stat, op, value}` | `Tuning` applies them |
 | Level data | `game/rooms/*.txt` | `Room` builder |
-| Player settings | `Settings` → `user://settings.cfg` (versioned; a bad or missing key falls back to its default, then the file is rewritten) | `Game.settings` + its signals |
+| Player settings | `Settings` → `user://settings.json` (versioned; a bad or missing key falls back to its default, then the file is rewritten) | `Game.settings` + its signals |
 | Player progress | `SlotState` / `DiveState` → `user://slot_N.json` (versioned) | `Game.slot`, `Game.dive` |
 | Player-facing text | `game/text/strings.csv` | `tr()` |
 | Platform differences | `OS.has_feature("web")` branches, only in boot, display scale, storage check, quit button and audio gate | — |
@@ -1249,10 +1249,11 @@ var window := Game.settings.light_tap_window
 # write: always a rule method that emits its signal
 Game.slot.set_flag(&"gate_s3_1", true)
 Game.dive.add_carried(amount)
-Game.settings.set_value(&"reduce_flashing", true)   # Settings saves itself
+Game.settings.set_value(&"reduce_flashing", true)   # emits changed; core/ persists settings.json
 
 # save/load: only Game commands
-Game.save_now()            # autosave triggers call this
+Game.save_now()            # resume-save triggers call this
+Game.save_progress()       # progress moments call this (R14)
 Game.load_slot(2)
 ```
 

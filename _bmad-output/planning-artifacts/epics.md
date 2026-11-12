@@ -89,7 +89,7 @@ FR28: Lift Station: touching it lights it (respawn point). ↓ to rest: full hea
 
 **Saving (E1)**
 
-FR29: Autosave at every Lift Station rest, on arriving at the hub, and when the player quits at a lit lantern anchor (position saved; carried embers stay at risk until a station). [E1]
+FR29: Autosave at every Lift Station rest, on arriving at the hub, and when the player quits at a lit lantern anchor (position saved; carried embers stay at risk until a station). Progress moments (difficulty change, purchases, story flags, the Weaver phase checkpoint and defeat) also save world progress without moving the resume point (R14). [E1]
 FR30: Three save slots. The slot picker shows depth, best chain, play time and difficulty; Continue loads the most recent slot; Load on the title opens the picker; New Game picks a slot and a difficulty. A failed save is shown to the player ("Not saved") and never crashes or pauses the game. [E1]
 
 **Controls, pause and options**
@@ -186,7 +186,7 @@ NFR14: Zero softlocks in M2, checked by the reachability bot and the playtest; a
 NFR15: Audio mix: predator cues have the highest priority (music ducks 6 dB under them); no sound effect comes close to clipping during a 75 ms hitstop.
 NFR16: Accessibility of input: fully playable on keyboard and on gamepad, one button per action, no chords; UI shows glyph prompts, never hard-coded key names; every action rebindable (E7).
 NFR17: All player-facing text is localisable (string keys), names shapes rather than colours, and fits the 8 px UI font.
-NFR18: Licences and provenance: the font licence (OFL 1.1) ships in every build; AI-assisted art, audio and text pipelines are disclosed on store pages with provenance kept in git.
+NFR18: Licences and provenance: the font licence (OFL 1.1) and Godot's MIT licence with its third-party notices ship in every build; AI-assisted art, audio and text pipelines are disclosed on store pages with provenance kept in git.
 NFR19: Originality: no names, creatures, places or plot beats borrowed from any existing work. Creature deaths dissolve into sparks, never blood (low age rating).
 
 ### Additional Requirements
@@ -196,7 +196,7 @@ Source: `game-architecture.md` (2026-11-11) + `project-context.md`. **No starter
 **Migration and foundations (E1 story 1 impact)**
 
 AR1: M1 migration, in **one commit** with `git mv` (so `.gd.uid` files move with their scripts): `chain_state.gd` → `scripts/rules/`; `player.gd`, `crawler.gd`, `lurker.gd` → `scripts/actors/`; `fx.gd` → `scripts/core/`; `scenes/enemies/*` → `scenes/actors/`; `tests/run_tests.gd` → `tests/test_chain_state.gd`. Then `godot --headless --path game --import`, re-save the moved scenes, and add the first `[autoload]` section (M1 has none). `run_tests.sh` must be green before anything else changes. [E1]
-AR2: Retire `shaft.gd`: its LAYOUT becomes `rooms/l1/m1_shaft.txt` (22 columns including walls); its statics (`ambient_index`, `show_controls`, `best_chain`, `deaths`, `checkpoint`, `banked_embers`) move into state objects; the F1/F2/F3 hotkeys and `reload_current_scene()` on death are removed (F1 brightness moves to Options in E7); `run/main_scene` becomes `scenes/world/world.tscn`. [E1]
+AR2: Retire `shaft.gd`: its LAYOUT becomes `rooms/l1/m1_shaft.txt` (22 columns including walls); its statics (`ambient_index`, `show_controls`, `best_chain`, `deaths`, `checkpoint`, `banked_embers`) move into state objects; the F1/F2/F3 hotkeys and `reload_current_scene()` on death are removed (F1 brightness becomes the Brightness setting, in Options > Accessibility from E1 and Options > Video from E7; R1); `run/main_scene` becomes `scenes/world/world.tscn`. [E1]
 AR3: Retire the other M1 patterns: `player.gd`'s three `Engine.time_scale` writes (→ `Clock`), raw `Input.*` reads (→ `PlayerInput`), `randf_range` camera shake (→ `camera_rig.gd`), ≈ 28 `@export` tuning vars on player/crawler/lurker (→ `Tuning`); `lurker.gd`'s `get_viewport_rect()` and `get_first_node_in_group("player")` (→ `World.play_rect()` + `Sensing`); `Fx._unshaded()` building a material per effect (→ cached static). [E1]
 AR4: Foundations in the architecture's order: `Log` → `Clock` → state objects (`Settings`, `SlotState`, `DiveState`, `Tuning`) → `Game` → `RoomLoader` + `World` → `PlayerInput` → `run_tests.sh` glob runner + `test_lint.gd`. The lint can only go green once Clock, PlayerInput, the F-key removal and the camera-shake move have landed. [E1]
 AR5: Build the worst-case perf scene `rooms/dev/perf_worst.txt` **early in E1** (Old Mine density + flare + cache + player, placeholder art; debug presets only) and check it on the laptop and in a web debug build. It decides: engine glow/bloom go/no-go (fallback: unshaded additive sprites), whether ≤ 6 `PointLight2D` holds 60 FPS, Compatibility glow web parity, and informs the flare cap question. [E1]
@@ -214,7 +214,7 @@ AR10: Four pure `RefCounted` state classes in `scripts/rules/` (`Settings`, `Slo
 AR11: `Game` autoload (`core/game.gd`) holds refs only (`settings`, `slot`, `dive`, `tuning`, `clock`, `devices`), commands `new_game`, `load_slot(n)`, `save_now()`, signals `save_failed(n, err)` / `save_succeeded`, and `reset_for_tests()`. It keeps the same state instances all session and resets them in place (`from_dict()` / `reset()` emit change signals); never replaces them. [E1]
 AR12: `ChainState` (moves to `rules/`) gains Flare halving and "any hit → carried"; signals `changed(count)`, `banked`; API `count`, `break_chain()`, `light_radius()`. `tests/test_chain_state.gd` stays its spec. `Health` (`rules/health.gd`): 4 HP, damage table, 0.6 s invulnerability, bank-heal; signal `damaged`; `test_health.gd`. [E1]
 AR13: Ember rule methods on `DiveState`/`SlotState`: bank held → carried; deposit `dive.carried` → `slot.deposited`; death cost by difficulty. At most one Ember Cache, stored in `SlotState` (room, position, amount); a new death replaces it; no cache when carried is 0; it survives rests and saves. [E1]
-AR14: `DiveState`: carried embers (`add_carried(n)` → `carried_changed`), killed enemies keyed `room_id` + grid cell (never saved long-term), current respawn point; `reset()` respawns enemies. `SlotState`: world flags (gates, stations, anchors, hoards, secrets), cache, deposited embers, abilities, gear, map visits (`visit(room_id)`), journal, records, `death_log` (appended from E1), difficulty, play time, resume point; `set_flag(id, value)` emits `flag_set`. `Settings`: accessibility flags, `light_tap_window`, Cling/Snuff toggle modes, volumes, video, bindings, last slot; `set_value(&"key", v)` saves itself to `user://settings.cfg`. [E1, extended E4–E7]
+AR14: `DiveState`: carried embers (`add_carried(n)` → `carried_changed`), killed enemies keyed `room_id` + grid cell (never saved long-term), current respawn point; `reset()` respawns enemies. `SlotState`: world flags (gates, stations, anchors, hoards, secrets), cache, deposited embers, abilities, gear, map visits (`visit(room_id)`), journal, records, `death_log` (appended from E1), difficulty, play time, resume point; `set_flag(id, value)` emits `flag_set`. `Settings`: accessibility flags, brightness, `light_tap_window`, Cling/Snuff toggle modes, volumes, video, bindings, last slot; `set_value(&"key", v)` emits `changed`, and `core/` persists it to `user://settings.json` (R15; `rules/` does no file I/O). `DiveState` also holds `killed` (room_id + grid cell) with `mark_killed()`; `reset()` clears it. [E1, extended E4–E7]
 AR15: `Tuning` (`rules/tuning.gd`): one `const` per value with a `##` unit + intent + "was X" comment, listed in `BASE`; `f(key)` asserts on unknown keys, `flag(key)`, `apply_gear(ids)`, `changed`; rebuilt from `Game.slot.gear`; actors re-read each tick. All M1 `@export` tuning migrates here; values no system bends stay local consts. Changing a value updates the matching GDD table. [E1]
 AR16: Gear as data (`rules/gear.gd`, `{id, stat, op, value}`, ops `set` / `add` / `mul` / `flag`, applied set → add → mul regardless of gear order): `long_wick` flare_burn set 6.0; `steady_grip` cling_slide set 10.0; `silk_grip` cling_grace add 0.25; `quick_wick` flag `instant_snuff`. Never `if has_gear`. The tap window stays a `Settings` value; difficulty is not a modifier. [E5 / E6]
 AR17: `rules/economy.gd` holds prices (map 60, hint 25, gear 200–300, cosmetics 75–150), the ember curve and the journal payout, with GDD citations. `rules/dialogue.gd` holds per-NPC `{key, requires_flag}` lists. [E4 / E5]
@@ -252,8 +252,8 @@ AR36: `core/clock.gd` (child of `Game`) is the only writer of `Engine.time_scale
 
 **Save and persistence**
 
-AR37: `core/save_store.gd`: `user://slot_1..3.json` + `.bak`, `settings.cfg`. Slot JSON `{"version", "meta", "slot", "dive"|null}`; meta = depth, best chain, play time, difficulty, last saved. Atomic write `.tmp` → re-read/parse → rename, keep `.bak`; load falls back to `.bak`. Integer version, `rules/migrations.gd` (`migrate_vN_to_vN1()` in order), newer-than-known saves rejected untouched; fixture `tests/fixtures/slot_v1.json` loaded by every later build; every format change ships a migration + fixture. [E1, every later epic]
-AR38: Save triggers only: Lift Station rest, arriving home, quitting at a lit anchor (writes `dive`: anchor id + carried; killed enemies not saved). New Game writes the slot right after the difficulty step; slot delete removes `.json` + `.bak`. Failure: `Error` → `save_failed` → crossed save icon + "Not saved"; never crash or pause; retry at the next trigger and on quit to title; `push_warning` once per failure. Web: `OS.is_userfs_persistent()` at boot and before each save. `settings.cfg` carries its own version; corrupt/missing keys fall back to defaults and are rewritten. [E1]
+AR37: `core/save_store.gd`: `user://slot_1..3.json` + `.bak`, `settings.json` (R15). All JSON is parsed with `JSON.new().parse()`, which prints no engine `ERROR:` on bad input (`JSON.parse_string()` and `ConfigFile` do, and would fail the test runner). Slot JSON `{"version", "meta", "slot", "dive"|null}`; meta = depth, best chain, play time, difficulty, last saved. Atomic write `.tmp` → re-read/parse → rename, keep `.bak`; load falls back to `.bak`. Integer version, `rules/migrations.gd` (`migrate_vN_to_vN1()` in order), newer-than-known saves rejected untouched; fixture `tests/fixtures/slot_v1.json` loaded by every later build; every format change ships a migration + fixture. [E1, every later epic]
+AR38: Save triggers (R14): **resume saves** at a Lift Station rest, arriving home, and quitting at a lit anchor (writes `dive`: anchor id + carried; killed enemies not saved); **progress saves** at progress moments (difficulty change, purchase, story flag, phase checkpoint, boss defeat), which rewrite the slot's world progress but keep the last resume point and dive snapshot unchanged, so they never move where you wake or make carried embers safe. New Game writes the slot right after the difficulty step; slot delete removes `.json` + `.bak`. Failure: `Error` → `save_failed` → crossed save icon + "Not saved"; never crash or pause; retry at the next trigger and on quit to title; `push_warning` once per failure. Web: `OS.is_userfs_persistent()` at boot and before each save. `settings.json` carries its own version; corrupt/missing keys fall back to defaults and are rewritten. [E1]
 
 **UI architecture**
 
@@ -686,7 +686,7 @@ Source: UX `DESIGN.md` + `EXPERIENCE.md` (2026-11-10/11). "The spines win": if a
   - Snuff toggle (Off by default).
   [UX: EXPERIENCE → Options tabs, Accessibility Floor] [Owner: E1]
 - UX-DR77: Audio tab: volume sliders. Mono audio and separate sliders are open (O14). [UX: EXPERIENCE → Options tabs, Open Q O14] [Owner: E3]
-- UX-DR78: Video tab: Brightness (4 levels), Fullscreen, Scale. This replaces the M1 F1 brightness hotkey. Brightness may move earlier than E7 (A1). [UX: EXPERIENCE → Options tabs, Accessibility Floor] [Owner: E7 (A1: maybe earlier)]
+- UX-DR78: Video tab: Brightness (4 levels), Fullscreen, Scale. This replaces the M1 F1 brightness hotkey. Brightness ships earlier, in Options > Accessibility from E1, and moves here in E7 (R1). [UX: EXPERIENCE → Options tabs, Accessibility Floor] [Owner: E7; E1 for the Accessibility entry]
 - UX-DR79: Controls tab: rebinding of every action, keyboard and gamepad. [UX: EXPERIENCE → Options tabs, Input Schemes > Rules] [Owner: E7]
 - UX-DR80: Accessibility tab, E7 additions:
   - Large HUD.
@@ -938,7 +938,7 @@ Source: UX `DESIGN.md` + `EXPERIENCE.md` (2026-11-10/11). "The spines win": if a
 - UX-DR130: Contrast floors per UX-DR7/8 enforced in every zone. [UX: EXPERIENCE → Accessibility Floor] [Owner: E1]
 - UX-DR131: Steam Deck legibility check in E1 at ×2 (960×540 on a 7" panel or equivalent) with Fusion Pixel Font 8px. The full Deck pass, with gamepad glyphs, is E7. [UX: EXPERIENCE → Responsive & Platform, Foundation] [Owner: E1 (check), E7 (pass)]
 - UX-DR132: Death-card accessibility: held input is ignored, there is a skip lockout and auto-advance, and lines are kept for the death log. [UX: EXPERIENCE → Accessibility Floor] [Owner: E1]
-- UX-DR133: Brightness at 4 levels in Options > Video. [UX: EXPERIENCE → Accessibility Floor] [Owner: E7 (A1 maybe earlier)]
+- UX-DR133: Brightness at 4 levels: Options > Accessibility from E1 (R1), Options > Video from E7. [UX: EXPERIENCE → Accessibility Floor] [Owner: E1 → E7]
 - UX-DR134: E7 accessibility additions:
   - Large HUD.
   - Text scale (menus, speech, journal; layout open, O12).
@@ -1049,7 +1049,7 @@ Also stated:
 - The key-mock positions and colours are also defaults to review.
 
 **Assumptions that affect rollout**
-- A1: Brightness may move from E7 into an earlier Video tab.
+- A1: Brightness may move from E7 into an earlier Video tab. **Resolved (R1):** it ships in E1 under Accessibility and moves to Video in E7.
 - A3: Title, slot picker and gate land in E1.
 - A4: Credits land in E7.
 - A5: Quit on the title is PC only.
@@ -1061,7 +1061,7 @@ Also stated:
 - A13: Options changes apply at once.
 
 **Ambiguities to settle while writing stories (my reading, not stated in the spec)**
-1. Brightness gap: E1 removes the F1 key, but the Video tab lands in E7, so builds from E1 to E6 have no brightness control unless A1 is applied.
+1. Brightness gap: E1 removes the F1 key, but the Video tab lands in E7, so builds from E1 to E6 have no brightness control unless A1 is applied. **Resolved (R1).**
 2. Credits entry: Options lists a Credits entry, but Credits land in E7. Presumably the entry is hidden until then. Meanwhile the font licence files ship from E1, while the "credits name the font" rule waits for E7.
 3. E1 station menu: the spec says only "placeholder station menu", so it is unclear whether Fast travel shows (and with what list) before E4.
 4. Tab bar with one tab: in E1 the Pause tab bar holds only "Pause", so what Q/E or LB/RB do there is not specified.
@@ -1077,7 +1077,7 @@ Source: `narrative-design.md` (complete 2026-11-12). These become stories (syste
 
 NR1: Voice-anchor gate: sonlm approves 3 anchor lines per speaker before any line for that speaker is written, and later lines must match them. Speakers and due points: death card (E1); Oda's journal hand and the lost-islander documents (before E4 writing); Old Tessaly, Smith, Cartographer, Naturalist (before E5 lines). [E1 / E4 / E5]
 NR2: Writing workflow for every story string: anchors approved → Claude drafts against the anchors and `narrative-design.md` → sonlm edits and approves before commit → strings go into `game/text/strings.csv` under the key scheme → the length and flag validators pass. [E1 / E4 / E5 / E6]
-NR3: String-key scheme: `NPC_<WHO>_<FLAG>_<n>`, `NPC_<WHO>_IDLE_<n>`, `DEATH_<CAUSE>`, `JOURNAL_<ID>_BODY`; all via `tr()`. [E1+]
+NR3: String-key scheme: `NPC_<WHO>_<FLAG>_<n>`, `NPC_<WHO>_IDLE_<n>`, `DEATH_<CAUSE>_LINE` + `DEATH_<CAUSE>_TIP`, `JOURNAL_<ID>_BODY`; all via `tr()`. [E1+]
 NR4: M2 writing budget ≈ 2,000–2,500 words: 6 hub conversations, 4 documents, 5 scripted moments, ≈ 40 dialogue lines, ≈ 8 death causes, ≈ 20 Memorial names, 5 creature entries. [E1–E6]
 
 **Narrative systems**
@@ -1129,6 +1129,9 @@ Conflicts found between the input documents while extracting requirements, and h
 | R11 | Narrative creature-entry list says "walker"; everywhere else "crawler" | default: "crawler walker" / "crawler hoverer" |
 | R12 | 13 small inconsistencies inside `game-architecture.md` | default: the more specific reading wins; listed at the end of Additional Requirements |
 | R13 | Open details deferred to their epic: ≈ 8 death causes (E1), Smith / Cartographer / Naturalist names and pronouns (E5; copy avoids pronouns until then), partner-tag flag id and Swing-secret ids (E6), flare cap (E1 perf scene + playtest), Weaver flee target (E2), phase-2 respawn route (E6) | default: decided in the named epic's stories |
+| R14 | Readiness check (2026-11-12): only rest, hub arrival and anchor quit save, so a difficulty change, hub purchases and flags, the Weaver phase checkpoint and the Weaver win can be lost on quit | **sonlm:** progress saves at those moments rewrite world progress but never move the resume point or make carried embers safe (AR38, FR29) |
+| R15 | Readiness check: Godot 4.7.2 prints an engine `ERROR:` on a corrupt `ConfigFile` (load and parse), which fails the test runner | **sonlm:** settings are stored as `user://settings.json`, parsed with the silent `JSON.new().parse()` like the slots (AR14, AR37) |
+| R16 | Readiness check: the E1 shaft is one-way, so after the first anchor the player can't return to the top station to rest, deposit or save | **sonlm:** the shaft's bottom exit loops to its own top entry; crossing it banks the chain like a landing (Stories 1.5, 1.7, 1.24) |
 
 ### FR Coverage Map
 
@@ -1337,13 +1340,13 @@ So that every later story builds on the architecture's layout instead of extendi
 **And** every move is a `git mv` in one commit, with each `.gd.uid` moved beside its script; `scripts/` and `scenes/` share the domain folders `core/ rules/ world/ actors/ objects/ moments/ ui/ audio/ dev/` (AR58)
 
 **Given** the moved files
-**When** `godot --headless --path game --import` runs and the moved scenes are re-saved
-**Then** every `ext_resource` path matches its uid and loading the project prints no `SCRIPT ERROR` or `ERROR:` line
+**When** every `res://` path that points at a moved file is rewritten by hand (the M1 scenes carry no `uid=` attributes: e.g. `shaft.gd`'s preloads of `res://scenes/enemies/*.tscn`, `shaft.tscn`'s `res://scenes/player.tscn`, the test's `res://scripts/chain_state.gd`; the full list goes in the commit message) and `godot --headless --path game --import` runs
+**Then** loading the project and every moved scene prints no `SCRIPT ERROR` or `ERROR:` line
 
 **Given** `run_tests.sh` updated only for the renamed test
 **When** it runs
-**Then** it is green, with `test_chain_state` unchanged and `smoke_shaft` still passing, before any other change is made
-**And** `shaft.gd` and `shaft.tscn` stay where they are until Story 1.6 retires them
+**Then** it is green, with `test_chain_state` unchanged except its preload path and `smoke_shaft` still passing, before any other change is made
+**And** `shaft.gd` and `shaft.tscn` stay where they are until Story 1.7 retires them
 
 ### Story 1.2: Log and a Clock that owns time
 
@@ -1365,10 +1368,11 @@ So that hitstop and later slow-mo stack predictably and freeze with the pause.
 **And** while `SceneTree.paused` is true, requests do not count down
 **And** player death and `_exit_tree` clear every request
 
-**Given** `player.gd`'s three direct `Engine.time_scale` writes
+**Given** `player.gd`'s four direct `Engine.time_scale` writes (M1 lines 85, 270, 272 and 338)
 **When** they are replaced by Clock requests
 **Then** a pogo hit still freezes for 75 ms (FR4) and no script outside `clock.gd` writes `Engine.time_scale`
-**And** `tests/test_clock.gd` covers stacking, real-time expiry, pause freeze and clear-on-death
+**And** re-requesting an id that is already active refreshes its duration and never stacks with itself
+**And** `tests/test_clock.gd` covers stacking of different ids, re-requesting the same id, real-time expiry, pause freeze and clear-on-death
 
 ### Story 1.3: Tuning as data
 
@@ -1380,10 +1384,10 @@ So that gear, assists and playtests change values in one place that matches the 
 
 **Acceptance Criteria:**
 
-**Given** the ≈ 28 `@export` tuning vars on `player.gd`, `crawler.gd` and `lurker.gd`
+**Given** the 44 `@export` tuning vars on `player.gd` (28), `crawler.gd` (5) and `lurker.gd` (11)
 **When** they migrate
-**Then** each bendable value is a `const` in `scripts/rules/tuning.gd` with a `##` comment giving unit, intent and "was X", listed in `BASE`; values no system will bend (physics layer values, pixel offsets) stay local consts (AR15)
-**And** a regression test asserts every migrated value equals its M1 default, i.e. the playtested values in FR1–FR8 and FR58: run 110 px/s with ground/air accel 900/1500 px/s²; jump −330 px/s (apex ≈ 60 px), early release ×0.45; gravity 900 px/s² rising, ×0.6 falling, max fall 210 px/s; coyote 0.08 s, buffer 0.10 s; air dash 260 px/s for 0.12 s; slash active 0.12 s, cooldown 0.22 s, hitbox 22×16; pogo armed 0.22 s, hitbox 26×24, bounce −300 px/s, hitstop 75 ms; body 10×20, hurtbox 8×18; chain cap 20 links, light 40 + 22·√links px, Blade Bloom ×(1 + 0.18·√links) up to ×1.8; base light 40 px, Snuff light 12 px; cling grace 1.0 s per link, slide 18 px/s, kick (150, −260) px/s with 0.15 s no steering; hoverer drift 10 px over 2.4 s
+**Then** each bendable value is a `const` in `scripts/rules/tuning.gd` with a `##` comment giving unit, intent and "was X", listed in `BASE`; values no system will bend (physics layer values, pixel offsets) stay local consts; the chain-curve consts that `test_chain_state` reads (`MAX_CHAIN`, `BASE_RADIUS`, `SNUFF_RADIUS`, `BASE_BLOOM` and the rest of the curve) stay in `ChainState`, since no gear bends them in M2 and that test must stay unchanged (AR15)
+**And** a regression test iterates over a fixture of all 44 M1 `@export` defaults, each marked moved to `Tuning` or kept local (with its new home), and asserts every value still equals its M1 default; these include the playtested values in FR1–FR8 and FR58: run 110 px/s with ground/air accel 900/1500 px/s²; jump −330 px/s (apex ≈ 60 px), early release ×0.45; gravity 900 px/s² rising, ×0.6 falling, max fall 210 px/s; coyote 0.08 s, buffer 0.10 s; air dash 260 px/s for 0.12 s; slash active 0.12 s, cooldown 0.22 s, hitbox 22×16; pogo armed 0.22 s, hitbox 26×24, bounce −300 px/s, hitstop 75 ms; body 10×20, hurtbox 8×18; chain cap 20 links, light 40 + 22·√links px, Blade Bloom ×(1 + 0.18·√links) up to ×1.8; base light 40 px, Snuff light 12 px; cling grace 1.0 s per cling (a pogo hit refills it), slide 18 px/s, kick (150, −260) px/s with 0.15 s no steering; hoverer drift 10 px over 2.4 s
 
 **Given** `Tuning`
 **When** code calls `f(&"key")`, `flag(&"key")` or `apply_gear(ids)`
@@ -1411,20 +1415,21 @@ So that global, per-slot and per-dive state each have exactly one home.
 
 **Given** `shaft.gd`'s statics (`ambient_index`, `show_controls`, `best_chain`, `deaths`, `checkpoint`, `banked_embers`)
 **When** they move into the state objects
-**Then** `best_chain` and `deaths` are `SlotState` records, `checkpoint` is the `DiveState` respawn point, `banked_embers` is `DiveState` carried embers, `ambient_index` becomes `Settings` brightness, and `show_controls` is dropped (the M1 controls bar is removed, UX-DR26)
+**Then** `best_chain` and `deaths` are `SlotState` records, `checkpoint` becomes the `DiveState` respawn point, which no longer follows M1's per-frame "last ledge stood on" (the room's spawn until stations and anchors set it in Story 1.24; the last-ledge tracker survives only for hazard respawn, Story 1.19), `banked_embers` is `DiveState` carried embers, `ambient_index` becomes `Settings` brightness, and `show_controls` is dropped (the M1 controls bar is removed, UX-DR26)
 **And** `SlotState` also holds `difficulty` (default Normal); its death-cost rules arrive in Story 1.22
-**And** `shaft.gd` reads and writes them only through `Game` until Story 1.6 retires it
+**And** `DiveState` holds `killed` (room_id + grid cell) with `mark_killed(room_id, cell)` and `is_killed()`, and `reset()` clears it (AR14, AR24)
+**And** `shaft.gd` reads and writes them only through `Game` until Story 1.7 retires it
 
 **Given** `Settings.set_value(&"key", v)`
 **When** a value changes
-**Then** it saves to `user://settings.cfg` with its own `version`; a missing or corrupt file, or a missing or bad key, falls back to the default and the file is rewritten (AR14)
+**Then** `Settings` (pure, in `rules/`) emits `changed`, and a `core/` store writes `user://settings.json` with its own `version`, at most once per frame, to a path tests can redirect so they never touch the real file; a missing or corrupt file, or a missing or bad key, falls back to the default and the file is rewritten; parsing uses `JSON.new().parse()`, which prints no engine error (AR14, R15)
 **And** `SlotState.set_flag(id, value)` emits `flag_set` and `DiveState.add_carried(n)` emits `carried_changed`
 **And** state is written only through rule methods that emit typed signals; reads go through `Game` refs; no event bus, no node paths (AR18)
-**And** `tests/test_state.gd` builds fresh instances per test and covers round-trips and the corrupt-file fallback
+**And** `tests/test_state.gd` builds fresh instances per test and covers round-trips, `killed` and the corrupt-file fallback, with no `ERROR:` line in the output
 
 ### Story 1.5: Rooms as text, the M1 shaft at 22 tiles
 
-**Type:** dev
+**Type:** dev, content
 
 As the level designer,
 I want rooms written as text files that are validated before they build,
@@ -1432,10 +1437,11 @@ So that every room is reviewable in git, testable on its own, and fits the 360 p
 
 **Acceptance Criteria:**
 
-**Given** `game/rooms/l1/m1_shaft.txt` (`key=value` header with `id=`, `zone=`, `exits=`; `---`; a grid of equal-width rows, 22 columns including walls, 1 char = 16 px)
+**Given** `game/rooms/l1/m1_shaft.txt` (`key=value` header with `id=`, `zone=`, `spine=true`, `exits=`, its bottom exit leading to its own top entry (R16); `---`; a grid of equal-width rows, 22 columns including walls, 1 char = 16 px)
 **When** `RoomLoader.load_room_from_path()` parses it
 **Then** the pure validator returns no errors and the room builds with the TileSet and ledge rims made in code (AR21, AR22, FR39)
 **And** the layout keeps the M1 shaft's intent within 352 px: hoverer rows with left/right choices, lurker pockets with an escape in reach, ledges every ≤ 1.5 s of fall (FR57)
+**And** the 22-column layout is level design: Claude drafts it from the M1 30-column layout and sonlm approves it before commit, since the CP1 and CP2 verdicts are judged on it
 
 **Given** a room file with unequal rows, an unknown char or a duplicate id (fixtures in `tests/rooms/`)
 **When** it is validated
@@ -1471,13 +1477,14 @@ So that respawns are instant and the HUD has its own space.
 
 **Given** the player dies (M1 rules still apply until Story 1.19)
 **When** `World` handles the death
-**Then** it re-instances `Player` at the `DiveState` respawn point without `reload_current_scene()`, emits `player_spawned(player)` and clears Clock requests; enemies killed this dive stay dead (AR25)
+**Then** it re-instances `Player` at the `DiveState` respawn point without `reload_current_scene()`, emits `player_spawned(player)` and clears Clock requests; enemies killed this dive stay dead (`DiveState.killed`); the respawn point is the room's spawn until stations and anchors set it (Story 1.24), and M1's per-frame last-ledge checkpoint no longer moves it (AR25)
 
-**Given** the retirement of `shaft.gd`
+**Given** the camera
 **When** this story lands
-**Then** `shaft.gd` and `shaft.tscn` are deleted (with the M1 patterns in AR3: statics, scene reload, viewport-based notice), the F1/F2/F3 hotkeys are gone (no `KEY_F` in `game/scripts/`) while the brightness level keeps applying from `Settings` (changed through DevTools until Options lands), and camera shake lives only in `camera_rig.gd` (the only `randf` use) with the 70 px downward lead (FR3, AR2, AR27, UX-DR123)
+**Then** camera shake lives only in `camera_rig.gd` (the only `randf` use) with the 70 px downward lead (FR3, AR27, UX-DR123)
+**And** `shaft.gd` and `shaft.tscn` stay only for the M1 tests that preload them (`smoke_shaft.gd`, `screenshot.gd`) until Story 1.7 ports those tests and retires them
 
-### Story 1.7: Room swaps and physics interpolation
+### Story 1.7: Room swaps, physics interpolation and retiring `shaft.gd`
 
 **Type:** dev
 
@@ -1494,6 +1501,19 @@ So that the shaft, and later the whole layer, feels continuous.
 **Given** physics interpolation
 **When** this story lands
 **Then** 2D physics interpolation is on (`physics/common/physics_interpolation`, 60 ticks, `snap_2d_transforms_to_pixel` kept) and every teleport calls `reset_physics_interpolation()` (AR6)
+
+**Given** `m1_shaft`'s bottom exit (R16)
+**When** the player crosses it
+**Then** `enter_room(&"m1_shaft", <top entry>)` places them at the top entry, and a live chain is banked first, exactly like a landing; a test crosses it with a chain and checks the carried total
+
+**Given** a death
+**When** `World` respawns the player
+**Then** it goes through `enter_room(respawn room, respawn object)`, rebuilding the room so persistent objects, the Ember Cache rule and the killed-enemy rule apply (cells in `DiveState.killed` are skipped) (AR24, AR25)
+
+**Given** the M1 tests that preload `shaft.tscn` (`tests/smoke_shaft.gd`, `tests/screenshot.gd`)
+**When** `shaft.gd` is retired
+**Then** both first load `m1_shaft` through `RoomLoader` with a test player and a stub node in group `world` that provides `play_rect()`, and every M1 smoke check still passes against it
+**And** only then are `shaft.gd` and `shaft.tscn` deleted, with the M1 patterns in AR3 (statics, scene reload, viewport-based notice); the F1/F2/F3 hotkeys are gone (no `KEY_F` in `game/scripts/`) and the brightness level applies from `Settings` (changed through DevTools until Options lands in Story 1.36) (AR2)
 
 ### Story 1.8: PlayerInput intents
 
@@ -1512,6 +1532,7 @@ So that no input is ever dropped and a tap on Light never breaks my chain.
 **Given** Light pressed and released
 **When** the release comes inside `Settings.light_tap_window` (0.12 s default; 0.2 and 0.3 s also tested)
 **Then** it produces `light_tap` and never `snuff_active`; held past the window it produces `snuff_active` (FR9, UX-DR119)
+**And** the Light timer runs on real time, so a hitstop never stretches the window; a test holds Light across a 75 ms hitstop
 
 **Given** a 75 ms hitstop (`Engine.time_scale` 0.05)
 **When** Jump or Attack is pressed during it
@@ -1556,12 +1577,13 @@ So that a layout change can never quietly break a guarantee.
 
 **Acceptance Criteria:**
 
-**Given** `tests/smoke_rooms.gd` (replacing `smoke_shaft.gd`)
-**When** it loads every `rooms/**/*.txt` standalone
+**Given** `tests/smoke_rooms.gd` (replacing `smoke_shaft.gd` as ported in Story 1.7)
+**When** it loads every `rooms/**/*.txt` standalone, with a stub node in group `world` that provides `play_rect()`
 **Then** it checks: the file validates; ids are unique across all files; every lurker telegraph ≥ `Spec.TELEGRAPH_MIN`; no lurker notices outside the play rect; a Snuff, landing or cling in time drops a hunting lurker's lethality; base light (40 px) is never noticed; every hazard pit has a ledge or wall within a 1.5 s fall (AR50, NFR10)
+**And** in rooms marked `spine=true`, no fall between ledges lasts longer than `Spec.LEDGE_FALL_MAX` (1.5 s at 210 px/s; GDD Level Types) unless the stretch is declared a narrow cling stretch in the room header; rooms under `rooms/dev/` are only validated, never swept for fairness
 
 **Given** `tests/smoke_bot.gd` (the M1 bot, ported)
-**When** it runs every spine room with plain movement and no dash
+**When** it runs every `spine=true` room with plain movement and no dash
 **Then** it reaches chain ≥ `Spec.BOT_MIN_CHAIN` in each (`m1_shaft` today) and the exit backstop never fires on its line; targets are picked by position, never by group index
 
 ### Story 1.11: DevTools: entry args and overlays
@@ -1576,11 +1598,11 @@ So that I can jump straight into any room and state and see the invisible rules 
 
 **Given** `scripts/dev/dev_tools.gd` (`DevTools`)
 **When** `World._ready()` runs in a debug build (`OS.is_debug_build()`)
-**Then** DevTools is added; in a release build it is never added, and nothing outside `dev/` and `tests/` references it (AR54)
+**Then** `world.gd` adds DevTools by loading `res://scripts/dev/dev_tools.gd` by path string inside `if OS.is_debug_build()` (no `preload`, so a release export without `scripts/dev/` still loads `world.gd`); in a release build it is never added; that line is the only reference to `dev/` outside `dev/` and `tests/`, and the lint allows exactly that line, proven by a test (AR54)
 
 **Given** desktop args `-- --room=<id> --chain=<n>` or the URL query `?room=<id>&chain=<n>` in a web debug build
 **When** the game starts
-**Then** it loads that room with that chain; later systems register their own args as they land (`--hp` in Story 1.19, `--difficulty` in Story 1.22) and `-- --log=lurker,clock` enables those `Log` categories; `--set=<key>:<value>` overrides any `Settings` value for the session (how accessibility and brightness settings are changed until Options lands)
+**Then** it loads that room with that chain; later systems register their own args as they land (`--hp` in Story 1.19, `--difficulty` in Story 1.22) and `-- --log=lurker,clock` enables those `Log` categories; `--set=<key>:<value>` overrides any `Settings` value for the session only, never written to `settings.json` (how accessibility and brightness settings are changed until Options lands)
 
 **Given** the dev-only overlay action on the backquote key
 **When** it is pressed repeatedly
@@ -1599,16 +1621,16 @@ So that the light budget and bloom are decided on data before any art depends on
 
 **Given** `rooms/dev/perf_worst.txt` (Old Mine density: ≥ 1 lurker per screen plus hoverer rows; the player at chain 20; stand-in light sources where a flare and an Ember Cache will be; placeholder art)
 **When** it is started with `--room=perf_worst`
-**Then** it runs in the editor and in a web debug build, and is excluded from release presets (AR5)
+**Then** it runs in the editor and in desktop debug builds; its web debug run and its exclusion from release presets arrive with the presets in Story 1.13 (AR5)
 
 **Given** the lights in the scene
 **When** they render
-**Then** every `PointLight2D` shares `art/light.png` via `texture_scale`; small glows (eye cores, ember cores, ledge rims) are unshaded sprites; lurker wall glow falls back to a sprite glow when more than 6 `PointLight2D` would be on screen (AR46)
+**Then** every `PointLight2D` shares `art/light.png` via `texture_scale`; small glows (eye cores, ember cores, ledge rims) are unshaded sprites; lurker wall glow falls back to a sprite glow when more than 6 `PointLight2D` would be on screen; a test with 8 light sources on screen proves at most 6 `PointLight2D` stay lit, lurker glows switching to sprites first and the player's and flares' lights never (AR46)
 **And** `Fx` builds each material once as a cached static (M1's per-effect `_unshaded()` is fixed)
 
-**Given** a written measurement procedure (`docs/perf.md`: 60 s run at ×3 on the laptop and at the ×2 embed in desktop Chrome/Firefox; plus an HD 620-class machine if available)
-**When** it is run with engine glow off and on
-**Then** min/average FPS and the worst frame time are recorded for each, ready for the CP1 verdict (NFR1, NFR5)
+**Given** the measurement procedure the agent writes in `docs/perf.md` (60 s run at ×3 on the laptop and at the ×2 embed in desktop Chrome/Firefox, with engine glow off and on; plus an HD 620-class machine if available) and an FPS + worst-frame readout in the DevTools overlay
+**When** this story is done
+**Then** the procedure and the readout are ready to run; the measurements themselves are taken by sonlm in Story 1.15 (a human gate: the server is headless, and the agent never records a number it did not measure) (NFR1, NFR5)
 
 ### Story 1.13: Export pipeline and web boot smoke
 
@@ -1622,11 +1644,12 @@ So that every build I play on the laptop is known to boot.
 
 **Given** a committed `game/export_presets.cfg`
 **When** it is inspected
-**Then** it has Windows, Linux and Web (single-threaded) release presets plus a debug web preset; templates are pinned to 4.7.2; the include filter has `rooms/**/*.txt`; release presets exclude `rooms/dev/*`, `tests/*` and `scripts/dev/*`; all built from Godot 4.7.2 with the Compatibility renderer (AR51, NFR7)
+**Then** it has Windows, Linux and Web (single-threaded) release presets plus a debug web preset; templates are pinned to 4.7.2; the include filter has `rooms/**/*.txt`; release presets exclude `rooms/dev/*`, `tests/*` and `scripts/dev/*`; the debug web preset includes `rooms/dev/perf_worst.txt` (Story 1.12); all built from Godot 4.7.2 with the Compatibility renderer (AR51, NFR7)
 
 **Given** `tools/export.sh`
 **When** it runs on the server
 **Then** it validates every room file (any error stops the build), exports the three targets headless, checks the web download is under 30 MB, runs the web smoke check and writes to `builds/<version>/` (gitignored) (AR52)
+**And** it lists each release PCK's contents and fails if `rooms/dev/`, `tests/` or `scripts/dev/` appear, and the release web build gets the boot-only check (AR53), proving `world.gd` loads without `scripts/dev/`
 **And** later stories add their checks to it (string keys and licence copy in Story 1.17)
 
 **Given** `tools/web_smoke/` (Playwright version pinned in `package.json`, Node 24, headless Chromium; outside `game/`)
@@ -1665,15 +1688,15 @@ So that the kit is built on foundations I trust.
 
 **Given** the CP1 build
 **When** the automated gate runs
-**Then** `test_chain_state` passes unchanged from M1, `test_lint` is green, the bot reaches chain ≥ 5 in the 22-tile shaft, and the web debug build boots in the Playwright check
+**Then** `test_chain_state` passes unchanged from M1 (except its preload path), `test_lint` is green, the bot reaches chain ≥ 5 in the 22-tile shaft, and the web debug build boots in the Playwright check
 
 **Given** sonlm plays the desktop build at ×3 (60 Hz, and a high-refresh display if available)
 **When** the feel check is done
 **Then** physics interpolation is kept or turned off, and the decision and reason are recorded in `project-context.md` and the architecture (AR6)
 
-**Given** the Story 1.12 measurements
-**When** they are reviewed
-**Then** the engine-glow go/no-go, the confirmed or tightened light budget and a recommendation on a flare cap are recorded in the architecture and the GDD Open Questions rows (AR5)
+**Given** the Story 1.12 procedure
+**When** sonlm runs it on the laptop (×3), in desktop Chrome and Firefox at the ×2 embed and, if available, on an HD 620-class machine (if not, the gap is recorded), with engine glow off and on
+**Then** min/average FPS and the worst frame time for each run are recorded in `docs/perf.md`, and the engine-glow go/no-go, the confirmed or tightened light budget and a recommendation on a flare cap are recorded in the architecture and the GDD Open Questions rows (AR5)
 **And** a devlog or private build is posted; if the feel check fails, its fix stories come before CP2
 
 ### Story 1.16: Effects accessibility gate and flash cap
@@ -1695,8 +1718,8 @@ So that the game is safe to play from the first kit build.
 **Then** it declares its flash rate, and a test asserts no effect exceeds 3 flashes per second, pulses ≤ 2 Hz and blinks at 2.5 Hz (NFR8, UX-DR125)
 
 **Given** reduce flashing is on
-**When** a hit flash, pogo sparks or a bank burst plays
-**Then** the hit flash becomes a short dim, sparks are smaller and the bank burst is toned down (UX-DR126)
+**When** pogo sparks play
+**Then** they use half the count and half the size (UX-DR126); the hit flash (Story 1.19) and the bank burst (Story 1.26) are new effects that declare their reduce-flashing variants through this gate when they land
 **And** with screen shake off the camera never shakes; the pogo freeze frame and sparks on every hit still play (FR38)
 
 **Given** code-built effects
@@ -1720,7 +1743,7 @@ So that everything I read is sharp at every integer scale.
 
 **Given** `game/fonts/fusion-pixel-8px-proportional-latin.otf` + `OFL.txt` + `LICENSES/` (release tag pinned at download)
 **When** text renders
-**Then** it uses size 8 with antialiasing and hinting off; `tools/export.sh` copies `OFL.txt` and `LICENSES/` into every build (AR42, UX-DR11, UX-DR16)
+**Then** it uses size 8 with antialiasing and hinting off; `tools/export.sh` copies `OFL.txt` and `LICENSES/` into every build, plus Godot's MIT licence and third-party notices (from `Engine.get_license_text()` and `Engine.get_copyright_info()`) as `GODOT_LICENSES.txt` (AR42, NFR18, UX-DR11, UX-DR16)
 
 **Given** `ui/theme_builder.gd`
 **When** the theme is built in code (no `.tres`)
@@ -1758,18 +1781,18 @@ So that a mistake costs me health, not the whole run.
 
 **Acceptance Criteria:**
 
-**Given** `rules/health.gd` (per-life on `Player`; signal `damaged`)
+**Given** `rules/health.gd` (per-life on `Player`; signal `damaged(amount, cause)`, where `cause` is a cause id such as `&"crawler_walker"` or `&"lurker"` that the death card reads)
 **When** damage arrives
 **Then** it applies the table: crawler contact 1, boss attack 1, hunting lurker 2, spikes/hazard 1; at 0 HP the player dies (FR10, AR12)
 **And** `tests/test_health.gd` covers the table, invulnerability and bank-heal
 
 **Given** crawler contact (still polled with `get_overlapping_bodies`)
 **When** it hits the player
-**Then** the player takes 1, is knocked back at (150, −150) px/s and is invulnerable for 0.6 s, blinking at 2.5 Hz through the Fx gate (steady transparency under reduce flashing)
+**Then** the player takes 1, is knocked back at (150, −150) px/s and is invulnerable for 0.6 s, blinking at 2.5 Hz through the Fx gate (steady transparency under reduce flashing); the hit flash shows the player white for 67 ms, and under reduce flashing dims the player to 60% for 100 ms instead (defaults, reviewed in Story 1.30)
 
 **Given** a lurker
 **When** it touches the player
-**Then** it deals 2 only while it hunts with the player as its target (`monitorable` rule); M1's one-touch death is removed
+**Then** it deals 2 only while it hunts with the player as its target (`monitorable` rule), with the same knockback and 0.6 s invulnerability as crawler contact; M1's one-touch death is removed
 
 **Given** any hit
 **When** it lands
@@ -1778,7 +1801,7 @@ So that a mistake costs me health, not the whole run.
 
 **Given** a chain of ≥ 10 banked
 **When** it banks
-**Then** the player heals +1 HP up to the maximum; a chain broken by a hit never triggers bank-heal (FR12)
+**Then** the player heals +1 HP up to the maximum; the threshold is `Tuning` `bank_heal_min` (10); chains that end by landing, Snuff, cling timeout or a room exit count, while a chain broken by a hit or spent by a Flare Toss never triggers bank-heal (FR12)
 **And** at 0 HP `World` respawns the player with full HP without a scene reload (FR13), and DevTools gains `--hp=<n>`
 
 ### Story 1.20: Light sensing for predators
@@ -1831,16 +1854,21 @@ So that a crash or a bad write never costs me my save.
 **Given** a main file that fails to parse
 **When** the slot loads
 **Then** it falls back to `.bak`; if both fail, the slot is reported as damaged; a file with a newer `version` than the build knows is rejected and left untouched
+**And** a damaged or newer-version slot is never written over by an autosave: saves to it emit `save_failed` until the player overwrites or deletes it in the slot picker (Story 1.38); files are parsed with `JSON.new().parse()`, so a corrupt file prints no engine `ERROR:` line (R15)
 
 **Given** `rules/migrations.gd`
 **When** an older `version` loads
 **Then** `migrate_vN_to_vN1()` functions run in order (scaffold only; the first real migration lands in E4)
 
+**Given** a progress moment (R14; in E1, a difficulty change)
+**When** `Game.save_progress()` runs
+**Then** the slot's world progress is rewritten while the resume point and the dive snapshot stay as the last resume save left them; a test saves progress mid-dive, reloads, and finds the player at the last rest with the new progress kept and carried embers not made safe (AR38)
+
 **Given** `Game.save_now()`
 **When** the write fails (simulated unwritable directory)
 **Then** `Game` emits `save_failed(n, err)` and `push_warning` fires once; on success it emits `save_succeeded`; the game never crashes or pauses (AR38)
 **And** until the slot picker (Story 1.38) the game uses slot 1 and loads it at boot if present
-**And** `tests/test_saves.gd` covers the round-trip, the `.bak` fallback, the newer-version rejection and the failure signal
+**And** `tests/test_saves.gd` covers the round-trip, the `.bak` fallback, the newer-version rejection, the damaged-slot write refusal, progress saves and the failure signal, with no `ERROR:` line in the output
 
 ### Story 1.22: Three ember stages, the Ember Cache and difficulty tiers
 
@@ -1868,7 +1896,8 @@ So that "one more hit" and "can I reach the station?" are both real choices.
 **Given** `objects/ember_cache.gd` (a `LightSource` of kind `cache`, amber glow, radius from `Tuning`, starting at 80 px and tuned at the CP2 gate)
 **When** `enter_room` builds a room whose id matches `slot.cache.room`
 **Then** the cache spawns there; it wakes lurkers only if its radius is ≥ 80 px (tested at 79 and 80); a lurker hunting the cache is harmless; the cache survives rests and saves (FR24, AR24)
-**And** if the player died inside a hazard or out of reach, the cache is placed at the last safe ground position in that room
+**And** the cache always sits at the last safe ground position the player stood on in that room (the per-life tracker from Story 1.19), so a mid-air or hazard death never leaves it floating or out of reach; tests cover a ground, a mid-air and a hazard death
+**And** a smoke test dies on Normal in `m1_shaft` with carried > 0, respawns through `enter_room`, finds the cache in the room and touches it to get the embers back
 **And** rule tests cover every stage transition and tier
 
 ### Story 1.23: Flare Toss
@@ -1928,6 +1957,7 @@ So that deaths cost distance, not the whole descent.
 **When** the player dies
 **Then** they respawn at whichever is deeper, with full HP (FR13)
 **And** `m1_shaft.txt` now has the station at the top and two anchors (FR39); their legend chars are in `room_legend.gd` and `docs/rooms.md`
+**And** through the bottom-exit loop (R16) the player can return to the top station and rest again; a smoke test dives, lights an anchor, kills an enemy, loops to the top, rests, and finds the enemy back and the carried embers deposited
 
 ### Story 1.25: Gutter HUD v2: frame, HP and embers
 
@@ -1951,12 +1981,13 @@ So that the play area stays clear and I always know what I'm risking.
 **Given** HP and embers
 **When** they change
 **Then** 4 pips at x 26, y 24 + 10·n fill or outline (UX-DR32); the held row (amber, flickering while > 0) and carried row (solid, HP colour) sit at y 96 and y 108 and fit `+999` and `+1240` (UX-DR33)
-**And** a lost pip cracks, shakes (no shake under reduced motion) and outlines, then the pips blink at 2.5 Hz for 0.6 s (UX-DR138)
+**And** a lost pip cracks, shakes (no shake under reduced motion) and outlines, then the pips blink at 2.5 Hz for 0.6 s, holding steady transparency instead under reduce flashing (UX-DR138, UX-DR126)
+**And** the held row's flicker runs at ≤ 3 changes per second through the Fx gate and is steady under reduce flashing
 **And** on `save_succeeded` the steady lantern autosave icon (left gutter, y 252) shows for ≥ 1000 ms (UX-DR41)
 
 ### Story 1.26: Gutter HUD v2: chain number, meter and cling cues
 
-**Type:** dev
+**Type:** dev, content
 
 As a player,
 I want my chain to grow visibly in the right gutter and my cling time to show beside me,
@@ -1966,11 +1997,11 @@ So that I feel every link and know when a cling will run out.
 
 **Given** the chain
 **When** it grows
-**Then** the amber number (0 in the Empty colour) steps 24 → 26 → 28 → 32 px at 3 / 6 / 10 with a 1 px pop for 67 ms, its digits built by the sprite pipeline (`tools/sprites/`, `build_sprites.py`); the 20-segment meter at x 444 fills bottom-up; the flare notch sits beside segment 2 (UX-DR13, UX-DR34, UX-DR35, UX-DR37, UX-DR135, UX-DR136)
+**Then** the amber number (0 in the Empty colour) steps 24 → 26 → 28 → 32 px at 3 / 6 / 10 with a 1 px pop for 67 ms, its digits hand-pixelled at each of the 4 heights as sprite grids (`tools/sprites/`, built by `build_sprites.py`), drafted by Claude and approved by sonlm before commit; the 20-segment meter at x 444 fills bottom-up; the flare notch sits beside segment 2 (UX-DR13, UX-DR34, UX-DR35, UX-DR37, UX-DR135, UX-DR136)
 
 **Given** a bank
 **When** the chain ends safely
-**Then** the popup `x{links} +{embers}` rises and fades over 600 ms (no rise under reduced motion), embers fly into the gutter counter, and the meter empties; on a break, segments fall away and dim with no flash (UX-DR45, UX-DR137, UX-DR139)
+**Then** the popup `x{links} +{embers}` rises and fades over 600 ms (no rise under reduced motion), a bank burst of 12 amber sparks plays at the player over 300 ms (under reduce flashing: 6 sparks at half alpha, no bloom; defaults reviewed in Story 1.30), embers fly into the gutter counter, and the meter empties; M1's English "+N banked" / "-N lost" popups are removed; on a break, segments fall away and dim with no flash (UX-DR45, UX-DR137, UX-DR139)
 
 **Given** a cling
 **When** it starts
@@ -1989,7 +2020,7 @@ So that I hear and see it before it can reach me.
 **Given** any lurker in `TELEGRAPH`
 **When** the alert shows
 **Then** both gutters get a 1 px predator-red frame pulsing ≤ 2 Hz for at least 400 ms, plus the open-eye icon (right gutter, centred x 450, y 68); overlapping telegraphs keep one frame without restarting the pulse; under reduce flashing the frame is solid; HUD values are never recoloured; colour is never the only signal (FR19, UX-DR29, UX-DR39, UX-DR40, UX-DR129)
-**And** M1's `#ff594d` alert colour is replaced by `#d9473f` (UX-DR2)
+**And** no `#ff594d` remains in the code (M1 used it for `shaft.gd`'s alert and `fx.gd`'s loss popup); predator red is `#d9473f` from `core/palettes.gd` (UX-DR2)
 
 **Given** a stirring lurker (`stir` from Story 1.20)
 **When** it is off screen
@@ -2031,11 +2062,11 @@ So that every death teaches.
 
 **Given** the player reaches 0 HP
 **When** the death card opens through `ScreenRouter` (`PROCESS_MODE_ALWAYS`)
-**Then** after a short fade the play area dims to the zone surface at 70% with the gutters still visible, and one death line shows centred, 328 px wide, in `body-line` with the text outline: cause in the HP colour, avoidance in the label colour (FR37, UX-DR81)
+**Then** after a short fade the play area dims to the zone surface at 70% with the gutters still visible, and the death line shows centred, 328 px wide, in `body-line` with the text outline: the cause line in the HP colour, then the avoidance tip in the label colour (FR37, UX-DR81)
 
 **Given** the E1 causes
 **When** their lines are written
-**Then** each is a `DEATH_<CAUSE>` key written against the approved anchors, about one row long, and approved by sonlm before commit (NR2, NR3, NR11)
+**Then** each cause has two keys, `DEATH_<CAUSE>_LINE` (the cause; may carry island idiom) and `DEATH_<CAUSE>_TIP` (the avoidance; always plain), each fitting one 328 px row, written against the approved anchors and approved by sonlm before commit (NR2, NR3, NR11)
 
 **Given** the difficulty tier
 **When** the card shows
@@ -2043,8 +2074,8 @@ So that every death teaches.
 
 **Given** buttons held at the moment of death
 **When** the card is up
-**Then** they are ignored; a fresh press skips the card only after 0.6 s; it auto-advances after about 3 s; then the player respawns (UX-DR85, UX-DR132)
-**And** each death appends an entry to `slot.death_log` holding the `DEATH_<CAUSE>` key and the room id (not the rendered text), so the E7 Journal can group deaths by cause (AR14, UX-DR86)
+**Then** they are ignored; a fresh press of any action skips the card only after 0.6 s (`menu_confirm` once Story 1.31 lands); it auto-advances after about 3 s; then the player respawns (UX-DR85, UX-DR132)
+**And** each death appends an entry to `slot.death_log` holding the cause id from `damaged(amount, cause)` and the room id (not string keys or rendered text; this format freezes with `slot_v1`), so the E7 Journal can group deaths by cause (AR14, UX-DR86)
 
 ### Story 1.30: CP2 gate: the kit playtest
 
@@ -2062,7 +2093,7 @@ So that the Weaver prototype is built on a kit I trust.
 **When** sonlm plays the kit build mid-chain under lurker pressure
 **Then** the record also answers: does tap vs hold on Light feel overwhelming mid-chain? Does an instant mid-air Snuff become a free bank every time an eye opens? A "yes" on Snuff triggers the GDD Risks fix (e.g. Snuff banks only half the held embers) as a fix story before E2, with its HUD cue (UX O20)
 
-**Given** the HUD defaults D1 (chain number steps), D3 (cling cue and grace bar), D4 (icon art), D8 (alert hold on overlap) and D11 (autosave icon)
+**Given** the HUD defaults D1 (chain number steps), D3 (cling cue and grace bar), D4 (icon art), D8 (alert hold on overlap) and D11 (autosave icon), plus the hit flash (Story 1.19) and bank burst (Story 1.26) defaults and their reduce-flashing variants
 **When** sonlm reviews them in the kit build with `DESIGN.md` open
 **Then** each is marked keep or change; small changes are fixed before CP3, and the spine tags are updated with the decision and date
 
@@ -2159,6 +2190,7 @@ So that I can stop a long descent without losing progress or guessing the contro
 **Given** play
 **When** the player presses Esc or P (Start on gamepad), or the window loses focus (desktop and web)
 **Then** `SceneTree.paused` is set and the Pause tab opens, replacing the view; Esc, P or Back closes it (UX-DR68, UX-DR71, FR32, NFR5)
+**And** while the death card, the rest sequence or the station menu is up, Pause does nothing; a focus loss there pauses the tree without opening a second screen, and the sequence resumes on focus; pausing during hitstop or slow-mo resumes the remaining Clock request on unpause; tests cover each case
 
 **Given** the Pause tab
 **When** it shows
@@ -2167,7 +2199,7 @@ So that I can stop a long descent without losing progress or guessing the contro
 **Given** Quit
 **When** it is chosen
 **Then** a confirm step asks "Quit to title?" (No selected); away from a lit anchor or station it adds "You will wake at the last rest."; Yes returns to the title (UX-DR72)
-**And** quitting at a lit anchor autosaves the slot plus the dive snapshot (anchor id + carried embers), and a desktop window close runs the same Quit path; autosave happens only at a station rest, the hub and a quit at a lit anchor (FR29, AR35, AR38, UX-DR112)
+**And** quitting at a lit anchor autosaves the slot plus the dive snapshot (anchor id + carried embers), and a desktop window close runs the same Quit path; resume saves happen only at a station rest, the hub and a quit at a lit anchor, while progress saves have already kept world progress (FR29, AR35, AR38, R14, UX-DR112)
 
 ### Story 1.35: Cling and Snuff hold→press toggles
 
@@ -2204,7 +2236,7 @@ So that I can make the game fit me without restarting.
 
 **Given** the Game tab
 **When** the player changes Difficulty (Easy / Normal / Hard)
-**Then** it applies at once to the loaded slot's death cost (FR25, UX-DR75)
+**Then** it applies at once to the loaded slot's death cost and triggers a progress save, so the slot picker shows the new tier (FR25, UX-DR75, R14)
 
 **Given** the Accessibility tab
 **When** it shows
@@ -2212,7 +2244,7 @@ So that I can make the game fit me without restarting.
 
 **Given** any control
 **When** it changes
-**Then** toggles flip on confirm, choices change with ← / →, values sit right-aligned at x 412, and the change applies at once and persists in `settings.cfg` (UX-DR49)
+**Then** toggles flip on confirm, choices change with ← / →, values sit right-aligned at x 412, and the change applies at once and persists in `settings.json` (UX-DR49, R15)
 
 ### Story 1.37: Gamepad, glyph swap and disconnect pause
 
@@ -2239,7 +2271,7 @@ So that I never need the keyboard and prompts always match what I hold.
 
 **Given** the pad in use disconnects mid-play
 **When** it is lost
-**Then** the game pauses with "Controller disconnected" and keyboard glyphs (a disconnect while a menu or the death card is open only switches glyphs; it never opens a second screen); reconnecting or pressing any key resumes with game state (including the chain) unchanged; the J6 gamepad session works end to end (FR32, UX-DR73, UX-DR110)
+**Then** the game pauses with "Controller disconnected" and keyboard glyphs (a disconnect while a menu or the death card is open only switches glyphs; it never opens a second screen); reconnecting or pressing any key resumes with game state (including the chain) unchanged; J6 steps 1 and 3–7 of the gamepad session work end to end; step 2 (Load slot 2) is verified in Story 1.38 (FR32, UX-DR73, UX-DR110)
 
 ### Story 1.38: Slot picker and difficulty step
 
@@ -2268,6 +2300,7 @@ So that I can keep separate runs and pick how much death costs me.
 **Then** Easy / Normal / Hard and one `body-line` text say only what death costs on each tier and that it can be changed later in Options, never "casual" or "hardcore"; Play writes the slot at once and starts in the shaft (the hub opening arrives in E5) (UX-DR66, AR38)
 **And** Continue on the title loads the most recently saved slot, and Load appears on the title once a save exists
 **And** a slot whose file and `.bak` both fail reads "Slot N — Damaged" and can only be overwritten or deleted; deleting the most recent slot makes Continue load the next most recent, or hides it if none is left
+**And** J6 step 2 works on a gamepad: Load opens the picker, A loads slot 2, B goes back (UX-DR110)
 
 ### Story 1.39: Save-failure feedback and web persistence
 
@@ -2282,7 +2315,7 @@ So that I'm never surprised by lost progress, especially in the browser.
 **Given** `Game.save_failed`
 **When** a save fails
 **Then** the autosave lantern becomes the crossed lantern and stays crossed until a save succeeds; "Not saved" shows for 3 s at the bottom-left of the play area (x 64) with the text outline; the Pause tab shows the pause note explaining the fix; the game never crashes or pauses (UX-DR41, UX-DR53, UX-DR113, NFR13)
-**And** the save retries at the next trigger and on quit to title
+**And** the save retries at the next trigger and on quit to title; a retry on quit to title away from a lit anchor is a progress save (R14), so it never moves the resume point
 
 **Given** a web build
 **When** it boots and before each save
@@ -2323,11 +2356,12 @@ So that testers' saves survive every update from here on.
 
 **Given** a real E1 slot with an Ember Cache, lit anchors, records and `death_log` entries
 **When** it is captured
-**Then** it is committed as `tests/fixtures/slot_v1.json`, and a test loads it in every later build (AR37)
+**Then** it is committed as `tests/fixtures/slot_v1.json`, and a test in every later build loads it and asserts its values (the cache, lit anchors, records and `death_log` entries), not just that it loads (AR37)
+**And** a schema guard test fails if the keys of `SlotState.to_dict()` or `DiveState.to_dict()` change without a version bump, a migration and a new fixture
 
 **Given** the end of E1
 **When** the close-out runs
-**Then** `tools/export.sh` is green for all three targets including the web smoke check, the E1 playtest answer is recorded in `implementation-artifacts/`, the GDD Epic Structure table shows E1 as L, and a devlog or private build is posted
+**Then** `tools/export.sh` is green for all three targets including the web smoke check, the CP2 (Story 1.30) and CP3 (Story 1.40) records are in `implementation-artifacts/playtests/`, and a devlog or private build is posted
 
 ## Epic 2: Weaver Prototype: The Restraint Fight Is Fun
 
@@ -2548,7 +2582,7 @@ So that every attempt starts the same way and teaches me something.
 
 **Given** the new death causes
 **When** their lines are written
-**Then** `DEATH_WEAVER_BITE` and `DEATH_SPIDERLING` follow the approved death-card anchors and are approved by sonlm before commit (NR2, NR11, NR21)
+**Then** the `DEATH_WEAVER_BITE_LINE` / `_TIP` and `DEATH_SPIDERLING_LINE` / `_TIP` keys follow the approved death-card anchors and are approved by sonlm before commit (NR2, NR11, NR21)
 
 **Given** the player enters the arena
 **When** the fight begins
@@ -2768,7 +2802,7 @@ So that I can balance music and effects for where I'm playing.
 
 **Given** a slider change
 **When** it applies
-**Then** it takes effect at once, multiplies with master through `Audio._apply`, and persists in `settings.cfg`
+**Then** it takes effect at once, multiplies with master through `Audio._apply`, and persists in `settings.json`
 
 ### Story 3.9: E3 playtest
 
@@ -3991,7 +4025,7 @@ So that I can fit the game to my screen.
 **Given** Options
 **When** E7 lands
 **Then** a Video tab appears with Brightness (4 levels, moved here from Accessibility), Fullscreen and Scale (whole-number scales only) (FR33, UX-DR78, UX-DR133)
-**And** each change applies at once and persists in `settings.cfg`; on web, Fullscreen sits beside the itch fullscreen button (UX-DR146)
+**And** each change applies at once and persists in `settings.json`; on web, Fullscreen sits beside the itch fullscreen button (UX-DR146)
 
 ### Story 7.3: Options > Controls: rebinding
 

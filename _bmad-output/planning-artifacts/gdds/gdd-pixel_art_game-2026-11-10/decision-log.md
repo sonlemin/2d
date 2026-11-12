@@ -238,3 +238,12 @@ Source: `planning-artifacts/epics.md` (gds-create-epics-and-stories, complete), 
 - **Brightness ships in E1** (R1, decided by sonlm 2026-11-12; UX A1): 4 levels in the Accessibility tab, replacing the M1 F1 hotkey that E1 removes; it moves to the Video tab in E7. Fixes the earlier text that had F1 removed in E7. Updated: Options rollout, `epics.md` E1 and E7.
 - **Not changed here:** UX `EXPERIENCE.md` still lists Brightness as an E7 assumption (A1). Left for the readiness check or a UX update.
 - **Status:** stays `final`; `updated: 2026-11-12`.
+
+## 2026-11-12 — Implementation-readiness decisions (Epic 1 fixes)
+
+Source: `planning-artifacts/implementation-readiness-report-2026-11-12.md` (verdict NEEDS WORK). Recorded as R14–R16 in `planning-artifacts/epics.md`.
+
+- **R14 Progress saves (sonlm):** besides the resume saves (station rest, hub arrival, quit at a lit anchor), the slot is saved at progress moments: a difficulty change, a purchase, a story flag, the Weaver phase checkpoint and its defeat. These never move the resume point or make carried embers safe. Updated: Platform-Specific Details → Saves; architecture Data Persistence; project-context.
+- **R15 Settings as JSON (sonlm):** `user://settings.json` replaces `settings.cfg`, parsed with the silent `JSON.new().parse()`. Godot 4.7.2 prints an engine `ERROR:` on a corrupt `ConfigFile`, which fails the test runner. Architecture and project-context only; no GDD text named the file.
+- **R16 E1 shaft loop (sonlm):** the rebuilt M1 shaft's bottom exit leads to its own top entry, banking the chain like a landing, so the E1 kit build can rest, deposit and redive at the placeholder station. E1 only; Layer 1 (E4) is unaffected.
+- **Status:** stays `final`; `updated: 2026-11-12`.
