@@ -1,0 +1,12 @@
+; The smallest room that uses every legend char and both exit sides (Story 1.5 D8).
+id=ok_min
+zone=dusk
+exits=up:ok_min@x2, down:ok_min@x5
+---
+##.####
+#.....#
+#.P.h.#
+###...L
+#.....#
+#c....#
+#####.#

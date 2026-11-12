@@ -1,0 +1,12 @@
+; ok_min with one fault: a hole in the left wall at row 5 (test_room_loader.gd).
+id=bad_edge_hole
+zone=dusk
+exits=up:ok_min@x2, down:ok_min@x5
+---
+##.####
+#.....#
+#.P.h.#
+###...L
+......#
+#c....#
+#####.#

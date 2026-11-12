@@ -1,0 +1,14 @@
+; ok_min with one fault: two obj= lines share the id a (test_room_loader.gd).
+id=bad_duplicate_id
+zone=dusk
+exits=up:ok_min@x2, down:ok_min@x5
+obj=a@1,1
+obj=a@2,1
+---
+##.####
+#.....#
+#.P.h.#
+###...L
+#.....#
+#c....#
+#####.#

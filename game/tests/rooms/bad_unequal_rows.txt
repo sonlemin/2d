@@ -1,0 +1,12 @@
+; ok_min with one fault: row 3 is 6 wide (test_room_loader.gd).
+id=bad_unequal_rows
+zone=dusk
+exits=up:ok_min@x2, down:ok_min@x5
+---
+##.####
+#.....#
+#.P.h#
+###...L
+#.....#
+#c....#
+#####.#

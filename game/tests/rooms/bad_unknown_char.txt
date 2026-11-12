@@ -1,0 +1,12 @@
+; ok_min with one fault: an unknown char x in row 5 (test_room_loader.gd).
+id=bad_unknown_char
+zone=dusk
+exits=up:ok_min@x2, down:ok_min@x5
+---
+##.####
+#.....#
+#.P.h.#
+###...L
+#..x..#
+#c....#
+#####.#

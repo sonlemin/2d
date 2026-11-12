@@ -1,0 +1,317 @@
+class_name RoomLoader
+## Rooms are text (AR21): `res://rooms/<layer>/<room_id>.txt`, a key=value header, `---`, then the
+## grid, 1 char = 16 px (format: docs/rooms.md). parse() splits a file; the pure validate() returns
+## every content error as "<path>:<row>:<col> <what>"; the loader push_errors them and refuses to
+## build (Architecture → Error Handling). Tests inspect validate()'s list and never trigger push_error.
+
+const ROOT := "res://rooms"
+const SPINE_WIDTH := 22  ## spine rooms are 22 columns wall to wall (decision log: 352 px in the 360 px play area)
+const ZONES: Array[String] = ["dusk", "umber", "violet"]  ## the GDD's Layer 1 zones
+const SINGLE_KEYS: Array[String] = ["id", "zone", "spine", "exits"]
+const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's shaft background until the zone palettes (1.18)
+const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
+
+static var _id_re := RegEx.create_from_string("^[a-z][a-z0-9_]*$")
+static var _exit_re := RegEx.create_from_string("^(up|down):([a-z][a-z0-9_]*)@x(\\d+)$")
+static var _obj_re := RegEx.create_from_string("^([a-z][a-z0-9_]*)@(\\d+),(\\d+)$")
+# Shared by every room (project-context: cache materials and shared resources as statics).
+static var _tileset: TileSet
+static var _rim_material: CanvasItemMaterial
+static var _index := {}  # room id -> path, built on the first load_room()
+static var _indexed := false
+
+
+## Resolves an id to its file under res://rooms/ and loads it. Null (after push_error) when unknown.
+static func load_room(id: StringName) -> Room:
+	var index := _get_index()
+	if not index.has(id):
+		push_error("RoomLoader: no room '%s' under %s" % [id, ROOT])
+		return null
+	return load_room_from_path(index[id])
+
+
+static func load_room_from_path(path: String) -> Room:
+	# get_file_as_string() on a missing file prints an engine error of its own.
+	if not FileAccess.file_exists(path):
+		push_error("%s:0:0 file not found" % path)
+		return null
+	var parsed := parse(FileAccess.get_file_as_string(path))
+	var errors := validate(path, parsed)
+	for e in errors:
+		push_error(e)
+	if not errors.is_empty():
+		return null
+	return _build(parsed)
+
+
+## Splits a room file into header entries ({key, value, line, ok}) and grid rows. No checks here.
+## `grid_line` is the 1-based file line of grid row 0, or 0 when there is no `---` line.
+static func parse(text: String) -> Dictionary:
+	var header: Array[Dictionary] = []
+	var grid: Array[String] = []
+	var grid_line := 0
+	var lines := text.split("\n")
+	for i in lines.size():
+		var line := lines[i].strip_edges(false, true)  # drops \r and trailing spaces
+		if grid_line > 0:
+			grid.append(line)
+		elif line == "---":
+			grid_line = i + 2
+		elif line != "" and not line.begins_with(";"):
+			var eq := line.find("=")
+			header.append({key = line.left(eq).strip_edges() if eq >= 0 else line,
+					value = line.substr(eq + 1).strip_edges() if eq >= 0 else "", line = i + 1, ok = eq > 0})
+	while not grid.is_empty() and grid[-1] == "":
+		grid.pop_back()
+	return {header = header, grid = grid, grid_line = grid_line}
+
+
+## Pure: every content error in the file, or [] when it builds. `path` names the file in messages
+## and must end in "<id>.txt". Rows and columns are 1-based file positions, so an editor jumps there.
+static func validate(path: String, parsed: Dictionary) -> Array[String]:
+	var errors: Array[String] = []
+	var err := func(row: int, col: int, what: String) -> void:
+		errors.append("%s:%d:%d %s" % [path, row, col, what])
+	if parsed.grid_line == 0:
+		err.call(1, 1, "no '---' line between the header and the grid")
+		return errors
+	# Header.
+	var seen := {}
+	var values := {}
+	var exit_lines := {}  # side -> header line
+	var exits: Array[Dictionary] = []
+	var objs := {}  # obj id -> true
+	var obj_cells: Array[Dictionary] = []  # {cell, line}
+	for h: Dictionary in parsed.header:
+		var key: String = h.key
+		if not h.ok:
+			err.call(h.line, 1, "header line is not key=value")
+			continue
+		if not key in SINGLE_KEYS and key != "obj":
+			err.call(h.line, 1, "unknown key '%s'" % key)
+			continue
+		if key in SINGLE_KEYS:
+			if seen.has(key):
+				err.call(h.line, 1, "key '%s' repeated (first on line %d)" % [key, seen[key]])
+				continue
+			seen[key] = h.line
+			values[key] = h.value
+		match key:
+			"id":
+				if _id_re.search(h.value) == null:
+					err.call(h.line, 1, "id '%s' is not snake_case" % h.value)
+				elif h.value != path.get_file().get_basename():
+					err.call(h.line, 1, "id '%s' is not the file name '%s'" % [h.value, path.get_file()])
+			"zone":
+				if not h.value in ZONES:
+					err.call(h.line, 1, "zone '%s' is not one of %s" % [h.value, ", ".join(ZONES)])
+			"spine":
+				if h.value != "true" and h.value != "false":
+					err.call(h.line, 1, "spine '%s' is not true or false" % h.value)
+			"exits":
+				for part in h.value.split(",", false):
+					var m := _exit_re.search(part.strip_edges())
+					if m == null:
+						err.call(h.line, 1, "exit '%s' is not <up|down>:<room_id>@x<col>" % part.strip_edges())
+					elif exit_lines.has(m.get_string(1)):
+						err.call(h.line, 1, "two '%s' exits" % m.get_string(1))
+					else:
+						exit_lines[m.get_string(1)] = h.line
+						exits.append({side = m.get_string(1), col = m.get_string(3).to_int(), line = h.line})
+			"obj":
+				var m := _obj_re.search(h.value)
+				if m == null:
+					err.call(h.line, 1, "obj '%s' is not <id>@<col>,<row>" % h.value)
+				elif objs.has(m.get_string(1)):
+					err.call(h.line, 1, "duplicate obj id '%s'" % m.get_string(1))
+				else:
+					objs[m.get_string(1)] = true
+					obj_cells.append({cell = Vector2i(m.get_string(2).to_int(), m.get_string(3).to_int()), line = h.line})
+	for key in ["id", "zone"]:
+		if not seen.has(key):
+			err.call(1, 1, "missing '%s='" % key)
+	# Grid shape and chars.
+	var grid: Array[String] = parsed.grid
+	var top: int = parsed.grid_line
+	if grid.size() < 3 or grid[0].length() < 3:
+		err.call(top, 1, "grid is smaller than 3 x 3")
+		return errors
+	var w := grid[0].length()
+	var even := true
+	var spawns: Array[Vector2i] = []
+	for r in grid.size():
+		if grid[r].length() != w:
+			err.call(top + r, 1, "row is %d wide, row 1 is %d" % [grid[r].length(), w])
+			even = false
+		for c in grid[r].length():
+			var ch := grid[r][c]
+			if not RoomLegend.is_known(ch):
+				err.call(top + r, c + 1, "unknown char '%s'" % ch)
+			elif ch == RoomLegend.SPAWN:
+				spawns.append(Vector2i(c, r))
+	if values.get("spine", "false") == "true" and w != SPINE_WIDTH:
+		err.call(top, 1, "spine room is %d wide, must be %d" % [w, SPINE_WIDTH])
+	if spawns.size() > 1:
+		err.call(top + spawns[1].y, spawns[1].x + 1, "second 'P' (one spawn per room)")
+	# The cell checks need a rectangle; an unequal row has been reported above.
+	if not even:
+		return errors
+	var h_rows := grid.size()
+	for s in spawns:
+		if not solid_at(grid, s + Vector2i.DOWN):
+			err.call(top + s.y, s.x + 1, "'P' has nothing solid below it")
+	for o: Dictionary in obj_cells:
+		if o.cell.x >= w or o.cell.y >= h_rows:
+			err.call(o.line, 1, "obj cell %s is outside the %d x %d grid" % [o.cell, w, h_rows])
+	# Exit openings: the named cell plus the open cells right of it in the edge row (D3).
+	var opening := {}  # Vector2i -> true
+	for e: Dictionary in exits:
+		var row := 0 if e.side == "up" else h_rows - 1
+		if e.col >= w:
+			err.call(e.line, 1, "%s exit column %d is outside the grid (0..%d)" % [e.side, e.col, w - 1])
+			continue
+		if solid_at(grid, Vector2i(e.col, row)):
+			err.call(e.line, 1, "%s exit column %d is a solid cell" % [e.side, e.col])
+			continue
+		var c: int = e.col
+		while c < w and not solid_at(grid, Vector2i(c, row)):
+			opening[Vector2i(c, row)] = true
+			c += 1
+	# The edge rule: a hole in the room's edge that isn't an exit would let the player leave.
+	for r in h_rows:
+		for c in w:
+			var edge := r == 0 or r == h_rows - 1 or c == 0 or c == w - 1
+			var cell := Vector2i(c, r)
+			if edge and not solid_at(grid, cell) and not opening.has(cell):
+				err.call(top + r, c + 1, "hole in the room's edge that is not a declared exit")
+	return errors
+
+
+## Solid = a wall, or an in-wall char (L) whose left or right neighbour is a wall or the room edge
+## (D5: with 1-tile walls a lurker sits in the edge column). False outside the grid.
+static func solid_at(grid: Array[String], cell: Vector2i) -> bool:
+	if cell.y < 0 or cell.y >= grid.size() or cell.x < 0 or cell.x >= grid[cell.y].length():
+		return false
+	var row := grid[cell.y]
+	var ch := row[cell.x]
+	if ch == RoomLegend.WALL:
+		return true
+	if not RoomLegend.is_in_wall(ch):
+		return false
+	return cell.x == 0 or cell.x == row.length() - 1 \
+			or row[cell.x - 1] == RoomLegend.WALL or row[cell.x + 1] == RoomLegend.WALL
+
+
+## Builds a validated room. Entities spawn in grid order (row, then column), so it is deterministic.
+static func _build(parsed: Dictionary) -> Room:
+	var grid: Array[String] = parsed.grid
+	var room := Room.new()
+	room.size_cells = Vector2i(grid[0].length(), grid.size())
+	for h: Dictionary in parsed.header:
+		match h.key:
+			"id":
+				room.id = StringName(h.value)
+			"zone":
+				room.zone = StringName(h.value)
+			"spine":
+				room.spine = h.value == "true"
+			"exits":
+				for part in h.value.split(",", false):
+					var m := _exit_re.search(part.strip_edges())
+					room.exits.append({side = StringName(m.get_string(1)), target = StringName(m.get_string(2)),
+							col = m.get_string(3).to_int()})
+			"obj":
+				var m := _obj_re.search(h.value)
+				room.objects[StringName(m.get_string(1))] = Vector2i(m.get_string(2).to_int(), m.get_string(3).to_int())
+	room.name = String(room.id)
+	var backdrop := ColorRect.new()
+	backdrop.name = "Backdrop"
+	backdrop.z_index = -10
+	backdrop.size = room.bounds().size
+	backdrop.color = BACKDROP
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.add_child(backdrop)
+	room.walls = TileMapLayer.new()
+	room.walls.name = "Walls"
+	room.walls.tile_set = _get_tileset()
+	room.add_child(room.walls)
+	var rims := Node2D.new()
+	rims.name = "Rims"
+	room.add_child(rims)
+	var tile := Room.TILE
+	for r in grid.size():
+		for c in grid[r].length():
+			var cell := Vector2i(c, r)
+			var ch := grid[r][c]
+			if solid_at(grid, cell):
+				room.walls.set_cell(cell, 0, Vector2i.ZERO)
+				# A rim on every floor surface, so places to land read in the dark (M1 finding 7).
+				var above := cell + Vector2i.UP
+				if r > 0 and not solid_at(grid, above) and not RoomLegend.is_in_wall(grid[r - 1][c]):
+					rims.add_child(_rim(cell))
+			if ch == RoomLegend.SPAWN:
+				room.spawn_cell = cell
+			elif RoomLegend.SPAWNS.has(ch):
+				var kind: Dictionary = RoomLegend.SPAWNS[ch]
+				room.spawn(kind.scene, room.cell_centre(cell), kind.args)
+	return room
+
+
+static func _rim(cell: Vector2i) -> ColorRect:
+	if _rim_material == null:
+		_rim_material = CanvasItemMaterial.new()
+		_rim_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED  # must read in the dark
+	var rim := ColorRect.new()
+	rim.material = _rim_material
+	rim.color = LEDGE_RIM
+	rim.position = Vector2(cell * Room.TILE)
+	rim.size = Vector2(Room.TILE, 1)
+	rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rim
+
+
+## One wall tile with a full-square collision on world layer 1 (M1's shaft tileset, built in code: no .tres).
+static func _get_tileset() -> TileSet:
+	if _tileset != null:
+		return _tileset
+	var t := Room.TILE
+	_tileset = TileSet.new()
+	_tileset.tile_size = Vector2i(t, t)
+	_tileset.add_physics_layer()
+	_tileset.set_physics_layer_collision_layer(0, 1)  # world
+	var src := TileSetAtlasSource.new()
+	src.texture = preload("res://art/tile.png")
+	src.texture_region_size = Vector2i(t, t)
+	src.create_tile(Vector2i.ZERO)
+	_tileset.add_source(src, 0)
+	var h := t / 2.0
+	var data := src.get_tile_data(Vector2i.ZERO, 0)
+	data.add_collision_polygon(0)
+	data.set_collision_polygon_points(0, 0, PackedVector2Array([
+		Vector2(-h, -h), Vector2(h, -h), Vector2(h, h), Vector2(-h, h)]))
+	return _tileset
+
+
+## id -> path for every *.txt under ROOT, walked once. An id found twice is a content error.
+static func _get_index() -> Dictionary:
+	if not _indexed:
+		_indexed = true
+		_scan(ROOT, _index)
+	return _index
+
+
+static func _scan(dir_path: String, into: Dictionary) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	for sub in dir.get_directories():
+		_scan(dir_path.path_join(sub), into)
+	for file in dir.get_files():
+		if file.get_extension() != "txt":
+			continue
+		var id := StringName(file.get_basename())
+		var path := dir_path.path_join(file)
+		if into.has(id):
+			push_error("RoomLoader: room id '%s' in both %s and %s" % [id, into[id], path])
+			continue
+		into[id] = path
