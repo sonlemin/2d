@@ -70,11 +70,22 @@ func _test_inline_errors() -> void:
 	_has(_inline(ok.replace("zone=dusk\n", "")), p + ":1:1 missing 'zone='", "a missing zone")
 	_has(_inline(ok, "res://x/other.txt"), "res://x/other.txt:2:1 id 'ok_min' is not the file name 'other.txt'", "id != file name")
 	_has(_inline(ok.replace("#.....#\n#c", "#..P..#\n#c")), p + ":10:4 second 'P' (one spawn per room)", "two Ps")
+	var three_p := _inline(ok.replace("#.....#\n#c", "#..P..#\n#c").replace("#.....#\n#.P", "#...P.#\n#.P"))
+	_has(three_p, p + ":8:3 second 'P' (one spawn per room)", "three Ps: the first extra (grid order: the new row-1 P comes first)")
+	_has(three_p, p + ":10:4 second 'P' (one spawn per room)", "three Ps: the second extra")
 	_has(_inline(ok.replace("#.P.h.#\n###", "#.P.h.#\n#..")), p + ":8:3 'P' has nothing solid below it", "P in mid-air")
 	_has(_inline(ok.replace("zone=dusk", "zone=dusk\nspine=true")), p + ":7:1 spine room is 7 wide, must be 22", "a spine room not 22 wide")
 	var exits := "exits=up:ok_min@x2, down:ok_min@x5"
 	_has(_inline(ok.replace(exits, "exits=up:ok_min@x3, down:ok_min@x5")), p + ":4:1 up exit column 3 is a solid cell", "an exit on a solid cell")
-	_has(_inline(ok.replace(exits, "exits=up:ok_min@x9, down:ok_min@x5")), p + ":4:1 up exit column 9 is outside the grid (0..6)", "an exit outside the grid")
+	_has(_inline(ok.replace(exits, "exits=up:ok_min@x9, down:ok_min@x5")), p + ":4:1 up exit column 9 is outside the inner columns (1..5)", "an exit outside the grid")
+	_has(_inline(ok.replace(exits, "exits=up:ok_min@x0, down:ok_min@x5")), p + ":4:1 up exit column 0 is outside the inner columns (1..5)", "an exit on a corner column")
+	# The opening stops before the corner, so an open corner is still a hole in the side wall.
+	_has(_inline(ok.replace("##.####", "##.....")), p + ":6:7 hole in the room's edge that is not a declared exit", "an opening through the corner")
+	_has(_inline(ok.replace("#.....#\n#.P", "#.#...#\n#.P")), p + ":4:1 up exit's entry cell (2, 1) is solid", "a wall in the up exit's entry cell")
+	_has(_inline(ok.replace("#c....#", "#c...##")), p + ":4:1 down exit's entry cell (5, 5) is solid", "a wall in the down exit's entry cell")
+	_has(_inline(ok.replace(exits, "exits=up:ok_min@x4294967298, down:ok_min@x5")), p + ":4:1 exit 'up:ok_min@x4294967298' is not <up|down>:<room_id>@x<col>", "an exit column too long to be a cell")
+	_has(_inline(ok.replace("zone=dusk", "zone=dusk\nobj=a@4294967297,1")), p + ":4:1 obj 'a@4294967297,1' is not <id>@<col>,<row>", "an obj cell too long to be a cell")
+	_has(_inline(ok.replace("---\n", "---\n\n")), p + ":6:1 row 1 is empty (a blank line right after '---'?)", "a blank line after ---")
 	_has(_inline(ok.replace(exits, exits + ", up:ok_min@x2")), p + ":4:1 two 'up' exits", "two up exits")
 	_has(_inline(ok.replace(exits, "exits=left:ok_min@y2")), p + ":4:1 exit 'left:ok_min@y2' is not <up|down>:<room_id>@x<col>", "a left exit (E4)")
 	_has(_inline(ok.replace("zone=dusk", "zone=dusk\nobj=a@9,1")), p + ":4:1 obj cell (9, 1) is outside the 7 x 7 grid", "an obj outside the grid")
@@ -145,7 +156,7 @@ func _test_spawn_args_before_ready() -> void:
 	await get_tree().process_frame
 
 
-## The real room: the 22-column draft of M1's shaft (Story 1.5 D1, awaiting sonlm's play approval).
+## The real room: M1's shaft at 22 columns, as sonlm approved it after playing it (Story 1.5 D1).
 func _test_m1_shaft() -> void:
 	check(_errors_of(M1_SHAFT).is_empty(), "m1_shaft validates clean (got %s)" % [_errors_of(M1_SHAFT)])
 	var room := RoomLoader.load_room(&"m1_shaft")

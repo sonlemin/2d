@@ -21,12 +21,13 @@ class WorldStub extends Node2D:
 		return Rect2(camera.get_screen_center_position() - size / 2.0, size)
 
 
-static func build(parent: Node, room_id: StringName) -> Dictionary:
+## `entry`: where the player starts. Most rooms have no `P`, so pass &"up" (or a later anchor) there.
+static func build(parent: Node, room_id: StringName, entry := &"spawn") -> Dictionary:
 	var room := RoomLoader.load_room(room_id)
 	assert(room != null, "RoomHarness: room '%s' failed to load (errors above)" % room_id)
 	parent.add_child(room)
 	var player: Player = PlayerScene.instantiate()
-	player.position = room.entry_position(&"spawn")
+	player.position = room.entry_position(entry)
 	parent.add_child(player)
 	var cam: Camera2D = player.get_node("Camera")
 	centre_camera(cam, room)

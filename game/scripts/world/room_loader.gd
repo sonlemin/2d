@@ -12,8 +12,10 @@ const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's shaft background u
 const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
 
 static var _id_re := RegEx.create_from_string("^[a-z][a-z0-9_]*$")
-static var _exit_re := RegEx.create_from_string("^(up|down):([a-z][a-z0-9_]*)@x(\\d+)$")
-static var _obj_re := RegEx.create_from_string("^([a-z][a-z0-9_]*)@(\\d+),(\\d+)$")
+# Coordinates are at most 4 digits: a longer number would wrap in Vector2i (or make to_int() print
+# an engine ERROR) and pass the bounds checks as the wrong cell.
+static var _exit_re := RegEx.create_from_string("^(up|down):([a-z][a-z0-9_]*)@x(\\d{1,4})$")
+static var _obj_re := RegEx.create_from_string("^([a-z][a-z0-9_]*)@(\\d{1,4}),(\\d{1,4})$")
 # Shared by every room (project-context: cache materials and shared resources as statics).
 static var _tileset: TileSet
 static var _rim_material: CanvasItemMaterial
@@ -133,6 +135,9 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 	# Grid shape and chars.
 	var grid: Array[String] = parsed.grid
 	var top: int = parsed.grid_line
+	if not grid.is_empty() and grid[0].is_empty():
+		err.call(top, 1, "row 1 is empty (a blank line right after '---'?)")
+		return errors
 	if grid.size() < 3 or grid[0].length() < 3:
 		err.call(top, 1, "grid is smaller than 3 x 3")
 		return errors
@@ -151,8 +156,8 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 				spawns.append(Vector2i(c, r))
 	if values.get("spine", "false") == "true" and w != SPINE_WIDTH:
 		err.call(top, 1, "spine room is %d wide, must be %d" % [w, SPINE_WIDTH])
-	if spawns.size() > 1:
-		err.call(top + spawns[1].y, spawns[1].x + 1, "second 'P' (one spawn per room)")
+	for i in range(1, spawns.size()):
+		err.call(top + spawns[i].y, spawns[i].x + 1, "second 'P' (one spawn per room)")
 	# The cell checks need a rectangle; an unequal row has been reported above.
 	if not even:
 		return errors
@@ -167,14 +172,19 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 	var opening := {}  # Vector2i -> true
 	for e: Dictionary in exits:
 		var row := 0 if e.side == "up" else h_rows - 1
-		if e.col >= w:
-			err.call(e.line, 1, "%s exit column %d is outside the grid (0..%d)" % [e.side, e.col, w - 1])
+		# Columns 0 and w-1 are corners: an opening there would also open the side wall.
+		if e.col < 1 or e.col > w - 2:
+			err.call(e.line, 1, "%s exit column %d is outside the inner columns (1..%d)" % [e.side, e.col, w - 2])
 			continue
 		if solid_at(grid, Vector2i(e.col, row)):
 			err.call(e.line, 1, "%s exit column %d is a solid cell" % [e.side, e.col])
 			continue
+		# Room.entry_position() puts an arriving player one cell inside the opening.
+		var inside := Vector2i(e.col, 1 if e.side == "up" else h_rows - 2)
+		if solid_at(grid, inside):
+			err.call(e.line, 1, "%s exit's entry cell %s is solid" % [e.side, inside])
 		var c: int = e.col
-		while c < w and not solid_at(grid, Vector2i(c, row)):
+		while c < w - 1 and not solid_at(grid, Vector2i(c, row)):
 			opening[Vector2i(c, row)] = true
 			c += 1
 	# The edge rule: a hole in the room's edge that isn't an exit would let the player leave.
@@ -303,6 +313,7 @@ static func _get_index() -> Dictionary:
 static func _scan(dir_path: String, into: Dictionary) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
+		push_error("RoomLoader: can't open %s (%s)" % [dir_path, error_string(DirAccess.get_open_error())])
 		return
 	for sub in dir.get_directories():
 		_scan(dir_path.path_join(sub), into)
