@@ -1,12 +1,16 @@
 extends Node
-## Headless integration smoke test: loads the real shaft, drives inputs, and checks the loop.
+## Headless integration smoke test: loads m1_shaft standalone (RoomLoader + a test player, Story
+## 1.5), drives inputs, and checks the loop. Positions come from the room API, never literals.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd
 ## Exits 0 on pass. (Import the project once first so textures resolve.)
 
-const ShaftScene := preload("res://scenes/shaft.tscn")
+const RoomHarness := preload("res://tests/room_harness.gd")
+## The long run: the hoverers between the row-41 ledge and the row-85 platform (M1's rows, kept).
+const LONG_RUN_ROWS := Vector2i(44, 84)
 
 var _fail := 0
-var _shaft: Node2D
+var _parts: Dictionary
+var _room: Room
 var _player: Player
 
 
@@ -26,10 +30,9 @@ func seconds(s: float) -> void:
 
 
 func run() -> void:
-	_shaft = ShaftScene.instantiate()
-	add_child(_shaft)
-	_player = _shaft.get_node("Player")
+	_build()
 	await frames(2)
+	test_world_stub()
 	await test_pogo_builds_chain()
 	await test_landing_breaks_chain()
 	await test_jump_height()
@@ -39,6 +42,7 @@ func run() -> void:
 	await test_snuff_escape_point_blank()
 	await test_lurker_kills()
 	await test_snuff_needs_hold()
+	RoomHarness.free_all(_parts)
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
 
 
@@ -47,6 +51,25 @@ func place(pos: Vector2) -> void:
 	_player.global_position = pos
 	_player.velocity = Vector2.ZERO
 	(_player.get_node("Camera") as Camera2D).reset_smoothing()
+
+
+func _build() -> void:
+	_parts = RoomHarness.build(self, &"m1_shaft")
+	_room = _parts.room
+	_player = _parts.player
+
+
+## The stub World the lurkers will read from 1.6: the play area between the gutters.
+func test_world_stub() -> void:
+	var w := get_tree().get_first_node_in_group("world")
+	check(w != null and w.has_method("play_rect") and w.play_rect().size.x == 360.0, "a stub World in group world gives a 360 px play_rect()")
+
+
+## Sorted by height, never by group order: [0] is the top lurker (row 28).
+func _lurkers() -> Array:
+	var out := get_tree().get_nodes_in_group("predator")
+	out.sort_custom(func(a, b): return a.global_position.y < b.global_position.y)
+	return out
 
 
 func set_lurkers_active(on: bool) -> void:
@@ -65,10 +88,9 @@ func _hovers() -> Array:
 
 ## A tap or brush of Light (V is next to Dash) must never break the chain; a real hold Snuffs.
 func test_snuff_needs_hold() -> void:
-	_shaft.queue_free()  # the lurker test left the player dead: use a fresh shaft
-	_shaft = ShaftScene.instantiate()
-	add_child(_shaft)
-	_player = _shaft.get_node("Player")
+	RoomHarness.free_all(_parts)  # the lurker test left the player dead: use a fresh room
+	await frames(1)
+	_build()
 	await frames(2)
 	place(_hovers()[0].global_position + Vector2(40, -60))
 	await frames(1)
@@ -91,7 +113,9 @@ func test_snuff_needs_hold() -> void:
 ## releasing Jump kicks you away from the wall.
 func test_wall_cling() -> void:
 	var y: float = _hovers()[2].global_position.y
-	place(Vector2(2 * 16 + 5.5, y))  # body (10 px wide) touching the left wall, mid-air
+	var row := int(y / Room.TILE)
+	check(_room.is_solid(Vector2i(0, row)) and not _room.is_solid(Vector2i(1, row)), "row %d: the left wall is 1 tile, open beside it" % row)
+	place(Vector2(Room.TILE + 5.5, y))  # body (10 px wide) touching the 1-tile left wall, mid-air
 	_player._cling_left = Game.tuning.f(&"cling_grace")
 	for i in 6:
 		_player.chain.add_hit()
@@ -133,7 +157,7 @@ func test_pogo_builds_chain() -> void:
 func test_landing_breaks_chain() -> void:
 	_player.chain.add_hit()
 	_player.chain.add_hit()
-	place(Vector2(5 * 16 + 8, 3 * 16))  # above the spawn ledge
+	place(_room.entry_position(&"spawn") + Vector2(0, -40))  # above the spawn ledge
 	await seconds(1.0)
 	check(_player.is_on_floor(), "player landed on the spawn ledge")
 	check(_player.chain.count == 0, "landing breaks the chain")
@@ -149,7 +173,7 @@ func test_jump_height() -> void:
 
 
 func _measure_jump(hold: bool) -> float:
-	place(Vector2(5 * 16 + 8, 6 * 16 - 12))  # standing on the spawn ledge
+	place(_room.entry_position(&"spawn"))  # standing on the spawn ledge
 	await frames(5)
 	var start_y := _player.global_position.y
 	var top := start_y
@@ -171,7 +195,7 @@ func _measure_jump(hold: bool) -> float:
 ## proves the spacing is pogo-able with plain run speed (no dash needed).
 ## Lurkers are paused: this checks reachability, not survival.
 func test_bot_chains_long_run() -> void:
-	var run := _hovers().filter(func(h): return h.position.y > 44 * 16 and h.position.y < 84 * 16)
+	var run := _hovers().filter(func(h): return h.position.y > LONG_RUN_ROWS.x * Room.TILE and h.position.y < LONG_RUN_ROWS.y * Room.TILE)
 	set_lurkers_active(false)
 	_player.chain.break_chain()
 	for h in run:
@@ -221,7 +245,7 @@ func test_bot_chains_long_run() -> void:
 
 
 func test_lurker_telegraph_hunt_lose() -> void:
-	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
+	var lurker: Lurker = _lurkers()[0]
 	Game.clock.clear()
 	_player.set_physics_process(false)  # freeze the player so only the lurker acts
 	place(lurker.global_position + Vector2(100, 0))
@@ -257,7 +281,7 @@ func test_lurker_telegraph_hunt_lose() -> void:
 ## Playtest: "saw it, couldn't escape". A Snuff in time must save you even with the lurker
 ## at full speed a body-length away: it is harmless the moment it loses the scent.
 func test_snuff_escape_point_blank() -> void:
-	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
+	var lurker: Lurker = _lurkers()[0]
 	_player.set_physics_process(false)
 	place(lurker.global_position + Vector2(60, 0))
 	for i in 10:
@@ -274,13 +298,13 @@ func test_snuff_escape_point_blank() -> void:
 
 
 func test_lurker_kills() -> void:
-	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
+	var lurker: Lurker = _lurkers()[0]
 	var died := [false]
 	_player.died.connect(func(): died[0] = true)
 	_player.set_physics_process(true)
 	# An idle lurker is harmless: it has not telegraphed yet.
 	var idle: Lurker = null
-	for l in get_tree().get_nodes_in_group("predator"):
+	for l in _lurkers():
 		if l.state == Lurker.State.IDLE:
 			idle = l
 			break

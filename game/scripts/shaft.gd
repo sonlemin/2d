@@ -1,16 +1,11 @@
 extends Node2D
-## The M1 test shaft: one hand-built vertical descent in the Edge of the Abyss palette.
-## The layout below is the level. Each char is one 16 px tile:
-##   #  wall          P  player spawn     c  walking crawler
-##   .  empty         h  hovering crawler L  lurker (hidden; may sit inside a wall)
+## The interim game: builds m1_shaft (rooms/l1/m1_shaft.txt) through RoomLoader and runs the M1
+## loop around it: HUD label, F1 brightness, F3 restart, reload on death. World replaces it in 1.6
+## and it is deleted in 1.7.
 ## A death reloads the scene, which resets the chain and every enemy and respawns you at P.
 ## Session state lives in `Game` (Story 1.4), so it survives the reload: Settings.brightness,
-## the SlotState records and the DiveState carried embers. Retired in Story 1.7.
+## the SlotState records and the DiveState carried embers.
 
-const TILE := 16
-const CrawlerScene := preload("res://scenes/actors/crawler.tscn")
-const LurkerScene := preload("res://scenes/actors/lurker.tscn")
-const TileTexture := preload("res://art/tile.png")
 const RESPAWN_DELAY := 0.6
 ## Ambient brightness of the dark (CanvasModulate value). `Settings.brightness` picks the level;
 ## F1 cycles it until Story 1.7 retires the shaft; DevTools sets it from then until Options (1.36).
@@ -18,124 +13,14 @@ const RESPAWN_DELAY := 0.6
 const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
 const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
 
-const LAYOUT: Array[String] = [
-	"##############################",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..P.......................##",
-	"##########..................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##...........h......h.......##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##........h......h..........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##...........h......h.......##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##.........h......h.........##",
-	"##..........................##",
-	"#L..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##............h......h......##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........h......h........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##...c..................c...##",
-	"#########............#########",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##............h......h......##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##........h......h..........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................L#",
-	"##......h......h............##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##.........h......h.........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##.......h......h...........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"#L..........................##",
-	"##..........h......h........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##........h......h..........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##...........h......h.......##",
-	"##..........................##",
-	"##..........................##",
-	"##..........c...............##",
-	"##........##########........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##....h......h..............##",
-	"##..........................##",
-	"##..........................##",
-	"##..................L.......##",
-	"##........h......h..........##",
-	"##..........................##",
-	"##..........................##",
-	"##..........................##",
-	"##.............h......h.....##",
-	"##..........................##",
-	"##..........................##",
-	"##.........h......h.........##",
-	"##..........................##",
-	"##......c..............c....##",
-	"##############################",
-	"##############################",
-]
-
-@onready var _walls: TileMapLayer = $Walls
 @onready var _player: Player = $Player
 @onready var _debug: Label = $Debug/Label
 @onready var _darkness: CanvasModulate = $Darkness
 
 var _deepest := 0.0
-var _rim_material := _unshaded_material()
+var _room: Room
 
 const HUD_COLOR := Color(1, 0.823529, 0.478431)
-const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here"
 const ALERT_COLOR := Color(1, 0.35, 0.3)  ## top label turns red while any lurker is awake
 
 
@@ -148,77 +33,23 @@ func _ready() -> void:
 	_apply_ambient()
 	# A method, not a lambda: the connection drops when the shaft is freed on reload.
 	Game.settings.changed.connect(_on_setting_changed)
-	_walls.tile_set = _make_tileset()
-	_build()  # the player stays at P: anchors and stations set the respawn point from Story 1.24
+	_room = RoomLoader.load_room(&"m1_shaft")
+	assert(_room != null, "m1_shaft failed to load: its content errors are above")
+	add_child(_room)
+	move_child(_room, _player.get_index())  # the player draws on top
+	_player.position = _room.entry_position(&"spawn")  # anchors and stations set the respawn point from Story 1.24
 	_player.died.connect(_on_player_died)
 	_player.chain.banked.connect(_on_banked)
 	_player.chain.changed.connect(_on_chain_changed)
+	# D2: the 352 px room centred in the view; the side bands show the clear colour where the
+	# gutters go in 1.6 (camera_rig.gd takes this over).
 	var cam: Camera2D = _player.get_node("Camera")
-	cam.limit_left = 0
-	cam.limit_top = 0
-	cam.limit_right = LAYOUT[0].length() * TILE
-	cam.limit_bottom = LAYOUT.size() * TILE
-
-
-func _make_tileset() -> TileSet:
-	var ts := TileSet.new()
-	ts.tile_size = Vector2i(TILE, TILE)
-	ts.add_physics_layer()
-	ts.set_physics_layer_collision_layer(0, 1)  # world
-	var src := TileSetAtlasSource.new()
-	src.texture = TileTexture
-	src.texture_region_size = Vector2i(TILE, TILE)
-	src.create_tile(Vector2i.ZERO)
-	ts.add_source(src, 0)
-	var h := TILE / 2.0
-	var data := src.get_tile_data(Vector2i.ZERO, 0)
-	data.add_collision_polygon(0)
-	data.set_collision_polygon_points(0, 0, PackedVector2Array([
-		Vector2(-h, -h), Vector2(h, -h), Vector2(h, h), Vector2(-h, h)]))
-	return ts
-
-
-func _build() -> void:
-	var width := LAYOUT[0].length()
-	for y in LAYOUT.size():
-		var row := LAYOUT[y]
-		assert(row.length() == width, "LAYOUT row %d has width %d, expected %d" % [y, row.length(), width])
-		for x in row.length():
-			var cell := Vector2i(x, y)
-			var center := Vector2(x * TILE + TILE / 2.0, y * TILE + TILE / 2.0)
-			match row[x]:
-				"#":
-					_walls.set_cell(cell, 0, Vector2i.ZERO)
-					if y > 0 and LAYOUT[y - 1][x] != "#" and LAYOUT[y - 1][x] != "L":
-						_add_ledge_rim(x, y)
-				"P":
-					_player.position = Vector2(center.x, (y + 1) * TILE - 12)  # feet on the tile below (body bottom = +12)
-				"c", "h":
-					var crawler: Crawler = CrawlerScene.instantiate()
-					crawler.hover = row[x] == "h"
-					crawler.position = center
-					add_child(crawler)
-				"L":
-					if _is_wall(x - 1, y) or _is_wall(x + 1, y):
-						_walls.set_cell(cell, 0, Vector2i.ZERO)  # in-wall lurker: no hole in the wall
-					var lurker: Lurker = LurkerScene.instantiate()
-					lurker.position = center
-					add_child(lurker)
-
-
-## A faint unshaded line on every floor surface, so places to land read even in the dark.
-func _add_ledge_rim(x: int, y: int) -> void:
-	var rim := ColorRect.new()
-	rim.material = _rim_material
-	rim.color = LEDGE_RIM
-	rim.position = Vector2(x * TILE, y * TILE)
-	rim.size = Vector2(TILE, 1)
-	rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(rim)
-
-
-func _is_wall(x: int, y: int) -> bool:
-	return y >= 0 and y < LAYOUT.size() and x >= 0 and x < LAYOUT[y].length() and LAYOUT[y][x] == "#"
+	var b := _room.bounds()
+	var view_w := get_viewport_rect().size.x
+	cam.limit_left = int(b.position.x - (view_w - b.size.x) / 2.0)
+	cam.limit_right = cam.limit_left + int(view_w)
+	cam.limit_top = int(b.position.y)
+	cam.limit_bottom = int(b.end.y)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -250,8 +81,14 @@ func _on_chain_changed(count: int) -> void:
 	Game.slot.record_chain(count)
 
 
+func _physics_process(_delta: float) -> void:
+	# Falling through the floor hole never ends until 1.7 wires the down exit to the top (R16 loop).
+	if not _player.is_dead and _player.position.y > _room.bounds().end.y + 32:
+		_player.die()
+
+
 func _process(_delta: float) -> void:
-	_deepest = maxf(_deepest, _player.position.y / TILE)
+	_deepest = maxf(_deepest, _player.position.y / Room.TILE)
 	var hunting := 0
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:
@@ -268,8 +105,3 @@ func _on_player_died() -> void:
 	if get_tree().current_scene == self:  # test harnesses add the shaft by hand; don't reload there
 		get_tree().reload_current_scene()
 
-
-static func _unshaded_material() -> CanvasItemMaterial:
-	var m := CanvasItemMaterial.new()
-	m.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
-	return m

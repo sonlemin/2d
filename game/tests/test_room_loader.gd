@@ -5,6 +5,10 @@ extends Node
 ## and any error line fails the runner. Every node a case builds is freed before the case ends.
 
 const DIR := "res://tests/rooms/"
+const M1_SHAFT := "res://rooms/l1/m1_shaft.txt"
+## FR57: a ledge at least every 1.5 s of fall: 315 px at 210 px/s max fall, so ≤ 19 rows (304 px)
+## between ledge rows. Story 1.10's Spec.LEDGE_FALL_MAX and the smoke_rooms sweep take this over.
+const LEDGE_GAP_MAX_ROWS := 19
 
 var _fail := 0
 
@@ -14,6 +18,7 @@ func run() -> void:
 	_test_inline_errors()
 	await _test_ok_min()
 	await _test_spawn_args_before_ready()
+	await _test_m1_shaft()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -136,5 +141,47 @@ func _test_spawn_args_before_ready() -> void:
 	var node := room.spawn(scene, Vector2(5, 7), {flag = true})
 	check(node.get(&"seen") == true and node.position == Vector2(5, 7) and node.get_parent() == room,
 			"spawn() sets the args before add_child, so _ready sees them, and the room owns the node")
+	room.queue_free()
+	await get_tree().process_frame
+
+
+## The real room: the 22-column draft of M1's shaft (Story 1.5 D1, awaiting sonlm's play approval).
+func _test_m1_shaft() -> void:
+	check(_errors_of(M1_SHAFT).is_empty(), "m1_shaft validates clean (got %s)" % [_errors_of(M1_SHAFT)])
+	var room := RoomLoader.load_room(&"m1_shaft")
+	check(room != null, "load_room(&\"m1_shaft\") resolves through the index and builds")
+	if room == null:
+		return
+	add_child(room)
+	check(room.spine and room.zone == &"violet" and room.bounds() == Rect2(0, 0, 352, 1680),
+			"a violet spine room, 352 x 1680 (got %s)" % room.bounds())
+	var hovers := 0
+	var walkers := 0
+	var lurkers := 0
+	for n in room.get_children():
+		if n is Crawler:
+			if n.hover:
+				hovers += 1
+			else:
+				walkers += 1
+		elif n is Lurker:
+			lurkers += 1
+	check(hovers == 36 and walkers == 5 and lurkers == 4, "36 hoverers, 5 walkers, 4 lurkers (got %d, %d, %d)" % [hovers, walkers, lurkers])
+	# Ledge rows: a solid cell inside the outer walls with an open cell above it.
+	var ledges: Array[int] = []
+	for r in range(1, room.size_cells.y):
+		for c in range(1, room.size_cells.x - 1):
+			if room.is_solid(Vector2i(c, r)) and not room.is_solid(Vector2i(c, r - 1)):
+				ledges.append(r)
+				break
+	check(ledges == ([6, 24, 41, 57, 72, 85, 103] as Array[int]), "ledge rows 6, 24, 41, 57, 72, 85, 103 (got %s)" % [ledges])
+	var worst := 0
+	for i in range(1, ledges.size()):
+		worst = maxi(worst, ledges[i] - ledges[i - 1])
+	check(worst <= LEDGE_GAP_MAX_ROWS, "FR57: no fall between ledge rows is over %d rows (worst %d)" % [LEDGE_GAP_MAX_ROWS, worst])
+	check(room.exits == ([{side = &"up", target = &"m1_shaft", col = 3}, {side = &"down", target = &"m1_shaft", col = 1}] as Array[Dictionary]),
+			"R16: the exits are up@3 and down@1, both to m1_shaft (got %s)" % [room.exits])
+	check(not room.is_solid(Vector2i(1, 104)) and not room.is_solid(Vector2i(2, 104)) and room.is_solid(Vector2i(3, 104)),
+			"the floor hole is cols 1-2")
 	room.queue_free()
 	await get_tree().process_frame

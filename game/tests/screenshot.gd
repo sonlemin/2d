@@ -1,9 +1,13 @@
 extends Node
-## Renders the shaft and saves PNG screenshots. This needs a real renderer, not --headless:
+## Renders m1_shaft and saves PNG screenshots. This needs a real renderer, not --headless:
 ##   xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd <out_dir>
 ## Shot 1: spawn, chain 0 (small light). Shot 2: mid-shaft, chain 10, with a lurker telegraphing.
+## The room is loaded standalone (Story 1.5), so this test lights the scene itself.
 
-const ShaftScene := preload("res://scenes/shaft.tscn")
+const RoomHarness := preload("res://tests/room_harness.gd")
+## shaft.gd's ambient at the default brightness (level 1: 0.16 × the Edge palette's violet tint).
+## World owns the ambient from 1.6/1.7; shaft.gd is not preloaded here.
+const AMBIENT := Color(0.16 * 1.0, 0.16 * 0.86, 0.16 * 1.57)
 
 
 func _shoot(path: String) -> void:
@@ -22,14 +26,19 @@ func run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out := args[1] if args.size() > 1 else OS.get_user_data_dir()
 	DirAccess.make_dir_recursive_absolute(out)
-	var shaft: Node2D = ShaftScene.instantiate()
-	add_child(shaft)
-	var player: Player = shaft.get_node("Player")
+	var darkness := CanvasModulate.new()
+	darkness.color = AMBIENT
+	add_child(darkness)
+	var parts := RoomHarness.build(self, &"m1_shaft")
+	var player: Player = parts.player
 	await _frames(30)
 	await _shoot(out.path_join("shaft_spawn_chain0.png"))
 
 	# Hang the player near a lurker with a long chain and let the telegraph start.
-	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[1]
+	# The second-highest lurker, picked by position (M1 took group index [1]).
+	var lurkers := get_tree().get_nodes_in_group("predator")
+	lurkers.sort_custom(func(a, b): return a.global_position.y < b.global_position.y)
+	var lurker: Lurker = lurkers[1]
 	player.set_physics_process(false)
 	player.global_position = lurker.global_position + Vector2(-120, 10)
 	for i in 10:
@@ -40,4 +49,6 @@ func run() -> void:
 	cam.reset_smoothing()
 	await _frames(25)
 	await _shoot(out.path_join("shaft_chain10_telegraph.png"))
+	RoomHarness.free_all(parts)
+	darkness.queue_free()
 	print("PASS")
