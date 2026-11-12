@@ -4,7 +4,7 @@ baseline_commit: 656a7a2
 
 # Story 1.5: Rooms as text, the M1 shaft at 22 tiles
 
-Status: ready-for-dev
+Status: done
 
 **Type:** dev, content (human gate: sonlm plays the 22-column layout on the laptop and approves it **before the story goes to `review`**; see D1) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -29,36 +29,52 @@ so that every room is reviewable in git, testable on its own, and fits the 360 p
 
 Run everything from `game/` and wrap every Godot run in `timeout`.
 
-- [ ] **Task 1: Baseline** (AC: 8)
-  - [ ] Run `timeout 600 ./run_tests.sh` on `656a7a2`. Expected (re-run at story creation): `test_chain_state` `ALL PASS (69 checks)`, then `test_log`, `test_clock`, `test_tuning`, `test_state`, `test_deferred_owners` `PASS`, then `smoke_shaft` `SMOKE PASS` (29 `ok`) and `smoke_shaft_state` `SMOKE PASS` (14 `ok`), and `== ALL GREEN`.
-- [ ] **Task 2: Legend, loader, room** (AC: 1, 4, 5, 6)
-  - [ ] `scripts/world/room_legend.gd` (`class_name RoomLegend`): the char table (D4).
-  - [ ] `scripts/world/room_loader.gd` (`class_name RoomLoader`, static functions only): `parse()`, the pure `validate()`, `load_room_from_path()`, `load_room()` and the build (D3, D5, D6).
-  - [ ] `scripts/world/room.gd` (`class_name Room`, `extends Node2D`): the API in D7.
-  - [ ] Run `godot --headless --path . --import` after adding the `class_name`s. Commit the generated `.gd.uid` files and never write one by hand.
-- [ ] **Task 3: The room file** (AC: 1, 2)
-  - [ ] Write `game/rooms/l1/m1_shaft.txt` from Dev Notes → *The approved layout*: the header as in AC1, then the grid byte for byte. Check that the grid's md5 matches the one given there.
-  - [ ] Commit it with the shaft port (Task 6) in one commit whose message ends `(layout draft: awaiting sonlm's play approval)`.
-- [ ] **Task 4: Validator tests** (AC: 4, 1)
-  - [ ] `tests/rooms/`: the fixtures in D8.
-  - [ ] `tests/test_room_loader.gd`: D8's cases. Add it to `run_tests.sh`'s `for t in …` list, after `test_state`.
-- [ ] **Task 5: Port the tests** (AC: 3)
-  - [ ] `tests/room_harness.gd`: the shared helper in D9 (not run by the runner; its name matches neither `test_*` nor `smoke_*`).
-  - [ ] `tests/smoke_shaft.gd` on the harness: every M1 check kept, coordinates retargeted (D9). Every check message stays word for word, except where it names a tile or row.
-  - [ ] `tests/screenshot.gd` on the harness (D9). Run it once under `xvfb-run` and look at both PNGs.
-- [ ] **Task 6: The shaft builds the room** (AC: 7, 3)
-  - [ ] `shaft.gd` / `shaft.tscn` as in D2. `smoke_shaft_state.gd` changes only where the shaft's node tree changed.
-- [ ] **Task 7: Gate: sonlm plays the layout** (AC: 2)
-  - [ ] Ask sonlm before pushing `feat/m2-e1` (a push is outward-facing), push, then HALT. Ask him to pull and play `shaft.tscn` on the laptop (F5). Give him the draft's facts: the rows of the three new wall ledges, the exit hole, and the bot's best chain from `smoke_shaft`.
-  - [ ] Record his answer and the date in the Dev Agent Record. If he asks for changes, edit the grid, re-run Task 4's layout checks and `smoke_shaft`, commit the change as a follow-up, and ask again. Set the story to `review` only after a yes.
-- [ ] **Task 8: Docs** (AC: 5)
-  - [ ] New `docs/rooms.md` (D10).
-  - [ ] Update the facts that change: `docs/development-guide.md` §Edit the Level and its test list; `docs/architecture.md` §Level Data and the play-width / scene-structure rows of the gap table; `docs/component-inventory.md` (Shaft, the new world scripts, the test table); `docs/source-tree-analysis.md`; `docs/index.md`; `game/README.md` (the test list); `_bmad-output/project-context.md` → *Current State vs Target* (one sentence for Story 1.5). Facts only.
-- [ ] **Task 9: Verify** (AC: 8)
-  - [ ] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
-  - [ ] `grep -rn "shaft.tscn" tests/` lists only `smoke_shaft_state.gd`.
-  - [ ] `grep -rn "LAYOUT" scripts/` finds nothing.
-  - [ ] Every new `.gd` has its `.gd.uid` staged.
+- [x] **Task 1: Baseline** (AC: 8)
+  - [x] Run `timeout 600 ./run_tests.sh` on `656a7a2`. Expected (re-run at story creation): `test_chain_state` `ALL PASS (69 checks)`, then `test_log`, `test_clock`, `test_tuning`, `test_state`, `test_deferred_owners` `PASS`, then `smoke_shaft` `SMOKE PASS` (29 `ok`) and `smoke_shaft_state` `SMOKE PASS` (14 `ok`), and `== ALL GREEN`.
+- [x] **Task 2: Legend, loader, room** (AC: 1, 4, 5, 6)
+  - [x] `scripts/world/room_legend.gd` (`class_name RoomLegend`): the char table (D4).
+  - [x] `scripts/world/room_loader.gd` (`class_name RoomLoader`, static functions only): `parse()`, the pure `validate()`, `load_room_from_path()`, `load_room()` and the build (D3, D5, D6).
+  - [x] `scripts/world/room.gd` (`class_name Room`, `extends Node2D`): the API in D7.
+  - [x] Run `godot --headless --path . --import` after adding the `class_name`s. Commit the generated `.gd.uid` files and never write one by hand.
+- [x] **Task 3: The room file** (AC: 1, 2)
+  - [x] Write `game/rooms/l1/m1_shaft.txt` from Dev Notes → *The approved layout*: the header as in AC1, then the grid byte for byte. Check that the grid's md5 matches the one given there.
+  - [x] Commit it with the shaft port (Task 6) in one commit whose message ends `(layout draft: awaiting sonlm's play approval)`.
+- [x] **Task 4: Validator tests** (AC: 4, 1)
+  - [x] `tests/rooms/`: the fixtures in D8.
+  - [x] `tests/test_room_loader.gd`: D8's cases. Add it to `run_tests.sh`'s `for t in …` list, after `test_state`.
+- [x] **Task 5: Port the tests** (AC: 3)
+  - [x] `tests/room_harness.gd`: the shared helper in D9 (not run by the runner; its name matches neither `test_*` nor `smoke_*`).
+  - [x] `tests/smoke_shaft.gd` on the harness: every M1 check kept, coordinates retargeted (D9). Every check message stays word for word, except where it names a tile or row.
+  - [x] `tests/screenshot.gd` on the harness (D9). Run it once under `xvfb-run` and look at both PNGs.
+- [x] **Task 6: The shaft builds the room** (AC: 7, 3)
+  - [x] `shaft.gd` / `shaft.tscn` as in D2. `smoke_shaft_state.gd` changes only where the shaft's node tree changed.
+- [x] **Task 7: Gate: sonlm plays the layout** (AC: 2)
+  - [x] Ask sonlm before pushing `feat/m2-e1` (a push is outward-facing), push, then HALT. Ask him to pull and play `shaft.tscn` on the laptop (F5). Give him the draft's facts: the rows of the three new wall ledges, the exit hole, and the bot's best chain from `smoke_shaft`.
+  - [x] Record his answer and the date in the Dev Agent Record. If he asks for changes, edit the grid, re-run Task 4's layout checks and `smoke_shaft`, commit the change as a follow-up, and ask again. Set the story to `review` only after a yes.
+- [x] **Task 8: Docs** (AC: 5)
+  - [x] New `docs/rooms.md` (D10).
+  - [x] Update the facts that change: `docs/development-guide.md` §Edit the Level and its test list; `docs/architecture.md` §Level Data and the play-width / scene-structure rows of the gap table; `docs/component-inventory.md` (Shaft, the new world scripts, the test table); `docs/source-tree-analysis.md`; `docs/index.md`; `game/README.md` (the test list); `_bmad-output/project-context.md` → *Current State vs Target* (one sentence for Story 1.5). Facts only.
+- [x] **Task 9: Verify** (AC: 8)
+  - [x] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
+  - [x] `grep -rn "shaft.tscn" tests/` lists only `smoke_shaft_state.gd`.
+  - [x] `grep -rn "LAYOUT" scripts/` finds nothing.
+  - [x] Every new `.gd` has its `.gd.uid` staged.
+
+### Review Findings
+
+Code review 2026-11-12 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; 10 findings dismissed as noise or matching the spec).
+
+- [x] [Review][Defer] A `down` entry puts the player over the exit hole — `entry_position(&"down")` uses `(col, h-2)` with "feet on the tile below", but that bottom-row tile is always open, so a player arriving there falls straight back out [game/scripts/world/room.gd:50] — deferred (sonlm): 1.7 wires room swaps and owns the arrival rules
+- [x] [Review][Decision] The in-wall rule checks for a `#` neighbour, while D5 said "solid" — resolved (sonlm): D5 amended to "wall"; code and `docs/rooms.md` stay
+- [x] [Review][Patch] Validator doesn't check the entry cell just inside an exit (row 1 / row h-2 at the exit column); a wall there validates clean and `entry_position()` places the player inside it [game/scripts/world/room_loader.gd:173]
+- [x] [Review][Patch] An exit opening can run through a corner cell (`##.....` with `up@x2`), opening the side edge; the opening must stop before column w-1 [game/scripts/world/room_loader.gd:177]
+- [x] [Review][Patch] With three or more `P`s only the second is reported; report every extra one (D5 "every error") [game/scripts/world/room_loader.gd:154]
+- [x] [Review][Patch] Unbounded `\d+` in the exit/obj regexes: `obj=a@4294967297,1` wraps to (1,1) and validates; 20 digits print an engine `ERROR:` from `to_int()`. Bound the digit count [game/scripts/world/room_loader.gd:15]
+- [x] [Review][Patch] A blank line right after `---` reports "grid is smaller than 3 x 3" on a full-size grid and hides every other grid error; report the empty row instead [game/scripts/world/room_loader.gd:136]
+- [x] [Review][Patch] `_scan()` is silent when `res://rooms` can't be opened, and the empty index is cached, so every `load_room()` only says "no room"; push_error the root cause [game/scripts/world/room_loader.gd:305]
+- [x] [Review][Patch] Stale "draft, awaiting sonlm's play approval" comments after the D1 approval [game/rooms/l1/m1_shaft.txt header; game/tests/test_room_loader.gd:148]
+- [x] [Review][Patch] `RoomHarness.build()` always places the player at `&"spawn"`, but a room without `P` validates clean, so the harness asserts on most future rooms; take an `entry` argument (default `&"spawn"`) [game/tests/room_harness.gd:29]
+- [x] [Review][Defer] Exit targets are never checked to exist (`exits=down:m1_shatf@x1` validates clean); a cross-file check, like id uniqueness [game/scripts/world/room_loader.gd:111] — deferred, cross-file check belongs to the smoke_rooms sweep
 
 ## Dev Notes
 
@@ -276,7 +292,7 @@ These are story-author decisions; sonlm can veto any of them before dev. D1 and 
     - more than one `P`
     - a `P` with no solid cell below it
     - a spine room not 22 wide
-  - **The edge rule:** every cell in the top row, the bottom row and the left and right columns must be solid, or part of a declared exit opening. Otherwise the player could leave the room through a hole. An `L` in an edge column counts as solid: **the in-wall rule** is that an `L` whose left or right neighbour is solid *or the room edge* gets a wall tile (M1 checked only the neighbours; with 1-tile walls a lurker sits in the edge column).
+  - **The edge rule:** every cell in the top row, the bottom row and the left and right columns must be solid, or part of a declared exit opening. Otherwise the player could leave the room through a hole. An `L` in an edge column counts as solid: **the in-wall rule** is that an `L` whose left or right neighbour is a wall (`#`) *or the room edge* gets a wall tile (amended at code review 2026-11-12, sonlm: "wall", not "solid"; an `L` beside another `L` doesn't chain) (M1 checked only the neighbours; with 1-tile walls a lurker sits in the edge column).
   - It reports every error, not just the first. Test fixtures only need to check that the expected message is in the list.
 - **D6, the build** (`RoomLoader._build(parsed) -> Room`, after a clean validation):
   - A `Room` node named after the id, holding:
@@ -472,10 +488,50 @@ The pattern: one `feat:` / `refactor:` / `docs:` commit per task, each green, wi
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-12.
+
 ### Debug Log References
 
+- Task 1 baseline (`c7a2f9d`, docs-only on top of `656a7a2`): `== ALL GREEN`. M1's `smoke_shaft.gd` has **28** `check(` calls, not 29 as the story says; a line-by-line diff of the check calls shows all 28 kept word for word, plus 2 new ones (the stub World, the 1-tile wall row), so the port prints 30 `ok`.
+- Final run: `test_chain_state` 69, `test_log` 7, `test_clock` 15, `test_tuning` 85, `test_state` 145, `test_room_loader` 48, `test_deferred_owners` 24, `smoke_shaft` 30, `smoke_shaft_state` 14 (unchanged, 0 edits needed); `== ALL GREEN`.
+- `smoke_shaft` on the 22-column room: bot best chain **8**, ends at row 80 alive; held jump 63.3 px, tap 26.1 px (same as the story's dry run).
+- `screenshot.gd` under `xvfb-run`: both PNGs saved and inspected (room centred, 64 px bands, ceiling gap above the spawn ledge; the row-55 right-wall lurker telegraphing beside the row-57 left ledge). The one `ERROR:` line is the server's missing ALSA device, printed before the runner's logger attaches (exit 0); `--audio-driver Dummy` silences it.
+- Two parse errors on the way, both `x == [..] as Array[T]` precedence (`as` binds looser than `==`); parenthesised.
+- Task 7: `git push` failed: the repo has **no remote** (`git remote -v` is empty; memory says none was ever set up). The three commits are on local `feat/m2-e1`; sonlm pulls them from this server over SSH.
+
 ### Completion Notes List
+
+- `RoomLegend` / `RoomLoader` / `Room` (D3–D7). The legend's `L` carries `in_wall = true`, so the loader never names a char: solid = `#` or an in-wall char beside a `#` or the room edge (`RoomLoader.solid_at()`, shared by the validator and the build). The validator reports every header and char error; the cell checks (P below, obj/exit cells, the edge rule) run only once every row has the same width, since they need a rectangle (documented in rooms.md). TileSet and rim material are cached statics; no exit-time leak.
+- Room children: `Backdrop`, `Walls`, `Rims` (a `Node2D` holding the rim `ColorRect`s, so tests can find them), then the spawned entities in grid order.
+- `shaft.gd`: `LAYOUT`, the builder, `_rim_material`, `_unshaded_material()`, `LEDGE_RIM`, the preloads and `TILE` removed (`Room.TILE` used for the HUD depth); `Walls`/`Background` dropped from `shaft.tscn`. Camera centred from `get_viewport_rect().size.x`; out-of-room death in `_physics_process` (1.7 replaces it with the loop).
+- `tests/room_harness.gd` (D9): `build()` → `{room, player, world}`, `centre_camera()`, `free_all()`; `WorldStub.play_rect()` is 360 × viewport height centred on the camera's screen centre. `smoke_shaft` picks lurkers sorted by `y` (`_lurkers()`), including the IDLE search in `test_lurker_kills`; `screenshot` picks the second-highest lurker.
+- `test_room_loader` (48 checks): 4 bad fixtures (exact single message each), 21 inline error cases incl. CRLF, the edge-L rule and "every error reported", ok_min build (counts, hover args, edge lurker solid, rims at exact cells, bounds, entries, `cell_centre`), `spawn()` args before `_ready`, and m1_shaft (validates, index lookup, counts 36/5/4, ledge rows `[6, 24, 41, 57, 72, 85, 103]`, worst gap 18 ≤ 19 (FR57), exits, floor hole).
+- **Gate (Task 7) passed:** the layout was committed as a draft (`0e3079b`). sonlm played it on the laptop and approved it: "Yes" (2026-11-12). No grid changes; story set to `review`.
 
 - Story context created by gds-create-story on 2026-11-12. Ultimate context engine analysis completed - comprehensive developer guide created. The 22-column layout was drafted from M1's and dry-run against every `smoke_shaft` check in a scratch copy (bot best chain 8). sonlm chose D1 (approve after playing) and D2 (the shaft builds the room now; `smoke_shaft_state` stays on `shaft.tscn` until 1.6).
 
 ### File List
+
+New:
+- game/scripts/world/room_legend.gd (+ .gd.uid)
+- game/scripts/world/room_loader.gd (+ .gd.uid)
+- game/scripts/world/room.gd (+ .gd.uid)
+- game/rooms/l1/m1_shaft.txt
+- game/tests/test_room_loader.gd (+ .gd.uid)
+- game/tests/room_harness.gd (+ .gd.uid)
+- game/tests/rooms/ok_min.txt, bad_unequal_rows.txt, bad_unknown_char.txt, bad_duplicate_id.txt, bad_edge_hole.txt
+- docs/rooms.md
+
+Modified:
+- game/scripts/shaft.gd, game/scenes/shaft.tscn
+- game/tests/smoke_shaft.gd, game/tests/screenshot.gd
+- game/run_tests.sh
+- docs/architecture.md, docs/component-inventory.md, docs/source-tree-analysis.md, docs/index.md, docs/development-guide.md
+- game/README.md
+- _bmad-output/project-context.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+## Change Log
+
+- 2026-11-12: Rooms as text: legend, pure validator, loader and Room (`30a96c2`); m1_shaft as a 22-column room file, the shaft and its tests build it, layout draft (`0e3079b`); docs (`98a18df`). sonlm approved the layout after playing it (Task 7, 2026-11-12); status review.
+- 2026-11-13: Code review: 8 patches applied (validator: exit entry cells, corner columns, every extra `P`, 4-digit coordinates, blank first row; `_scan()` reports an unopenable root; `RoomHarness.build()` takes an entry; stale draft comments). Down-entry arrival deferred to 1.7 (sonlm); D5 amended to "wall" (sonlm); exit-target existence deferred to 1.10 (proposed). `test_room_loader` 57 checks; `== ALL GREEN`. Status done.

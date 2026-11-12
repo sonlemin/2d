@@ -27,7 +27,7 @@ exits=up:m1_shaft@x3, down:m1_shaft@x1
 | `id` | yes | snake_case, equal to the file's base name. Ids are global and **never renamed once testers have saves**. |
 | `zone` | yes | `dusk`, `umber` or `violet` (the GDD's Layer 1 zones) |
 | `spine` | no (`false`) | `true` / `false`. A spine room must be exactly **22 columns wide, walls included** (352 px in the 360 px play area). |
-| `exits` | no | Comma-separated `<side>:<target_id>@x<col>`, side `up` or `down`. At most one exit per side. |
+| `exits` | no | Comma-separated `<side>:<target_id>@x<col>`, side `up` or `down`, `col` in `1..width-2` (never a corner). At most one exit per side. |
 | `obj` | no, repeatable | `<id>@<col>,<row>`: a persistent object's id and cell. Ids are unique within the file here; across files from Story 1.10. |
 
 Any other key is an error, so a typo can't pass silently. `map=` and left/right exits (`@y<row>`) arrive with E4.
@@ -69,11 +69,11 @@ Entities spawn through `room.spawn(scene, cell_centre, args)` in grid order (row
 - a missing `id` or `zone`; `id` not snake_case or not the file's base name
 - an unknown key; a repeated `id`, `zone`, `spine` or `exits`
 - a bad `zone` or `spine` value
-- a malformed exit or `obj`; two exits on one side; a duplicate `obj` id in the file
-- a grid smaller than 3 × 3; unequal rows (against row 1's width); an unknown char
-- a spine room that isn't 22 wide; more than one `P`
-- **(only when every row has the same width)** a `P` with nothing solid below it; an `obj` cell outside the grid; an exit column outside the grid or on a solid cell
-- **the edge rule:** every cell in the top and bottom rows and the left and right columns must be solid or part of a declared exit opening, or the player could leave the room through a hole
+- a malformed exit or `obj` (coordinates are at most 4 digits); two exits on one side; a duplicate `obj` id in the file
+- an empty first grid row (a blank line right after `---`, reported alone); a grid smaller than 3 × 3; unequal rows (against row 1's width); an unknown char
+- a spine room that isn't 22 wide; every `P` after the first
+- **(only when every row has the same width)** a `P` with nothing solid below it; an `obj` cell outside the grid; an exit column on a corner (0 or width−1), outside the grid or on a solid cell; a solid **entry cell** (one cell inside the opening, where `entry_position()` puts an arriving player)
+- **the edge rule:** every cell in the top and bottom rows and the left and right columns must be solid or part of a declared exit opening, or the player could leave the room through a hole. An opening is the exit cell plus the open cells right of it, stopping before the corner, so an open corner is always a hole
 
 A missing file is `"<path>:0:0 file not found"`.
 
@@ -102,4 +102,4 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.
 
 `test_room_loader.gd` checks `m1_shaft`'s ledge rows: no fall between two of them is over 19 rows (FR57: a ledge every ≤ 1.5 s of fall). From Story 1.10, `smoke_rooms.gd` loads every room file and sweeps this for all of them. Test-only rooms live in `game/tests/rooms/` and are never exported.
 
-To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` returns `{room, player, world}` (the room at the origin, a test player at `spawn`, the camera centred, and a stub in group `world` with `play_rect()`); free them with `RoomHarness.free_all()`.
+To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` returns `{room, player, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), the camera centred, and a stub in group `world` with `play_rect()`); free them with `RoomHarness.free_all()`.
