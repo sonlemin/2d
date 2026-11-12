@@ -1,25 +1,23 @@
-extends SceneTree
+extends Node
 ## Fails while any item in the deferred-work ledger has no owner.
 ## Why: gds-code-review appends deferred findings without one, and unowned items are how
 ## M1 work went missing until the 2026-11-12 readiness pass gave every item an owner.
 ## An agent may propose an owner (`→ **Owner (proposed): E3** — why`); only sonlm drops
 ## "(proposed)". Never edit this check to get green: give the item an owner instead.
-## Run: godot --headless --path game --script res://tests/test_deferred_owners.gd
+## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd
 
 const LEDGER := "../_bmad-output/implementation-artifacts/deferred-work.md"
 
 var _fail := 0
 
 
-func _init() -> void:
+func run() -> void:
 	_test_scan_rules()
 	_test_real_ledger()
 	if _fail == 0:
 		print("PASS")
-		quit(0)
 	else:
 		print("FAILED (%d)" % _fail)
-		quit(1)
 
 
 func check(cond: bool, msg: String) -> void:

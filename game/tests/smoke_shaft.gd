@@ -1,6 +1,6 @@
-extends SceneTree
+extends Node
 ## Headless integration smoke test: loads the real shaft, drives inputs, and checks the loop.
-## Run: godot --headless --path game --script res://tests/smoke_shaft.gd
+## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd
 ## Exits 0 on pass. (Import the project once first so textures resolve.)
 
 const ShaftScene := preload("res://scenes/shaft.tscn")
@@ -8,10 +8,6 @@ const ShaftScene := preload("res://scenes/shaft.tscn")
 var _fail := 0
 var _shaft: Node2D
 var _player: Player
-
-
-func _initialize() -> void:
-	_run.call_deferred()
 
 
 func check(cond: bool, msg: String) -> void:
@@ -22,16 +18,16 @@ func check(cond: bool, msg: String) -> void:
 
 func frames(n: int) -> void:
 	for i in n:
-		await physics_frame
+		await get_tree().physics_frame
 
 
 func seconds(s: float) -> void:
 	await frames(int(ceil(s * Engine.physics_ticks_per_second)))
 
 
-func _run() -> void:
+func run() -> void:
 	_shaft = ShaftScene.instantiate()
-	root.add_child(_shaft)
+	add_child(_shaft)
 	_player = _shaft.get_node("Player")
 	await frames(2)
 	await test_pogo_builds_chain()
@@ -44,7 +40,6 @@ func _run() -> void:
 	await test_lurker_kills()
 	await test_snuff_needs_hold()
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
-	quit(0 if _fail == 0 else 1)
 
 
 ## Teleport the player and snap the camera, so on-screen checks see the real view.
@@ -55,13 +50,13 @@ func place(pos: Vector2) -> void:
 
 
 func set_lurkers_active(on: bool) -> void:
-	for l in get_nodes_in_group("predator"):
+	for l in get_tree().get_nodes_in_group("predator"):
 		l.set_physics_process(on)
 
 
 func _hovers() -> Array:
 	var out := []
-	for e in get_nodes_in_group("enemy"):
+	for e in get_tree().get_nodes_in_group("enemy"):
 		if e.hover:
 			out.append(e)
 	out.sort_custom(func(a, b): return a.position.y < b.position.y)
@@ -72,7 +67,7 @@ func _hovers() -> Array:
 func test_snuff_needs_hold() -> void:
 	_shaft.queue_free()  # the lurker test left the player dead: use a fresh shaft
 	_shaft = ShaftScene.instantiate()
-	root.add_child(_shaft)
+	add_child(_shaft)
 	_player = _shaft.get_node("Player")
 	await frames(2)
 	place(_hovers()[0].global_position + Vector2(40, -60))
@@ -226,7 +221,7 @@ func test_bot_chains_long_run() -> void:
 
 
 func test_lurker_telegraph_hunt_lose() -> void:
-	var lurker: Lurker = get_nodes_in_group("predator")[0]
+	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
 	Engine.time_scale = 1.0
 	_player.set_physics_process(false)  # freeze the player so only the lurker acts
 	place(lurker.global_position + Vector2(100, 0))
@@ -262,7 +257,7 @@ func test_lurker_telegraph_hunt_lose() -> void:
 ## Playtest: "saw it, couldn't escape". A Snuff in time must save you even with the lurker
 ## at full speed a body-length away: it is harmless the moment it loses the scent.
 func test_snuff_escape_point_blank() -> void:
-	var lurker: Lurker = get_nodes_in_group("predator")[0]
+	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
 	_player.set_physics_process(false)
 	place(lurker.global_position + Vector2(60, 0))
 	for i in 10:
@@ -279,13 +274,13 @@ func test_snuff_escape_point_blank() -> void:
 
 
 func test_lurker_kills() -> void:
-	var lurker: Lurker = get_nodes_in_group("predator")[0]
+	var lurker: Lurker = get_tree().get_nodes_in_group("predator")[0]
 	var died := [false]
 	_player.died.connect(func(): died[0] = true)
 	_player.set_physics_process(true)
 	# An idle lurker is harmless: it has not telegraphed yet.
 	var idle: Lurker = null
-	for l in get_nodes_in_group("predator"):
+	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state == Lurker.State.IDLE:
 			idle = l
 			break

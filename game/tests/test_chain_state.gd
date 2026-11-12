@@ -1,6 +1,6 @@
-extends SceneTree
+extends Node
 ## Headless test runner for the pure chain logic.
-## Run: godot --headless --path game --script res://tests/test_chain_state.gd
+## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_chain_state.gd
 ## Exits 0 when every test passes and 1 otherwise.
 
 const ChainStateScript := preload("res://scripts/rules/chain_state.gd")
@@ -9,7 +9,7 @@ var _failures: int = 0
 var _checks: int = 0
 
 
-func _init() -> void:
+func run() -> void:
 	for t in [
 		"test_hit_increments",
 		"test_land_breaks",
@@ -25,10 +25,8 @@ func _init() -> void:
 		call(t)
 	if _failures == 0:
 		print("ALL PASS (%d checks)" % _checks)
-		quit(0)
 	else:
 		printerr("%d FAILED of %d checks" % [_failures, _checks])
-		quit(1)
 
 
 func check(cond: bool, msg: String) -> void:
