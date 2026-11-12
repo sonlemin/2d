@@ -3,24 +3,20 @@ extends Node2D
 ## The layout below is the level. Each char is one 16 px tile:
 ##   #  wall          P  player spawn     c  walking crawler
 ##   .  empty         h  hovering crawler L  lurker (hidden; may sit inside a wall)
-## A death reloads the scene, which resets the chain and every enemy.
+## A death reloads the scene, which resets the chain and every enemy and respawns you at P.
+## Session state lives in `Game` (Story 1.4), so it survives the reload: Settings.brightness,
+## the SlotState records and the DiveState carried embers. Retired in Story 1.7.
 
 const TILE := 16
 const CrawlerScene := preload("res://scenes/actors/crawler.tscn")
 const LurkerScene := preload("res://scenes/actors/lurker.tscn")
 const TileTexture := preload("res://art/tile.png")
 const RESPAWN_DELAY := 0.6
-## Ambient brightness of the dark (CanvasModulate value). F1 cycles it in game.
+## Ambient brightness of the dark (CanvasModulate value). `Settings.brightness` picks the level;
+## F1 cycles it until Options (1.36).
 ## Lower = more tension; too low and darkness turns into confusion (Pillar 2).
 const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
 const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
-
-static var ambient_index := 1  # static: survives the scene reload on death
-static var show_controls := true
-static var best_chain := 0  # session stats for playtest notes (survive death reloads)
-static var deaths := 0
-static var checkpoint := Vector2.INF  # last ledge stood on: death respawns here, not at the top (F3 clears)
-static var banked_embers := 0  # the haul: kept across deaths (only HELD embers are lost)
 
 const LAYOUT: Array[String] = [
 	"##############################",
@@ -134,7 +130,6 @@ const LAYOUT: Array[String] = [
 @onready var _player: Player = $Player
 @onready var _debug: Label = $Debug/Label
 @onready var _darkness: CanvasModulate = $Darkness
-@onready var _controls: Label = $Debug/Controls
 
 var _deepest := 0.0
 var _rim_material := _unshaded_material()
@@ -145,14 +140,19 @@ const ALERT_COLOR := Color(1, 0.35, 0.3)  ## top label turns red while any lurke
 
 
 func _ready() -> void:
+	# The entry scene boots Game once: it loads settings.json and arms its writes (Story 1.4 D6).
+	# A test harness adds the shaft by hand and is never the current scene, so tests can't touch
+	# the real settings.json even through the shaft. The call moves to world.gd in Story 1.6.
+	if get_tree().current_scene == self:
+		Game.boot()
 	_apply_ambient()
-	_controls.visible = show_controls
+	# A method, not a lambda: the connection drops when the shaft is freed on reload.
+	Game.settings.changed.connect(_on_setting_changed)
 	_walls.tile_set = _make_tileset()
-	_build()
-	if checkpoint.is_finite():
-		_player.position = checkpoint
+	_build()  # the player stays at P: anchors and stations set the respawn point from Story 1.24
 	_player.died.connect(_on_player_died)
-	_player.chain.banked.connect(func(amount: int) -> void: banked_embers += amount)
+	_player.chain.banked.connect(_on_banked)
+	_player.chain.changed.connect(_on_chain_changed)
 	var cam: Camera2D = _player.get_node("Camera")
 	cam.limit_left = 0
 	cam.limit_top = 0
@@ -225,39 +225,45 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if not key or not key.pressed or key.echo:
 		return
-	if key.physical_keycode == KEY_F1:
-		ambient_index = (ambient_index + 1) % AMBIENT_LEVELS.size()
-		_apply_ambient()
-	elif key.physical_keycode == KEY_F2:
-		show_controls = not show_controls
-		_controls.visible = show_controls
-	elif key.physical_keycode == KEY_F3:  # full run from the top
-		checkpoint = Vector2.INF
+	if key.physical_keycode == KEY_F1:  # the changed signal applies it, and the change is saved
+		Game.settings.set_value(&"brightness", (Game.settings.brightness + 1) % AMBIENT_LEVELS.size())
+	elif key.physical_keycode == KEY_F3:  # restart from the top
 		get_tree().reload_current_scene()
 
 
+func _on_setting_changed(key: StringName) -> void:
+	if key == &"brightness":
+		_apply_ambient()
+
+
 func _apply_ambient() -> void:
-	var v := AMBIENT_LEVELS[ambient_index]
+	var v := AMBIENT_LEVELS[Game.settings.brightness]
 	_darkness.color = Color(v * AMBIENT_TINT.r, v * AMBIENT_TINT.g, minf(v * AMBIENT_TINT.b, 1.0))
+
+
+## M1's "banked" embers are M2's carried ones: they survive a death, held embers don't.
+func _on_banked(amount: int) -> void:
+	Game.dive.add_carried(amount)
+
+
+func _on_chain_changed(count: int) -> void:
+	Game.slot.record_chain(count)
 
 
 func _process(_delta: float) -> void:
 	_deepest = maxf(_deepest, _player.position.y / TILE)
-	best_chain = maxi(best_chain, _player.chain.count)
-	if _player.is_on_floor() and not _player.is_dead:
-		checkpoint = _player.position  # the ground is the sanctuary: it is also where you come back
 	var hunting := 0
 	for l in get_tree().get_nodes_in_group("predator"):
 		if l.state != Lurker.State.IDLE:
 			hunting += 1
 	_debug.text = "embers %d  (held +%d)   chain %d (best %d)   light %d%s   depth %d   alert %d   deaths %d" % [
-		banked_embers, _player.chain.held, _player.chain.count, best_chain, int(_player.light_radius()),
-		" SNUFF" if _player.chain.snuffed else "", int(_deepest), hunting, deaths]
+		Game.dive.carried, _player.chain.held, _player.chain.count, Game.slot.best_chain, int(_player.light_radius()),
+		" SNUFF" if _player.chain.snuffed else "", int(_deepest), hunting, Game.slot.deaths]
 	_debug.add_theme_color_override("font_color", ALERT_COLOR if hunting > 0 else HUD_COLOR)
 
 
 func _on_player_died() -> void:
-	deaths += 1
+	Game.slot.record_death()
 	await get_tree().create_timer(RESPAWN_DELAY, true, false, true).timeout
 	if get_tree().current_scene == self:  # test harnesses add the shaft by hand; don't reload there
 		get_tree().reload_current_scene()
