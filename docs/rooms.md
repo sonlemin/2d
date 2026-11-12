@@ -102,4 +102,4 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.
 
 `test_room_loader.gd` checks `m1_shaft`'s ledge rows: no fall between two of them is over 19 rows (FR57: a ledge every ≤ 1.5 s of fall). From Story 1.10, `smoke_rooms.gd` loads every room file and sweeps this for all of them. Test-only rooms live in `game/tests/rooms/` and are never exported.
 
-To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` returns `{room, player, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), the camera centred, and a stub in group `world` with `play_rect()`); free them with `RoomHarness.free_all()`.
+To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` returns `{room, player, camera, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), a `CameraRig` following it with limits from the room, and a stub in group `world` with `play_rect()` and `current_room()`); free them with `RoomHarness.free_all()`.

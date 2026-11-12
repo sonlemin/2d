@@ -13,17 +13,16 @@ Open this folder in Godot 4.7 and press F5.
 | X in the air | **Pogo**: strike down, bounce off an enemy and add 1 to the chain |
 | C | Air dash (refilled by each pogo) |
 | Hold V | **Snuff** (hold about 0.12 s; a quick tap does nothing): go dark. Breaks the chain, and lurkers lose you |
-| F1 | Cycle brightness (4 levels; remembered between launches) |
 
 ## The loop
 
 - Pogo off crawlers without landing to build the **chain**. Each link makes your slash bigger and your light brighter.
 - **Landing** ends the chain.
-- **Embers:** each pogo hit adds embers to a **held** pile, and later hits pay more (hit 5 pays 5). Landing or Snuff **banks** them. Dying **loses** whatever you're holding. The top bar shows `embers` (banked) and `held`.
+- **Embers:** each pogo hit adds embers to a **held** pile, and later hits pay more (hit 5 pays 5). Landing or Snuff **banks** them. Dying **loses** whatever you're holding. There is no HUD for now (the gutter HUD comes later); the popups over each hit show the chain and its embers.
 - A big light wakes the **lurkers**: red eyes pulse in the dark for about a second, then they hunt you. Contact with a hunting lurker kills you.
 - To shake a lurker off, **land or Snuff**. Both break the chain.
 - Touching a crawler knocks you back and breaks the chain, but doesn't kill you.
-- Dying respawns you at the **top of the shaft**; banked embers are kept. **F3** also restarts from the top.
+- Dying respawns you at the **top of the shaft** after a short pause, without reloading: banked embers are kept, and a crawler you killed stays dead. To restart from scratch, relaunch. There are no F1/F3 keys for now: brightness keeps the last saved level.
 - The hole in the floor (bottom left) will loop you back to the top; for now, falling through it kills you.
 - A lurker that loses your scent (you land or Snuff) is harmless at once, even point-blank.
 
@@ -39,4 +38,4 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **Rooms** (`tests/test_room_loader.gd`): room files are checked before they build (every error names its file, line and column), and the shaft (`rooms/l1/m1_shaft.txt`) has the right enemies and a ledge every 19 rows or less.
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the shaft room with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.
-- **Shaft state smoke test** (`tests/smoke_shaft_state.gd`): banked embers, the best chain, deaths and brightness live in `Game`, so they survive the reload after a death.
+- **World smoke test** (`tests/smoke_world.gd`): the game scene with its gutters and framing; banked embers, the best chain, deaths and brightness live in `Game`; a death respawns a fresh player at the top without a reload; a lurker hidden behind a gutter never notices you.

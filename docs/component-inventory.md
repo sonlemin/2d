@@ -43,7 +43,6 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Slash | Area2D | 22×16 box at x +14; mask 4 (enemies); unshaded `slash.png` |
 | Pogo | Area2D | 26×24 box at y +18; mask 4; the slash sprite rotated 90° |
 | Hurtbox | Area2D | 8×18; mask 12 (enemies + predators) |
-| Camera | Camera2D | smoothing 8; limits set by Shaft |
 
 **Tuning keys (`rules/tuning.gd`)**, read each tick through `Game.tuning.f(&"key")`:
 
@@ -57,7 +56,9 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Combat | `pogo_velocity` −300, `slash_active` 0.12, `pogo_armed` 0.22, `attack_cooldown` 0.22, `hitstop` 0.075 |
 | Damage | `knockback_x` / `knockback_y` 150 / −150, `invuln_time` 0.6 |
 
-**Local consts** (no system bends them): `SHAKE` 2.5, `LOOK_AHEAD` 70 (both move to `camera_rig.gd` in 1.6), `LIGHT_KICK` 18, `LIGHT_LERP` 10, `SNUFF_HOLD` 0.12 (becomes `Settings.light_tap_window` in 1.8), `HITSTOP_SCALE` 0.05, `LIGHT_TEXTURE_HALF` 64.
+No camera: `World`'s `CameraRig` follows the player (Story 1.6). **Signals:** `died`, `chain_changed(count)`, `pogo_hit` (World kicks the camera). `Fx` popups go to `World.current_room()` (falling back to the parent when there is no World).
+
+**Local consts** (no system bends them): `LIGHT_KICK` 18, `LIGHT_LERP` 10, `SNUFF_HOLD` 0.12 (becomes `Settings.light_tap_window` in 1.8), `HITSTOP_SCALE` 0.05, `LIGHT_TEXTURE_HALF` 64.
 
 ### Crawler — `scripts/actors/crawler.gd` + `scenes/actors/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
 
@@ -78,7 +79,8 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
                     └──► IDLE / RETURN                                 └──► TELEGRAPH
 ```
 
-- **Senses** when: the player is alive, `light_radius() ≥ 80`, the distance is ≤ radius × 1.6, and the lurker is inside the viewport minus an 8 px margin.
+- **Senses** when: the player is alive, `light_radius() ≥ 80`, the distance is ≤ radius × 1.6, and the lurker is inside `World.play_rect()` (the play area between the gutters) minus an 8 px margin; with no World it never notices.
+- **Drops a dead target:** a telegraph or hunt on a dead or freed player goes to RETURN at once (Pillar 2: a hunt never carries over a death).
 - **Lethal** only when `monitorable` is true, which is HUNT *and* sensed. Losing the scent is harmless at once.
 - **Look:** unshaded eyes open from a slit over 0.2 s, pulse at 2 Hz, and the body shivers. A red `PointLight2D` glow follows the eye alpha.
 
@@ -93,7 +95,10 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 | `NOTICE_MIN_RADIUS` / `NOTICE_FACTOR` / `SCREEN_MARGIN` | 80 px / 1.6 / 8 px (the sensing rule; moves to `rules/sensing.gd` in 1.20) |
 | `EYE_PULSE_HZ`, `EYE_OPEN_TIME`, `GLOW_ENERGY` | 2.0, 0.2, 1.3 (presentation) |
 
-### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, main scene)
+### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, unused)
+
+**Unused since Story 1.6, deleted in 1.7.** Neither the game nor any test loads it, and its `_player.get_node("Camera")` no longer matches `player.tscn`. What it did:
+
 
 Loads `m1_shaft` through `RoomLoader` (Story 1.5), puts the player at its `spawn` entry, centres the 352 px room in the 480 px view, kills a player who falls out of the floor hole (until the R16 loop in 1.7), draws the debug HUD from `Game` state and handles hotkeys. It has no session statics: what survives a death lives in `Game` (Story 1.4). See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
 
@@ -106,7 +111,38 @@ Loads `m1_shaft` through `RoomLoader` (Story 1.5), puts the player at its `spawn
 
 **Hotkeys:** F1 brightness (saved in `settings.json`) · F3 restart from the top. **Constants:** `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
 
-### World — `scripts/world/`
+### World — `scripts/world/world.gd` + `scenes/world/world.tscn` (`Node2D`, `class_name World`, main scene)
+
+The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current scene, applies the ambient from `Settings.brightness`, loads `START_ROOM` (`m1_shaft`) into `RoomHolder`, sets the camera limits and spawns the player. A death waits `RESPAWN_DELAY` 0.6 s (pauses with the tree, ignores the time scale), clears the Clock and spawns a fresh player at the respawn point (`Game.dive.respawn_room`/`respawn_entry`, else the room's `spawn`), with no reload. Kills a player who falls out of the room until Story 1.7 wires the bottom exit.
+
+| Node | Type | Role |
+|---|---|---|
+| Darkness | CanvasModulate | `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45] × `AMBIENT_TINT`, picked by `Settings.brightness` |
+| RoomHolder | Node2D | At the origin; holds the current room |
+| Player | player.tscn | Spawned in code, kept right after `RoomHolder` |
+| Camera | Camera2D + `camera_rig.gd` | Smoothing 8 |
+| UI | CanvasLayer (layer 10, `PROCESS_MODE_ALWAYS`) | `Gutters` then `ScreenRouter`, so screens draw over the gutters |
+
+**API:** `play_rect()`, `current_room()`, `signal player_spawned(player)`. **Consts:** `START_ROOM`, `RESPAWN_DELAY`, `AMBIENT_LEVELS`, `AMBIENT_TINT`.
+
+### CameraRig — `scripts/world/camera_rig.gd` (`Camera2D`, `class_name CameraRig`)
+
+`follow(body)`, `snap()` (on the target, no lead or shake, `reset_smoothing()`), `kick(amount)` (the only shake entry; the `Settings.shake` gate arrives in 1.16), `apply_limits(bounds)`, `play_rect()`. `_process` runs on real time: shake decay, the downward lead while falling, and the follow. The only `randf` in `scripts/`.
+
+| Const | Value |
+|---|---|
+| `GUTTER_WIDTH` / `PLAY_WIDTH` | 60 / 360 px (UX DESIGN.md) |
+| `LOOK_AHEAD` / `LEAD_SPEED` | 70 px / 140 px/s (FR3, M1) |
+| `POGO_SHAKE` / `SHAKE_DECAY` | 2.5 px / 20 px/s (M1) |
+
+### UI — `scripts/ui/`
+
+| Script | Role |
+|---|---|
+| `gutters.gd` (`Gutters`, Control) | Two flat `ColorRect` strips at screen x 0–60 and 420–480, `PLACEHOLDER` `#07060b` (DESIGN.md `gutter-violet`) until the palettes (1.18) and the HUD (1.25) |
+| `screen_router.gd` (`ScreenRouter`, Control) | `open(screen)` replaces the current screen, never stacks; `close()`; `current()`. No screens yet |
+
+### Rooms — `scripts/world/`
 
 Rooms as text (Story 1.5). The format, legend, validator errors and Room API are in [rooms.md](./rooms.md).
 
@@ -150,7 +186,7 @@ Everything is unshaded and frees itself.
 | `dash` | C |
 | `light` | V |
 
-Keyboard only, bound by physical keycode. F1 and F3 are read directly in `Shaft._unhandled_input`, not through actions.
+Keyboard only, bound by physical keycode. No function keys since Story 1.6 (the unused `shaft.gd` still reads F1 and F3).
 
 ## Asset Inventory
 
@@ -190,8 +226,8 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts), the build and the `Room` API, and the real `m1_shaft` (counts, ledge rows, FR57 gaps, exits) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 10 scenario tests (30 checks) on `m1_shaft` loaded through the room harness, including a pathing bot | headless |
-| `tests/smoke_shaft_state.gd` | The shaft's state wiring: carried embers, the best chain, deaths and brightness go through `Game` and survive a new shaft (14 checks) | headless |
-| `tests/screenshot.gd` | 2 screenshots of `m1_shaft` through the room harness | needs a renderer |
-| `tests/room_harness.gd` | Not a test: `build(parent, room_id)` loads a room standalone with a test player, a centred camera and a stub `World` (`play_rect()`); `free_all()` | — |
+| `tests/smoke_world.gd` | World: no boot, the tree, framing (limits, play rect, gutters), state wiring, popups in the room, death and respawn without a reload, a lurker behind a gutter, a hunt over a death, `ScreenRouter`, source checks (45 checks) | headless |
+| `tests/screenshot.gd` | 2 screenshots of `world.tscn` (gutters, darkness, framing) | needs a renderer |
+| `tests/room_harness.gd` | Not a test: `build(parent, room_id)` loads a room standalone with a test player, a `CameraRig` and a stub `World` (`play_rect()`, `current_room()`); `free_all()` | — |
 
 Helpers in `smoke_shaft.gd` worth reusing: `place(pos)` (teleport and snap the camera), `frames(n)` / `seconds(s)` (physics-frame waits), `set_lurkers_active(on)`, `_hovers()` (hovering crawlers sorted by depth), `_lurkers()` (lurkers sorted by depth).
