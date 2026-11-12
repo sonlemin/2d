@@ -24,6 +24,7 @@ Open this folder in Godot 4.7 and press F5.
 - To shake a lurker off, **land or Snuff**. Both break the chain.
 - Touching a crawler knocks you back and breaks the chain, but doesn't kill you.
 - Dying respawns you at the **top of the shaft**; banked embers are kept. **F3** also restarts from the top.
+- The hole in the floor (bottom left) will loop you back to the top; for now, falling through it kills you.
 - A lurker that loses your scent (you land or Snuff) is harmless at once, even point-blank.
 
 ## Tests
@@ -35,6 +36,7 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **Clock** (`tests/test_clock.gd`): time-scale requests multiply, refresh, run on real time, pause with the game and clear on death; a pogo hit freezes for 75 ms.
 - **Tuning** (`tests/test_tuning.gd`): gear modifiers apply in a fixed order, and every M1 tuning value still holds after the move to `scripts/rules/tuning.gd`.
 - **State** (`tests/test_state.gd`): settings, slot and dive state, their save shapes and `settings.json` (a missing or broken file falls back to the defaults).
+- **Rooms** (`tests/test_room_loader.gd`): room files are checked before they build (every error names its file, line and column), and the shaft (`rooms/l1/m1_shaft.txt`) has the right enemies and a ledge every 19 rows or less.
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
-- **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the real level with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.
+- **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the shaft room with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.
 - **Shaft state smoke test** (`tests/smoke_shaft_state.gd`): banked embers, the best chain, deaths and brightness live in `Game`, so they survive the reload after a death.

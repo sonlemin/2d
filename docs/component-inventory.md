@@ -95,17 +95,26 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 
 ### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, main scene)
 
-Builds the level from `LAYOUT`, draws the debug HUD from `Game` state and handles hotkeys. It has no session statics: what survives a death lives in `Game` (Story 1.4). See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
+Loads `m1_shaft` through `RoomLoader` (Story 1.5), puts the player at its `spawn` entry, centres the 352 px room in the 480 px view, kills a player who falls out of the floor hole (until the R16 loop in 1.7), draws the debug HUD from `Game` state and handles hotkeys. It has no session statics: what survives a death lives in `Game` (Story 1.4). See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
 
 | Node | Type | Role |
 |---|---|---|
 | Darkness | CanvasModulate | Ambient darkness: 4 levels, picked by `Settings.brightness` (F1 cycles it) |
-| Background | ColorRect | 480×1680, z −10, palette `#2a2440` |
-| Walls | TileMapLayer | Tileset assigned in code |
-| Player | player.tscn | Spawned at `P` |
+| m1_shaft | Room | Added at `_ready`, before `Player` (see World below) |
+| Player | player.tscn | Placed at `entry_position(&"spawn")` |
 | Debug/Label | Label | HUD: `embers, held, chain (best), light, SNUFF, depth, alert, deaths`; turns red while a lurker is awake |
 
-**Hotkeys:** F1 brightness (saved in `settings.json`) · F3 restart from the top. **Constants:** `TILE` 16, `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
+**Hotkeys:** F1 brightness (saved in `settings.json`) · F3 restart from the top. **Constants:** `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
+
+### World — `scripts/world/`
+
+Rooms as text (Story 1.5). The format, legend, validator errors and Room API are in [rooms.md](./rooms.md).
+
+| Script | Role |
+|---|---|
+| `room_legend.gd` (`RoomLegend`) | The one definition of every grid char: `#` `.` `P`, and `SPAWNS` (`c`, `h`, `L` with their scene and args; `L` is `in_wall`) |
+| `room_loader.gd` (`RoomLoader`, static) | `parse()`, the pure `validate()` (errors as `file:row:col`), `load_room_from_path()`, `load_room(id)` through an index of `res://rooms/**/*.txt`, and the build. Caches the TileSet and the unshaded rim material as statics |
+| `room.gd` (`Room`, `Node2D`) | One built room: `Backdrop`, `Walls` (TileMapLayer), `Rims`, spawned entities. `spawn(scene, pos, args)`, `bounds()`, `entry_position()` / `has_entry()`, `is_solid()`, `cell_centre()` |
 
 ### Core — `scripts/core/`
 
@@ -178,9 +187,11 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
 | `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), `rules/` purity, and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
 | `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 145 checks) | headless |
+| `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts), the build and the `Room` API, and the real `m1_shaft` (counts, ledge rows, FR57 gaps, exits) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
-| `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
+| `tests/smoke_shaft.gd` | 10 scenario tests (30 checks) on `m1_shaft` loaded through the room harness, including a pathing bot | headless |
 | `tests/smoke_shaft_state.gd` | The shaft's state wiring: carried embers, the best chain, deaths and brightness go through `Game` and survive a new shaft (14 checks) | headless |
-| `tests/screenshot.gd` | 2 screenshots | needs a renderer |
+| `tests/screenshot.gd` | 2 screenshots of `m1_shaft` through the room harness | needs a renderer |
+| `tests/room_harness.gd` | Not a test: `build(parent, room_id)` loads a room standalone with a test player, a centred camera and a stub `World` (`play_rect()`); `free_all()` | — |
 
-Helpers in `smoke_shaft.gd` worth reusing: `place(pos)` (teleport and snap the camera), `frames(n)` / `seconds(s)` (physics-frame waits), `set_lurkers_active(on)`, `_hovers()` (hovering crawlers sorted by depth).
+Helpers in `smoke_shaft.gd` worth reusing: `place(pos)` (teleport and snap the camera), `frames(n)` / `seconds(s)` (physics-frame waits), `set_lurkers_active(on)`, `_hovers()` (hovering crawlers sorted by depth), `_lurkers()` (lurkers sorted by depth).

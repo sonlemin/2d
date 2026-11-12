@@ -14,7 +14,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - **Tech stack:** Godot 4.7 · GDScript · GL Compatibility · 480×270 integer-scaled · Python/Pillow sprite pipeline
 - **Entry point:** `game/scenes/shaft.tscn` → `game/scripts/shaft.gd`
 - **Core rules:** `game/scripts/rules/chain_state.gd` (pure, unit-tested)
-- **Architecture pattern:** scene tree + node-free rules class + ASCII level + session state in pure objects held by the `Game` autoload
+- **Architecture pattern:** scene tree + node-free rules class + rooms as text files (`game/rooms/`, built by `RoomLoader`) + session state in pure objects held by the `Game` autoload
 - **Database / API:** none
 - **Deployment:** none yet (played from the editor); M2 targets Windows, Linux, web/itch.io
 
@@ -25,6 +25,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - [Component Inventory](./component-inventory.md) — every script, node, tuning value, input action and asset
 - [Source Tree Analysis](./source-tree-analysis.md) — annotated directory tree
 - [Development Guide](./development-guide.md) — run, test, edit art and levels, common tasks
+- [Rooms](./rooms.md) — the room file format, legend, validator errors and `Room` API
 
 Not generated (nothing to document): API contracts, data models, deployment guide, contribution guide, integration architecture.
 
@@ -79,7 +80,7 @@ python3 tools/build_sprites.py
 - **Gameplay rule change** (chain, light, embers, Flare Toss): `architecture.md` → State Management, then `rules/chain_state.gd` and `tests/test_chain_state.gd`. Keep `ChainState` free of nodes.
 - **Feel or tuning:** `component-inventory.md` tuning tables; keep the GDD tables in sync.
 - **New enemy or predator:** `component-inventory.md` (Crawler/Lurker) and `development-guide.md` → Common Tasks. Respect the layers, groups and the `monitorable` kill rule.
-- **Level work:** `architecture.md` → Level Data. Run the smoke test's bot after changing the long run.
+- **Level work:** `rooms.md` (format, legend, validator) and `architecture.md` → Level Data. Edit `game/rooms/l1/m1_shaft.txt`; run `test_room_loader` and the smoke test's bot after changing it.
 - **M2 architecture** (`gds-game-architecture`): start from `architecture.md` → *Gaps against the M2 design*, the GDD and UX `EXPERIENCE.md`'s `[NOTE FOR ARCHITECTURE]` items.
 - **Build/deploy:** no config yet; see the GDD Platform-Specific Details.
 

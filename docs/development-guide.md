@@ -42,8 +42,9 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/test_chain_s
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_log.gd              # Log
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_clock.gd            # Game.clock and the hitstop
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.gd            # Settings, SlotState, DiveState, Game and settings.json
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd      # room validator, build, Room API and m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
-godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd           # integration smoke test
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd           # integration smoke test on m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft_state.gd     # the shaft's state lives in Game
 ```
 
@@ -61,8 +62,8 @@ xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn
 - `run()` starts two frames after the test enters the tree, because the first frame's delta carries the load time. Timers that expire in the same frame fire in creation order, so a real-time probe that must see a request still active is created before the request (see `test_clock.gd`).
 - Extra arguments after the test path reach the test as `OS.get_cmdline_user_args()[1..]` (`screenshot.gd` reads its output folder there).
 - **Pure rules → a new `tests/test_<subject>.gd`**, never into `test_chain_state.gd`. Build fresh state objects per case.
-- **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
-- Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`; a test that changes `Game` state ends with `Game.reset_for_tests()`. A test never calls `Game.boot()` against the real folder, so tests never load or write the real `user://settings.json`: a test that checks the file first points `Game.store.dir` at a temp folder it creates and removes (see `test_state.gd`). Only `test_state.gd` boots, on that temp folder and as its last case, because `reset_for_tests()` leaves the process booted. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
+- **Behaviour in the level → `smoke_shaft.gd`.** It loads `m1_shaft` standalone through `tests/room_harness.gd` (room, test player, stub `World`); find positions through the room API (`entry_position()`, `is_solid()`, `cell_centre()`), never literal tile coordinates, and pick targets by position, never by group index. Add an `async` test, `await` it from `run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
+- Order matters in the smoke test because it shares one room and player. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`; a test that changes `Game` state ends with `Game.reset_for_tests()`. A test never calls `Game.boot()` against the real folder, so tests never load or write the real `user://settings.json`: a test that checks the file first points `Game.store.dir` at a temp folder it creates and removes (see `test_state.gd`). Only `test_state.gd` boots, on that temp folder and as its last case, because `reset_for_tests()` leaves the process booted. A test that leaves the player dead must be followed by a fresh room (`RoomHarness.free_all()` then `build()`, see `test_snuff_needs_hold`). Free every node a test builds: an exit-time leak prints an engine `ERROR:`.
 - Add every new test file to the `for t in …` list in `run_tests.sh` until Story 1.9's glob runs `tests/test_*.gd` and `tests/smoke_*.gd` itself. `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED` (plus error lines and their `at:` traces), so keep that output format. It also kills a run after 150 s of wall-clock time, which catches a test that blocks the main loop, where the runner's watchdog can't fire.
 
 ## Edit Art
@@ -76,7 +77,7 @@ Never hand-edit `game/art/*.png`; the next build overwrites them. Do not name a 
 
 ## Edit the Level
 
-The shaft is the `LAYOUT` array in `game/scripts/shaft.gd` (`#` wall, `.` empty, `P` spawn, `c` walker, `h` hoverer, `L` lurker). Every row must have the same width; an `assert` checks this at build time. After moving crawlers in the long run (rows 44–84), run the smoke test: the bot checks the run is still chainable (≥ 5).
+The level is `game/rooms/l1/m1_shaft.txt`: a header, `---`, then the grid (`#` wall, `.` empty, `P` spawn, `c` walker, `h` hoverer, `L` lurker; the full format and legend are in [rooms.md](./rooms.md)). It is a spine room, so it must stay 22 columns wide including the walls. Edit the text and run the tests: `test_room_loader` validates the file (errors print as `file:row:col`) and checks no fall between ledge rows is over 19 rows (FR57), and the smoke test's bot checks the long run (rows 44–84) is still chainable (≥ 5). A bad file never builds: the loader prints its errors and `shaft.gd` stops on an assert.
 
 ## Common Tasks
 

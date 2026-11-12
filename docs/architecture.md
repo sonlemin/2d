@@ -11,7 +11,7 @@ A single-scene Godot 4.7 prototype that answers one question: *does a long pogo 
 The architecture is deliberately small:
 
 - One **pure-logic class** (`ChainState`) holds the core rules, so they can be unit-tested with no scene.
-- One **level script** (`shaft.gd`) builds the level from an ASCII array and owns session state.
+- Rooms are **text files** (`rooms/<layer>/<id>.txt`) that `RoomLoader` validates and builds into a `Room` node; one **interim level script** (`shaft.gd`) loads `m1_shaft` and runs the M1 loop around it. Session state lives in `Game`.
 - Three **actor scripts** (Player, Crawler, Lurker) talk to each other only through physics overlaps, groups and duck-typed methods.
 - One **static helper** (`Fx`) makes effects in code.
 - Art comes from a **text-to-PNG pipeline** outside Godot.
@@ -38,10 +38,12 @@ The architecture is deliberately small:
 
 ```
               ┌──────────────────────── shaft.tscn (Node2D, shaft.gd) ───────────────────────┐
-              │  Darkness (CanvasModulate)   Background (ColorRect)   Walls (TileMapLayer)    │
+              │  Darkness (CanvasModulate)                                                    │
+              │  m1_shaft (Room, built by RoomLoader from rooms/l1/m1_shaft.txt at _ready)    │
+              │    Backdrop (ColorRect)  Walls (TileMapLayer)  Rims (ColorRect × N)           │
+              │    Crawler × N, Lurker × N   (spawned through room.spawn())                   │
               │  Player (player.tscn) ── owns ──► ChainState (RefCounted)                     │
-              │  Crawler × N, Lurker × N   (instanced from LAYOUT at _ready)                  │
-              │  ledge rims (ColorRect × N)   Debug (CanvasLayer: Label HUD)                  │
+              │  Debug (CanvasLayer: Label HUD)                                               │
               └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -132,17 +134,9 @@ _tick_timers → _handle_snuff → _handle_cling ─(not clinging)→ _handle_ho
 
 ## Level Data
 
-The level is the `LAYOUT` constant in `shaft.gd`: 105 rows × 30 columns (480 × 1680 px), one char per 16 px tile. It holds 1 spawn, 5 walking crawlers, 36 hovering crawlers (in pairs per row) and 4 lurkers.
+The level is a room file, `game/rooms/l1/m1_shaft.txt` (Story 1.5): a `key=value` header, `---`, then 105 rows × 22 columns (352 × 1680 px, walls included), one char per 16 px tile. It holds 1 spawn, 5 walking crawlers, 36 hovering crawlers (in pairs per row) and 4 lurkers, with ledge rows 6, 24, 41, 57, 72, 85 and 103 (no fall between ledges over 19 rows, FR57) and a floor hole for the `down` exit that loops to its own top (R16, wired in Story 1.7).
 
-| Char | Meaning |
-|---|---|
-| `#` | wall (a tile with a full-square collision polygon) |
-| `.` | empty |
-| `P` | player spawn (feet on the tile below) |
-| `c` / `h` | walking / hovering crawler |
-| `L` | lurker. If a wall is beside it, the cell is also filled with wall so the lurker "sits inside" it |
-
-At build time, every wall tile with open space above gets a 1 px unshaded **ledge rim**, so landing spots read in the dark. The `TileSet` is built in code (`_make_tileset`) from `art/tile.png`; there is no `.tres`.
+`RoomLoader` (`scripts/world/room_loader.gd`) parses the file, checks it with a pure validator (every error as `file:row:col`; a bad file never builds) and builds a `Room` (`scripts/world/room.gd`): a backdrop, a `TileMapLayer` with a TileSet built once in code from `art/tile.png` (no `.tres`), an unshaded 1 px **ledge rim** on every wall tile with open space above, and the entities spawned through `room.spawn()`. The chars are defined in `scripts/world/room_legend.gd`; the format, legend, validator errors and Room API are in [rooms.md](./rooms.md). `shaft.gd` centres the 352 px room in the 480 px view; the 64 px bands on each side stay empty until the gutters (Story 1.6).
 
 ## Physics Layers
 
@@ -182,7 +176,8 @@ tools/sprites/<name>.txt ───────┼─► python3 tools/build_spri
 | Unit | `tests/test_clock.gd` | `Clock`: ids multiply, a re-request refreshes (latest scale wins, never stacks), real-time expiry, pause freezes requests, `_exit_tree` and player death clear them, a pogo hit requests the 75 ms hitstop |
 | Unit | `tests/test_tuning.gd` | `Tuning`: `f()` / `flag()`, gear modifiers apply set → add → mul in every order, one `changed` per `apply_gear()`, reset in place, `rules/` purity; a regression fixture pins all 44 M1 `@export` defaults in their new homes, plus the player boxes, the chain curve, Blade Bloom and the hitstop depth |
 | Unit | `tests/test_state.gd` | `Settings`, `SlotState` and `DiveState`: the signal rules, the fallbacks on bad data, the `to_dict()` shapes, round trips in memory and through JSON, `rules/` purity. `Game`: the same instances all session, `reset_for_tests()`. `settings.json` through `SaveStore`: a missing, corrupt or partly bad file is rewritten, a file that can't be opened or is from a newer build is left untouched, one write per frame, and the warnings are counted |
-| Integration (headless) | `tests/smoke_shaft.gd` | Loads the real shaft and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
+| Unit | `tests/test_room_loader.gd` | The room validator (each error at its file line and column, from fixtures in `tests/rooms/` and inline texts), the build (spawn counts, `hover` args, in-wall lurkers, rims) and the `Room` API; `m1_shaft` validates, holds 36 hoverers, 5 walkers and 4 lurkers, and has no ledge gap over 19 rows (FR57) |
+| Integration (headless) | `tests/smoke_shaft.gd` | Loads `m1_shaft` standalone through `tests/room_harness.gd` (a test player and a stub `World` with `play_rect()`) and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
 | Integration (headless) | `tests/smoke_shaft_state.gd` | Loads the real shaft and checks its state wiring: a bank raises `Game.dive.carried`, a chain raises `Game.slot.best_chain`, a death raises `Game.slot.deaths`, `Settings.brightness` repaints the darkness, a shaft added by a test never boots `Game`, and a new shaft keeps all of it and spawns at `P` |
 | Visual (manual) | `tests/screenshot.gd` | Two PNGs (spawn; chain 10 with a telegraph). Needs a renderer: `xvfb-run` on the server |
 
@@ -211,8 +206,8 @@ Observations from comparing this code with GDD v1.0 and the UX spines (2026-11-1
 
 | Area | M1 as built | M2 target (source) | Likely impact |
 |---|---|---|---|
-| Play width | Shaft is 30 tiles (480 px), full-width view, no gutters | ~60 px HUD gutters, ~360 px view; spine shafts 22 tiles (352 px); wider rooms scroll horizontally (GDD Level Design, UX) | Camera limits/viewport split; rebuild the shaft at 22 tiles (E1) |
-| Scene structure | One scene, level as a const string array | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | A room/level format and a scene-transition layer |
+| Play width | Shaft is 22 tiles (352 px) since Story 1.5, centred in the 480 px view with empty 64 px bands; no gutters yet | ~60 px HUD gutters, ~360 px view; spine shafts 22 tiles (352 px); wider rooms scroll horizontally (GDD Level Design, UX) | Camera limits/viewport split and the gutters (Story 1.6) |
+| Scene structure | One scene (`shaft.tscn`) that loads one room file through `RoomLoader` (Story 1.5) | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | `World` and room swaps (Stories 1.6–1.7) |
 | Damage | Crawler = knockback only; hunting lurker = instant death | 4 HP; crawler 1, lurker 2, spikes 1; heal at stations (GDD Health) | Health component; lurker contact deals damage instead of calling `die()` |
 | Embers | held → banked (`Game.dive.carried`) → held lost on death | held → **carried** → **deposited** at a Lift Station/hub (GDD Economy) | Rename and extend ChainState/economy; deposit flow |
 | Respawn | The shaft's spawn `P` (`DiveState` has an unused respawn point) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Anchors and stations call `DiveState.set_respawn()` (Story 1.24); a last-safe-ledge tracker for hazards (Story 1.19) |
