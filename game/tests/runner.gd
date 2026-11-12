@@ -6,13 +6,19 @@ extends Node
 ## Contract for a test script:
 ## - `extends Node` and implements `func run() -> void`, which may `await`.
 ## - Prints `ok …` / `FAIL …` lines and a final line containing `PASS` or `FAILED`.
-## - Never calls `quit()`: the runner decides the exit code.
+##   `ok` lines and `[category]` Log lines never count as a verdict.
+## - Never calls `quit()`: the runner decides the exit code, and fails a test that quits itself.
 ## - Extra arguments after the test path reach it as `OS.get_cmdline_user_args()[1..]`.
+## - `run()` starts two frames after the test enters the tree (its `_ready` runs before that).
+## - The runner frees the test after `run()` returns and watches two more frames, so errors in
+##   its teardown count too.
 ##
 ## Exits 1 when the test printed a failure, printed no PASS line, ran longer than TIMEOUT, or
 ## logged any error (D3: a runtime error inside a helper aborts only the helper, so `run()`
 ## carries on and prints PASS; the error count is the only signal). Warnings are allowed:
 ## environment errors use `push_warning` (Architecture → Error Handling).
+## TIMEOUT is a SceneTreeTimer, so it can't fire if a test blocks the main loop; run_tests.sh
+## adds a wall-clock `timeout` around each run for that.
 
 const TIMEOUT := 120.0  ## seconds of real time, counted even while the test pauses the tree or freezes time
 
@@ -33,9 +39,13 @@ class Capture extends Logger:
 	func _log_message(message: String, _error: bool) -> void:
 		_lock.lock()
 		for line in message.split("\n", false):
+			# An `ok` line is a passed check whatever its text says, and a `[category]` line is Log
+			# output from game code: a "[save] … PASS" must not pass a test that returned early.
+			if line.begins_with("ok") or line.begins_with("["):
+				continue
 			if line.begins_with("FAIL") or _failed_re.search(line) != null:
 				_failed = true
-			elif not line.begins_with("ok") and _pass_re.search(line) != null:
+			elif _pass_re.search(line) != null:
 				_passed = true
 		_lock.unlock()
 
@@ -85,6 +95,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await test.run()
+	# The test's last frame may have queued frees and deferred calls: let them run while the
+	# logger still watches, so a teardown error fails the test (D3) instead of slipping past.
+	if is_instance_valid(test):
+		test.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var r := _capture.result()
 	var passed: bool = r[0]
 	var failed: bool = r[1]
@@ -97,6 +113,12 @@ func _ready() -> void:
 		_finish(false, "no PASS line")
 	else:
 		_finish(true, "")
+
+
+## A test that calls quit() itself (as every pre-runner test did) would otherwise exit with its
+## own code and skip the PASS, failure and error checks.
+func _exit_tree() -> void:
+	_finish(false, "the test quit on its own; the runner sets the exit code")
 
 
 ## Both the watchdog and a late completion can arrive; only the first one counts.

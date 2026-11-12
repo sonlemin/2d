@@ -383,7 +383,7 @@ user://
 - `Game.clock` is the **only** code that writes `Engine.time_scale`. Callers request named effects: `clock.request(&"hitstop", 0.05, 0.075)`, `clock.request(&"slowmo", 0.3, 0.5)`, `clock.set_assist(0.8)` (E7). Durations are real time and pausable: `create_timer(t, false, false, true)` (`process_always = false`, `ignore_time_scale = true`). `Clock` is a `Node` child of `Game`, so it can own timers.
 - `Engine.time_scale` = product of active requests × assist. Death and `_exit_tree` clear all requests.
 - Clock requests count down **only while the tree is not paused**: pause freezes slow-mo and hitstop where they are. (Supersedes M1's `process_always` hitstop timer.)
-- Pause is `SceneTree.paused`, never the time scale. UI, HUD, death card and the Clock's timers run with `PROCESS_MODE_ALWAYS`.
+- Pause is `SceneTree.paused`, never the time scale. UI, HUD and the death card run with `PROCESS_MODE_ALWAYS`; the Clock's timers pause (above).
 - Real-time visuals keep using `delta / Engine.time_scale` in `_process` (M1 rule).
 
 ### Input

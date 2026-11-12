@@ -54,13 +54,14 @@ xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn
 ### Writing tests
 
 - A test is a script that `extends Node` and implements `func run() -> void`, which may `await`. It has a local `check(cond, msg)`; there is no framework. Don't use `--script`: under it, anything that names `Game` fails to compile.
-- It prints `ok …` / `FAIL …` lines and a final line containing `PASS` or `FAILED`. It never calls `quit()`; the runner sets the exit code.
-- The runner fails a test that prints no `PASS` line, runs longer than 120 s, or logs any `SCRIPT ERROR` / `ERROR:` line, even if it printed `PASS` (a runtime error inside a helper aborts only the helper). `push_warning` is allowed.
+- It prints `ok …` / `FAIL …` lines and a final line containing `PASS` or `FAILED`. `ok` lines and `[category]` Log lines never count as the verdict. It never calls `quit()`; the runner sets the exit code and fails a test that quits on its own.
+- The runner fails a test that prints no `PASS` line, runs longer than 120 s, or logs any `SCRIPT ERROR` / `ERROR:` line, even if it printed `PASS` (a runtime error inside a helper aborts only the helper). That includes the test's teardown: after `run()` returns, the runner frees the test and watches two more frames. `push_warning` is allowed.
+- `run()` starts two frames after the test enters the tree, because the first frame's delta carries the load time. Timers that expire in the same frame fire in creation order, so a real-time probe that must see a request still active is created before the request (see `test_clock.gd`).
 - Extra arguments after the test path reach the test as `OS.get_cmdline_user_args()[1..]` (`screenshot.gd` reads its output folder there).
 - **Pure rules → a new `tests/test_<subject>.gd`**, never into `test_chain_state.gd`. Build fresh state objects per case.
 - **Behaviour in the level → `smoke_shaft.gd`.** Add an `async` test, `await` it from `run()`, and drive it with `Input.action_press/release`. Use `place()` to teleport, and wait with `frames()` / `seconds()` (physics frames).
 - Order matters in the smoke test because it shares one shaft instance. Reset what you touch: `chain.break_chain()`, `set_lurkers_active(true)`, `set_physics_process(true)`, `Game.clock.clear()`. A test that leaves the player dead must be followed by a fresh shaft (see `test_snuff_needs_hold`).
-- Add every new test file to the `for t in …` list in `run_tests.sh` until Story 1.9's glob runs `tests/test_*.gd` and `tests/smoke_*.gd` itself. `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED`, so keep that output format.
+- Add every new test file to the `for t in …` list in `run_tests.sh` until Story 1.9's glob runs `tests/test_*.gd` and `tests/smoke_*.gd` itself. `run_tests.sh` greps for lines that start with `ok`/`FAIL` or contain `PASS`/`FAILED` (plus error lines and their `at:` traces), so keep that output format. It also kills a run after 150 s of wall-clock time, which catches a test that blocks the main loop, where the runner's watchdog can't fire.
 
 ## Edit Art
 

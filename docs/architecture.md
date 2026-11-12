@@ -179,6 +179,8 @@ tools/sprites/<name>.txt ───────┼─► python3 tools/build_spri
 | Layer | File | What it covers |
 |---|---|---|
 | Unit | `tests/test_chain_state.gd` | `ChainState`: hit/land/snuff/cap, monotonic curves, `changed` signal only on real changes, embers held → banked → lost, cling pause |
+| Unit | `tests/test_log.gd` | `Log`: `[category] message` format, the fixed categories, debug categories off by default and toggled by `set_enabled()` |
+| Unit | `tests/test_clock.gd` | `Clock`: ids multiply, a re-request refreshes (latest scale wins, never stacks), real-time expiry, pause freezes requests, `_exit_tree` and player death clear them, a pogo hit requests the 75 ms hitstop |
 | Integration (headless) | `tests/smoke_shaft.gd` | Loads the real shaft and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
 | Visual (manual) | `tests/screenshot.gd` | Two PNGs (spawn; chain 10 with a telegraph). Needs a renderer: `xvfb-run` on the server |
 

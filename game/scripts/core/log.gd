@@ -31,9 +31,10 @@ static func debug(cat: StringName, msg: String) -> void:
 		print(format(cat, msg))
 
 
-## Release builds strip the assert, so a disabled category costs one call and one lookup.
+## The hot-path guard. The assert is inline, not `_check()`, because release builds strip an
+## assert but keep a call: a disabled category costs this call and `OS.is_debug_build()`.
 static func enabled(cat: StringName) -> bool:
-	_check(cat)
+	assert(cat in CATEGORIES, "Log: unknown category '%s'" % cat)
 	return OS.is_debug_build() and _debug_on.has(cat)
 
 
