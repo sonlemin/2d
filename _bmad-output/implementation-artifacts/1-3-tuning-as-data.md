@@ -4,7 +4,7 @@ baseline_commit: 85bb1ed
 
 # Story 1.3: Tuning as data
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev (no human gate; done when every AC passes and `run_tests.sh` is green) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -47,46 +47,46 @@ so that gear, assists and playtests change values in one place that matches the 
 
 Run everything from `game/` and wrap every Godot run in `timeout`.
 
-- [ ] **Task 1: Baseline** (AC: 4)
-  - [ ] Run `timeout 400 ./run_tests.sh` and expect:
+- [x] **Task 1: Baseline** (AC: 4)
+  - [x] Run `timeout 400 ./run_tests.sh` and expect:
     - `test_chain_state`: `ALL PASS (69 checks)`
     - `test_log`: 7 `ok` + `PASS`
     - `test_clock`: 15 `ok` + `PASS`
     - `test_deferred_owners`: 21 `ok` + `PASS`
     - `smoke_shaft`: 28 `ok` + `SMOKE PASS`
     - the last line: `== ALL GREEN`
-  - [ ] Record the counts in the Debug Log. They are the regression bar for Task 4 and Task 6.
-- [ ] **Task 2: `Tuning` and `Gear`** (AC: 1, 3)
-  - [ ] Create `scripts/rules/gear.gd` per Dev Notes → *Gear*.
-  - [ ] Create `scripts/rules/tuning.gd` per Dev Notes → *Tuning* and *Migration map*: 34 keys in `BASE`, each const commented per *Const comments*.
-  - [ ] Create `tests/test_tuning.gd` with the API and purity cases from Dev Notes → *test_tuning*. Its regression fixture comes in Task 4, because the "moved property is gone" checks fail until the actors migrate.
-  - [ ] Add `test_tuning` to the `for t in …` list in `run_tests.sh`, after `test_clock`.
-- [ ] **Task 3: `Game.tuning`** (AC: 4)
-  - [ ] In `scripts/core/game.gd`, add `var tuning := Tuning.new()` beside `clock`, and update the header comment: 1.4 still adds settings, slot, dive and devices.
-  - [ ] Add the `Game.tuning` case to `test_tuning.gd` (Dev Notes → *test_tuning*). It can't land in Task 2, because `Game.tuning` doesn't exist yet.
-- [ ] **Task 4: Migrate the actors** (AC: 1, 2, 4). Use one actor at a time and run `run_tests.sh` after each.
-  - [ ] `player.gd`: delete the 28 exports. Add the 5 local consts from the map, plus `HITSTOP_SCALE := 0.05` (Dev Notes → D3). Replace every use with `Game.tuning.f(&"…")` per the map. The two `Vector2` exports become two keys each.
-  - [ ] `crawler.gd`: delete the 5 exports. `hover` becomes `var hover := false` (per instance). The other 4 values read `Tuning`.
-  - [ ] `lurker.gd`: delete the 11 exports. Add the 6 local consts. The other 5 values read `Tuning`.
-  - [ ] `tests/smoke_shaft.gd`, harness lines only:
+  - [x] Record the counts in the Debug Log. They are the regression bar for Task 4 and Task 6.
+- [x] **Task 2: `Tuning` and `Gear`** (AC: 1, 3)
+  - [x] Create `scripts/rules/gear.gd` per Dev Notes → *Gear*.
+  - [x] Create `scripts/rules/tuning.gd` per Dev Notes → *Tuning* and *Migration map*: 34 keys in `BASE`, each const commented per *Const comments*.
+  - [x] Create `tests/test_tuning.gd` with the API and purity cases from Dev Notes → *test_tuning*. Its regression fixture comes in Task 4, because the "moved property is gone" checks fail until the actors migrate.
+  - [x] Add `test_tuning` to the `for t in …` list in `run_tests.sh`, after `test_clock`.
+- [x] **Task 3: `Game.tuning`** (AC: 4)
+  - [x] In `scripts/core/game.gd`, add `var tuning := Tuning.new()` beside `clock`, and update the header comment: 1.4 still adds settings, slot, dive and devices.
+  - [x] Add the `Game.tuning` case to `test_tuning.gd` (Dev Notes → *test_tuning*). It can't land in Task 2, because `Game.tuning` doesn't exist yet.
+- [x] **Task 4: Migrate the actors** (AC: 1, 2, 4). Use one actor at a time and run `run_tests.sh` after each.
+  - [x] `player.gd`: delete the 28 exports. Add the 5 local consts from the map, plus `HITSTOP_SCALE := 0.05` (Dev Notes → D3). Replace every use with `Game.tuning.f(&"…")` per the map. The two `Vector2` exports become two keys each.
+  - [x] `crawler.gd`: delete the 5 exports. `hover` becomes `var hover := false` (per instance). The other 4 values read `Tuning`.
+  - [x] `lurker.gd`: delete the 11 exports. Add the 6 local consts. The other 5 values read `Tuning`.
+  - [x] `tests/smoke_shaft.gd`, harness lines only:
     - line 95: `_player.cling_time` → `Game.tuning.f(&"cling_grace")`
     - line 267: `lurker.hunt_speed` → `Game.tuning.f(&"lurker_hunt_speed")`
-  - [ ] Add the regression fixture and the FR-values case to `test_tuning.gd` (Dev Notes → *test_tuning*).
-- [ ] **Task 5: Docs and project-context** (fix facts only; the docs get regenerated later)
-  - [ ] `docs/component-inventory.md`:
+  - [x] Add the regression fixture and the FR-values case to `test_tuning.gd` (Dev Notes → *test_tuning*).
+- [x] **Task 5: Docs and project-context** (fix facts only; the docs get regenerated later)
+  - [x] `docs/component-inventory.md`:
     - The player's "Exported tuning" table becomes a "Tuning keys (`rules/tuning.gd`)" table with the new key names, plus a line naming the local consts.
     - Do the same for the crawler's and the lurker's tuning tables.
     - Add rows for `Tuning` and `Gear` to the Core table that 1.2 added.
-  - [ ] `docs/development-guide.md` → Common Tasks:
+  - [x] `docs/development-guide.md` → Common Tasks:
     - "Tune movement or combat feel" and "Tune a lurker" now point to the consts in `scripts/rules/tuning.gd`, and say: change the matching GDD table too, and keep `LURKER_TELEGRAPH_TIME ≥ 0.75`.
     - The Player node's Inspector no longer shows them.
-  - [ ] `docs/source-tree-analysis.md`:
+  - [x] `docs/source-tree-analysis.md`:
     - In the tree block, add `scripts/rules/{tuning,gear}.gd` and `tests/test_tuning.gd`.
     - Line 115 ("Tuning lives in code: `@export` vars …") says tuning is consts in `rules/tuning.gd`, read through `Game.tuning`. Chain-curve consts stay in `ChainState`, and presentation consts stay on their actors.
-  - [ ] `docs/architecture.md`: add a `test_tuning.gd` row to the Testing Strategy table. Line 204 ("Tuning names match the GDD tables") gains "keys live in `rules/tuning.gd`".
-  - [ ] `game/README.md` → Tests: add a `test_tuning.gd` line.
-  - [ ] `_bmad-output/project-context.md` → "Current State vs Target": add one sentence after the 1.2 sentence: "Story 1.3 moved the M1 `@export` tuning into `scripts/rules/tuning.gd` (read through `Game.tuning`) and added an empty `rules/gear.gd`." Remove nothing else.
-- [ ] **Task 6: Verify** (AC: 1–4). Every grep below must print nothing.
+  - [x] `docs/architecture.md`: add a `test_tuning.gd` row to the Testing Strategy table. Line 204 ("Tuning names match the GDD tables") gains "keys live in `rules/tuning.gd`".
+  - [x] `game/README.md` → Tests: add a `test_tuning.gd` line.
+  - [x] `_bmad-output/project-context.md` → "Current State vs Target": add one sentence after the 1.2 sentence: "Story 1.3 moved the M1 `@export` tuning into `scripts/rules/tuning.gd` (read through `Game.tuning`) and added an empty `rules/gear.gd`." Remove nothing else.
+- [x] **Task 6: Verify** (AC: 1–4). Every grep below must print nothing.
   ```bash
   godot --headless --path . --import 2>&1 | grep -E 'SCRIPT ERROR|ERROR:'
   timeout 60 godot --headless --path . --quit-after 120 2>&1 | grep -E 'SCRIPT ERROR|ERROR:'   # main-scene boot
@@ -98,8 +98,8 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
   timeout 400 ./run_tests.sh     # Task 1 counts + test_tuning, ends "== ALL GREEN"
   timeout 120 xvfb-run -a godot --path . --rendering-driver opengl3 --audio-driver Dummy res://tests/runner.tscn -- res://tests/screenshot.gd /tmp/shots   # exit 0, two PNGs
   ```
-  - [ ] The raw per-test greps also cover exit-time errors. A test that creates a node and never frees it leaks RIDs, and the engine prints `ERROR: … leaked at exit` after the runner has finished (verified; see *Verified on the server*). Story 1.9's gate will fail on those lines.
-- [ ] **Task 7: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
+  - [x] The raw per-test greps also cover exit-time errors. A test that creates a node and never frees it leaks RIDs, and the engine prints `ERROR: … leaked at exit` after the runner has finished (verified; see *Verified on the server*). Story 1.9's gate will fail on those lines.
+- [x] **Task 7: Commit.** Use conventional prefixes, and leave `run_tests.sh` green at every commit. Suggested split:
   - `feat:` `Tuning`, `Gear`, `Game.tuning` and the API half of `test_tuning` (Tasks 2–3)
   - `refactor:` the actor migration, the two `smoke_shaft` lines and the regression fixture (Task 4)
   - `docs:` (Task 5)
@@ -432,14 +432,83 @@ The pattern: `feat:` / `refactor:` / `test:` / `docs:` commits, each leaving `ru
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-12.
+
 ### Debug Log References
+
+- **Task 1 baseline (85bb1ed + story file):** `test_chain_state` ALL PASS (69 checks); `test_log` 7 ok + PASS; `test_clock` 15 ok + PASS; `test_deferred_owners` 21 ok + PASS; `smoke_shaft` 28 ok + SMOKE PASS; `== ALL GREEN`. Matches the story exactly.
+- **After each actor migration** (player, then crawler, then lurker): `run_tests.sh` ALL GREEN, with the same counts each time. `test_clock` stayed at 15 ok, including `_test_pogo_requests_hitstop`, which checks the `HITSTOP_SCALE` + Tuning `hitstop` wiring end to end.
+- **Task 6 (final):**
+  - Import, main-scene boot and the six raw per-test runs printed no `SCRIPT ERROR` / `ERROR:` lines, exit-time leaks included.
+  - `grep -rn "@export" scripts/` printed nothing, and so did the purity grep.
+  - The `check(` diff against 85bb1ed printed nothing. `smoke_shaft`'s diff is exactly lines 95 and 267.
+  - `run_tests.sh`: ALL GREEN with 69 / 7 / 15 / **83** (`test_tuning`) / 21 / 28.
+  - The screenshot run exited 0 with two PNGs (chain 10: light 109, lurker telegraph visible). The output went to the session scratchpad instead of `/tmp/shots` (agent sandbox rule); the command is otherwise the same.
+- **Red phase:**
+  - `test_tuning` was written after `tuning.gd`, so both halves were mutation-tested.
+  - OPS swapped to add → set → mul made all 6 order checks fail (got 3.0).
+  - Re-adding `@export var run_speed` to `player.gd` and setting `CRAWLER_HOVER_PERIOD` to 2.5 failed exactly those two fixture rows.
+  - The `Game.tuning` case was added before the field existed: the runner failed it on the engine error even though the test printed PASS. This shows the 1.2 D3 net working.
+  - Every mutation was reverted, and the files were checked afterwards.
+- **`assert` messages are evaluated eagerly in debug builds** (probe on 4.7.2: the message expression ran on all 1000 passing asserts). With the formatted message, `f()` costs about 0.25 µs instead of 0.13 µs per call on the server; release builds strip both. I kept the story's form, which `Log.enabled()` already uses. If the CP1 perf scene ever shows `f()` in a debug profile, the fix is `if not _values.has(key): assert(false, …)`.
+- **No value looked wrong**, so there is nothing to raise at CP1/CP2.
+- **Things left alone on purpose (out of scope):**
+  - The `ChainState` header still says "All tuning constants live here" (the story says don't touch `ChainState`).
+  - `project-context.md`'s 1.2 sentence still says "(holding only `clock`)". I followed "Remove nothing else", and the new 1.3 sentence names `Game.tuning`.
+  - `docs/architecture.md`'s hitstop line still shows `Game.clock.request(&"hitstop", 0.05, 0.075)` as an example call. It is still a valid call.
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-12. Ultimate context engine analysis completed - comprehensive developer guide created. The `Tuning` / `Gear` API and the test's introspection were dry-run on Godot 4.7.2 in a scratch copy first (see "Verified on the server").
+- **`rules/tuning.gd`** (`class_name Tuning`, `RefCounted`, pure):
+  - 34 consts in the map's order and groups, each with a `## unit; intent (source). Was X.` comment, all listed in `BASE`.
+  - `FLAGS = [&"instant_snuff"]`, `OPS = [&"set", &"add", &"mul"]` and `signal changed`.
+  - `apply_gear(gear_ids, table := Gear.TABLE)` precomputes `_values` (D4) and asserts on a malformed row, an unknown key or flag, and a double `set` (D5). It ignores unknown gear ids and emits `changed` once. `apply_gear([])` is the reset in place (D6).
+  - `f()` and `flag()` assert on an unknown key.
+  - Small additions beyond the spec, both inside D5:
+    - `_check_row()` also asserts that `id` / `stat` / `op` are present and `value` is a number.
+    - Ids, stats and ops go through `StringName()`, so a row written with `"strings"` behaves like one written with `&"names"`.
+- **`rules/gear.gd`:** `class_name Gear` with an empty `const TABLE: Array[Dictionary]` and an AR16 header naming the four E5/E6 items.
+- **`Game.tuning`:** one `Tuning.new()` beside `clock`. The header says 1.4 adds settings, slot, dive and devices, and that gear changes call `apply_gear()`, never a new `Tuning`.
+- **Actor migration** (D1–D3), with no value changed:
+  - `player.gd`: 28 exports gone. It reads 25 Tuning keys and has 6 local consts: `SHAKE`, `LOOK_AHEAD`, `LIGHT_KICK`, `LIGHT_LERP`, `SNUFF_HOLD` and the new `HITSTOP_SCALE`. `_freeze_frame()` keeps its `<= 0.0` guard.
+  - `crawler.gd`: 5 exports gone; `hover` is a plain per-instance var.
+  - `lurker.gd`: 11 exports gone; 6 local consts, 5 Tuning keys.
+  - Functions take `var t := Game.tuning` and read keys each tick. Only timers and seeds are taken at a moment: `_cling_left`, `_dash_left`, `_swing_left`, `_swing_cd`, `_invuln`, `_kick_left`, the lurker's `_timer` and the crawler phase seed.
+  - Group notes above the local consts are plain `#` comments. A `##` block above a member would become that member's doc comment.
+- **`tests/test_tuning.gd`** (83 checks):
+  - API: BASE size and values, all 6 gear orders = 9 (the table order is permuted along with the ids, because `apply_gear` filters the table in table order), other stats untouched, unknown ids ignored, flag on/off/reset, one `changed` per call, reset in place, an empty `Gear.TABLE`, and `Game.tuning`.
+  - Purity, with an open-error check.
+  - The 44-row M1 fixture: values, moved properties gone, local consts present, `hover` per instance, and each BASE key from exactly one row.
+  - The FR values: the chain cap 20, 40 / 12 px light, the radius curve at 0 / 4 / 10 / 20, bloom 1.0 → 1.805 and clamped, `HITSTOP_SCALE` 0.05, and the four player boxes read from a freed `player.tscn` instance.
+- **Docs:** component inventory, dev guide, source tree, architecture, README and the project-context sentence (Task 5).
+- **Commits:** `b4f9fac` feat (Tasks 2–3), `cf1bb64` refactor (Task 4), `120f9bd` docs (Task 5), each green; this record and the sprint status in a final docs commit.
+- **Feel:** this is a pure refactor. Tests are green; it needs a quick feel check on the laptop (no change intended).
 
 ### File List
+
+- `game/scripts/rules/tuning.gd` (new)
+- `game/scripts/rules/tuning.gd.uid` (new)
+- `game/scripts/rules/gear.gd` (new)
+- `game/scripts/rules/gear.gd.uid` (new)
+- `game/tests/test_tuning.gd` (new)
+- `game/tests/test_tuning.gd.uid` (new)
+- `game/scripts/core/game.gd`
+- `game/scripts/actors/player.gd`
+- `game/scripts/actors/crawler.gd`
+- `game/scripts/actors/lurker.gd`
+- `game/tests/smoke_shaft.gd`
+- `game/run_tests.sh`
+- `game/README.md`
+- `docs/component-inventory.md`
+- `docs/development-guide.md`
+- `docs/source-tree-analysis.md`
+- `docs/architecture.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/implementation-artifacts/1-3-tuning-as-data.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
 - 2026-11-12: Story 1.3 created (ready-for-dev).
+- 2026-11-12: Implemented (gds-dev-story). Added `Tuning` and `Gear` in `rules/` and `Game.tuning`; migrated the 44 M1 exports (34 Tuning keys, 11 local consts, 1 per-instance var); added `test_tuning` (API, purity, M1 regression fixture, FR values); updated the docs. No value changed. Status → review.
