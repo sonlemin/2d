@@ -34,5 +34,6 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **Chain rules** (`tests/test_chain_state.gd`): chain hits, landing, Snuff, the cap and the growth curves.
 - **Log** (`tests/test_log.gd`): the `[category] message` format and the debug-category switches.
 - **Clock** (`tests/test_clock.gd`): time-scale requests multiply, refresh, run on real time, pause with the game and clear on death; a pogo hit freezes for 75 ms.
+- **Tuning** (`tests/test_tuning.gd`): gear modifiers apply in a fixed order, and every M1 tuning value still holds after the move to `scripts/rules/tuning.gd`.
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the real level with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.

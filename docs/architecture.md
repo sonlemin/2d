@@ -181,6 +181,7 @@ tools/sprites/<name>.txt ───────┼─► python3 tools/build_spri
 | Unit | `tests/test_chain_state.gd` | `ChainState`: hit/land/snuff/cap, monotonic curves, `changed` signal only on real changes, embers held → banked → lost, cling pause |
 | Unit | `tests/test_log.gd` | `Log`: `[category] message` format, the fixed categories, debug categories off by default and toggled by `set_enabled()` |
 | Unit | `tests/test_clock.gd` | `Clock`: ids multiply, a re-request refreshes (latest scale wins, never stacks), real-time expiry, pause freezes requests, `_exit_tree` and player death clear them, a pogo hit requests the 75 ms hitstop |
+| Unit | `tests/test_tuning.gd` | `Tuning`: `f()` / `flag()`, gear modifiers apply set → add → mul in every order, one `changed` per `apply_gear()`, reset in place, `rules/` purity; a regression fixture pins all 44 M1 `@export` defaults in their new homes, plus the player boxes, the chain curve, Blade Bloom and the hitstop depth |
 | Integration (headless) | `tests/smoke_shaft.gd` | Loads the real shaft and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
 | Visual (manual) | `tests/screenshot.gd` | Two PNGs (spawn; chain 10 with a telegraph). Needs a renderer: `xvfb-run` on the server |
 
@@ -201,7 +202,7 @@ No export presets or CI. Builds are played in the Godot editor on the laptop (F5
 - **Determinism:** no randomness in level behaviour. Hover phase comes from position, and `reset_phase()` exists so tests do not depend on order. Only the camera shake uses `randf`.
 - **Lurker lethality is `monitorable`.** It is false except in HUNT with the scent. Do not add other kill paths that skip this, or the rule "Snuff/landing in time always saves you" breaks.
 - **Polling, not `body_entered`, for crawler contact**, so a crawler still overlapping when invulnerability ends still hurts.
-- **Tuning names match the GDD tables.** When you change a value, update the GDD tuning table (M1 values are marked there).
+- **Tuning names match the GDD tables; keys live in `rules/tuning.gd`.** When you change a value, update the GDD tuning table (M1 values are marked there).
 
 ## Gaps Against the M2 Design
 

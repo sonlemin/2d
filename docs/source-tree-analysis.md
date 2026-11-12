@@ -25,13 +25,15 @@ pixel_art_game/
 │   ├── scripts/
 │   │   ├── shaft.gd              # ★ Level: ASCII LAYOUT, tileset built in code, spawns, debug HUD, session statics (retired in Story 1.7)
 │   │   ├── rules/
-│   │   │   └── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
+│   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
+│   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
+│   │   │   └── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
 │   │   ├── actors/
 │   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, contact and death
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
 │   │   ├── core/
-│   │   │   ├── game.gd           # The Game autoload: refs to session state (only `clock` so far), no rules
+│   │   │   ├── game.gd           # The Game autoload: refs to session state (`clock`, `tuning` so far), no rules
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text
@@ -41,6 +43,7 @@ pixel_art_game/
 │   │   ├── test_chain_state.gd   # Unit tests for ChainState
 │   │   ├── test_log.gd           # Unit tests for Log
 │   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
+│   │   ├── test_tuning.gd        # Tuning API, gear order, rules/ purity, the 44 M1 exports regression fixture
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── smoke_shaft.gd        # Integration smoke test: real shaft, simulated input, bot run
 │   │   └── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
@@ -112,7 +115,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 - **Script per scene:** `scenes/<domain>/X.tscn` ↔ `scripts/<domain>/X.gd`. Both trees use the same domain folder names; scripts live under `scripts/`, not next to their scene, and `scenes/` has only the domains that have scenes. `shaft.gd`/`shaft.tscn` stay at the top level until Story 1.7.
 - **Enemies** live with the player in `scenes/actors/` and `scripts/actors/`.
 - **One autoload (`Game`), no addons, no resources (`.tres`).** Tilesets and materials are built in code. `Audio` is the only other autoload the architecture allows (E3).
-- **Tuning lives in code:** `@export` vars on node scripts (Player, Crawler, Lurker) and `const`s in `ChainState` and `Shaft`.
+- **Tuning lives in code:** gameplay numbers are `const`s in `rules/tuning.gd`, read through `Game.tuning.f(&"key")` (Story 1.3; no `@export` remains). The chain-curve consts stay in `ChainState`, presentation consts stay on their actors, and `Shaft` keeps its own `const`s until 1.7.
 
 ## Configuration Files
 

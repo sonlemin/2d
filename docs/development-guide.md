@@ -80,9 +80,9 @@ The shaft is the `LAYOUT` array in `game/scripts/shaft.gd` (`#` wall, `.` empty,
 
 | Task | Where |
 |---|---|
-| Tune movement or combat feel | `@export` vars in `player.gd` (also editable on the Player node in the editor) |
+| Tune movement or combat feel | consts in `scripts/rules/tuning.gd` (read through `Game.tuning`; the Player node's Inspector no longer shows them). Change the matching GDD table too. Camera and light presentation consts stay in `player.gd` |
 | Tune the chain, light, bloom or embers curve | constants and `ember_value()` in `chain_state.gd`, plus unit tests |
-| Tune a lurker | `@export` vars in `lurker.gd` (keep `telegraph_time ≥ 0.75`) |
+| Tune a lurker | the `LURKER_*` consts in `scripts/rules/tuning.gd`; change the matching GDD table too, and keep `LURKER_TELEGRAPH_TIME ≥ 0.75`. The sensing consts stay in `lurker.gd` until 1.20 |
 | Add an enemy that can be pogoed | A body on layer 3 (value 4) with a `take_hit()` method; add it to group `enemy` if contact should knock back |
 | Add a predator | An `Area2D` on layer 4 (value 8) in group `predator`; `monitorable` only while it may kill |
 | New effect | A static function in `fx.gd`; unshaded so it reads in the dark |

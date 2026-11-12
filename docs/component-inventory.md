@@ -45,7 +45,7 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Hurtbox | Area2D | 8×18; mask 12 (enemies + predators) |
 | Camera | Camera2D | smoothing 8; limits set by Shaft |
 
-**Exported tuning:**
+**Tuning keys (`rules/tuning.gd`)**, read each tick through `Game.tuning.f(&"key")`:
 
 | Group | Values |
 |---|---|
@@ -53,20 +53,20 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 | Gravity | `gravity` 900, `fall_gravity_scale` 0.6, `max_fall` 210 |
 | Jump | `jump_velocity` −330, `jump_cut` 0.45, `coyote_time` 0.08, `jump_buffer` 0.10 |
 | Dash | `dash_speed` 260, `dash_time` 0.12 (air only, once per airtime; a pogo refills it) |
-| Cling | `cling_time` 1.0, `cling_slide` 18, `wall_kick` (150, −260), `kick_lock` 0.15 |
-| Combat | `pogo_velocity` −300, `swing_active` 0.12, `air_swing_active` 0.22, `swing_cooldown` 0.22 |
-| Juice | `hitstop` 0.075, `shake` 2.5, `light_kick` 18, `look_ahead` 70, `light_lerp` 10 |
-| Damage | `knockback` (150, −150), `invuln_time` 0.6 |
-| Light key | `snuff_hold` 0.12 |
+| Cling | `cling_grace` 1.0, `cling_slide` 18, `wall_kick_x` / `wall_kick_y` 150 / −260, `kick_lock` 0.15 |
+| Combat | `pogo_velocity` −300, `slash_active` 0.12, `pogo_armed` 0.22, `attack_cooldown` 0.22, `hitstop` 0.075 |
+| Damage | `knockback_x` / `knockback_y` 150 / −150, `invuln_time` 0.6 |
+
+**Local consts** (no system bends them): `SHAKE` 2.5, `LOOK_AHEAD` 70 (both move to `camera_rig.gd` in 1.6), `LIGHT_KICK` 18, `LIGHT_LERP` 10, `SNUFF_HOLD` 0.12 (becomes `Settings.light_tap_window` in 1.8), `HITSTOP_SCALE` 0.05, `LIGHT_TEXTURE_HALF` 64.
 
 ### Crawler — `scripts/actors/crawler.gd` + `scenes/actors/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
 
-"Chain fuel." Layer 4, mask 1, body 14×8, `EdgeRay` 10 px down. **Group:** `enemy`. **API:** `take_hit()` (spark burst + free), `reset_phase()`.
+"Chain fuel." Layer 4, mask 1, body 14×8, `EdgeRay` 10 px down. **Group:** `enemy`. **API:** `take_hit()` (spark burst + free), `reset_phase()`. **Per instance:** `hover` (set by the spawner before `add_child`).
 
-| Mode | Behaviour | Tuning |
+| Mode | Behaviour | Tuning keys (`rules/tuning.gd`) |
 |---|---|---|
-| Walker (`c`) | Gravity; turns at a wall or a missing floor | `walk_speed` 25 |
-| Hoverer (`h`) | Ignores physics; sine drift around home; phase from position | `hover_drift` 10 px, `hover_period` 2.4 s |
+| Walker (`c`) | Gravity; turns at a wall or a missing floor | `crawler_walk_speed` 25, `crawler_gravity` 900 |
+| Hoverer (`h`) | Ignores physics; sine drift around home; phase from position | `crawler_hover_drift` 10 px, `crawler_hover_period` 2.4 s |
 
 ### Lurker — `scripts/actors/lurker.gd` + `scenes/actors/lurker.tscn` (`Area2D`, `class_name Lurker`)
 
@@ -82,13 +82,16 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 - **Lethal** only when `monitorable` is true, which is HUNT *and* sensed. Losing the scent is harmless at once.
 - **Look:** unshaded eyes open from a slit over 0.2 s, pulse at 2 Hz, and the body shivers. A red `PointLight2D` glow follows the eye alpha.
 
-| Tuning | Value |
+| Tuning keys (`rules/tuning.gd`) | Value |
 |---|---|
-| `notice_min_radius` / `notice_factor` | 80 px / 1.6 |
-| `telegraph_time` | 0.9 s (range-limited to ≥ 0.75) |
-| `lose_track_time` | 0.6 s |
-| `hunt_speed` / `hunt_accel` / `return_speed` | 95 / 220 / 40 |
-| `eye_pulse_hz`, `eye_open_time`, `glow_energy`, `screen_margin` | 2.0, 0.2, 1.3, 8 |
+| `lurker_telegraph_time` | 0.9 s (never below 0.75; `Spec.TELEGRAPH_MIN` checks it from 1.9) |
+| `lurker_lose_track_time` | 0.6 s |
+| `lurker_hunt_speed` / `lurker_hunt_accel` / `lurker_return_speed` | 95 / 220 / 40 |
+
+| Local const | Value |
+|---|---|
+| `NOTICE_MIN_RADIUS` / `NOTICE_FACTOR` / `SCREEN_MARGIN` | 80 px / 1.6 / 8 px (the sensing rule; moves to `rules/sensing.gd` in 1.20) |
+| `EYE_PULSE_HZ`, `EYE_OPEN_TIME`, `GLOW_ENERGY` | 2.0, 0.2, 1.3 (presentation) |
 
 ### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, main scene)
 
@@ -109,9 +112,11 @@ Builds the level from `LAYOUT`, owns the session statics, draws the debug HUD an
 
 | Script | Kind | Role |
 |---|---|---|
-| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules. Only `clock` so far; 1.3 and 1.4 add the rest |
+| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `clock` and `tuning` so far; 1.4 adds the rest |
 | `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)` |
 | `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
+| `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
+| `rules/gear.gd` | `class_name Gear` (pure data) | `TABLE` of `{id, stat, op, value}` rows (`set` / `add` / `mul` / `flag`); empty until E5 |
 
 ### Fx — `scripts/core/fx.gd` (static, `class_name Fx`)
 
@@ -168,6 +173,7 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_chain_state.gd` | 10 test functions on ChainState | headless |
 | `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
 | `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
+| `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), `rules/` purity, and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 9 scenario tests (≈ 28 checks) on the real shaft, including a pathing bot | headless |
 | `tests/screenshot.gd` | 2 screenshots | needs a renderer |
