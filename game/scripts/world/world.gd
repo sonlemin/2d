@@ -56,13 +56,13 @@ func current_room() -> Room:
 
 func _physics_process(_delta: float) -> void:
 	# Falling out of the room kills until 1.7 wires the bottom exit (R16 loop).
-	if _player != null and not _player.is_dead and _player.position.y > _room.bounds().end.y + 32:
+	if is_instance_valid(_player) and not _player.is_dead and _player.position.y > _room.bounds().end.y + 32:
 		_player.die()
 
 
 ## First spawn and respawn are one path, so both emit player_spawned.
 func _spawn_player() -> void:
-	if _player != null and is_instance_valid(_player):
+	if is_instance_valid(_player):
 		remove_child(_player)  # leaves group `player` now, not at the end of the frame
 		_player.queue_free()
 	var room_id := Game.dive.respawn_room if Game.dive.respawn_room != &"" else _room.id

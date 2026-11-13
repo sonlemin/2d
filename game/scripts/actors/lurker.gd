@@ -54,10 +54,10 @@ func senses(player: Node2D) -> bool:
 
 ## Pillar 2 beats off-screen ambushes: a lurker only notices when its telegraph will be seen.
 ## AR20: "seen" means inside World.play_rect(), never the viewport, since a gutter hides what
-## is behind it. No World means no screen, so it never notices.
+## is behind it. No World (or a `world` node with no play rect) means no screen, so it never notices.
 func _on_screen() -> bool:
 	var world := get_tree().get_first_node_in_group("world")
-	if world == null:
+	if world == null or not world.has_method(&"play_rect"):
 		return false
 	return world.play_rect().grow(-SCREEN_MARGIN).has_point(global_position)
 

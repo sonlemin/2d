@@ -9,6 +9,10 @@ const PLACEHOLDER := Color("#07060b")
 
 
 func _ready() -> void:
+	# A 352 px room leaves 4 px of clear colour either side of it inside the play area; matching
+	# the gutter makes them one band. CanvasModulate never tints the clear colour. Set here so
+	# the colour has one home: when the fill turns per-zone (1.18), set it with the fill.
+	RenderingServer.set_default_clear_color(PLACEHOLDER)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var view_w := CameraRig.GUTTER_WIDTH * 2.0 + CameraRig.PLAY_WIDTH

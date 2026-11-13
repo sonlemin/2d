@@ -13,14 +13,14 @@ const LEAD_SPEED := 140.0  ## px/s the lead eases in and out; presentation (M1 v
 const SHAKE_DECAY := 20.0  ## px/s the shake dies down; presentation (M1 value, was inline in player.gd).
 const POGO_SHAKE := 2.5  ## px camera kick on a pogo hit; presentation (was player.SHAKE, M1 player.shake).
 
-var target: Node2D
+var target: CharacterBody2D
 var _lead := 0.0
 var _shake := 0.0
 
 
-## `body` drives the lead through its `velocity` and `is_on_floor()` (duck typed: any
-## CharacterBody2D works, so the test harness needs no Player).
-func follow(body: Node2D) -> void:
+## `body` drives the lead through its `velocity` and `is_on_floor()`: any CharacterBody2D works,
+## so the test harness needs no Player.
+func follow(body: CharacterBody2D) -> void:
 	target = body
 
 
@@ -33,6 +33,8 @@ func snap() -> void:
 	if _has_target():
 		global_position = target.global_position
 	reset_smoothing()
+	# Without this the screen centre (so play_rect()) keeps the old position until next frame.
+	force_update_scroll()
 
 
 ## The only way to shake the screen: Story 1.16 gates it on Settings.shake here.
@@ -56,13 +58,16 @@ func apply_limits(bounds: Rect2) -> void:
 
 
 ## AR20: "on screen" is the play area inside the gutters, in world coordinates, never the viewport.
+## Without the shake: the offset is added after the limit clamp, so subtracting it gives the steady
+## centre, and what a lurker notices never depends on randf ("no randomness in level behaviour").
 func play_rect() -> Rect2:
 	var size := Vector2(PLAY_WIDTH, get_viewport_rect().size.y)
-	return Rect2(get_screen_center_position() - size / 2.0, size)
+	return Rect2(get_screen_center_position() - offset - size / 2.0, size)
 
 
 func _process(delta: float) -> void:
 	if not _has_target():
+		offset = Vector2.ZERO  # never leave the last random shake frozen on screen
 		return
 	var real := delta / maxf(Engine.time_scale, 0.001)
 	_shake = move_toward(_shake, 0.0, SHAKE_DECAY * real)

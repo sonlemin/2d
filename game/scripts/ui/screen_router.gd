@@ -12,14 +12,21 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # an empty router must not eat clicks
 
 
+## The router owns `screen` from here: it must come unparented. Opening the current one again
+## keeps it (replacing it with itself would free it).
 func open(screen: Control) -> void:
+	assert(screen != null, "open() needs a screen; use close() to clear")
+	if screen == _current:
+		return
+	assert(screen.get_parent() == null, "a screen is opened unparented: the router owns it")
 	close()
 	_current = screen
 	add_child(screen)
 
 
+## Frees the screen only while it is still the router's: one moved elsewhere is not ours to free.
 func close() -> void:
-	if _current != null and is_instance_valid(_current):
+	if is_instance_valid(_current) and _current.get_parent() == self:
 		remove_child(_current)  # out of the tree now, not at the end of the frame
 		_current.queue_free()
 	_current = null

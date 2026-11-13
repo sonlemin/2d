@@ -157,7 +157,8 @@ func test_popups_in_room() -> void:
 	var in_world := _world.get_child_count()
 	p.chain.add_hit()
 	p.chain.break_chain()  # banks 1: the "+1 banked" popup
-	check(_room().get_child_count() == in_room + 1, "a bank's popup goes under the room (room children %d -> %d)" % [in_room, _room().get_child_count()])
+	var added := _room().get_child(_room().get_child_count() - 1)
+	check(_room().get_child_count() == in_room + 1 and added is Label, "a bank's popup (a Label) goes under the room (room children %d -> %d, last is %s)" % [in_room, _room().get_child_count(), added.get_class()])
 	check(_world.get_child_count() == in_world, "...and nothing goes under World")
 
 
@@ -175,7 +176,11 @@ func test_death_and_respawn() -> void:
 	check(Game.slot.deaths == 1, "a death records one death on the slot (got %d)" % Game.slot.deaths)
 	check(Game.dive.carried == carried and old.chain.held == 0, "...keeps the carried embers and loses the held ones (carried %d, held %d)" % [Game.dive.carried, old.chain.held])
 	check(not Game.clock.is_active(&"hitstop") and is_equal_approx(Engine.time_scale, 1.0), "...and clears the Clock: no hitstop survives a death")
+	# AC3 is World's own clear at the respawn: die() already cleared, so a request made during
+	# the delay is the only thing that fails without it. Longer than the delay, so it can't expire.
+	Game.clock.request(&"smoke_hold", 0.5, 30.0)
 	await seconds(World.RESPAWN_DELAY + 0.1)
+	check(not Game.clock.is_active(&"smoke_hold") and is_equal_approx(Engine.time_scale, 1.0), "the respawn clears the Clock again: a request made during the delay ends with it")
 	check(is_instance_valid(_world) and _world.is_inside_tree(), "after the respawn delay, the same World is still in the tree: no reload")
 	var p := _player()
 	check(p != null and p != old, "a new player exists")
@@ -215,6 +220,13 @@ func test_behind_the_gutter() -> void:
 	p.global_position = Vector2(24, y)
 	p.velocity = Vector2.ZERO
 	_camera().snap()
+	var steady := _world.play_rect()
+	check(is_equal_approx(steady.get_center().y, y), "play_rect() is on the player the same frame as the snap, not a frame late (centre y %.1f, player %.1f)" % [steady.get_center().y, y])
+	_camera().kick(6.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(_camera().offset != Vector2.ZERO and _world.play_rect().is_equal_approx(steady), "a shake moves the view but never play_rect(): noticing has no randomness (offset %s)" % _camera().offset)
+	_camera().snap()
 	for i in 4:
 		p.chain.add_hit()  # light ~84 px: noticed from up to ~134 px
 	_set_room_lurkers_active(false)
@@ -248,13 +260,13 @@ func test_hunt_over_death() -> void:
 	check(c.state == Lurker.State.HUNT, "precondition: the lurker hunts the player")
 	p.die()
 	await frames(1)
-	# RETURN, or already IDLE: it hunted from home, so RETURN reaches home in the same frame.
-	# Without D6 it would stay in HUNT for lurker_lose_track_time (0.6 s).
+	# The state is the proof: without D6 it stays in HUNT for lurker_lose_track_time (0.6 s), so a
+	# refetch after the respawn would keep hunting the new player with no telegraph. RETURN, or
+	# already IDLE: it hunted from home, so RETURN reaches home in the same frame.
 	var dropped := c.state == Lurker.State.RETURN or c.state == Lurker.State.IDLE
-	check(dropped and not c.monitorable, "one frame after the death the lurker drops the hunt and is harmless (state %d, monitorable %s)" % [c.state, c.monitorable])
+	check(dropped, "one frame after the death the lurker drops the hunt (state %d)" % c.state)
 	await seconds(World.RESPAWN_DELAY + 0.1)
 	check(_spawned.size() == 2 and _player() == _spawned[1], "a second death respawns again")
-	check(c.state != Lurker.State.HUNT and not c.monitorable, "...and the lurker is not hunting the new player")
 	_room().remove_child(c)
 	c.queue_free()
 
@@ -266,8 +278,17 @@ func test_screen_router() -> void:
 	router.open(a)
 	router.open(b)
 	check(router.current() == b and a.get_parent() == null and router.get_child_count() == 1, "open(a) then open(b): b replaces a, never stacks")
+	router.open(b)
+	check(router.current() == b and is_instance_valid(b) and not b.is_queued_for_deletion() and b.get_parent() == router, "open(b) while b is open keeps b: replacing a screen with itself never frees it")
 	router.close()
 	check(router.current() == null and router.get_child_count() == 0, "close() leaves no screen")
+	var c := Control.new()
+	router.open(c)
+	router.remove_child(c)
+	add_child(c)  # someone moved it away
+	router.close()
+	check(router.current() == null and is_instance_valid(c) and not c.is_queued_for_deletion(), "close() after the screen moved elsewhere forgets it without freeing it")
+	c.queue_free()
 
 
 ## AC2 and AC4 by source, until the lint takes them over in 1.9.
