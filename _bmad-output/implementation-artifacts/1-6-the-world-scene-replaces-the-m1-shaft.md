@@ -3,7 +3,7 @@ baseline_commit: dd1b510
 ---
 # Story 1.6: The World scene replaces the M1 shaft
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -57,6 +57,25 @@ Run everything from `game/` and wrap every Godot run in `timeout`.
   - [x] `grep -rn "reload_current_scene" scripts/ --include=*.gd | grep -v "^scripts/shaft.gd"` finds nothing.
   - [x] Every new `.gd` has its `.gd.uid` staged.
   - [x] Report "tests green; needs a feel check on the laptop" and give sonlm D12's list of what to look at.
+
+### Review Findings
+
+Code review 2026-11-13 (gds-code-review, scope `dd1b510..2674abd`; Blind Hunter, Edge Case Hunter, Acceptance Auditor).
+
+- [x] [Review][Patch] Clear colour has two unlinked copies of the gutter violet (`project.godot` duplicates `Gutters.PLACEHOLDER`). sonlm chose: set it from code, `RenderingServer.set_default_clear_color(Gutters.PLACEHOLDER)` and drop the `project.godot` line, so 1.18 changes one place. Applied in `Gutters._ready()`, not World: the fill and the clear colour share one home, and `world/` must not depend on `ui/` [game/scripts/ui/gutters.gd:11]
+- [x] [Review][Patch] `play_rect()` includes the random shake offset, so lurker noticing depends on `randf` (breaks "no randomness in level behaviour"); build it from the unshaken centre [game/scripts/world/camera_rig.gd:59]
+- [x] [Review][Patch] `snap()` leaves `get_screen_center_position()` stale until the next frame (verified: frame 0 reads the limit-top centre; a snap 600→1200 reads 626.7 the same frame); call `force_update_scroll()` [game/scripts/world/camera_rig.gd:39]
+- [x] [Review][Patch] `ScreenRouter.open()` frees the screen if it is already current, errors on a parented or null screen; `close()` errors if the screen was reparented [game/scripts/ui/screen_router.gd:15]
+- [x] [Review][Patch] Nothing tests World's own `Game.clock.clear()` at respawn (AC3): `die()` already cleared it, so deleting `world.gd`'s clear fails no test; request during the delay and check after [game/tests/smoke_world.gd:170]
+- [x] [Review][Patch] `test_hunt_over_death`'s second check can never fail (respawned chain 0 is below the notice radius) and its `monitorable` half is false with or without D6; drop the vacuous check and say what the state check proves [game/tests/smoke_world.gd:250]
+- [x] [Review][Patch] `test_popups_in_room` counts children only; check the added node is the popup (a `Label`) [game/tests/smoke_world.gd:150]
+- [x] [Review][Patch] Out-of-room check uses `_player != null`, not `is_instance_valid()` [game/scripts/world/world.gd:59]
+- [x] [Review][Patch] Lurker calls `play_rect()` on any `world`-group node with no `has_method` guard (the player's `_fx_parent()` has one) [game/scripts/actors/lurker.gd:59]
+- [x] [Review][Patch] `CameraRig.follow()` takes any `Node2D` but `_process` reads `velocity` / `is_on_floor()`; type it `CharacterBody2D` [game/scripts/world/camera_rig.gd:23]
+- [x] [Review][Patch] A lost target freezes the last random shake `offset` on screen; zero it on the early return [game/scripts/world/camera_rig.gd:65]
+- [x] [Review][Patch] D1's variance (Darkness under World, player spawned in code) is not recorded as a variance in the docs [docs/architecture.md]
+- [x] [Review][Patch] `project-context.md` still lists `World` among files that don't exist yet [_bmad-output/project-context.md]
+- [x] [Review][Defer] `apply_limits()` has no vertical centring for a room shorter than the 270 px view [game/scripts/world/camera_rig.gd:46] — deferred, latent (no such room yet)
 
 ## Dev Notes
 
@@ -405,14 +424,14 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-13.
 - **Lurker:** `_on_screen()` reads `World.play_rect()` (false with no World); a TELEGRAPH/HUNT on a dead or freed target goes to RETURN at once (D6).
 - **Gutters / ScreenRouter** as in D7. No HUD, no function keys.
 - **Tests:** the harness uses a `CameraRig` and a stub with `current_room()`. `smoke_shaft` still has its 30 checks; only `place()` changed, to `_parts.camera.snap()`. New `smoke_world` (45 checks) replaces `smoke_shaft_state` (removed with `git rm`, `run_tests.sh` updated). `screenshot.gd` instances `world.tscn`, and its copied ambient formula is gone. `test_tuning`'s fixture follows the camera consts to `camera_rig.gd` (see Debug Log).
-- **Screenshots** (`xvfb-run`): gutters on both sides (#07060b), room centred, darkness, a lurker telegraphing in shot 2. **Fixed on sonlm's call (not in the tasks):** the play area is 360 px and the room 352 px, so a 4 px band at screen x 60–64 and 416–420 showed Godot's default clear colour (grey 0.3, 77/77/77). `project.godot` now sets `rendering/environment/defaults/default_clear_color` to the gutter violet `#07060b`. Re-shot: those columns read (7, 6, 11), the same as the gutters. `project.godot` can't hold a comment (the editor strips it), so the reason is in `docs/architecture.md` → Level Data. Story 1.18's per-zone gutter fill must set the clear colour to match.
+- **Screenshots** (`xvfb-run`): gutters on both sides (#07060b), room centred, darkness, a lurker telegraphing in shot 2. **Fixed on sonlm's call (not in the tasks):** the play area is 360 px and the room 352 px, so a 4 px band at screen x 60–64 and 416–420 showed Godot's default clear colour (grey 0.3, 77/77/77). `project.godot` now sets `rendering/environment/defaults/default_clear_color` to the gutter violet `#07060b`. Re-shot: those columns read (7, 6, 11), the same as the gutters. `project.godot` can't hold a comment (the editor strips it), so the reason is in `docs/architecture.md` → Level Data. Story 1.18's per-zone gutter fill must set the clear colour to match. **Review:** the setting moved from `project.godot` to `Gutters._ready()` (`RenderingServer.set_default_clear_color(PLACEHOLDER)`), so the colour has one home; re-shot, columns 61–63 and 417–419 still read (7, 6, 11).
 - **D7 brightness gap:** I took the story's default (no F1). Brightness keeps the saved level until DevTools (1.11).
 - Verification: `./run_tests.sh` → `== ALL GREEN` (`test_chain_state` 69, `smoke_shaft` 30 `ok`, `smoke_world` 45 `ok`); no `ERROR`/leak lines in the raw output of either smoke test. `randf` appears only in `scripts/world/camera_rig.gd`. No `get_viewport_rect` remains in `scripts/actors/`. No `reload_current_scene` outside `shaft.gd`. Every new `.gd.uid` is staged.
 - Tests green; needs a feel check on the laptop (D12).
 
 ### File List
 
-- game/project.godot (modified: main scene; default clear colour = gutter violet)
+- game/project.godot (modified: main scene; the clear colour moved to `Gutters` in review)
 - game/run_tests.sh (modified: smoke_world replaces smoke_shaft_state)
 - game/README.md (modified)
 - game/scenes/world/world.tscn (new)
@@ -436,3 +455,4 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-13.
 ### Change Log
 
 - 2026-11-13: Story 1.6 implemented. World scene with CameraRig, gutters and ScreenRouter replaces the shaft as main scene; respawn without reload; lurkers read `World.play_rect()` and drop a hunt on death; `smoke_world` replaces `smoke_shaft_state`; docs updated. Status → review.
+- 2026-11-13: Code review (13 patches applied, 1 deferred to the ledger with proposed owner Story 2.1). `play_rect()` drops the shake offset; `snap()` forces the scroll; `follow()` takes a CharacterBody2D and a lost target zeroes the offset; ScreenRouter guards re-open, parented and moved screens; World uses `is_instance_valid`; the lurker guards `play_rect`; the clear colour moved to `Gutters`; `smoke_world` gains checks for snap, shake, World's Clock clear, the popup Label and the router (each red-checked), and drops a vacuous one; architecture records the D1 variance. Status → done.

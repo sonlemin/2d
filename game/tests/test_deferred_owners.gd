@@ -2,8 +2,9 @@ extends Node
 ## Fails while any item in the deferred-work ledger has no owner.
 ## Why: gds-code-review appends deferred findings without one, and unowned items are how
 ## M1 work went missing until the 2026-11-12 readiness pass gave every item an owner.
-## An agent may propose an owner (`→ **Owner (proposed): E3** — why`); only sonlm drops
-## "(proposed)". Never edit this check to get green: give the item an owner instead.
+## The agent that defers an item assigns its owner (`→ **Owner: E3** — why`; sonlm, 2026-11-13);
+## "(proposed)" still marks one left for sonlm. Never edit this check to get green: give the item
+## an owner instead.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd
 
 const LEDGER := "../_bmad-output/implementation-artifacts/deferred-work.md"
