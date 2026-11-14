@@ -36,7 +36,7 @@ Columns and rows in `@x<col>` and `obj=` are **0-based grid cells**. Validator m
 
 ### Exits
 
-`@x<col>` names the leftmost column of an opening in the top row (`up`) or the bottom row (`down`). The opening is that cell plus the open cells to its right in that row. Crossing a `down` exit arrives at the target room's `up` entry, and the reverse (wired in Story 1.7). `m1_shaft`'s two exits both target `m1_shaft`: falling out of the floor hole loops back in at the top (R16). Until 1.7, `shaft.gd` kills a player who falls out of the room.
+`@x<col>` names the leftmost column of an opening in the top row (`up`) or the bottom row (`down`). The opening is that cell plus the open cells to its right in that row. `World` polls the player each physics frame (Story 1.7): when the body centre is past the floor (or above the ceiling), it crosses that side's exit. A live chain is banked first, exactly like a landing, then `World.enter_room(target, entry)` swaps rooms at the end of the frame. Crossing a `down` exit arrives at the target's `up` entry: one cell inside the top opening, **still falling**. Crossing an `up` exit arrives at the target's `down` entry: **standing still on the floor beside the bottom opening**, never over it, so the player can't drop straight back out (see the validator rule below). `m1_shaft`'s two exits both target `m1_shaft`: falling out of the floor hole loops back in at the top (R16). Every swap rebuilds the room; enemies killed this dive are skipped.
 
 ## Legend
 
@@ -72,7 +72,7 @@ Entities spawn through `room.spawn(scene, cell_centre, args)` in grid order (row
 - a malformed exit or `obj` (coordinates are at most 4 digits); two exits on one side; a duplicate `obj` id in the file
 - an empty first grid row (a blank line right after `---`, reported alone); a grid smaller than 3 × 3; unequal rows (against row 1's width); an unknown char
 - a spine room that isn't 22 wide; every `P` after the first
-- **(only when every row has the same width)** a `P` with nothing solid below it; an `obj` cell outside the grid; an exit column on a corner (0 or width−1), outside the grid or on a solid cell; a solid **entry cell** (one cell inside the opening, where `entry_position()` puts an arriving player)
+- **(only when every row has the same width)** a `P` with nothing solid below it; an `obj` cell outside the grid; an exit column on a corner (0 or width−1), outside the grid or on a solid cell; for `up`, a solid **entry cell** (one cell inside the opening, where an arriving player appears); for `down`, **no floor beside the opening to arrive on**: neither the column right of the opening nor the one left of it (side-edge columns don't count) has a solid run from the bottom row with two open cells above it (the stand cell and headroom for the body)
 - **the edge rule:** every cell in the top and bottom rows and the left and right columns must be solid or part of a declared exit opening, or the player could leave the room through a hole. An opening is the exit cell plus the open cells right of it, stopping before the corner, so an open corner is always a hole
 
 A missing file is `"<path>:0:0 file not found"`.
@@ -83,14 +83,15 @@ A missing file is `"<path>:0:0 file not found"`.
 
 | Member | What it gives |
 |---|---|
-| `id`, `zone`, `spine`, `exits` (`{side, target, col}`), `objects` (`{id: Vector2i}`), `size_cells` | the header and grid size |
+| `id`, `zone`, `spine`, `exits` (`{side, target, col, entry_cell}`), `objects` (`{id: Vector2i}`), `size_cells` | the header and grid size |
 | `bounds()` | room-local `Rect2(0, 0, cols × 16, rows × 16)`; `m1_shaft` is 352 × 1680 |
-| `entry_position(entry)` | room-local. `&"spawn"`: the `P` cell with feet on the tile below. `&"up"` / `&"down"`: one cell inside the exit opening's first column (row 1 / the second-to-last row). Asserts on an unknown entry. Anchors and stations join in 1.24. |
+| `entry_position(entry)` | room-local. `&"spawn"`: the `P` cell with feet on the tile below. `&"up"`: one cell inside the top opening's first column (row 1). `&"down"`: the stand cell beside the bottom opening (`RoomLoader.down_entry_cell()`; `m1_shaft`: cell (3, 102)). Both with feet on the tile below. Asserts on an unknown entry. Anchors and stations join in 1.24. |
 | `has_entry(entry)` | whether that entry exists |
+| `exit(side)` | the exit dict on that side, or `{}` |
 | `spawn(scene, pos, args := {})` | instances `scene`, sets each arg before `add_child` (so `_ready` sees it), and returns the node |
 | `is_solid(cell)`, `cell_centre(cell)` | for tests and the room sweep |
 
-`RoomLoader.load_room(id)` resolves an id through an index of every `*.txt` under `res://rooms/`, built once (an id in two files is an error naming both). `load_room_from_path(path)` loads one file directly.
+`RoomLoader.load_room(id, dive = null)` resolves an id through an index of every `*.txt` under `res://rooms/`, built once (an id in two files is an error naming both). `load_room_from_path(path, dive = null)` loads one file directly. With a `DiveState`, killable spawns (`c`, `h`) whose cell it marked killed are not built; without one (tests, the harness) every enemy is. Killable spawns get `room_id` and `cell`, and a crawler's `take_hit()` marks its cell. Tests index their own rooms with `RoomLoader.add_root(dir)`: the swap rooms live in `tests/rooms/swap/`, apart from the validator fixtures in `tests/rooms/` (one of which repeats an id on purpose).
 
 ## Running the checks
 

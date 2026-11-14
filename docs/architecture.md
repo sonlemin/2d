@@ -11,7 +11,7 @@ A single-scene Godot 4.7 prototype that answers one question: *does a long pogo 
 The architecture is deliberately small:
 
 - One **pure-logic class** (`ChainState`) holds the core rules, so they can be unit-tested with no scene.
-- Rooms are **text files** (`rooms/<layer>/<id>.txt`) that `RoomLoader` validates and builds into a `Room` node; the **`World` scene** (Story 1.6) holds the room, the player, the camera rig, the darkness and the UI layer, and respawns a dead player without a reload. Session state lives in `Game`.
+- Rooms are **text files** (`rooms/<layer>/<id>.txt`) that `RoomLoader` validates and builds into a `Room` node; the **`World` scene** (Story 1.6) holds the room, the player, the camera rig, the darkness and the UI layer; it swaps rooms through exits (Story 1.7) and respawns a dead player without a reload, rebuilding the respawn room. Session state lives in `Game`.
 - Three **actor scripts** (Player, Crawler, Lurker) talk to each other only through physics overlaps, groups and duck-typed methods.
 - One **static helper** (`Fx`) makes effects in code.
 - Art comes from a **text-to-PNG pipeline** outside Godot.
@@ -52,6 +52,8 @@ The architecture is deliberately small:
 
 **Variance from `game-architecture.md` → Scene Structure** (Story 1.6 D1): that tree has no `Darkness`; here the ambient `CanvasModulate` sits under `World`, first, so it tints the room and the player but not the UI layer. The player is spawned by `world.gd` (one path for spawn and respawn) instead of being placed in the scene, and draws right after `RoomHolder`.
 
+**Variance from `game-architecture.md` → Room swaps** (Story 1.7 D2): exits are **polled**, not overlapped. `World._physics_process` checks the player's body centre against the floor and the ceiling and crosses that side's exit, as crawler contact is polled; no trigger nodes. A body past a closed edge (tunnelling) dies instead of falling forever.
+
 - **ChainState** is a `RefCounted` with no node dependencies. It owns the count, snuffed/clinging flags and held embers. It computes the light radius and Blade Bloom, and emits `changed(count)` and `banked(amount)`.
 - **Player** owns one `ChainState` (`player.chain`) and turns input and collisions into calls on it (`add_hit`, `break_chain`, `set_snuffed`, `set_clinging`, `lose`). It then applies the results to its nodes (light texture scale, hitbox scale).
 - **World** binds each player it spawns: `chain.banked` → `Game.dive.add_carried()`, `chain.changed` → `Game.slot.record_chain()`, `died` → the respawn, `pogo_hit` → `CameraRig.kick()`. The haul and the records live in `Game`. It emits `player_spawned(player)` on every spawn. There is no HUD until the gutter HUD (Stories 1.25–1.26).
@@ -89,7 +91,7 @@ There are three kinds of state. Only `Settings` is saved to disk, as `user://set
    | `Game.slot.best_chain`, `Game.slot.deaths` (`SlotState`) | records shown on the HUD |
    | `Game.settings.brightness` (`Settings`) | brightness level (index into `World.AMBIENT_LEVELS`), saved in `user://settings.json` by `core/save_store.gd`; `Game.boot()` (called once by World as the entry scene) loads it. No in-game key changes it until DevTools (Story 1.11) |
 
-3. **Actor state:** private vars on each node (timers, the lurker's FSM `state`). A respawn resets the player's; enemies keep theirs, and an enemy killed this dive stays dead, because the room is not rebuilt until Story 1.7.
+3. **Actor state:** private vars on each node (timers, the lurker's FSM `state`). A respawn resets the player's; enemies are rebuilt with their room on every entry and respawn, and an enemy killed this dive stays dead because the build skips cells in `DiveState`'s killed set (Story 1.7).
 
 ### Chain rules (ChainState)
 
@@ -110,10 +112,9 @@ Full catalogue with fields and tuning: [Component Inventory](./component-invento
 - **Player** (`CharacterBody2D`) — run, variable jump, coyote/buffer, air dash, wall cling and kick, ground slash, air pogo, hitstop, light easing, knockback and death. It emits `pogo_hit`; the camera is not part of it.
 - **Crawler** (`CharacterBody2D`) — walker (patrols, turns at walls and edges) or hoverer (sine drift, phase set by position for determinism). Dies to any hit.
 - **Lurker** (`Area2D`) — `IDLE → TELEGRAPH (0.9 s) → HUNT → RETURN`. It notices only a light ≥ 80 px, within radius × 1.6, **and** while on screen. It is lethal only while it is hunting *and* has the scent.
-- **World** — loads the room, spawns and respawns the player at the respawn point (the room's `P` for now), the darkness, the out-of-room death (until Story 1.7), `play_rect()`, `current_room()`.
-- **CameraRig** — follows the player with M1's 70 px downward lead and smoothing, owns the shake (`kick()`), sets the limits from the room bounds.
+- **World** — one swap path for the first room, an exit and a respawn (`enter_room()`, always deferred; the old room leaves the tree before `queue_free()`), polled exits with the chain backstop, `start_room`, the darkness, `play_rect()`, `current_room()`, `room_entered` / `player_spawned`.
+- **CameraRig** — follows the player with M1's 70 px downward lead; with physics interpolation on (Story 1.7) it smooths and clamps itself on the physics tick (engine smoothing off), so `snap()` cuts and `play_rect()` is computed, never read from the engine camera. Owns the shake (`kick()`) and the limits.
 - **Gutters / ScreenRouter** — two flat 60 px strips; one full-screen UI screen at a time.
-- **Shaft** — unused since Story 1.6, deleted in Story 1.7.
 - **Fx** — unshaded particles and labels that read in the dark.
 
 ## Key Runtime Flows
@@ -140,7 +141,7 @@ _tick_timers → _handle_snuff → _handle_cling ─(not clinging)→ _handle_ho
 
 ### Death and respawn
 
-`die()` → `Game.clock.clear()`, `chain.lose()` (a "−N lost" popup) → `died` → World records a death (`Game.slot.record_death()`) and starts a 0.6 s timer that ignores the time scale and pauses with the tree. On timeout it clears the Clock again, frees the old player, spawns a fresh one at the respawn point, snaps the camera and emits `player_spawned`. No reload: the room, its enemies and `Game` stay as they are, so carried embers are kept and held embers are lost. A lurker drops a hunt on a dead target at once (Pillar 2).
+`die()` → `Game.clock.clear()`, `chain.lose()` (a "−N lost" popup) → `died` → World records a death (`Game.slot.record_death()`) and starts a 0.6 s timer that ignores the time scale and pauses with the tree. On timeout it clears the Clock again and goes through the swap path: it rebuilds the respawn room (enemies killed this dive are skipped, the rest return to their cells), frees the old player, spawns a fresh one at the respawn point (the start room's `P` until anchors set one), snaps the camera and emits `player_spawned`, then `room_entered`. No reload: `Game` stays, so carried embers are kept and held embers are lost. A lurker drops a hunt on a dead target at once (Pillar 2).
 
 ## Level Data
 
@@ -188,7 +189,8 @@ tools/sprites/<name>.txt ───────┼─► python3 tools/build_spri
 | Unit | `tests/test_state.gd` | `Settings`, `SlotState` and `DiveState`: the signal rules, the fallbacks on bad data, the `to_dict()` shapes, round trips in memory and through JSON, `rules/` purity. `Game`: the same instances all session, `reset_for_tests()`. `settings.json` through `SaveStore`: a missing, corrupt or partly bad file is rewritten, a file that can't be opened or is from a newer build is left untouched, one write per frame, and the warnings are counted |
 | Unit | `tests/test_room_loader.gd` | The room validator (each error at its file line and column, from fixtures in `tests/rooms/` and inline texts), the build (spawn counts, `hover` args, in-wall lurkers, rims) and the `Room` API; `m1_shaft` validates, holds 36 hoverers, 5 walkers and 4 lurkers, and has no ledge gap over 19 rows (FR57) |
 | Integration (headless) | `tests/smoke_shaft.gd` | Loads `m1_shaft` standalone through `tests/room_harness.gd` (a test player, a `CameraRig` and a stub `World` with `play_rect()` and `current_room()`) and drives `Input.action_press`. Covers: pogo builds the chain; landing breaks it; jump height (held ≈ 60 px, tap < 60 %); wall cling/timeout/kick; a **bot** chaining ≥ 5 through the long run (proves spacing); lurker telegraph ≥ 0.75 s → hunt → lose track; base light never noticed; no off-screen notice; point-blank Snuff escape; idle lurker harmless; hunting lurker kills; Snuff needs a hold |
-| Integration (headless) | `tests/smoke_world.gd` | Instances `world.tscn`: a World added by a test never boots `Game`; the tree and its order; camera limits, the 360 px play rect and the 60 px gutters; a bank raises `Game.dive.carried`, a chain `Game.slot.best_chain`, `Settings.brightness` repaints the darkness; popups go under the room; a death respawns a fresh, rebound player at `P` without a reload, clears the Clock and leaves a killed crawler dead; a lurker behind a gutter never notices; a hunt drops on a death; `ScreenRouter` replaces, never stacks |
+| Integration (headless) | `tests/smoke_room_swap.gd` | Two test rooms (`tests/rooms/swap/`, indexed with `RoomLoader.add_root()`): `enter_room()` is deferred; the floor hole banks the chain before the swap and arrives at the top entry still falling; the old room is out of the tree but not yet freed at `room_entered`; the ceiling gap arrives standing beside the target's floor hole; killed cells stay empty across swaps and a cross-room respawn at the start room's `P`; interpolation on |
+| Integration (headless) | `tests/smoke_world.gd` | Instances `world.tscn`: a World added by a test never boots `Game`; the tree and its order; camera limits, the 360 px play rect and the 60 px gutters; a bank raises `Game.dive.carried`, a chain `Game.slot.best_chain`, `Settings.brightness` repaints the darkness; popups go under the room; a death respawns a fresh, rebound player at `P` without a reload, clears the Clock and rebuilds the room without the crawler killed before it; the bottom hole loops to the top (R16) with the chain banked first and a killed crawler still gone; a lurker behind a gutter never notices; a hunt drops on a death; `ScreenRouter` replaces, never stacks |
 | Visual (manual) | `tests/screenshot.gd` | Two PNGs (spawn; chain 10 with a telegraph). Needs a renderer: `xvfb-run` on the server |
 
 Design rules are encoded as tests: the telegraph is never under 0.75 s, there is no off-screen ambush, and a Snuff in time always saves you. Change these rules in the GDD first, then in the test.
@@ -203,7 +205,7 @@ No export presets or CI. Builds are played in the Godot editor on the laptop (F5
 
 - **Keep ChainState free of nodes.** It is the unit-tested core. New chain rules (Flare Toss halving, hit → "carried") belong there, with tests.
 - **Session state lives in `Game`, never in statics.** Anything that must survive a death goes into `Game.slot`, `Game.dive` or `Game.settings`, through their methods. A test that changes them ends with `Game.reset_for_tests()`.
-- **A death never reloads the scene.** World spawns a fresh player and emits `player_spawned(player)`; anything bound to the player or its chain rebinds there. Only the entry scene calls `Game.boot()`: a test adds World by hand, so it never boots.
+- **A death never reloads the scene.** World rebuilds the respawn room, spawns a fresh player and emits `player_spawned(player)`; anything bound to the player or its chain rebinds there. Only the entry scene calls `Game.boot()`: a test adds World by hand, so it never boots.
 - **Hitstop goes through `Game.clock`.** Request it with `Game.clock.request(&"hitstop", 0.05, 0.075)`; never write `Engine.time_scale` yourself. Use timers with `ignore_time_scale = true` for anything that must run during it. `die()` calls `Game.clock.clear()`.
 - **Determinism:** no randomness in level behaviour. Hover phase comes from position, and `reset_phase()` exists so tests do not depend on order. Only the camera shake uses `randf` (`world/camera_rig.gd`).
 - **Lurker lethality is `monitorable`.** It is false except in HUNT with the scent. Do not add other kill paths that skip this, or the rule "Snuff/landing in time always saves you" breaks.
@@ -217,12 +219,12 @@ Observations from comparing this code with GDD v1.0 and the UX spines (2026-11-1
 | Area | M1 as built | M2 target (source) | Likely impact |
 |---|---|---|---|
 | Play width | Shaft is 22 tiles (352 px), centred in the 360 px play area between two flat 60 px gutters (Story 1.6); lurkers notice only inside `World.play_rect()` | ~60 px HUD gutters, ~360 px view; spine shafts 22 tiles (352 px); wider rooms scroll horizontally (GDD Level Design, UX) | Camera limits/viewport split and the gutters (Story 1.6) |
-| Scene structure | `World` (Story 1.6) holds one room, loaded through `RoomLoader`; room swaps arrive in Story 1.7 | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | `World` and room swaps (Stories 1.6–1.7) |
+| Scene structure | `World` (Story 1.6) holds one room at a time and swaps rooms through exits (Story 1.7) | Hub + Layer 1 spine and branches, rooms, Weaver arena (GDD World Map) | `World` and room swaps (Stories 1.6–1.7) |
 | Damage | Crawler = knockback only; hunting lurker = instant death | 4 HP; crawler 1, lurker 2, spikes 1; heal at stations (GDD Health) | Health component; lurker contact deals damage instead of calling `die()` |
 | Embers | held → banked (`Game.dive.carried`) → held lost on death | held → **carried** → **deposited** at a Lift Station/hub (GDD Economy) | Rename and extend ChainState/economy; deposit flow |
 | Respawn | The shaft's spawn `P` (`DiveState` has an unused respawn point) | Lantern anchors and Lift Stations; hazards respawn at the last safe ledge in the room | Anchors and stations call `DiveState.set_respawn()` (Story 1.24); a last-safe-ledge tracker for hazards (Story 1.19) |
 | Light key | Hold V = Snuff; a tap does nothing | Tap = Flare Toss (needs ≥ 2 links, halves the chain); tap window 0.12/0.2/0.3 s setting; optional Snuff toggle key (GDD Controls) | Light input state machine; Flare entity that predators sense |
-| Input | Keyboard only; no debug hotkeys since Story 1.6 (DevTools in Story 1.11) | Gamepad from M2; Pause (Esc/P); rebinding in E7; F1 goes with the shaft in Story 1.7, then DevTools sets brightness until Options (Story 1.36) | Input map + settings; remove the debug hotkeys |
+| Input | Keyboard only; no debug hotkeys since Story 1.6 (DevTools in Story 1.11) | Gamepad from M2; Pause (Esc/P); rebinding in E7; DevTools sets brightness until Options (Story 1.36) | Input map + settings; remove the debug hotkeys |
 | HUD | None since Story 1.6: two flat gutters; the chain popups still show the count in the world | Gutter HUD, Fusion Pixel Font 8px (OFL files must ship), alert frame in the gutters (UX DESIGN) | Real HUD scene; font licence files in builds |
 | Lurker warning | On-screen telegraph only | Off-screen "stir": panned audio + half-open eye at the edge (GDD Lurker) | Needs audio and an edge indicator |
 | Persistence | `settings.json` only (brightness); session state in `Game`, not saved | 3 save slots, autosave at stations/hub/anchor quit, visible save failure (GDD Saves, UX) | Save system |

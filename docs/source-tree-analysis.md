@@ -19,7 +19,6 @@ pixel_art_game/
 │   ├── rooms/
 │   │   └── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
 │   ├── scenes/
-│   │   ├── shaft.tscn            # Unused since Story 1.6 (deleted in 1.7)
 │   │   ├── world/
 │   │   │   └── world.tscn        # ★ ENTRY: main scene (run/main_scene). Darkness, RoomHolder, Camera, UI (gutters, router)
 │   │   └── actors/
@@ -27,7 +26,6 @@ pixel_art_game/
 │   │       ├── crawler.tscn      # Crawler prefab (CharacterBody2D + edge ray)
 │   │       └── lurker.tscn       # Lurker prefab (Area2D + eyes + red glow light)
 │   ├── scripts/
-│   │   ├── shaft.gd              # Unused since Story 1.6 (deleted in 1.7)
 │   │   ├── rules/
 │   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
@@ -65,7 +63,8 @@ pixel_art_game/
 │   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── smoke_shaft.gd        # Integration smoke test: m1_shaft via the room harness, simulated input, bot run
-│   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect
+│   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
+│   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
 │   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*); never exported
@@ -106,7 +105,7 @@ pixel_art_game/
 
 ### `game/scripts/`
 
-All gameplay code. Every script declares a `class_name` (`ChainState`, `Player`, `Crawler`, `Lurker`, `Fx`, `Room`, `RoomLoader`, `RoomLegend`, …) except the unused `shaft.gd` and the `Game` autoload, so other scripts and tests use the types directly.
+All gameplay code. Every script declares a `class_name` (`ChainState`, `Player`, `Crawler`, `Lurker`, `Fx`, `Room`, `RoomLoader`, `RoomLegend`, …) except the `Game` autoload, so other scripts and tests use the types directly.
 
 - **Entry point:** `world/world.gd` runs on the main scene and loads the room through `world/room_loader.gd`.
 - **Key file:** `chain_state.gd` — the one place the core rules and their constants live.
@@ -138,7 +137,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 
 ## File Organization Patterns
 
-- **Script per scene:** `scenes/<domain>/X.tscn` ↔ `scripts/<domain>/X.gd`. Both trees use the same domain folder names; scripts live under `scripts/`, not next to their scene, and `scenes/` has only the domains that have scenes. `shaft.gd`/`shaft.tscn` stay at the top level until Story 1.7.
+- **Script per scene:** `scenes/<domain>/X.tscn` ↔ `scripts/<domain>/X.gd`. Both trees use the same domain folder names; scripts live under `scripts/`, not next to their scene, and `scenes/` has only the domains that have scenes.
 - **Enemies** live with the player in `scenes/actors/` and `scripts/actors/`.
 - **One autoload (`Game`), no addons, no resources (`.tres`).** Tilesets and materials are built in code. `Audio` is the only other autoload the architecture allows (E3).
 - **Tuning lives in code:** gameplay numbers are `const`s in `rules/tuning.gd`, read through `Game.tuning.f(&"key")` (Story 1.3; no `@export` remains). The chain-curve consts stay in `ChainState`, presentation consts stay on their actors, and `Shaft` keeps its own `const`s until 1.7.

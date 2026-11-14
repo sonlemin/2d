@@ -62,7 +62,7 @@ No camera: `World`'s `CameraRig` follows the player (Story 1.6). **Signals:** `d
 
 ### Crawler — `scripts/actors/crawler.gd` + `scenes/actors/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
 
-"Chain fuel." Layer 4, mask 1, body 14×8, `EdgeRay` 10 px down. **Group:** `enemy`. **API:** `take_hit()` (spark burst + free), `reset_phase()`. **Per instance:** `hover` (set by the spawner before `add_child`).
+"Chain fuel." Layer 4, mask 1, body 14×8, `EdgeRay` 10 px down. **Group:** `enemy`. **API:** `take_hit()` (marks its cell killed on `Game.dive` when it has one, spark burst, free), `reset_phase()`. **Per instance:** `hover`, `room_id`, `cell` (set by the room build before `add_child`; a crawler spawned any other way has no cell and is never remembered).
 
 | Mode | Behaviour | Tuning keys (`rules/tuning.gd`) |
 |---|---|---|
@@ -95,39 +95,23 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 | `NOTICE_MIN_RADIUS` / `NOTICE_FACTOR` / `SCREEN_MARGIN` | 80 px / 1.6 / 8 px (the sensing rule; moves to `rules/sensing.gd` in 1.20) |
 | `EYE_PULSE_HZ`, `EYE_OPEN_TIME`, `GLOW_ENERGY` | 2.0, 0.2, 1.3 (presentation) |
 
-### Shaft — `scripts/shaft.gd` + `scenes/shaft.tscn` (`Node2D`, unused)
-
-**Unused since Story 1.6, deleted in 1.7.** Neither the game nor any test loads it, and its `_player.get_node("Camera")` no longer matches `player.tscn`. What it did:
-
-
-Loads `m1_shaft` through `RoomLoader` (Story 1.5), puts the player at its `spawn` entry, centres the 352 px room in the 480 px view, kills a player who falls out of the floor hole (until the R16 loop in 1.7), draws the debug HUD from `Game` state and handles hotkeys. It has no session statics: what survives a death lives in `Game` (Story 1.4). See [Architecture → Level Data](./architecture.md#level-data) and [State Management](./architecture.md#state-management).
-
-| Node | Type | Role |
-|---|---|---|
-| Darkness | CanvasModulate | Ambient darkness: 4 levels, picked by `Settings.brightness` (F1 cycles it) |
-| m1_shaft | Room | Added at `_ready`, before `Player` (see World below) |
-| Player | player.tscn | Placed at `entry_position(&"spawn")` |
-| Debug/Label | Label | HUD: `embers, held, chain (best), light, SNUFF, depth, alert, deaths`; turns red while a lurker is awake |
-
-**Hotkeys:** F1 brightness (saved in `settings.json`) · F3 restart from the top. **Constants:** `RESPAWN_DELAY` 0.6, `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45].
-
 ### World — `scripts/world/world.gd` + `scenes/world/world.tscn` (`Node2D`, `class_name World`, main scene)
 
-The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current scene, applies the ambient from `Settings.brightness`, loads `START_ROOM` (`m1_shaft`) into `RoomHolder`, sets the camera limits and spawns the player. A death waits `RESPAWN_DELAY` 0.6 s (pauses with the tree, ignores the time scale), clears the Clock and spawns a fresh player at the respawn point (`Game.dive.respawn_room`/`respawn_entry`, else the room's `spawn`), with no reload. Kills a player who falls out of the room until Story 1.7 wires the bottom exit.
+The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current scene and applies the ambient from `Settings.brightness`. Every room goes through one swap path (Story 1.7): `RoomLoader.load_room(id, Game.dive)` (killed cells skipped), the old room `remove_child` + `queue_free`, the player placed (or spawned), camera limits + `snap()`, `Game.slot.visit(id)`, `room_entered`. The first room is the respawn point (`Game.dive.respawn_room`/`respawn_entry`, else `start_room`'s `spawn`). Exits are polled in `_physics_process`: the body centre past the floor or ceiling crosses that side's exit; a live chain is banked first (`break_chain()`), then `enter_room(target, entry)` (deferred). Arriving from above keeps the velocity; from below stands still beside the hole. A death waits `RESPAWN_DELAY` 0.6 s (pauses with the tree, ignores the time scale), clears the Clock and rebuilds the respawn room with a fresh player, with no reload; a bad respawn point falls back to `start_room`'s `P`. A swap queued before the player died is cancelled (no build, visit or `room_entered`), and `enter_room()` is ignored while the player is dead.
 
 | Node | Type | Role |
 |---|---|---|
 | Darkness | CanvasModulate | `AMBIENT_LEVELS` [0.07, 0.16, 0.28, 0.45] × `AMBIENT_TINT`, picked by `Settings.brightness` |
 | RoomHolder | Node2D | At the origin; holds the current room |
 | Player | player.tscn | Spawned in code, kept right after `RoomHolder` |
-| Camera | Camera2D + `camera_rig.gd` | Smoothing 8 |
+| Camera | Camera2D + `camera_rig.gd` | Engine smoothing off; the rig smooths (8/s) on the physics tick |
 | UI | CanvasLayer (layer 10, `PROCESS_MODE_ALWAYS`) | `Gutters` then `ScreenRouter`, so screens draw over the gutters |
 
-**API:** `play_rect()`, `current_room()`, `signal player_spawned(player)`. **Consts:** `START_ROOM`, `RESPAWN_DELAY`, `AMBIENT_LEVELS`, `AMBIENT_TINT`.
+**API:** `enter_room(room_id, entry)`, `play_rect()`, `current_room()`, `var start_room` (set before `add_child`), `signal player_spawned(player)`, `signal room_entered(room_id)`. **Consts:** `START_ROOM`, `RESPAWN_DELAY`, `AMBIENT_LEVELS`, `AMBIENT_TINT`.
 
 ### CameraRig — `scripts/world/camera_rig.gd` (`Camera2D`, `class_name CameraRig`)
 
-`follow(body)`, `snap()` (on the target, no lead or shake, `reset_smoothing()`), `kick(amount)` (the only shake entry; the `Settings.shake` gate arrives in 1.16), `apply_limits(bounds)`, `play_rect()`. `_process` runs on real time: shake decay, the downward lead while falling, and the follow. The only `randf` in `scripts/`.
+`follow(body: CharacterBody2D)`, `snap()` (on the target at once, no lead or shake, `reset_physics_interpolation()`), `kick(amount)` (the only shake entry; the `Settings.shake` gate arrives in 1.16), `apply_limits(bounds)`, `play_rect()` (from the rig's own clamped centre, never the shake). Physics interpolation runs a Camera2D on the physics tick, so the rig does too (`process_callback` PHYSICS from `_init`) and does its own smoothing (`SMOOTH_SPEED` 8, scaled delta) and clamping; the lead and shake decay run on real time. The only `randf` in `scripts/`.
 
 | Const | Value |
 |---|---|
@@ -148,9 +132,9 @@ Rooms as text (Story 1.5). The format, legend, validator errors and Room API are
 
 | Script | Role |
 |---|---|
-| `room_legend.gd` (`RoomLegend`) | The one definition of every grid char: `#` `.` `P`, and `SPAWNS` (`c`, `h`, `L` with their scene and args; `L` is `in_wall`) |
-| `room_loader.gd` (`RoomLoader`, static) | `parse()`, the pure `validate()` (errors as `file:row:col`), `load_room_from_path()`, `load_room(id)` through an index of `res://rooms/**/*.txt`, and the build. Caches the TileSet and the unshaded rim material as statics |
-| `room.gd` (`Room`, `Node2D`) | One built room: `Backdrop`, `Walls` (TileMapLayer), `Rims`, spawned entities. `spawn(scene, pos, args)`, `bounds()`, `entry_position()` / `has_entry()`, `is_solid()`, `cell_centre()` |
+| `room_legend.gd` (`RoomLegend`) | The one definition of every grid char: `#` `.` `P`, and `SPAWNS` (`c`, `h`, `L` with their scene and args; `c` and `h` are `killable`, `L` is `in_wall`) |
+| `room_loader.gd` (`RoomLoader`, static) | `parse()`, the pure `validate()` (errors as `file:row:col`), `load_room_from_path(path, dive)`, `load_room(id, dive)` through an index of `res://rooms/**/*.txt` (tests add roots with `add_root(dir)`), `down_entry_cell()`, and the build (killable spawns get `room_id` + `cell`; with a `dive`, its killed cells are skipped). Caches the TileSet and the unshaded rim material as statics |
+| `room.gd` (`Room`, `Node2D`) | One built room: `Backdrop`, `Walls` (TileMapLayer), `Rims`, spawned entities. `spawn(scene, pos, args)`, `bounds()`, `entry_position()` / `has_entry()` / `exit(side)` (exits carry `entry_cell`), `is_solid()`, `cell_centre()` |
 
 ### Core — `scripts/core/`
 
@@ -163,7 +147,7 @@ Rooms as text (Story 1.5). The format, legend, validator errors and Room API are
 | `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
 | `rules/gear.gd` | `class_name Gear` (pure data) | `TABLE` of `{id, stat, op, value}` rows (`set` / `add` / `mul` / `flag`); empty until E5 |
 | `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices |
-| `rules/slot_state.gd` | `class_name SlotState` (`RefCounted`, pure); `Game.slot` | Per-slot state: `best_chain`, `deaths`, `difficulty` (`&"easy"`/`&"normal"`/`&"hard"`), story flags (`set_flag()` / `has_flag()`). `to_dict()` becomes save format `slot_v1` at 1.41 |
+| `rules/slot_state.gd` | `class_name SlotState` (`RefCounted`, pure); `Game.slot` | Per-slot state: `best_chain`, `deaths`, `difficulty` (`&"easy"`/`&"normal"`/`&"hard"`), story flags (`set_flag()` / `has_flag()`), visited rooms (`visit()` / `has_visited()`, `visits_changed`; Story 1.7). `to_dict()` becomes save format `slot_v1` at 1.41 |
 | `rules/dive_state.gd` | `class_name DiveState` (`RefCounted`, pure); `Game.dive` | Per-dive state: `carried` embers (`add_carried()`), the respawn point (`set_respawn()`), killed enemies (`mark_killed()` / `is_killed()`, never saved) |
 
 ### Fx — `scripts/core/fx.gd` (static, `class_name Fx`)
@@ -186,7 +170,7 @@ Everything is unshaded and frees itself.
 | `dash` | C |
 | `light` | V |
 
-Keyboard only, bound by physical keycode. No function keys since Story 1.6 (the unused `shaft.gd` still reads F1 and F3).
+Keyboard only, bound by physical keycode. No function keys (the M1 shaft and its F1/F3 were deleted in Story 1.7).
 
 ## Asset Inventory
 
@@ -222,11 +206,12 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
 | `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
 | `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), `rules/` purity, and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
-| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 145 checks) | headless |
+| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 153 checks) | headless |
 | `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts), the build and the `Room` API, and the real `m1_shaft` (counts, ledge rows, FR57 gaps, exits) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 10 scenario tests (30 checks) on `m1_shaft` loaded through the room harness, including a pathing bot | headless |
-| `tests/smoke_world.gd` | World: no boot, the tree, framing (limits, play rect, gutters), state wiring, popups in the room, death and respawn without a reload, a lurker behind a gutter, a hunt over a death, `ScreenRouter`, source checks (45 checks) | headless |
+| `tests/smoke_world.gd` | World: no boot, the tree, framing (limits, play rect, gutters), state wiring, popups in the room, death and respawn without a reload, a lurker behind a gutter, a hunt over a death, the R16 bottom loop, `ScreenRouter`, source checks | headless |
+| `tests/smoke_room_swap.gd` | Room swaps between `tests/rooms/swap/t_swap_a` and `t_swap_b`: deferral, the chain backstop, arrival from above and below, killed cells across swaps and a cross-room respawn, interpolation on | headless |
 | `tests/screenshot.gd` | 2 screenshots of `world.tscn` (gutters, darkness, framing) | needs a renderer |
 | `tests/room_harness.gd` | Not a test: `build(parent, room_id)` loads a room standalone with a test player, a `CameraRig` and a stub `World` (`play_rect()`, `current_room()`); `free_all()` | — |
 
