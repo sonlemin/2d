@@ -81,6 +81,7 @@ func run() -> void:
 	_test_slot_difficulty()
 	_test_slot_round_trips()
 	_test_slot_flags_sorted()
+	_test_slot_visits()
 	_test_slot_fallbacks()
 	_test_slot_load_signals()
 	_test_slot_handler_sets_a_flag()
@@ -233,12 +234,14 @@ func _filled_slot() -> SlotState:
 	s.set_difficulty(&"easy")
 	s.set_flag(&"anchor_m1_1")
 	s.set_flag(&"met_glim")
+	s.visit(&"m1_shaft")
+	s.visit(&"a_side")
 	return s
 
 
 func _same_slot(a: SlotState, b: SlotState) -> bool:
 	return a.best_chain == b.best_chain and a.deaths == b.deaths and a.difficulty == b.difficulty \
-			and a.to_dict().flags == b.to_dict().flags
+			and a.to_dict().flags == b.to_dict().flags and a.to_dict().visited == b.to_dict().visited
 
 
 func _test_slot_round_trips() -> void:
@@ -252,7 +255,8 @@ func _test_slot_round_trips() -> void:
 	check(typeof(u.difficulty) == TYPE_STRING_NAME and u.has_flag(&"anchor_m1_1") and u.has_flag(&"met_glim"), "...a StringName difficulty, and flags that still answer has_flag()")
 	var keys := s.to_dict().keys()
 	keys.sort()
-	check(keys == ["best_chain", "deaths", "difficulty", "flags"], "to_dict() has exactly best_chain, deaths, difficulty, flags (D4; got %s)" % [keys])
+	check(keys == ["best_chain", "deaths", "difficulty", "flags", "visited"], "to_dict() has exactly best_chain, deaths, difficulty, flags, visited (D4, 1.7 D7; got %s)" % [keys])
+	check(u.has_visited(&"m1_shaft") and u.has_visited(&"a_side"), "...and visited rooms that still answer has_visited()")
 
 
 ## D4: StringName sort order is not alphabetical, so the save sorts flag ids as Strings.
@@ -265,28 +269,51 @@ func _test_slot_flags_sorted() -> void:
 	check(flags.all(func(f: Variant) -> bool: return f is String), "...as Strings, ready for JSON")
 
 
+## Story 1.7 D7: World visits every room it enters; the map reads them (FR60).
+func _test_slot_visits() -> void:
+	var s := SlotState.new()
+	var n := {v = 0}
+	s.visits_changed.connect(func() -> void: n.v += 1)
+	check(not s.has_visited(&"m1_shaft") and s.to_dict().visited == [], "SlotState: no room is visited by default")
+	s.visit(&"m1_shaft")
+	check(s.has_visited(&"m1_shaft") and n.v == 1, "visit(id) records it and emits visits_changed once (got %d)" % n.v)
+	s.visit(&"m1_shaft")
+	check(n.v == 1, "...and a repeat visit emits nothing")
+	for id: StringName in [&"zeta", &"beta"]:
+		s.visit(id)
+	check(s.to_dict().visited == ["beta", "m1_shaft", "zeta"], "to_dict().visited lists the ids sorted as Strings (got %s)" % [s.to_dict().visited])
+	var t := SlotState.new()
+	var clean := t.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": [], "visited": ["m1_shaft", 3, ""]})
+	check(not clean and t.to_dict().visited == ["m1_shaft"], "a bad or empty visited entry is skipped and makes the data unclean (got %s)" % [t.to_dict().visited])
+	var u := SlotState.new()
+	check(not u.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": []}) and u.to_dict().visited == [], "a missing visited list is unclean and loads none")
+	n.v = 0
+	s.reset()
+	check(s.to_dict().visited == [] and n.v == 1, "reset() clears the visits and emits visits_changed once (got %d)" % n.v)
+
+
 func _test_slot_fallbacks() -> void:
 	var cases := [
-		[{"best_chain": 4, "deaths": 2, "difficulty": "medium", "flags": []}, "an unknown difficulty", "difficulty"],
-		[{"best_chain": -1, "deaths": 2, "difficulty": "hard", "flags": []}, "a negative record", "best_chain"],
-		[{"best_chain": 4, "deaths": "x", "difficulty": "hard", "flags": []}, "a record that isn't a number", "deaths"],
-		[{"best_chain": 4.5, "deaths": 2, "difficulty": "hard", "flags": []}, "a fractional record", "best_chain"],
-		[{"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": "anchor_m1_1"}, "flags that aren't an array", "flags"],
+		[{"best_chain": 4, "deaths": 2, "difficulty": "medium", "flags": [], "visited": []}, "an unknown difficulty", "difficulty"],
+		[{"best_chain": -1, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a negative record", "best_chain"],
+		[{"best_chain": 4, "deaths": "x", "difficulty": "hard", "flags": [], "visited": []}, "a record that isn't a number", "deaths"],
+		[{"best_chain": 4.5, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a fractional record", "best_chain"],
+		[{"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": "anchor_m1_1", "visited": []}, "flags that aren't an array", "flags"],
 		# 1e17 is whole and fits an int, so only the 2^53 limit turns it down, on every platform.
-		[{"best_chain": 1e17, "deaths": 2, "difficulty": "hard", "flags": []}, "a record too big for a JSON number to hold exactly", "best_chain"],
+		[{"best_chain": 1e17, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a record too big for a JSON number to hold exactly", "best_chain"],
 	]
-	var want := {"best_chain": 0, "deaths": 0, "difficulty": &"normal", "flags": []}
+	var want := {"best_chain": 0, "deaths": 0, "difficulty": &"normal", "flags": [], "visited": []}
 	for c: Array in cases:
 		var s := _filled_slot()
 		var clean := s.from_dict(c[0])
 		var got: Variant = s.to_dict()[c[2]] if c[2] != "difficulty" else s.difficulty
 		check(not clean and got == want[c[2]], "SlotState: %s is unclean and gives the default %s (D3; got %s)" % [c[1], c[2], got])
 	var s := SlotState.new()
-	var clean := s.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", 7, null]})
+	var clean := s.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", 7, null], "visited": []})
 	check(not clean and s.to_dict().flags == ["met_glim"], "a non-string flag entry is skipped and makes the data unclean (got %s)" % [s.to_dict().flags])
 	check(s.best_chain == 4 and s.deaths == 2 and s.difficulty == &"hard", "...while the good fields still load")
 	var blank := SlotState.new()
-	check(not blank.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", ""]}) and blank.to_dict().flags == ["met_glim"] and not blank.has_flag(&""), "an empty flag id is skipped and makes the data unclean (got %s)" % [blank.to_dict().flags])
+	check(not blank.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", ""], "visited": []}) and blank.to_dict().flags == ["met_glim"] and not blank.has_flag(&""), "an empty flag id is skipped and makes the data unclean (got %s)" % [blank.to_dict().flags])
 	var e := SlotState.new()
 	check(not e.from_dict({}) and _same_slot(e, SlotState.new()), "from_dict({}) is unclean and gives the defaults")
 
@@ -311,6 +338,10 @@ func _test_slot_load_signals() -> void:
 	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": ["anchor_m1_1", "met_glim"]})
 	check(flags == [[&"anchor_m1_1", true]], "from_dict() emits flag_set(id, true) for each new flag, nothing for one it keeps (got %s)" % [flags])
 	check(n.records == 1 and n.tier == 1, "...and records_changed and difficulty_changed once each, even unchanged (got %d / %d)" % [n.records, n.tier])
+	var v := {n = 0}
+	s.visits_changed.connect(func() -> void: v.n += 1)
+	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": [], "visited": ["m1_shaft", "a_side"]})
+	check(v.n == 1 and s.has_visited(&"a_side"), "from_dict() emits visits_changed once for a whole list of rooms (got %d)" % v.n)
 
 
 ## A subscriber may set a flag from its flag_set handler (a derived flag). A load walks the flags

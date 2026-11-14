@@ -11,6 +11,8 @@ const SINGLE_KEYS: Array[String] = ["id", "zone", "spine", "exits"]
 const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's shaft background until the zone palettes (1.18)
 const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
 
+const NO_CELL := Vector2i(-1, -1)
+
 static var _id_re := RegEx.create_from_string("^[a-z][a-z0-9_]*$")
 # Coordinates are at most 4 digits: a longer number would wrap in Vector2i (or make to_int() print
 # an engine ERROR) and pass the bounds checks as the wrong cell.
@@ -23,16 +25,25 @@ static var _index := {}  # room id -> path, built on the first load_room()
 static var _indexed := false
 
 
-## Resolves an id to its file under res://rooms/ and loads it. Null (after push_error) when unknown.
-static func load_room(id: StringName) -> Room:
+## Resolves an id to its file under res://rooms/ (or an added root) and loads it. Null (after
+## push_error) when unknown. With `dive`, killable enemies whose cell it marked killed are not
+## built (AR24: they stay dead until a rest); without it (tests, the harness) every enemy is,
+## so a room still loads standalone.
+static func load_room(id: StringName, dive: DiveState = null) -> Room:
 	var index := _get_index()
 	if not index.has(id):
 		push_error("RoomLoader: no room '%s' under %s" % [id, ROOT])
 		return null
-	return load_room_from_path(index[id])
+	return load_room_from_path(index[id], dive)
 
 
-static func load_room_from_path(path: String) -> Room:
+## Tests only (release exports exclude tests/*): indexes the rooms under `dir_path` too, so
+## enter_room() can reach test rooms by id (Story 1.7 D6). Ids stay unique across all roots.
+static func add_root(dir_path: String) -> void:
+	_scan(dir_path, _get_index())
+
+
+static func load_room_from_path(path: String, dive: DiveState = null) -> Room:
 	# get_file_as_string() on a missing file prints an engine error of its own.
 	if not FileAccess.file_exists(path):
 		push_error("%s:0:0 file not found" % path)
@@ -43,7 +54,7 @@ static func load_room_from_path(path: String) -> Room:
 		push_error(e)
 	if not errors.is_empty():
 		return null
-	return _build(parsed)
+	return _build(parsed, dive)
 
 
 ## Splits a room file into header entries ({key, value, line, ok}) and grid rows. No checks here.
@@ -179,10 +190,14 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 		if solid_at(grid, Vector2i(e.col, row)):
 			err.call(e.line, 1, "%s exit column %d is a solid cell" % [e.side, e.col])
 			continue
-		# Room.entry_position() puts an arriving player one cell inside the opening.
-		var inside := Vector2i(e.col, 1 if e.side == "up" else h_rows - 2)
-		if solid_at(grid, inside):
-			err.call(e.line, 1, "%s exit's entry cell %s is solid" % [e.side, inside])
+		# Room.entry_position() puts a player arriving from above one cell inside the top opening,
+		# and one arriving from below on the floor beside the bottom opening (D3).
+		if e.side == "up":
+			var inside := Vector2i(e.col, 1)
+			if solid_at(grid, inside):
+				err.call(e.line, 1, "%s exit's entry cell %s is solid" % [e.side, inside])
+		elif down_entry_cell(grid, e.col) == NO_CELL:
+			err.call(e.line, 1, "%s exit has no floor beside its opening to arrive on" % e.side)
 		var c: int = e.col
 		while c < w - 1 and not solid_at(grid, Vector2i(c, row)):
 			opening[Vector2i(c, row)] = true
@@ -195,6 +210,29 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 			if edge and not solid_at(grid, cell) and not opening.has(cell):
 				err.call(top + r, c + 1, "hole in the room's edge that is not a declared exit")
 	return errors
+
+
+## Where a player arriving from below stands (Story 1.7 D3): on the floor beside the bottom
+## opening that starts at `col`, never over it (over it they would fall straight back out and two
+## rooms could loop). Tries the column right of the opening, then the one left of it, skipping
+## the side-edge columns; the stand cell is the first open cell above that column's solid run
+## from the bottom row, with an open cell above it for the body. NO_CELL when neither side has one. Shared by validate() and the build.
+static func down_entry_cell(grid: Array[String], col: int) -> Vector2i:
+	var h := grid.size()
+	var w := grid[0].length()
+	var end_col := col
+	while end_col + 1 < w - 1 and not solid_at(grid, Vector2i(end_col + 1, h - 1)):
+		end_col += 1
+	for c in [end_col + 1, col - 1]:
+		if c < 1 or c > w - 2:
+			continue
+		var r := h - 1
+		while r >= 0 and solid_at(grid, Vector2i(c, r)):
+			r -= 1
+		# Feet on the solid run, with the cell above open too: the body reaches ~6 px into it.
+		if r >= 1 and r < h - 1 and not solid_at(grid, Vector2i(c, r - 1)):
+			return Vector2i(c, r)
+	return NO_CELL
 
 
 ## Solid = a wall, or an in-wall char (L) whose left or right neighbour is a wall or the room edge
@@ -213,7 +251,7 @@ static func solid_at(grid: Array[String], cell: Vector2i) -> bool:
 
 
 ## Builds a validated room. Entities spawn in grid order (row, then column), so it is deterministic.
-static func _build(parsed: Dictionary) -> Room:
+static func _build(parsed: Dictionary, dive: DiveState = null) -> Room:
 	var grid: Array[String] = parsed.grid
 	var room := Room.new()
 	room.size_cells = Vector2i(grid[0].length(), grid.size())
@@ -228,8 +266,11 @@ static func _build(parsed: Dictionary) -> Room:
 			"exits":
 				for part in h.value.split(",", false):
 					var m := _exit_re.search(part.strip_edges())
-					room.exits.append({side = StringName(m.get_string(1)), target = StringName(m.get_string(2)),
-							col = m.get_string(3).to_int()})
+					var side := StringName(m.get_string(1))
+					var col := m.get_string(3).to_int()
+					var entry := Vector2i(col, 1) if side == &"up" else down_entry_cell(grid, col)
+					room.exits.append({side = side, target = StringName(m.get_string(2)), col = col,
+							entry_cell = entry})
 			"obj":
 				var m := _obj_re.search(h.value)
 				room.objects[StringName(m.get_string(1))] = Vector2i(m.get_string(2).to_int(), m.get_string(3).to_int())
@@ -263,7 +304,15 @@ static func _build(parsed: Dictionary) -> Room:
 				room.spawn_cell = cell
 			elif RoomLegend.SPAWNS.has(ch):
 				var kind: Dictionary = RoomLegend.SPAWNS[ch]
-				room.spawn(kind.scene, room.cell_centre(cell), kind.args)
+				var args: Dictionary = kind.args
+				if kind.get("killable", false):
+					# AR24: killed this dive, so not built until a rest (the header set room.id).
+					if dive != null and dive.is_killed(room.id, cell):
+						continue
+					args = args.merged({room_id = room.id, cell = cell})  # never the shared const
+				room.spawn(kind.scene, room.cell_centre(cell), args)
+	# 1.24: persistent objects (header ids) skip here by their SlotState flag.
+	# 1.22: spawn the Ember Cache here when Game.slot's cache is in this room.
 	return room
 
 

@@ -1,0 +1,10 @@
+; Story 1.7 swap test room B: a ceiling gap up to A, a walker. Not a level.
+id=t_swap_b
+zone=dusk
+exits=up:t_swap_a@x4
+---
+####.#####
+#........#
+#........#
+#......c.#
+##########

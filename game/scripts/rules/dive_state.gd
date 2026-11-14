@@ -10,8 +10,8 @@ extends RefCounted
 
 signal carried_changed(carried: int)
 signal respawn_changed(room_id: StringName, entry: StringName)
-## No subscriber yet (the room build skips killed cells from Story 1.7); it exists because every
-## write emits (AR18).
+## No subscriber: the room build reads is_killed() when it builds (Story 1.7); it exists because
+## every write emits (AR18).
 signal killed_marked(room_id: StringName, cell: Vector2i)
 
 var carried := 0

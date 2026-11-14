@@ -1,0 +1,13 @@
+; Story 1.7 swap test room A: P, a walker, a floor hole down to B. Not a level.
+id=t_swap_a
+zone=dusk
+exits=down:t_swap_b@x1
+---
+##########
+#........#
+#.P......#
+#####....#
+#........#
+#........#
+#......c.#
+#..#######

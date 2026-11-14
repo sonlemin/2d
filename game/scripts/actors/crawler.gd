@@ -5,8 +5,12 @@ extends CharacterBody2D
 
 # Walk speed, gravity and the hover drift are Game.tuning keys (crawler_*, AR15).
 
-## Per instance: the spawner sets it before add_child (shaft.gd now, room spawn args from 1.5/1.6).
+## Per instance: the room build sets these before add_child (Room.spawn args, AR23).
 var hover := false
+## Identity for the killed-enemy rule (AR24): the room and grid cell it was built from. A crawler
+## spawned any other way has none and is never remembered.
+var room_id: StringName = &""
+var cell := Vector2i(-1, -1)
 
 var _dir := -1.0
 var _t := 0.0
@@ -44,5 +48,7 @@ func _physics_process(delta: float) -> void:
 
 
 func take_hit() -> void:
+	if cell != Vector2i(-1, -1):
+		Game.dive.mark_killed(room_id, cell)  # stays dead this dive, across deaths and room swaps
 	Fx.pop(get_parent(), global_position)
 	queue_free()

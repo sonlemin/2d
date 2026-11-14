@@ -5,13 +5,14 @@ extends RefCounted
 ## in `core/game.gd`. Written only through methods that emit a typed signal (AR18).
 ## `to_dict()` becomes save format slot_v1 at Story 1.41, when its key names freeze; until then a
 ## key may still change, after it never.
-## Not here yet, each added by its story: deposited embers and the Ember Cache (1.22), map visits
-## (1.7), gear (E5), the death log and cause ids (1.19 / 1.29), play time and the resume point
+## Not here yet, each added by its story: deposited embers and the Ember Cache (1.22), gear (E5), the death log and cause ids (1.19 / 1.29), play time and the resume point
 ## (1.21), abilities and the journal (E4–E7).
 
 signal flag_set(id: StringName, value: bool)
 signal records_changed
 signal difficulty_changed(difficulty: StringName)
+## A room was visited for the first time, or the visits were loaded or reset (the map, FR60).
+signal visits_changed
 
 ## Difficulty changes only what a death costs (GDD Difficulty, FR25); the rules arrive in
 ## Story 1.22. StringName ids match DevTools' --difficulty and the TIER_* string keys (D8).
@@ -26,6 +27,7 @@ var best_chain := 0  ## longest chain on this slot (Guild records, GDD Hub)
 var deaths := 0  ## deaths on this slot (Guild records, GDD Hub)
 var difficulty: StringName = DEFAULT_DIFFICULTY
 var _flags: Dictionary[StringName, bool] = {}  # only the flags that are set
+var _visited: Dictionary[StringName, bool] = {}  # room ids entered on this slot
 
 
 ## Story progress and lit anchors; the first callers are the anchors and stations (Story 1.24).
@@ -42,6 +44,19 @@ func set_flag(id: StringName, value := true) -> void:
 
 func has_flag(id: StringName) -> bool:
 	return _flags.has(id)
+
+
+## World calls it on every room entry (AR24); the map fills in from it (FR60, E4). Room ids are
+## save data from here: never rename a room once testers have saves.
+func visit(room_id: StringName) -> void:
+	if _visited.has(room_id):
+		return
+	_visited[room_id] = true
+	visits_changed.emit()
+
+
+func has_visited(room_id: StringName) -> bool:
+	return _visited.has(room_id)
 
 
 func record_chain(count: int) -> void:
@@ -66,14 +81,10 @@ func set_difficulty(tier: StringName) -> void:
 	difficulty_changed.emit(tier)
 
 
-## JSON-ready (D4). Flags are the set ids, sorted as Strings: Array.sort() on StringNames is not
-## alphabetical, and a stable order keeps save diffs readable.
+## JSON-ready (D4). Flags and visited rooms are the ids, sorted as Strings (see _sorted_ids()).
 func to_dict() -> Dictionary:
-	var flags := []
-	for id: StringName in _flags:
-		flags.append(String(id))
-	flags.sort()
-	return {"best_chain": best_chain, "deaths": deaths, "difficulty": String(difficulty), "flags": flags}
+	return {"best_chain": best_chain, "deaths": deaths, "difficulty": String(difficulty),
+			"flags": _sorted_ids(_flags), "visited": _sorted_ids(_visited)}
 
 
 ## Save data may be hand-edited or corrupt, an environment error, so this never asserts (D3): a
@@ -84,27 +95,23 @@ func from_dict(d: Dictionary) -> bool:
 	var died := _count(d.get("deaths"))
 	var tier: Variant = d.get("difficulty")
 	var tier_ok := (tier is String or tier is StringName) and StringName(tier) in DIFFICULTIES
-	var list: Variant = d.get("flags")
-	var clean := best >= 0 and died >= 0 and tier_ok and list is Array
 	var flags: Array[StringName] = []
-	if list is Array:
-		for id: Variant in list:
-			# An empty id names nothing, and a loaded flag is save data from then on.
-			if (id is String or id is StringName) and not String(id).is_empty():
-				flags.append(StringName(id))
-			else:
-				clean = false
-	_assign(maxi(best, 0), maxi(died, 0), StringName(tier) if tier_ok else DEFAULT_DIFFICULTY, flags)
+	var visited: Array[StringName] = []
+	var clean := best >= 0 and died >= 0 and tier_ok
+	clean = _read_ids(d.get("flags"), flags) and clean
+	clean = _read_ids(d.get("visited"), visited) and clean
+	_assign(maxi(best, 0), maxi(died, 0), StringName(tier) if tier_ok else DEFAULT_DIFFICULTY, flags, visited)
 	return clean
 
 
 func reset() -> void:
-	_assign(0, 0, DEFAULT_DIFFICULTY, [])
+	_assign(0, 0, DEFAULT_DIFFICULTY, [], [])
 
 
 ## Sets every field first, then emits (D2): flag_set per flag whose value changed, and
-## records_changed and difficulty_changed once each, so a subscriber always refreshes.
-func _assign(best: int, died: int, tier: StringName, flags: Array[StringName]) -> void:
+## records_changed, difficulty_changed and visits_changed once each, so a subscriber always refreshes.
+func _assign(best: int, died: int, tier: StringName, flags: Array[StringName],
+		visited: Array[StringName]) -> void:
 	var old := _flags.duplicate()
 	best_chain = best
 	deaths = died
@@ -112,6 +119,9 @@ func _assign(best: int, died: int, tier: StringName, flags: Array[StringName]) -
 	_flags.clear()
 	for id in flags:
 		_flags[id] = true
+	_visited.clear()
+	for id in visited:
+		_visited[id] = true
 	for id: StringName in old:
 		if not _flags.has(id):
 			flag_set.emit(id, false)
@@ -122,6 +132,31 @@ func _assign(best: int, died: int, tier: StringName, flags: Array[StringName]) -
 			flag_set.emit(id, true)
 	records_changed.emit()
 	difficulty_changed.emit(difficulty)
+	visits_changed.emit()
+
+
+## Ids as Strings, sorted as Strings: Array.sort() on StringNames is not alphabetical, and a
+## stable order keeps save diffs readable.
+static func _sorted_ids(ids: Dictionary) -> Array:
+	var out := []
+	for id: StringName in ids:
+		out.append(String(id))
+	out.sort()
+	return out
+
+
+## Appends every good id in `list` to `into`; false when the list is missing or not an Array, or
+## an entry is bad (skipped). An empty id names nothing, and a loaded id is save data from then on.
+static func _read_ids(list: Variant, into: Array[StringName]) -> bool:
+	if not list is Array:
+		return false
+	var clean := true
+	for id: Variant in list:
+		if (id is String or id is StringName) and not String(id).is_empty():
+			into.append(StringName(id))
+		else:
+			clean = false
+	return clean
 
 
 ## A whole number ≥ 0, or -1. JSON numbers come back as floats, so a whole float counts, up to

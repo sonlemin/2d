@@ -22,8 +22,8 @@ Open this folder in Godot 4.7 and press F5.
 - A big light wakes the **lurkers**: red eyes pulse in the dark for about a second, then they hunt you. Contact with a hunting lurker kills you.
 - To shake a lurker off, **land or Snuff**. Both break the chain.
 - Touching a crawler knocks you back and breaks the chain, but doesn't kill you.
-- Dying respawns you at the **top of the shaft** after a short pause, without reloading: banked embers are kept, and a crawler you killed stays dead. To restart from scratch, relaunch. There are no F1/F3 keys for now: brightness keeps the last saved level.
-- The hole in the floor (bottom left) will loop you back to the top; for now, falling through it kills you.
+- Dying respawns you at the **top of the shaft** after a short pause, without reloading: banked embers are kept, and the shaft is rebuilt with every crawler back except the ones you killed. To restart from scratch, relaunch. There are no F1/F3 keys for now: brightness keeps the last saved level.
+- The hole in the floor (bottom left) loops you back to the top, still falling. A chain you carry through it is banked first, as on a landing.
 - A lurker that loses your scent (you land or Snuff) is harmless at once, even point-blank.
 
 ## Tests
@@ -38,4 +38,5 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **Rooms** (`tests/test_room_loader.gd`): room files are checked before they build (every error names its file, line and column), and the shaft (`rooms/l1/m1_shaft.txt`) has the right enemies and a ledge every 19 rows or less.
 - **Deferred-work owners** (`tests/test_deferred_owners.gd`): fails while any item in `_bmad-output/implementation-artifacts/deferred-work.md` has no owner, so a ledger edit alone can turn the run red.
 - **Shaft smoke test** (`tests/smoke_shaft.gd`): plays the shaft room with simulated key presses. It covers the pogo, landing, jump height (held vs tapped), a bot chaining the long run, and the lurker's telegraph, hunt and kill rules.
-- **World smoke test** (`tests/smoke_world.gd`): the game scene with its gutters and framing; banked embers, the best chain, deaths and brightness live in `Game`; a death respawns a fresh player at the top without a reload; a lurker hidden behind a gutter never notices you.
+- **World smoke test** (`tests/smoke_world.gd`): the game scene with its gutters and framing; banked embers, the best chain, deaths and brightness live in `Game`; a death respawns a fresh player at the top without a reload; the floor hole loops you to the top; a lurker hidden behind a gutter never notices you.
+- **Room swap smoke test** (`tests/smoke_room_swap.gd`): two small test rooms; going through an exit banks the chain, you arrive still falling from above or standing beside the hole from below, and killed crawlers stay gone across swaps and deaths.

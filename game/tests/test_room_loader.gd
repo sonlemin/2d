@@ -19,6 +19,7 @@ func run() -> void:
 	await _test_ok_min()
 	await _test_spawn_args_before_ready()
 	await _test_m1_shaft()
+	await _test_killed_cells()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -82,7 +83,15 @@ func _test_inline_errors() -> void:
 	# The opening stops before the corner, so an open corner is still a hole in the side wall.
 	_has(_inline(ok.replace("##.####", "##.....")), p + ":6:7 hole in the room's edge that is not a declared exit", "an opening through the corner")
 	_has(_inline(ok.replace("#.....#\n#.P", "#.#...#\n#.P")), p + ":4:1 up exit's entry cell (2, 1) is solid", "a wall in the up exit's entry cell")
-	_has(_inline(ok.replace("#c....#", "#c...##")), p + ":4:1 down exit's entry cell (5, 5) is solid", "a wall in the down exit's entry cell")
+	# Story 1.7 D3: an opening that runs wall to wall leaves no floor beside it to arrive on.
+	var wide := ok.replace("down:ok_min@x5", "down:ok_min@x1").replace("#####.#", "#.....#")
+	check(_inline(wide) == ([p + ":4:1 down exit has no floor beside its opening to arrive on"] as Array[String]),
+			"a bottom opening with no floor beside it is the one error (got %s)" % [_inline(wide)])
+	var walled := ok.replace("#c....#\n#####.#", "#c..#.#\n#####.#")
+	check(_inline(walled).is_empty(), "a floor beside the opening is enough, whatever is above the opening (got %s)" % [_inline(walled)])
+	var low := ok.replace("###...L\n#.....#", "###...L\n#####.#")
+	check(_inline(low) == ([p + ":4:1 down exit has no floor beside its opening to arrive on"] as Array[String]),
+			"a stand cell with a wall right above it has no headroom: the one error (got %s)" % [_inline(low)])
 	_has(_inline(ok.replace(exits, "exits=up:ok_min@x4294967298, down:ok_min@x5")), p + ":4:1 exit 'up:ok_min@x4294967298' is not <up|down>:<room_id>@x<col>", "an exit column too long to be a cell")
 	_has(_inline(ok.replace("zone=dusk", "zone=dusk\nobj=a@4294967297,1")), p + ":4:1 obj 'a@4294967297,1' is not <id>@<col>,<row>", "an obj cell too long to be a cell")
 	_has(_inline(ok.replace("---\n", "---\n\n")), p + ":6:1 row 1 is empty (a blank line right after '---'?)", "a blank line after ---")
@@ -107,8 +116,9 @@ func _test_ok_min() -> void:
 		return
 	add_child(room)
 	check(room.id == &"ok_min" and room.zone == &"dusk" and not room.spine, "the header sets id, zone and spine")
-	check(room.exits == ([{side = &"up", target = &"ok_min", col = 2}, {side = &"down", target = &"ok_min", col = 5}] as Array[Dictionary]),
-			"the exits are up@2 and down@5 (got %s)" % [room.exits])
+	check(room.exits == ([{side = &"up", target = &"ok_min", col = 2, entry_cell = Vector2i(2, 1)},
+			{side = &"down", target = &"ok_min", col = 5, entry_cell = Vector2i(4, 5)}] as Array[Dictionary]),
+			"the exits are up@2 and down@5, arriving at (2, 1) and on the floor beside the hole at (4, 5) (got %s)" % [room.exits])
 	var walkers := 0
 	var hovers := 0
 	var lurkers := 0
@@ -130,7 +140,7 @@ func _test_ok_min() -> void:
 	check(room.bounds() == Rect2(0, 0, 112, 112), "bounds() is 7 x 7 tiles (got %s)" % room.bounds())
 	check(room.entry_position(&"spawn") == Vector2(40, 36), "spawn: the P cell, feet on the tile below (got %s)" % room.entry_position(&"spawn"))
 	check(room.entry_position(&"up") == Vector2(40, 20), "up: one cell inside the top opening (got %s)" % room.entry_position(&"up"))
-	check(room.entry_position(&"down") == Vector2(88, 84), "down: one cell inside the bottom opening (got %s)" % room.entry_position(&"down"))
+	check(room.entry_position(&"down") == Vector2(72, 84), "down: standing on the floor beside the bottom opening, never over it (got %s)" % room.entry_position(&"down"))
 	check(room.has_entry(&"spawn") and room.has_entry(&"up") and not room.has_entry(&"nope"), "has_entry knows spawn and up, not nope")
 	check(room.cell_centre(Vector2i(1, 5)) == Vector2(24, 88), "cell_centre is the tile's middle")
 	room.queue_free()
@@ -190,9 +200,40 @@ func _test_m1_shaft() -> void:
 	for i in range(1, ledges.size()):
 		worst = maxi(worst, ledges[i] - ledges[i - 1])
 	check(worst <= LEDGE_GAP_MAX_ROWS, "FR57: no fall between ledge rows is over %d rows (worst %d)" % [LEDGE_GAP_MAX_ROWS, worst])
-	check(room.exits == ([{side = &"up", target = &"m1_shaft", col = 3}, {side = &"down", target = &"m1_shaft", col = 1}] as Array[Dictionary]),
-			"R16: the exits are up@3 and down@1, both to m1_shaft (got %s)" % [room.exits])
+	check(room.exits == ([{side = &"up", target = &"m1_shaft", col = 3, entry_cell = Vector2i(3, 1)},
+			{side = &"down", target = &"m1_shaft", col = 1, entry_cell = Vector2i(3, 102)}] as Array[Dictionary]),
+			"R16: the exits are up@3 and down@1, both to m1_shaft; arrival from below stands at (3, 102) (got %s)" % [room.exits])
 	check(not room.is_solid(Vector2i(1, 104)) and not room.is_solid(Vector2i(2, 104)) and room.is_solid(Vector2i(3, 104)),
 			"the floor hole is cols 1-2")
 	room.queue_free()
+	await get_tree().process_frame
+
+
+## Story 1.7 D5: killable enemies carry their room and cell, and a dive's killed cells are skipped.
+func _test_killed_cells() -> void:
+	var all := RoomLoader.load_room_from_path(DIR + "ok_min.txt")
+	add_child(all)
+	var walker: Crawler = null
+	var hover: Crawler = null
+	var lurker: Lurker = null
+	for n in all.get_children():
+		if n is Crawler:
+			if n.hover:
+				hover = n
+			else:
+				walker = n
+		elif n is Lurker:
+			lurker = n
+	check(walker != null and walker.room_id == &"ok_min" and walker.cell == Vector2i(1, 5), "the walker knows its room and cell (got %s)" % [str([walker.room_id, walker.cell]) if walker else "none"])
+	check(hover != null and hover.cell == Vector2i(4, 2), "...and so does the hoverer (got %s)" % (hover.cell if hover else "none"))
+	check(lurker != null and not ("cell" in lurker), "a lurker is not killable, so it has no cell")
+	var dive := DiveState.new()
+	dive.mark_killed(&"ok_min", Vector2i(1, 5))
+	var some := RoomLoader.load_room_from_path(DIR + "ok_min.txt", dive)
+	add_child(some)
+	var cells := some.get_children().filter(func(n: Node) -> bool: return n is Crawler).map(func(c: Crawler) -> Vector2i: return c.cell)
+	check(cells == [Vector2i(4, 2)], "with that cell marked killed, the walker is skipped and the hoverer still built (got %s)" % [cells])
+	check(some.get_children().any(func(n: Node) -> bool: return n is Lurker), "...and the lurker is still built")
+	all.queue_free()
+	some.queue_free()
 	await get_tree().process_frame

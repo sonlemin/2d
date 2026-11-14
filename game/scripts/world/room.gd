@@ -10,7 +10,7 @@ const TILE := 16
 var id: StringName
 var zone: StringName
 var spine := false
-var exits: Array[Dictionary] = []  ## {side: &"up"/&"down", target: StringName, col: int}
+var exits: Array[Dictionary] = []  ## {side: &"up"/&"down", target: StringName, col: int, entry_cell: Vector2i}
 var objects := {}  ## obj id (StringName) -> cell (Vector2i)
 var size_cells := Vector2i.ZERO  ## columns, rows
 var spawn_cell := Vector2i(-1, -1)  ## the `P` cell; (-1, -1) when the room has none
@@ -37,17 +37,15 @@ func bounds() -> Rect2:
 func has_entry(entry: StringName) -> bool:
 	if entry == &"spawn":
 		return spawn_cell != Vector2i(-1, -1)
-	return _exit(entry) != {}
+	return exit(entry) != {}
 
 
 ## Room-local, feet on the tile below the entry cell (M1's P formula: body bottom = +12).
-## up/down: one cell inside the exit opening's first column. Anchors and stations join in 1.24.
+## up: one cell inside the top opening (arriving from above, still falling). down: on the floor
+## beside the bottom opening (arriving from below, Story 1.7 D3). Anchors and stations join in 1.24.
 func entry_position(entry: StringName) -> Vector2:
 	assert(has_entry(entry), "Room %s has no entry '%s'" % [id, entry])
-	var cell := spawn_cell
-	if entry != &"spawn":
-		var col: int = _exit(entry).col
-		cell = Vector2i(col, 1 if entry == &"up" else size_cells.y - 2)
+	var cell: Vector2i = spawn_cell if entry == &"spawn" else exit(entry).entry_cell
 	return Vector2(cell.x * TILE + TILE / 2.0, (cell.y + 1) * TILE - 12)
 
 
@@ -59,8 +57,9 @@ func cell_centre(cell: Vector2i) -> Vector2:
 	return Vector2(cell * TILE) + Vector2(TILE, TILE) / 2.0
 
 
-## At most one exit per side (D3), so a side name is also its entry name.
-func _exit(side: StringName) -> Dictionary:
+## The exit on `side` ({} when none). At most one exit per side (1.5 D3), so a side name is also
+## its entry name.
+func exit(side: StringName) -> Dictionary:
 	for e in exits:
 		if e.side == side:
 			return e

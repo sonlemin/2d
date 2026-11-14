@@ -33,8 +33,6 @@ static func build(parent: Node, room_id: StringName, entry := &"spawn") -> Dicti
 	parent.add_child(player)
 	var cam := CameraRig.new()
 	cam.name = "CameraRig"
-	cam.position_smoothing_enabled = true  # as in world.tscn
-	cam.position_smoothing_speed = 8.0
 	parent.add_child(cam)
 	cam.apply_limits(room.bounds())
 	cam.follow(player)

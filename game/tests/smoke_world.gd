@@ -44,6 +44,9 @@ func run() -> void:
 	_world.player_spawned.connect(_on_spawned)  # after the first spawn: counts respawns only
 	await frames(2)
 	_set_room_lurkers_active(false)
+	# Every respawn and loop builds a fresh room with live lurkers (1.7): keep them off, or a later
+	# case could be hunted at random.
+	_world.room_entered.connect(_on_room_entered)
 	test_no_boot()
 	test_tree(scene_before)
 	test_framing()
@@ -53,6 +56,7 @@ func run() -> void:
 	await test_death_and_respawn()
 	await test_behind_the_gutter()
 	await test_hunt_over_death()
+	await test_bottom_loop()
 	test_screen_router()
 	test_sources()
 	await get_tree().process_frame  # a queued settings write would land here
@@ -63,6 +67,10 @@ func run() -> void:
 	DirAccess.remove_absolute(TMP.path_join("settings.json"))  # silent when missing
 	DirAccess.remove_absolute(TMP)
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
+
+
+func _on_room_entered(_id: StringName) -> void:
+	_set_room_lurkers_active(false)
 
 
 func _on_spawned(player: Player) -> void:
@@ -167,7 +175,10 @@ func test_death_and_respawn() -> void:
 	var spawn := _room().entry_position(&"spawn")
 	var crawlers := _crawlers().size()
 	Game.clock.request(&"hitstop", 0.05, 0.075)
-	_crawlers()[0].take_hit()  # the topmost crawler, killed this dive
+	var old_room := _room()
+	var victim: Crawler = _crawlers()[0]  # the topmost crawler, killed this dive
+	var victim_cell := victim.cell
+	victim.take_hit()
 	var carried := Game.dive.carried
 	for i in 2:
 		old.chain.add_hit()
@@ -192,7 +203,9 @@ func test_death_and_respawn() -> void:
 		p.chain.add_hit()
 	check(Game.slot.best_chain == 4, "the new player's chain is bound: a chain of 4 records best_chain 4 (got %d)" % Game.slot.best_chain)
 	p.chain.break_chain()
-	check(_crawlers().size() == crawlers - 1, "the crawler killed before the death stays dead: the room was not rebuilt (%d -> %d)" % [crawlers, _crawlers().size()])
+	check(is_instance_valid(_room()) and _room() != old_room, "the respawn rebuilt the room: a new Room instance (AR25)")
+	check(Game.dive.is_killed(&"m1_shaft", victim_cell), "the kill was marked on the dive (room m1_shaft, cell %s)" % victim_cell)
+	check(_crawlers().size() == crawlers - 1 and not _has_crawler_at(victim_cell), "...and the crawler killed before the death stays dead in it (%d -> %d)" % [crawlers, _crawlers().size()])
 
 
 ## A free row whose two left tiles are wall then open, with room to the right: the player hangs
@@ -223,8 +236,7 @@ func test_behind_the_gutter() -> void:
 	var steady := _world.play_rect()
 	check(is_equal_approx(steady.get_center().y, y), "play_rect() is on the player the same frame as the snap, not a frame late (centre y %.1f, player %.1f)" % [steady.get_center().y, y])
 	_camera().kick(6.0)
-	await get_tree().process_frame
-	await get_tree().process_frame
+	await frames(2)  # the rig moves on the physics tick (Story 1.7 D8)
 	check(_camera().offset != Vector2.ZERO and _world.play_rect().is_equal_approx(steady), "a shake moves the view but never play_rect(): noticing has no randomness (offset %s)" % _camera().offset)
 	_camera().snap()
 	for i in 4:
@@ -267,8 +279,46 @@ func test_hunt_over_death() -> void:
 	check(dropped, "one frame after the death the lurker drops the hunt (state %d)" % c.state)
 	await seconds(World.RESPAWN_DELAY + 0.1)
 	check(_spawned.size() == 2 and _player() == _spawned[1], "a second death respawns again")
-	_room().remove_child(c)
-	c.queue_free()
+	check(not is_instance_valid(c), "...and the rebuild took the hunting lurker away with the old room")
+
+
+func _has_crawler_at(cell: Vector2i) -> bool:
+	return _crawlers().any(func(c: Crawler) -> bool: return c.cell == cell)
+
+
+## R16 (AC3, AC4): the bottom exit loops to the top entry of m1_shaft. A live chain is banked first,
+## like a landing, and a crawler killed before the loop is still gone in the rebuilt room.
+func test_bottom_loop() -> void:
+	var p := _player()
+	var victim: Crawler = _crawlers()[-1]  # the lowest
+	var victim_cell := victim.cell
+	victim.take_hit()
+	await frames(1)
+	var crawlers := _crawlers().size()
+	var old_room := _room()
+	var carried := Game.dive.carried
+	for i in 3:
+		p.chain.add_hit()  # held 1 + 2 + 3 = 6
+	var seen := []
+	_world.room_entered.connect(_record_entry.bind(seen), CONNECT_ONE_SHOT)
+	p.global_position = Vector2(24, _room().bounds().end.y - 8)  # in the floor hole (cols 1-2)
+	p.velocity = Vector2(0, 150)
+	for i in 60:
+		if not seen.is_empty():
+			break
+		await frames(1)
+	check(seen.size() == 1 and seen[0].id == &"m1_shaft", "falling through the floor hole enters m1_shaft again (got %s)" % [seen])
+	if seen.is_empty():
+		return
+	check(seen[0].count == 0 and seen[0].carried == carried + 6, "...with the chain of 3 banked first: carried +6, chain 0 when the room is entered (carried %d -> %d)" % [carried, seen[0].carried])
+	check(seen[0].position == Vector2(56, 20) and seen[0].vy > 0.0, "...placed at the top entry (56, 20), still falling (got %s, vy %.1f)" % [seen[0].position, seen[0].vy])
+	check(_player() == p and _room() != old_room, "...the same player, in a rebuilt room")
+	check(_crawlers().size() == crawlers and not _has_crawler_at(victim_cell), "...and the crawler killed before the loop is still gone (%d crawlers)" % _crawlers().size())
+
+
+func _record_entry(id: StringName, out: Array) -> void:
+	var p := _player()
+	out.append({id = id, count = p.chain.count, carried = Game.dive.carried, position = p.position, vy = p.velocity.y})
 
 
 func test_screen_router() -> void:
@@ -298,11 +348,17 @@ func test_sources() -> void:
 	var hits: Array[String] = []
 	_scan("res://scripts", hits)
 	check(hits == ["res://scripts/world/camera_rig.gd"], "randf appears only in world/camera_rig.gd (got %s)" % [hits])
+	# AC5 (Story 1.7): the M1 shaft is gone, and with it the function keys and the scene reload.
+	check(not FileAccess.file_exists("res://scripts/shaft.gd") and not FileAccess.file_exists("res://scenes/shaft.tscn"), "shaft.gd and shaft.tscn are deleted")
+	for needle in ["KEY_F", "reload_current_scene"]:
+		var found: Array[String] = []
+		_scan("res://scripts", found, needle)
+		check(found.is_empty(), "no %s under scripts/ (got %s)" % [needle, found])
 
 
-func _scan(dir: String, hits: Array[String]) -> void:
+func _scan(dir: String, hits: Array[String], needle := "randf") -> void:
 	for sub in DirAccess.get_directories_at(dir):
-		_scan(dir.path_join(sub), hits)
+		_scan(dir.path_join(sub), hits, needle)
 	for f in DirAccess.get_files_at(dir):
-		if f.ends_with(".gd") and FileAccess.get_file_as_string(dir.path_join(f)).contains("randf"):
+		if f.ends_with(".gd") and FileAccess.get_file_as_string(dir.path_join(f)).contains(needle):
 			hits.append(dir.path_join(f))
