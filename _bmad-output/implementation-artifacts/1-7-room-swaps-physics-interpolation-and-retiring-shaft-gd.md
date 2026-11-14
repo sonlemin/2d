@@ -1,6 +1,9 @@
+---
+baseline_commit: 7a07cbd
+---
 # Story 1.7: Room swaps, physics interpolation and retiring `shaft.gd`
 
-Status: ready-for-dev
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -31,65 +34,83 @@ so that the shaft, and later the whole layer, feels continuous.
 
 Run everything from `game/` and wrap every Godot run in `timeout`.
 
-- [ ] **Task 1: Baseline** (AC: 7)
-  - [ ] Run `timeout 600 ./run_tests.sh` on the story-file commit. Expected (re-run at story creation, 2026-11-14, on `29d8cde`):
+- [x] **Task 1: Baseline** (AC: 7)
+  - [x] Run `timeout 600 ./run_tests.sh` on the story-file commit. Expected (re-run at story creation, 2026-11-14, on `29d8cde`):
     - `test_chain_state`: `ALL PASS (69 checks)`.
     - These print `PASS` with the given `ok` counts: `test_log` 7, `test_clock` 15, `test_tuning` 85, `test_state` 145, `test_room_loader` 57, `test_deferred_owners` 19.
     - `smoke_shaft` 30 `ok` and `smoke_world` 49 `ok`, both `SMOKE PASS`.
     - `== ALL GREEN`.
-- [ ] **Task 2: Prototype the camera under interpolation first** (AC: 2) — **gate**
-  - [ ] Turn on `physics/common/physics_interpolation` and build the D8 rig. Prove three things in `smoke_world` and `smoke_shaft` before anything else:
+- [x] **Task 2: Prototype the camera under interpolation first** (AC: 2) — **gate**
+  - [x] Turn on `physics/common/physics_interpolation` and build the D8 rig. Prove three things in `smoke_world` and `smoke_shaft` before anything else:
     - `play_rect()` spans x −4 … 356 straight after the spawn;
     - it is on the player in the same frame as a `snap()`;
     - a shake never moves it.
-  - [ ] The engine `WARNING: Camera2D overridden to physics process mode` must not appear in any test output.
-  - [ ] If the rig can't pass these with interpolation on, **HALT and ask sonlm.** Never turn interpolation off on your own: keep-or-drop is 1.15's recorded decision (AR6).
-- [ ] **Task 3: Room identity and arrival in the loader** (AC: 4, 6)
-  - [ ] `room_legend.gd`: `killable = true` on `c` and `h` (D5).
-  - [ ] `room_loader.gd`:
+  - [x] The engine `WARNING: Camera2D overridden to physics process mode` must not appear in any test output.
+  - [x] If the rig can't pass these with interpolation on, **HALT and ask sonlm.** Never turn interpolation off on your own: keep-or-drop is 1.15's recorded decision (AR6).
+- [x] **Task 3: Room identity and arrival in the loader** (AC: 4, 6)
+  - [x] `room_legend.gd`: `killable = true` on `c` and `h` (D5).
+  - [x] `room_loader.gd`:
     - `load_room(id, dive: DiveState = null)` skips killed cells;
     - killable spawns get `room_id` + `cell`;
     - every exit gets its `entry_cell` from one shared static, which the validator also uses;
     - new validator error for a down exit with no floor beside it;
     - `add_root(dir)` (D3, D5, D6).
-  - [ ] `room.gd`: `entry_position()` reads `entry_cell`; add `exit(side)` (D2, D3).
-  - [ ] `crawler.gd`: `room_id` / `cell` vars; `take_hit()` marks the kill (D5).
-- [ ] **Task 4: Visits** (AC: 1)
-  - [ ] `slot_state.gd`: `visit()`, `has_visited()`, `visits_changed`, plus `visited` in `to_dict` / `from_dict` / `reset` (D7).
-- [ ] **Task 5: World swaps rooms** (AC: 1, 3, 4)
-  - [ ] `world.gd`:
+  - [x] `room.gd`: `entry_position()` reads `entry_cell`; add `exit(side)` (D2, D3).
+  - [x] `crawler.gd`: `room_id` / `cell` vars; `take_hit()` marks the kill (D5).
+- [x] **Task 4: Visits** (AC: 1)
+  - [x] `slot_state.gd`: `visit()`, `has_visited()`, `visits_changed`, plus `visited` in `to_dict` / `from_dict` / `reset` (D7).
+- [x] **Task 5: World swaps rooms** (AC: 1, 3, 4)
+  - [x] `world.gd`:
     - `enter_room()` and the one `_swap_room()` path for boot, exits and respawns;
     - the polled exits replace the out-of-room death;
     - `start_room`;
     - `room_entered` (D1, D2, D4).
-- [ ] **Task 6: Physics interpolation and the rig** (AC: 2)
-  - [ ] `project.godot`: `[physics]` `common/physics_interpolation=true` (the section doesn't exist yet).
-  - [ ] `camera_rig.gd` as in D8; `world.tscn` Camera without engine smoothing; `room_harness.gd` to match.
-- [ ] **Task 7: Retire the shaft** (AC: 5)
-  - [ ] `git rm scripts/shaft.gd scripts/shaft.gd.uid scenes/shaft.tscn` (D10).
-  - [ ] Fix the comments that name them, e.g. `crawler.gd`'s "shaft.gd now".
-- [ ] **Task 8: Tests** (AC: 1–7)
-  - [ ] `tests/rooms/swap/t_swap_a.txt` and `t_swap_b.txt` (D6, exactly as given).
-  - [ ] New `tests/smoke_room_swap.gd` (D11).
-  - [ ] `smoke_world.gd`, `test_room_loader.gd`, `test_state.gd` as in D11.
-  - [ ] `smoke_shaft` keeps its 30 checks word for word.
-  - [ ] `run_tests.sh`: add `smoke_room_swap` to the `for t in …` list.
-  - [ ] Red-check every new test: break the code it guards and see it fail.
-  - [ ] Re-shoot `screenshot.gd` under `xvfb-run` and look at both PNGs.
-- [ ] **Task 9: Ledger and docs** (AC: 6)
-  - [ ] `deferred-work.md`:
+- [x] **Task 6: Physics interpolation and the rig** (AC: 2)
+  - [x] `project.godot`: `[physics]` `common/physics_interpolation=true` (the section doesn't exist yet).
+  - [x] `camera_rig.gd` as in D8; `world.tscn` Camera without engine smoothing; `room_harness.gd` to match.
+- [x] **Task 7: Retire the shaft** (AC: 5)
+  - [x] `git rm scripts/shaft.gd scripts/shaft.gd.uid scenes/shaft.tscn` (D10).
+  - [x] Fix the comments that name them, e.g. `crawler.gd`'s "shaft.gd now".
+- [x] **Task 8: Tests** (AC: 1–7)
+  - [x] `tests/rooms/swap/t_swap_a.txt` and `t_swap_b.txt` (D6, exactly as given).
+  - [x] New `tests/smoke_room_swap.gd` (D11).
+  - [x] `smoke_world.gd`, `test_room_loader.gd`, `test_state.gd` as in D11.
+  - [x] `smoke_shaft` keeps its 30 checks word for word.
+  - [x] `run_tests.sh`: add `smoke_room_swap` to the `for t in …` list.
+  - [x] Red-check every new test: break the code it guards and see it fail.
+  - [x] Re-shoot `screenshot.gd` under `xvfb-run` and look at both PNGs.
+- [x] **Task 9: Ledger and docs** (AC: 6)
+  - [x] `deferred-work.md`:
     - close the 1.5 "down entry over the hole" item;
     - widen the 1.10 exit-target item (D12).
-  - [ ] Docs, facts only (D12).
-- [ ] **Task 10: Verify** (AC: 7, 5)
-  - [ ] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
-  - [ ] Each grep below finds nothing:
+  - [x] Docs, facts only (D12).
+- [x] **Task 10: Verify** (AC: 7, 5)
+  - [x] `timeout 600 ./run_tests.sh` → `== ALL GREEN`.
+  - [x] Each grep below finds nothing:
     - `grep -rn "KEY_F" scripts/`
     - `grep -rn "reload_current_scene" scripts/`
     - `grep -rln "shaft.gd\|shaft.tscn" scripts/ scenes/ tests/ project.godot` (the false positive is gone too: `smoke_shaft.gd`'s own name contains `shaft.gd`, so check its lines, not just its name)
     - `grep -rn "get_screen_center_position\|position_smoothing" scripts/`
-  - [ ] Every new `.gd` has its `.gd.uid` staged; run `godot --headless --path . --import` after adding scripts.
-  - [ ] Report "tests green; needs a feel check on the laptop" with D13's list.
+  - [x] Every new `.gd` has its `.gd.uid` staged; run `godot --headless --path . --import` after adding scripts.
+  - [x] Report "tests green; needs a feel check on the laptop" with D13's list.
+
+### Review Findings
+
+Code review 2026-11-14 (gds-code-review, scope `7a07cbd..working tree`; Blind Hunter, Edge Case Hunter, Acceptance Auditor).
+
+- [x] [Review][Defer] Arriving from below can land next to an enemy (`m1_shaft`: stand cell (3, 102) beside the walker at (4, 102); a probe loops the player through the hole with no input) [game/scripts/world/room_loader.gd:220] — deferred (sonlm): Story 1.10 owns cross-room checks and the bot; nothing in play arrives from below yet (`m1_shaft`'s ceiling gap is out of reach)
+- [x] [Review][Patch] The `SlotState` fallback fixtures lack `"visited"`, so every "is unclean" check now passes whatever field is under test. Add `"visited": []` to them, and test that `from_dict()` emits `visits_changed` once [game/tests/test_state.gd:296]
+- [x] [Review][Patch] `_swap_pending` is cleared after `player_spawned` / `room_entered`, so an `enter_room()` from a handler is silently dropped. Clear it before the emits [game/scripts/world/world.gd:130]
+- [x] [Review][Patch] A bad respawn point or a bad `start_room` falls back to the current room's `spawn`, which asserts in a room without P (verified: `t_swap_b`); in release it places the player at (-8, -12). On boot it dereferences a null room in release. Fall back to `start_room`'s spawn, and assert only when that fails too [game/scripts/world/world.gd:107]
+- [x] [Review][Patch] An exit swap that runs after the player died, and `enter_room()` during the death delay, still build the room, `visit()` it and emit `room_entered` with an unplaced corpse (verified). Cancel an exit swap when the player is dead; the respawn rebuilds anyway [game/scripts/world/world.gd:121]
+- [x] [Review][Patch] On a respawn the new room is added while the dead player is still in groups `player` / `light_source`. Free the old player before adding the room [game/scripts/world/world.gd:117]
+- [x] [Review][Patch] After a deferred swap or respawn, the engine camera keeps the old scroll until the next physics tick, so one frame can draw the new room under the old view. Verified: not needed. With engine smoothing off, setting the position updates the scroll at once (a probe from y≈1000 into `t_swap_b` read the engine centre (80, 40) = the rig's at `room_entered`). Added a `smoke_room_swap` check that they agree at entry instead [game/tests/smoke_room_swap.gd]
+- [x] [Review][Patch] Arrival from below has no headroom check: a one-row pocket puts the player inside a tile (the body reaches ~6 px into the cell above). The validator requires the cell above the down stand cell to be open [game/scripts/world/room_loader.gd:220]
+- [x] [Review][Patch] `smoke_room_swap` lacks D11 case 4's group check, "the enemy/predator groups hold nothing from the old room at `room_entered`". Record it where A's walker is still alive, so it can fail [game/tests/smoke_room_swap.gd:63]
+- [x] [Review][Patch] `follow()` leaves `_smoothed` at (0, 0) until a `snap()`; seed it from the body [game/scripts/world/camera_rig.gd:41]
+- [x] [Review][Patch] `_test_killed_cells`' failure messages dereference `walker` / `hover` before `check()`, so a missing crawler is a SCRIPT ERROR, not a FAIL line [game/tests/test_room_loader.gd:221]
+- [x] [Review][Patch] Stale `shaft.gd` mentions: `docs/source-tree-analysis.md:140` ("stay at the top level until Story 1.7") and `docs/development-guide.md:81` ("`shaft.gd` stops on an assert") [docs/]
+- [x] [Review][Patch] The new test files are untracked, though Task 10 says staged: stage `smoke_room_swap.gd` + `.uid` and `tests/rooms/swap/` [game/tests/]
 
 ## Dev Notes
 
@@ -559,10 +580,93 @@ It makes rooms real places. You leave one through an exit and arrive in the next
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-14.
+
 ### Debug Log References
+
+- Baseline at `7a07cbd`: `== ALL GREEN`, counts as listed in Task 1.
+- **Task 2 gate passed first try.** With interpolation on and the D8 rig, `smoke_world` and `smoke_shaft` both pass, and no `Camera2D overridden` WARNING appears in any test. Setting `process_callback` in `_init()` is early enough, so `world.tscn` needs no process-mode line. The shake check now awaits physics frames.
+- **The first full run after World's rewrite** gave an engine `ERROR: Condition "p_child->data.parent != this"` in `smoke_world`. `test_hunt_over_death` removed its own lurker from `_room()` after a respawn, but the respawn had rebuilt the room and freed the lurker with the old one. Fix: the test checks that the lurker went with the old room. This is the rebuild AC4 asks for.
+- **`test_room_loader`'s ok_min fixture** isn't in the `res://rooms` index, so the killed-cell test loads it by path (`load_room_from_path(…, dive)`).
+- **Red checks.** Each guarded behaviour was broken in turn, and each new test then failed:
+  - removing the backstop fails `smoke_room_swap` and `smoke_world`, with carried staying at its old value;
+  - removing the killed-cell skip fails both, with the walker back;
+  - removing `mark_killed` fails three `smoke_room_swap` checks;
+  - keeping the velocity on a down arrival fails the "velocity zero" check (vy −85);
+  - reusing the room on a respawn fails "a new Room instance" and "the lurker went with the old room";
+  - skipping `remove_child` before `queue_free` failed nothing at first, because A's only enemy was already dead. The check now records, at `room_entered`, that the previous room is valid but out of the tree, and that check fails.
+- **The test rooms validated clean** at story creation and here. B's walker is at col 7, away from the arrival column.
+- **`smoke_room_swap`'s killed-cell checks were empty-proof at first:** A's only crawler is the killed one. Added a control check that the rebuilt B still holds its walker, which nobody killed.
+- **Task 10 greps:** no `KEY_F`, `reload_current_scene` or `shaft.gd` / `shaft.tscn` references, and `randf` only in `camera_rig.gd`. `position_smoothing` appears only in `camera_rig.gd`, where `_init()` turns engine smoothing off and the `SMOOTH_SPEED` comment names where the value came from. `get_screen_center_position` appears nowhere.
+- **`xvfb-run` screenshots:** gutters, the room centred, the darkness, and the telegraph in shot 2. Columns 61/63/417/419 still read (7, 6, 11). The usual ALSA `ERR_CANT_OPEN` and a V-Sync WARNING come from the headless driver.
 
 ### Completion Notes List
 
+- **AC1, `World`:**
+  - one `_swap_room(room_id, entry, respawn)` for boot, exits and respawns;
+  - `enter_room()` is deferred and drops a second call while one is pending;
+  - the old room gets `remove_child` + `queue_free`;
+  - the player is placed or spawned with `reset_physics_interpolation()`;
+  - then `apply_limits` + `snap`, `Game.slot.visit`, `room_entered`.
+
+  Exits are polled (D2, recorded as a variance in `docs/architecture.md`), and a live chain is banked first. A load failure or a missing entry stays in the current room; on an exit it kills the player, so they never fall forever.
+- **AC2:** `physics/common/physics_interpolation=true`. `CameraRig` runs on the physics tick and owns its smoothing (`SMOOTH_SPEED` 8, scaled delta) and its clamp; engine smoothing is off. `play_rect()` comes from the rig's own centre. `snap()` resets interpolation, and so do World's placements and spawns.
+- **AC3 / AC4:**
+  - the R16 loop is tested with a chain of 3 (carried +6, top entry (56, 20), still falling);
+  - every respawn rebuilds the respawn room through the swap, and a death in another room respawns at `start_room`'s `P`;
+  - killable spawns (`c`, `h`) carry `room_id` + `cell`, `take_hit()` marks the kill, and `load_room(id, Game.dive)` skips it.
+
+  The 1.22 / 1.24 hooks are comments in `RoomLoader._build`.
+- **AC5:** `shaft.gd` (+ `.uid`) and `shaft.tscn` are deleted; no `KEY_F` and no scene reload remain; brightness is unchanged from 1.6.
+- **AC6:** a `down` entry stands on the floor beside the opening (`RoomLoader.down_entry_cell()`, shared with the validator, which has a new error). The 1.5 deferred item is closed. `ok_min`'s down entry is now (72, 84) and `m1_shaft`'s is (3, 102).
+- **D7:** `SlotState.visit()` / `has_visited()` / `visits_changed`, with `visited` in `to_dict` / `from_dict` / `reset`.
+- **New deferred item:** the bank popup is lost at a cut (D9). **Owner: Story 1.25.** The 1.10 exit-target item is widened to the arrival entry.
+- **AC7:** tests green: `test_state` 153, `test_room_loader` 63, `smoke_shaft` 30 (unchanged), `smoke_world` 60, new `smoke_room_swap` 33.
+- **Needs a feel check on the laptop (D13):**
+  - interpolation smooth at 60 Hz and high refresh, with no smear on a respawn or a cut;
+  - the floor hole loops with the fall continuing and a camera cut;
+  - killed crawlers stay gone after a loop and after a death;
+  - camera lead and shake as in 1.6;
+  - pogo squash and popups don't stutter.
+
+  Expected: no "+N banked" popup when crossing the hole with a chain.
 - Story context created by gds-create-story on 2026-11-14. Ultimate context engine analysis completed - comprehensive developer guide created. Baseline re-run at `29d8cde`: `== ALL GREEN`. Interpolation probes (D8) were run on 4.7.2 against a temporary `project.godot` change, which was reverted.
 
 ### File List
+
+- game/project.godot (modified: `[physics]` `common/physics_interpolation=true`)
+- game/run_tests.sh (modified: `smoke_room_swap` added)
+- game/README.md (modified)
+- game/scenes/world/world.tscn (modified: Camera engine smoothing removed)
+- game/scenes/shaft.tscn (deleted)
+- game/scripts/shaft.gd + shaft.gd.uid (deleted)
+- game/scripts/world/world.gd (modified)
+- game/scripts/world/camera_rig.gd (modified)
+- game/scripts/world/room.gd (modified)
+- game/scripts/world/room_loader.gd (modified)
+- game/scripts/world/room_legend.gd (modified)
+- game/scripts/actors/crawler.gd (modified)
+- game/scripts/rules/slot_state.gd (modified)
+- game/scripts/rules/dive_state.gd (modified: comment)
+- game/tests/room_harness.gd (modified)
+- game/tests/smoke_world.gd (modified)
+- game/tests/test_room_loader.gd (modified)
+- game/tests/test_state.gd (modified)
+- game/tests/smoke_room_swap.gd (new) + smoke_room_swap.gd.uid
+- game/tests/rooms/swap/t_swap_a.txt, t_swap_b.txt (new)
+- docs/architecture.md, docs/component-inventory.md, docs/development-guide.md, docs/rooms.md, docs/source-tree-analysis.md (modified)
+- _bmad-output/project-context.md (modified: Display, Current State, the interpolation rule)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified: 1.5 item closed, 1.10 item widened, D9 item added)
+- _bmad-output/implementation-artifacts/1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd.md, sprint-status.yaml (status)
+
+### Change Log
+
+- 2026-11-14: Story 1.7 implemented. Room swaps through one deferred World path with polled exits and the chain backstop; arrival from below on the floor beside the hole; a death rebuilds the respawn room, and killed cells are skipped; `SlotState` visits; physics interpolation on, with `CameraRig` owning its smoothing and clamp; `shaft.gd` / `shaft.tscn` deleted; new `smoke_room_swap` and test rooms; docs updated. Status → review.
+- 2026-11-14: Code review: 12 patches applied.
+  - World: pending cleared before the signals; a bad respawn point falls back to `start_room`; a swap is cancelled once the player is dead; the old player is freed before the respawn room enters the tree.
+  - Camera: `follow()` seeds the smoothing. The `force_update_scroll()` patch was verified as unneeded, so a check guards it instead.
+  - Validator: a headroom rule for arrival from below.
+  - Tests: the `test_state` fallback fixtures are no longer vacuous; new `smoke_room_swap` checks for groups, the camera, chained entry, a death before the swap, and the respawn order (each red-checked); a safe failure message in `test_room_loader`.
+  - Docs fixed and the new files staged.
+  - Deferred: arrival next to an enemy, to Story 1.10.
+  - Status → done.

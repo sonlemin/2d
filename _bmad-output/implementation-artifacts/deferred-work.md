@@ -60,12 +60,23 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 ## Deferred from: code review of 1-5-rooms-as-text-the-m1-shaft-at-22-tiles.md (2026-11-12)
 
-- **Exit targets are never checked to exist** — `game/scripts/world/room_loader.gd` `validate()` only checks the `exits=` shape, so `exits=down:m1_shatf@x1` validates clean, passes the export gate and fails only at runtime when 1.7 swaps rooms. `validate()` is per-file and pure; the check needs every room id.
+- **Exit targets are never checked to exist** — `game/scripts/world/room_loader.gd` `validate()` only checks the `exits=` shape, so `exits=down:m1_shatf@x1` validates clean, passes the export gate and fails only at runtime when 1.7 swaps rooms. `validate()` is per-file and pure; the check needs every room id. It must also check that the target has the arrival entry: crossing `down` arrives at the target's `up` entry and vice versa (World `push_error`s and cancels a swap into a room without it, Story 1.7).
   → **Owner: Story 1.10** — `smoke_rooms` already checks ids unique across all files; it can check every exit target resolves through `RoomLoader`'s index the same way.
 - **A `down` entry puts the player over the exit hole** — `game/scripts/world/room.gd` `entry_position(&"down")` uses cell `(col, h-2)` with "feet on the tile below", but `validate()` requires that bottom-row tile to be open, so a player arriving from below (crossing an `up` exit arrives at the target's `down` entry) falls straight back out, and could loop between two rooms. `tests/test_room_loader.gd` pins the current value (`Vector2(88, 84)` in `ok_min`). Latent: nothing arrives from below until room swaps.
-  → **Owner: Story 1.7** (chosen by sonlm at code review 2026-11-12) — it wires room swaps and owns the arrival rules (e.g. arrive moving up, or on a landing beside the opening).
+  → **Closed (Story 1.7): arrival stands on the floor beside the opening (D3), and the validator requires that floor.**
 
 ## Deferred from: code review of 1-6-the-world-scene-replaces-the-m1-shaft.md (2026-11-13)
 
 - **`CameraRig.apply_limits()` doesn't centre a room shorter than the view** — `game/scripts/world/camera_rig.gd` `apply_limits()` centres a narrow room horizontally, but sets `limit_top` / `limit_bottom` straight from the bounds, so a room under 270 px tall pins to one limit and shows void on the other side. Every room so far is a tall spine room.
   → **Owner: Story 2.1** — the Weaver test arena is the first non-spine room; centre vertically the same way if it is shorter than the view.
+
+## Deferred from: dev of 1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd.md (2026-11-14)
+
+- **No bank popup at a room cut** — crossing an exit with a live chain banks it (`break_chain()` in `World._on_exit_reached()`), and the "+N banked" popup spawns into the old room, which the swap frees at the end of the frame, so the bank is invisible. Runtime spawns belong to the room (AR23), so the popup isn't moved.
+  → **Owner: Story 1.25** — the gutter HUD's ember counter shows a bank at a cut; decide there whether a cut needs its own cue.
+
+## Deferred from: code review of 1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd.md (2026-11-14)
+
+- **Arriving from below can land next to an enemy** — `game/scripts/world/room_loader.gd` `down_entry_cell()` checks only that the stand cell is open, not what spawns on that floor. In `m1_shaft` the stand cell (3, 102) is beside the walker at (4, 102). A probe with no input: the walker knocks the player into the hole and they loop to the top. Latent: `m1_shaft`'s ceiling gap is out of reach in play (P's ledge is ~84 px below it, the jump reaches 60 px), so only tests and DevTools arrive from below.
+  → **Owner: Story 1.10** — its `smoke_rooms` / bot pass checks every arrival entry is safe (no enemy on the arrival floor, or a grace on arrival), with exit targets resolved across files.
+

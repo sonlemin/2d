@@ -52,7 +52,7 @@ development_status:
   1-4-state-objects-in-the-game-autoload: done
   1-5-rooms-as-text-the-m1-shaft-at-22-tiles: done
   1-6-the-world-scene-replaces-the-m1-shaft: done
-  1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd: ready-for-dev
+  1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd: done
   1-8-playerinput-intents: backlog
   1-9-glob-test-runner-spec-and-the-architecture-lint: backlog
   1-10-room-smoke-tests-and-the-reachability-bot: backlog
