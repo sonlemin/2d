@@ -428,6 +428,7 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-13.
 - **D7 brightness gap:** I took the story's default (no F1). Brightness keeps the saved level until DevTools (1.11).
 - Verification: `./run_tests.sh` → `== ALL GREEN` (`test_chain_state` 69, `smoke_shaft` 30 `ok`, `smoke_world` 45 `ok`); no `ERROR`/leak lines in the raw output of either smoke test. `randf` appears only in `scripts/world/camera_rig.gd`. No `get_viewport_rect` remains in `scripts/actors/`. No `reload_current_scene` outside `shaft.gd`. Every new `.gd.uid` is staged.
 - Tests green; needs a feel check on the laptop (D12).
+- **Feel check passed (sonlm, laptop, 2026-11-14), D12:** gutters frame the shaft with no grey band, camera lead and pogo shake as in M1, a death cuts back to the spawn without a reload, a killed crawler stays dead, wall lurkers still telegraph on screen. "Carried embers kept" can't be seen in play until the gutter HUD (1.25/1.26); `smoke_world` covers it (carried 6 before and after a death).
 
 ### File List
 

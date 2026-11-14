@@ -391,6 +391,7 @@ Claude Opus 5.5 (`claude-opus-5-5`) via gds-dev-story, 2026-11-12.
 - **Tests green; the pogo hitstop needs a quick feel check on the laptop (no change intended).** The one behaviour difference: a second pogo within 75 ms now refreshes the freeze instead of being cut short by the first timer's reset.
 - **On the laptop:** run `godot --headless --path game --import` after pulling, because `Log`, `Clock` and the `Game` autoload are new.
 - Commits: `afae546` (runner + ports), `03881df` (`Log`), `ac637ae` (`Game`, `Clock`, hitstop), `4809027` (docs), plus the story/status commit.
+- **Feel check passed (sonlm, laptop, 2026-11-14):** the pogo hitstop feels as in M1.
 
 ### File List
 

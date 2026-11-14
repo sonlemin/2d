@@ -752,6 +752,7 @@ Claude Opus 5.5 (`claude-opus-5-5`) via gds-dev-story, 2026-11-12.
   - The development guide's test list was already missing `test_tuning.gd` before this story; only `test_state.gd` was added.
 - **For the next story:** the real `user://settings.json` now exists on the server (Task 6's game boot). Tests never touch it.
 - **Tests green; needs a feel check on the laptop:** death now respawns at the top until anchors land in 1.24, brightness persists between launches, and the controls hint is gone. Gameplay numbers are unchanged.
+- **Feel check passed (sonlm, laptop, 2026-11-14):** death respawns at the top, brightness persists between launches, the controls hint is gone.
 
 ### File List
 
