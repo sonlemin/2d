@@ -1,5 +1,5 @@
 # generated: 2026-11-12T12:16:27+07:00
-# last_updated: 2026-11-14T10:00:00+07:00
+# last_updated: 2026-11-14T18:00:00+07:00
 # project: pixel_art_game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   dependencies live there, not here). Re-run gds-sprint-planning after adding stories.
 
 generated: "2026-11-12T12:16:27+07:00"
-last_updated: "2026-11-14T10:00:00+07:00"
+last_updated: "2026-11-14T18:00:00+07:00"
 project: pixel_art_game
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   1-5-rooms-as-text-the-m1-shaft-at-22-tiles: done
   1-6-the-world-scene-replaces-the-m1-shaft: done
   1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd: done
-  1-8-playerinput-intents: backlog
+  1-8-playerinput-intents: ready-for-dev
   1-9-glob-test-runner-spec-and-the-architecture-lint: backlog
   1-10-room-smoke-tests-and-the-reachability-bot: backlog
   1-11-devtools-entry-args-and-overlays: backlog
