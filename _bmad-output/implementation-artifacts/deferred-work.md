@@ -80,3 +80,12 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 - **Arriving from below can land next to an enemy** — `game/scripts/world/room_loader.gd` `down_entry_cell()` checks only that the stand cell is open, not what spawns on that floor. In `m1_shaft` the stand cell (3, 102) is beside the walker at (4, 102). A probe with no input: the walker knocks the player into the hole and they loop to the top. Latent: `m1_shaft`'s ceiling gap is out of reach in play (P's ledge is ~84 px below it, the jump reaches 60 px), so only tests and DevTools arrive from below.
   → **Owner: Story 1.10** — its `smoke_rooms` / bot pass checks every arrival entry is safe (no enemy on the arrival floor, or a grace on arrival), with exit targets resolved across files.
 
+
+## Deferred from: code review of 1-8-playerinput-intents.md (2026-11-18)
+
+- **The air dash runs longer than FR2 says** — `game/scripts/actors/player.gd` checks the dash timer before it counts it down, so a 0.12 s `DASH_TIME` dashes for 8–9 ticks (≈ 0.15 s, ≈ 39 px at 260 px/s), not FR2's 0.12 s / 31 px. That is M1's behaviour and `smoke_player_input` pins it (dx 31–40, 8–9 dashing ticks); the laptop feel checks have all been on the longer dash.
+  → **Owner: Story 1.15** — the CP1 feel gate decides: fix the off-by-one (the dash becomes 31 px) or change the GDD to the felt 39 px, then tighten the pin.
+- **The raw-`Input` source check is a substring regex** — `game/tests/smoke_player_input.gd` `test_sources` greps `Input\.` outside `player_input.gd`, so it misses event reads (`_input(event)`, `event.is_action_pressed(...)`) and aliasing (`var i := Input`), and flags `Input.` in comments.
+  → **Owner: Story 1.9** — `test_lint.gd` takes over the "no raw Input outside PlayerInput / the UI kit" rule and should cover event-based reads; `test_sources` can then drop its regex.
+- **`lock()` mid-move: a clinging player is kicked off the wall, and a jump keeps full height** — `game/scripts/actors/player_input.gd` `_clear()` sets `cling_held = false`, which `player.gd` `_handle_cling` reads as "Jump released", so one locked tick fires a wall kick (probe: `velocity (-150, -260)`); `jump_released` is not sampled while locked, so a jump released during a lock is never cut. Latent: nothing calls `lock()` yet. Reason (sonlm): decide it with the first scripted moment.
+  → **Owner: Story 1.24** — the first `lock()` caller (station rest); decide what a lock does to a cling or a rising jump (likely a drop with no kick, and a cut on unlock) and test it.

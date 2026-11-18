@@ -1,6 +1,9 @@
+---
+baseline_commit: e0d21eb
+---
 # Story 1.8: PlayerInput intents
 
-Status: ready-for-dev
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -51,28 +54,28 @@ so that no input is ever dropped and a tap on Light never breaks my chain.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Pin M1 movement first (AC: 6).** No player code changes in this task.
-  - [ ] Add `game/tests/rooms/input/t_input.txt` (D11 layout).
-  - [ ] Add `game/tests/smoke_player_input.gd` with the movement group only: run speed, coyote in/out, jump buffer in/out, air dash (speed, duration, gravity ignored, once per airtime, refreshed on landing). Add it to `run_tests.sh`.
-  - [ ] Run it against the unchanged M1 `player.gd`: every check `ok`. Record the counts in the Debug Log. If a check fails on M1, the test is wrong, not M1: fix the test.
-  - [ ] Red-check each movement check by breaking the value it guards (e.g. `coyote_time` 0 in a scratch edit), then revert.
-- [ ] **Task 2: `Settings.light_tap_window` (AC: 2).**
-  - [ ] Add the SCHEMA entry `{default = 0.12, choices = [0.12, 0.2, 0.3]}` and `var light_tap_window := 0.12` (D5).
-  - [ ] Update `test_state.gd`:
+- [x] **Task 1: Pin M1 movement first (AC: 6).** No player code changes in this task.
+  - [x] Add `game/tests/rooms/input/t_input.txt` (D11 layout).
+  - [x] Add `game/tests/smoke_player_input.gd` with the movement group only: run speed, coyote in/out, jump buffer in/out, air dash (speed, duration, gravity ignored, once per airtime, refreshed on landing). Add it to `run_tests.sh`.
+  - [x] Run it against the unchanged M1 `player.gd`: every check `ok`. Record the counts in the Debug Log. If a check fails on M1, the test is wrong, not M1: fix the test.
+  - [x] Red-check each movement check by breaking the value it guards (e.g. `coyote_time` 0 in a scratch edit), then revert.
+- [x] **Task 2: `Settings.light_tap_window` (AC: 2).**
+  - [x] Add the SCHEMA entry `{default = 0.12, choices = [0.12, 0.2, 0.3]}` and `var light_tap_window := 0.12` (D5).
+  - [x] Update `test_state.gd`:
     - the `to_dict()` checks (now two keys);
     - a JSON round trip for each choice (floats stay exact through `JSON.stringify` → `JSON.new().parse()`);
     - bad values fall back to 0.12 and are unclean: `0.15`, `"0.2"`, `true`, `12`.
-- [ ] **Task 3: `PlayerInput` (AC: 1–5).**
-  - [ ] Create `scripts/actors/player_input.gd` (+ `.uid`) per D1–D8.
-  - [ ] Add a `PlayerInput` node (type `Node`, that script) to `scenes/actors/player.tscn`.
-- [ ] **Task 4: Switch `player.gd` to intents (AC: 1, 3).** Per D9:
+- [x] **Task 3: `PlayerInput` (AC: 1–5).**
+  - [x] Create `scripts/actors/player_input.gd` (+ `.uid`) per D1–D8.
+  - [x] Add a `PlayerInput` node (type `Node`, that script) to `scenes/actors/player.tscn`.
+- [x] **Task 4: Switch `player.gd` to intents (AC: 1, 3).** Per D9:
   - `input.sample()` first in `_physics_process`;
   - every `Input.` read becomes an intent;
   - the jump `_buffer` timer moves into `PlayerInput`;
   - drop `SNUFF_HOLD` and `_light_held`.
 
   Keep every other line of M1 behaviour. Run the movement group, `smoke_shaft` and `test_chain_state`: all green, unchanged.
-- [ ] **Task 5: Intent tests (AC: 2–5).** Add the intent group to `smoke_player_input.gd` (D11):
+- [x] **Task 5: Intent tests (AC: 2–5).** Add the intent group to `smoke_player_input.gd` (D11):
   - Light taps at three windows;
   - Light across a hitstop;
   - Jump and Attack in a hitstop;
@@ -82,14 +85,35 @@ so that no input is ever dropped and a tap on Light never breaks my chain.
   - the source checks.
 
   Red-check each one.
-- [ ] **Task 6: `test_tuning` fixture (AC: 1).** The `player.snuff_hold` row moves to a new `setting` kind: `{m1 = "player.snuff_hold", value = 0.12, setting = &"light_tap_window"}`. It checks that `Settings.SCHEMA[&"light_tap_window"].default == 0.12` and that `player.gd` has no `SNUFF_HOLD` const or var.
-- [ ] **Task 7: Docs and ledger (D12).**
-- [ ] **Task 8: Verify (AC: 7).**
-  - [ ] `./run_tests.sh` → `== ALL GREEN`.
-  - [ ] `grep -rn 'Input\.' game/scripts` shows only `actors/player_input.gd`.
-  - [ ] No `ERROR:` or leak lines in the raw smoke output.
-  - [ ] Every new `.gd.uid` is staged.
-  - [ ] Report "tests green; needs a feel check on the laptop" with D13's list.
+- [x] **Task 6: `test_tuning` fixture (AC: 1).** The `player.snuff_hold` row moves to a new `setting` kind: `{m1 = "player.snuff_hold", value = 0.12, setting = &"light_tap_window"}`. It checks that `Settings.SCHEMA[&"light_tap_window"].default == 0.12` and that `player.gd` has no `SNUFF_HOLD` const or var.
+- [x] **Task 7: Docs and ledger (D12).**
+- [x] **Task 8: Verify (AC: 7).**
+  - [x] `./run_tests.sh` → `== ALL GREEN`.
+  - [x] `grep -rn 'Input\.' game/scripts` shows only `actors/player_input.gd`.
+  - [x] No `ERROR:` or leak lines in the raw smoke output.
+  - [x] Every new `.gd.uid` is staged.
+  - [x] Report "tests green; needs a feel check on the laptop" with D13's list.
+
+### Review Findings
+
+Code review 2026-11-18 (gds-code-review, scope `e0d21eb..working tree`; Blind Hunter, Edge Case Hunter, Acceptance Auditor). The Edge Case Hunter checked its findings with probes run through `tests/runner.tscn`.
+
+- [x] [Review][Patch] (decided by sonlm: keep M1; make the comment, the AC3 note and a test say so) An Attack pressed during a pogo hitstop is still lost — `_swing_cd` (0.22 s) counts down on the scaled delta, so it barely moves during the 75 ms hitstop, while the 0.10 s `ATTACK_BUFFER` counts real time and runs out about 25 ms after the hitstop ends. Probe: a press in a hitstop swings only if the hitstop started ≥ ~10 ticks into the swing. M1 lost these presses too (not a regression), but the `ATTACK_BUFFER` comment and AC3's "never dropped because the world is frozen" claim otherwise, and `test_attack_in_hitstop` runs with the cooldown at 0, so it never sees the gap. Options: keep M1 behaviour and make the comment, the AC3 note and the test honest; or make a press in a hitstop wait for the cooldown (a feel change).
+- [x] [Review][Defer] `lock()` on a clinging player fires a wall kick, and a Jump release while locked loses the jump cut — `_clear()` sets `cling_held = false`, which `_handle_cling` reads as "Jump released" (probe: one locked tick → `velocity (-150, -260)`); `jump_released` is not sampled while locked, so a rising jump keeps full height after unlock. Nothing calls `lock()` yet. Options: defer to 1.24, the first caller; or fix now (a lock ends a cling as a drop, no kick). — deferred (sonlm): 1.24 is the first `lock()` caller and decides what a scripted moment does to a move in progress
+- [x] [Review][Patch] ↓ no longer drops off a wall while ↑ is held: `jump` is bound to Z and ↑, and ↑ is also `move_up`, so `input.move.y` (↓ − ↑) is 0. M1 read `move_down` alone. Add a `down_held` intent on the raw `move_down` strength, and a test that clings on ↑ + `jump` and then presses ↓ [game/scripts/actors/player.gd:128]
+- [x] [Review][Patch] Snuff is not latched: raising `light_tap_window` mid-hold (Pause → Options, 1.36) turns a Snuff off while Light is held and then emits a tap on release (probe: true → false, tap true). The comment says a change "applies to the next hold" [game/scripts/actors/player_input.gd:146]
+- [x] [Review][Patch] Light held through a pause or a respawn never Snuffs until it is pressed again, because the machine starts only on `is_action_just_pressed` (probe: pressed in pause, held 20 ticks after resume → no Snuff; M1 Snuffed). A release and re-press inside one tick mid-Snuff restarts the timer and lights you for 7 ticks. Start the machine on "held and not yet timing", and keep the fresh-press rule for `unlock()` only (D7) [game/scripts/actors/player_input.gd:139]
+- [x] [Review][Patch] Summing 1/60 makes 12 ticks 0.19999…, so the 0.2 s window Snuffs on tick 13 while 0.3 Snuffs on exactly 18: compare with a small epsilon so each window starts on tick ⌈w·60⌉ (8 / 12 / 18), and test both sides of each boundary. Fix the test comments that say the attack buffer is 6 ticks (it is 7, like M1's jump buffer, which stays as is) [game/scripts/actors/player_input.gd:146]
+- [x] [Review][Patch] The Jump press that starts a cling is now buffered (M1's wasn't), so a quick release within coyote time can turn the kick into a full jump. Consume `jump_pressed` when a cling starts: the press was used [game/scripts/actors/player.gd:118]
+- [x] [Review][Patch] Nothing tests that the Jump and Attack buffers run on real time: both hitstop tests act on the press tick, and the M1 path passes them. Add checks that a buffered press made in a long hitstop, with its action blocked, expires within 7 real ticks [game/tests/smoke_player_input.gd]
+- [x] [Review][Patch] The lock test is partly vacuous: Light is locked before the press is sampled (2-tick latency), no check asserts that no `light_tap` fires after `unlock()`, and only 4 of the 11 intents are checked while locked [game/tests/smoke_player_input.gd]
+- [x] [Review][Patch] Test assertions that are missing: the "tap released in a hitstop" check never asserts that the hitstop was still active at release, `tap_while_snuffed` is computed but never asserted, and `_coyote_jump` returning `INF` satisfies the "out" check [game/tests/smoke_player_input.gd]
+- [x] [Review][Patch] `p.free()` in `test_sources`: use `queue_free()` (project rule; the 1.9 lint will forbid `.free()`) [game/tests/smoke_player_input.gd:544]
+- [x] [Review][Patch] `consume()` clears edges, although D2 calls it a no-op for an edge, and the `PRESSES` comment says all five are buffered (only Jump and Attack are). Keep the behaviour and fix the comments [game/scripts/actors/player_input.gd:16]
+- [x] [Review][Patch] `DASH_TIME`'s comment says ≈ 31 px, and the architecture test row says "0.12 s"; the measured M1 dash is 8–9 ticks, ≈ 39 px. Make both state the measured numbers [game/scripts/rules/tuning.gd:34]
+- [x] [Review][Patch] D12 docs gaps: the architecture.md Light key row lacks "Flare Toss in 1.23", component-inventory.md's tests table has no `smoke_player_input` row, the source-tree-analysis.md `rooms/` comment omits `input/`; and the Change Log has no entry for the 2026-11-18 feel check [docs/architecture.md]
+- [x] [Review][Defer] The air dash lasts 8–9 ticks (≈ 0.15 s, 39 px), not FR2's 0.12 s / 31 px, because the timer is checked before it counts down [game/scripts/actors/player.gd] — deferred, pre-existing (M1)
+- [x] [Review][Defer] The `Input.` source check misses event reads (`_input(event)`, `event.is_action_pressed`) and aliasing, and flags comments [game/tests/smoke_player_input.gd] — deferred: `test_lint.gd` (1.9) owns the raw-Input rule
 
 ## Dev Notes
 
@@ -416,10 +440,110 @@ The pattern per story is feat → docs → record (story file + sprint status + 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-14.
+
 ### Debug Log References
+
+- **Task 1 baseline (M1 `player.gd`, before any player change):** `smoke_player_input` movement group 13 `ok`. Red-checked one by one in scratch edits, each reverted:
+  - `RUN_SPEED` 100 → both run checks fail;
+  - `COYOTE_TIME` 0 → the coyote-in check fails (and the buffer and dash-refill checks, which need coyote to jump);
+  - `COYOTE_TIME` 0.2 → the coyote-out check fails;
+  - `JUMP_BUFFER` 0 → the buffer-in check fails; `JUMP_BUFFER` 0.2 → the buffer-out check fails;
+  - `DASH_SPEED` 200 and `DASH_TIME` 0.06 → the dash checks fail;
+  - removing `_can_dash = false` → "a second dash in the same airtime" fails;
+  - removing the dash's gravity skip → the no-gravity check fails.
+- **Frame-math correction to "Verified engine facts":** measured in this suite, a press made after `await get_tree().physics_frame` is first seen by the player **two** ticks later, not in the coming tick. The first coyote check failed for that reason (the press acted at 0.05 s, not 0.033 s). The tests use the measured latency, and `docs/development-guide.md` records it. The latency is the same for a press and its release, so hold lengths are exact.
+- **The air dash runs 8–9 ticks** (39 px), not 0.12 s / 31 px: M1 checks `_dash_left > 0` before counting it down, so the dash lasts the start tick plus 8. This is M1 behaviour, pinned as 8–9 ticks and ≥ 31 px; no code change. The `DASH_TIME` comment's "≈ 31 px" understates it by one tick.
+- **After the switch (Task 4):** movement 13 `ok` unchanged; `smoke_shaft` 30 `ok`; bot best chain **8 → 8** (same on M1 and after, so D9's attack buffer did not move it); `test_chain_state` 69. Only `test_tuning`'s `snuff_hold` row failed, as expected until Task 6.
+- **Task 2:** `test_state` 154 → 171 `ok`. Red-check: allowing 0.15 as a choice fails "light_tap_window 0.15 is unclean".
+- **Task 6:** the `setting` row passes; re-adding `const SNUFF_HOLD` to `player.gd` fails it.
+- **Task 5 red checks** (scratch edits of `player_input.gd`, each reverted and `cmp`-checked):
+  1. the scaled delta instead of real ticks → the hitstop Snuff lands on the 12th held tick, not the 8th: fails;
+  2. a window hard-coded to 0.12 → the 0.2 and 0.3 tap checks fail;
+  3. a tap on every release → the six hold checks fail ("no tap on release");
+  4. `ATTACK_BUFFER` 0 → Attack in a hitstop and the late attack-buffer check fail;
+  5. `ATTACK_BUFFER` 0.3 → the early (expired) check fails;
+  6. no arm use-up → five interact checks fail;
+  7. no floor check → the air and wall interact checks fail;
+  8. no sideways check → "↓ while moving sideways" fails;
+  9. `lock()` without `_clear()` → **failed nothing at first**: the test locked before anything was sampled. Strengthened (sample move, a Snuff and a buffered Jump in the air, then lock); now 2 checks fail;
+  10. a Light held through unlock counting → "never Snuffs on its own" fails;
+  11. sampling skipped while `time_scale < 1` → five hitstop checks fail;
+  12. sampling while locked → three lock checks fail;
+  13. an `Input.` line added to `lurker.gd` → the source check fails.
+- **Final:** `./run_tests.sh` → `== ALL GREEN`:
+  - `test_chain_state` 69, `test_log` 7, `test_clock` 15, `test_tuning` 85, `test_state` 171, `test_room_loader` 64, `test_deferred_owners` 19;
+  - `smoke_shaft` 30, `smoke_world` 60, `smoke_room_swap` 39, `smoke_player_input` 51 (new).
+  - No `ERROR:`, leak or orphan lines in any raw output; the only `WARNING:` lines are `test_state`'s counted SaveStore warnings.
+  - `grep -rn 'Input\.' game/scripts` finds only `actors/player_input.gd`.
+- **Code review 2026-11-18, patches.** Each new or strengthened check was red-checked by breaking the line it guards (all fail as expected):
+  1. wall drop back on `move.y > 0` → "clinging on ↑ and pressing ↓ drops" fails;
+  2. Snuff not latched → the "window raised mid-Snuff" check fails (Snuff off, tap 1);
+  3. hold started on the press edge only → the 8 / 12 / 18-tick holds and "Light pressed during a pause" fail;
+  4. no `TIME_EPSILON` → the 12-tick hold at 0.2 s fails;
+  5. no cling consume → "a Jump press that starts a cling is consumed" fails. A first version consumed only on the tick the cling started and passed broken: in a test the press edge arrives one tick after "held", so the buffer filled on the next tick. The Player now consumes the press on every clinging tick (Jump is held all through a cling, so only the starting press can be waiting);
+  6. / 7. Jump or Attack buffer on scaled time → the 0.5 s hitstop checks fail (20 ticks, not 7);
+  8. `_clear()` without `_light_down = false` → "a Light press released while locked gives no light_tap" fails;
+  9. `unlock()` without the wait-for-release → "Light held through lock and unlock never Snuffs" fails;
+  10. `ATTACK_BUFFER` 0.30 → the real-time, M1 hitstop and expired-buffer checks fail.
+- **Frame math found in the review:** a test press is "held" one tick before its press edge is seen. The 1.8 Light machine started on the edge, so in tests a hold was counted from its second tick; it now starts on the first held tick, as M1 counted it. In play the edge and "held" arrive on the same tick, so feel is unchanged.
+- **After the review:** `./run_tests.sh` → `== ALL GREEN`; `smoke_player_input` 51 → 60, every other count unchanged; bot best chain 8; `Input.` only in `player_input.gd`.
 
 ### Completion Notes List
 
+- **AC1:**
+  - `PlayerInput` (`scripts/actors/player_input.gd`, a `Node` child of `Player` in `player.tscn`) samples once per tick when `Player` calls `input.sample()` first in `_physics_process` (D1).
+  - Intents: `move`, `jump_pressed` / `jump_held` / `jump_released`, `attack_pressed`, `dash_pressed` / `dash_held`, `light_tap`, `snuff_active`, `cling_held`, `interact`; `consume()`.
+  - `player.gd` reads only intents; no `Input.` remains under `scripts/` outside `player_input.gd` (tested).
+- **AC2:**
+  - `Settings.light_tap_window` (0.12 / 0.2 / 0.3, default 0.12) replaces `SNUFF_HOLD`.
+  - The Light machine counts real ticks; taps and Snuffs are tested at all three windows and across a 75 ms hitstop (Snuff on the 8th held tick either way).
+  - A settings.json written before 1.8 lacks the key, so it loads the default and is rewritten once (the existing missing-key rule).
+- **AC3:**
+  - Jump and Attack presses wait in real-time buffers (`jump_buffer` 0.10 s, `ATTACK_BUFFER` 0.10 s) until consumed.
+  - Jump and Attack pressed in a hitstop act inside it.
+  - An Attack seen 3 ticks before the cooldown ends swings at its end; one seen 11 ticks before expires.
+- **AC4:** ↓ interact per D6 (0.6 fire, 0.3 re-arm, sideways < 0.2, on the floor, arm used up by the crossing); ↓ on a wall still drops, with no interact. Nothing consumes it yet (1.24).
+- **AC5:** `lock()` clears every intent, buffer and the Light machine; `unlock()` needs fresh presses and a fresh Light hold; `is_locked()`.
+- **AC6:** movement pinned on M1 first (13 checks) and unchanged after; `smoke_shaft` jump height and cling / kick still green.
+- **AC7:** `== ALL GREEN`.
+- **Small, intended feel differences (D9):** an Attack pressed up to 0.10 s before the cooldown ends now swings; a Jump pressed during a dash or a cling is kept 0.10 s; a Light hold across a hitstop Snuffs on real time.
+- **Nothing deferred at dev time.** The code review deferred three items, each with an owner in `deferred-work.md`: the dash length vs FR2 (1.15), the raw-Input source check (1.9), `lock()` mid-move (1.24).
+- **Code review 2026-11-18:** 2 decisions (sonlm: keep M1's lost Attack in a pogo hitstop, made honest in comments and pinned by a test; `lock()` mid-move deferred to 1.24), 13 patches applied, 3 deferred, 9 dismissed. Changes: the wall drop reads the new `down_held` (↑ is also Jump); a Snuff lasts until release; a Light hold starts on any held tick, so a pause or a respawn no longer loses it and only `unlock()` asks for a fresh press; windows start on held tick 8 / 12 / 18 (`TIME_EPSILON`); the Player consumes the Jump press while clinging; tests for real-time buffers, the lock, boundaries and the hitstop tap; doc fixes.
+- **Tests green; needs a feel check on the laptop (D13):**
+  1. run, jump (tap = short hop, hold = full), coyote off a ledge, air dash, and cling / kick / ↓ drop feel like 1.7;
+  2. a quick tap on V does nothing; a hold Snuffs at the same moment as before;
+  3. mashing X through pogo chains feels the same or better;
+  4. ↓ standing on the ground does nothing visible.
+- **Feel check passed (sonlm, laptop, 2026-11-18), D13:** all four checks passed: movement feels like 1.7, a V tap does nothing while a held V Snuffs at the same moment as before and breaks the chain (by design, FR9), mashing X through pogo chains feels the same or better, ↓ on the ground does nothing. The 0.12 s default tap window stays.
 - Story context created by gds-create-story on 2026-11-14. Ultimate context engine analysis completed - comprehensive developer guide created. Engine facts in "Verified engine facts" were probed on 4.7.2 in a scratch project, not in `game/`.
 
 ### File List
+
+- game/scripts/actors/player_input.gd (new)
+- game/scripts/actors/player_input.gd.uid (new)
+- game/scripts/actors/player.gd (modified: reads only PlayerInput intents; SNUFF_HOLD, _light_held and the _buffer timer removed)
+- game/scenes/actors/player.tscn (modified: PlayerInput child node)
+- game/scripts/rules/settings.gd (modified: light_tap_window key)
+- game/tests/smoke_player_input.gd (new)
+- game/tests/smoke_player_input.gd.uid (new)
+- game/tests/rooms/input/t_input.txt (new)
+- game/tests/test_state.gd (modified: light_tap_window checks)
+- game/tests/test_tuning.gd (modified: `setting` row kind for player.snuff_hold)
+- game/run_tests.sh (modified: smoke_player_input added)
+- game/README.md (modified: Snuff row, ↓ interact row)
+- docs/architecture.md (modified)
+- docs/component-inventory.md (modified)
+- docs/development-guide.md (modified)
+- docs/source-tree-analysis.md (modified)
+- _bmad-output/project-context.md (modified: Current State, Last Updated)
+- _bmad-output/implementation-artifacts/1-8-playerinput-intents.md (this file)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified: 1-8 → review, then done)
+- game/scripts/rules/tuning.gd (modified in review: DASH_TIME comment states the measured dash)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified in review: three items with owners)
+
+### Change Log
+
+- 2026-11-14: Story 1.8 implemented. PlayerInput intents with the Light tap/hold machine on real time, real-time Jump/Attack buffers, ↓ interact and lock(); Settings.light_tap_window; M1 movement pinned by smoke_player_input before the switch. Status → review.
+- 2026-11-18: Laptop feel check passed (all four D13 checks).
+- 2026-11-18: Code review: 13 patches applied (wall drop on ↑, Snuff latch, Light across pause/respawn, window boundaries, cling press, test gaps, docs), 3 items deferred with owners (1.15, 1.9, 1.24). Status → done.
