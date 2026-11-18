@@ -40,6 +40,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Closed (2026-11-12): rewritten in Story 1.2.**
 - **bmad-loop's canonical ledger format would switch off the owner gate** — `### DW-n` headings with `status:` lines contain no `- ` items, so after a `bmad-loop sweep --migrate` the scan in `tests/test_deferred_owners.gd` sees 0 items and prints PASS. Latent: only matters if bmad-loop is adopted.
   → **Owner: Story 1.9** — it builds the glob runner and the lint, where ledger-format checks belong.
+  → **Closed (Story 1.9 and its code review): `test_deferred_owners.gd` `unknown_format()` fails the run on a `### DW-n` heading, a `status:` line (any case, bulleted or bold), a table row, or a ledger with text under its sections but no list items; samples, plus a DW block appended to the real ledger.**
 
 ## Deferred from: code review of 1-2-log-and-a-clock-that-owns-time.md (2026-11-12)
 
@@ -50,6 +51,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **No floor holds once gear bends a tuning value** — `game/scripts/rules/tuning.gd` `apply_gear()`: the M1 `@export_range(0.75, 3.0)` on the lurker telegraph was editor-only and is gone, so a gear `set` / `mul` row could push `lurker_telegraph_time` under 0.75 s (Pillar 2) or `crawler_hover_period` to 0 (NaN hover drift). Latent: `Gear.TABLE` is empty until E5, and no planned gear targets either key.
   → **Owner: Story 1.9** — its `Spec.TELEGRAPH_MIN` check should compare `Game.tuning.f(&"lurker_telegraph_time")` with every `Gear.TABLE` row applied, so a future gear that breaks the floor fails the suite.
+  → **Closed (Story 1.9 and its code review): `test_tuning.gd` `stat_floor_errors()` tries every combination of the gear rows that bend a stat: `lurker_telegraph_time` ≥ `Spec.TELEGRAPH_MIN` and `crawler_hover_period` > 0. Probe gears prove both fire (a pair that only goes under together included), and two rows that both `set` a stat are reported.**
 
 ## Deferred from: code review of 1-4-state-objects-in-the-game-autoload.md (2026-11-12)
 
@@ -57,6 +59,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Owner: Story 1.21** — it adds `.tmp` → re-read → rename, `.bak` and `save_failed` to `SaveStore`, so settings can go through the same write path and failure signal.
 - **The `rules/` purity check has holes, and nothing stops a direct write to a state field** — `game/tests/test_state.gd:351` and `game/tests/test_tuning.gd:185` scan a hand-kept file list with `\b(Node|Input|Engine)\b`, which misses `Node2D`, `InputEventKey`, `OS`, `Time` and `load(`. The state fields are public (the spec's choice), so `Game.settings.brightness = 2` compiles, emits nothing and is never saved.
   → **Owner: Story 1.9** — `test_lint.gd` takes over `rules/` purity: glob `scripts/rules/*.gd`, match the prefixes, and add a rule against assigning to a `Game.settings` / `Game.slot` / `Game.dive` field outside `rules/`.
+  → **Closed (Story 1.9 and its code review): `test_lint.gd` rules `rules_purity` (every `rules/` file: Node classes, `Input*` / `Engine*` / `OS` / `Time` / file access / `load(`, the autoloads and every class from `core/` up) and `state_write` (assignments, nested fields, container mutators, `.set(`); the old purity scans are gone.** Not deferred work: what a text scan can't see by design (aliasing through a local, a write through a call's result) is listed in the lint's header, and every code review checks it.
 
 ## Deferred from: code review of 1-5-rooms-as-text-the-m1-shaft-at-22-tiles.md (2026-11-12)
 
@@ -87,5 +90,6 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Owner: Story 1.15** — the CP1 feel gate decides: fix the off-by-one (the dash becomes 31 px) or change the GDD to the felt 39 px, then tighten the pin.
 - **The raw-`Input` source check is a substring regex** — `game/tests/smoke_player_input.gd` `test_sources` greps `Input\.` outside `player_input.gd`, so it misses event reads (`_input(event)`, `event.is_action_pressed(...)`) and aliasing (`var i := Input`), and flags `Input.` in comments.
   → **Owner: Story 1.9** — `test_lint.gd` takes over the "no raw Input outside PlayerInput / the UI kit" rule and should cover event-based reads; `test_sources` can then drop its regex.
+  → **Closed (Story 1.9): `test_lint.gd` rule `raw_input` (`Input` / `InputMap` as identifiers, `InputEvent*`, the `_input` / `_gui_input` callbacks and the `gui_input` signal; comments and strings ignored); `test_sources` dropped its regex.**
 - **`lock()` mid-move: a clinging player is kicked off the wall, and a jump keeps full height** — `game/scripts/actors/player_input.gd` `_clear()` sets `cling_held = false`, which `player.gd` `_handle_cling` reads as "Jump released", so one locked tick fires a wall kick (probe: `velocity (-150, -260)`); `jump_released` is not sampled while locked, so a jump released during a lock is never cut. Latent: nothing calls `lock()` yet. Reason (sonlm): decide it with the first scripted moment.
   → **Owner: Story 1.24** — the first `lock()` caller (station rest); decide what a lock does to a cling or a rising jump (likely a drop with no kick, and a cut on unlock) and test it.

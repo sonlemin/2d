@@ -1,6 +1,9 @@
+---
+baseline_commit: b901497
+---
 # Story 1.9: Glob test runner, Spec and the architecture lint
 
-Status: ready-for-dev
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -46,32 +49,57 @@ so that no test silently stops running and the M2 patterns hold as the code grow
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Glob runner (AC: 1).**
-  - [ ] Rewrite the loop in `game/run_tests.sh` per D1. Keep the import step, the 150 s wall-clock `timeout` and the error-line grep.
-  - [ ] Red-check it with scratch files in `game/tests/`, removing each afterwards:
+- [x] **Task 1: Glob runner (AC: 1).**
+  - [x] Rewrite the loop in `game/run_tests.sh` per D1. Keep the import step, the 150 s wall-clock `timeout` and the error-line grep.
+  - [x] Red-check it with scratch files in `game/tests/`, removing each afterwards:
     - a `test_zz_probe.gd` that prints a `FAIL` line → the run fails without editing `run_tests.sh`;
     - a `smoke_zz_probe.gd` with only `ok` lines → `FAILED (runner: no PASS line)`;
     - an empty glob (point it at an empty folder) → the run fails.
-  - [ ] Confirm the green run lists the same 11 tests as before, plus `test_lint`.
-- [ ] **Task 2: Spec (AC: 2).**
-  - [ ] Add `game/tests/spec.gd` per D5.
-  - [ ] Switch the existing checks per D6: `smoke_shaft` (bot, telegraph, base light, the notice floor) and `test_tuning` (the telegraph floor with every `Gear.TABLE` row applied, and a probe table proving that check fires).
-- [ ] **Task 3: The lint (AC: 3, 4).**
-  - [ ] Add `game/tests/test_lint.gd` per D2–D4: a pure `lint_text()`, the rule table, the sample-line tests, and the scan of the real `scripts/` tree.
-  - [ ] Also check that every `const` in `spec.gd` carries a `## GDD` citation (D5).
-  - [ ] It must be green on today's code. If a rule hits real code, check whether the hit is a true violation. If it is, fix the code and record the fix. If it isn't, the rule is wrong: fix the rule. Never add an allow-list entry to get green.
-- [ ] **Task 4: Retire the ad-hoc checks (AC: 5).**
-  - [ ] Delete `_test_purity()` (and its `PURE` lists, if nothing else uses them) from `test_state.gd` and `test_tuning.gd`.
-  - [ ] Delete the `Input.` regex part of `test_sources()` in `smoke_player_input.gd`; keep its `SNUFF_HOLD` and `PlayerInput`-node checks.
-  - [ ] Add the ledger-format check to `test_deferred_owners.gd` per D8.
-- [ ] **Task 5: Docs and ledger (AC: 6).** Per D10.
-  - [ ] Close the four 1.9-owned items in `deferred-work.md` with `→ **Closed (Story 1.9): …**` lines.
-- [ ] **Task 6: Verify (AC: 6).**
-  - [ ] `./run_tests.sh` → `== ALL GREEN`.
-  - [ ] Run the D9 red checks and record each in the Debug Log.
-  - [ ] Every new `.gd.uid` is staged.
-  - [ ] No `ERROR:` lines in the raw output.
-  - [ ] Report "tests green"; no feel check is needed, because no gameplay changes.
+  - [x] Confirm the green run lists the same 11 tests as before, plus `test_lint`.
+- [x] **Task 2: Spec (AC: 2).**
+  - [x] Add `game/tests/spec.gd` per D5.
+  - [x] Switch the existing checks per D6: `smoke_shaft` (bot, telegraph, base light, the notice floor) and `test_tuning` (the telegraph floor with every `Gear.TABLE` row applied, and a probe table proving that check fires).
+- [x] **Task 3: The lint (AC: 3, 4).**
+  - [x] Add `game/tests/test_lint.gd` per D2–D4: a pure `lint_text()`, the rule table, the sample-line tests, and the scan of the real `scripts/` tree.
+  - [x] Also check that every `const` in `spec.gd` carries a `## GDD` citation (D5).
+  - [x] It must be green on today's code. If a rule hits real code, check whether the hit is a true violation. If it is, fix the code and record the fix. If it isn't, the rule is wrong: fix the rule. Never add an allow-list entry to get green.
+- [x] **Task 4: Retire the ad-hoc checks (AC: 5).**
+  - [x] Delete `_test_purity()` (and its `PURE` lists, if nothing else uses them) from `test_state.gd` and `test_tuning.gd`.
+  - [x] Delete the `Input.` regex part of `test_sources()` in `smoke_player_input.gd`; keep its `SNUFF_HOLD` and `PlayerInput`-node checks.
+  - [x] Add the ledger-format check to `test_deferred_owners.gd` per D8.
+- [x] **Task 5: Docs and ledger (AC: 6).** Per D10.
+  - [x] Close the four 1.9-owned items in `deferred-work.md` with `→ **Closed (Story 1.9): …**` lines.
+- [x] **Task 6: Verify (AC: 6).**
+  - [x] `./run_tests.sh` → `== ALL GREEN`.
+  - [x] Run the D9 red checks and record each in the Debug Log.
+  - [x] Every new `.gd.uid` is staged.
+  - [x] No `ERROR:` lines in the raw output.
+  - [x] Report "tests green"; no feel check is needed, because no gameplay changes.
+
+### Review Findings
+
+Code review 2026-11-18 (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 0 decision, 20 patch, 0 defer, 2 dismissed (`keycode` firing on a project const named `KEY_*`: none exist, and the failure would be loud, not silent; a Spec citation on the line above: D5 puts it on the same line).
+
+- [x] [Review][Patch] `strip()` ignores `\` escapes inside `"""` strings, and drops a single-quoted string continued with a trailing `\` onto the next line, so code after it is hidden (or string text is linted) [game/tests/test_lint.gd:99]
+- [x] [Review][Patch] `time_scale` misses compound writes (`*=`, `+=`) and `Engine.set(&"time_scale", …)` [game/tests/test_lint.gd:28]
+- [x] [Review][Patch] `state_write` misses nested fields and indexes, container mutators (`.append/.erase/.clear…`), `.set(`, and writes to `Game.tuning` internals; it also has no "quiet in a string" sample (AC4, D4(d)) [game/tests/test_lint.gd:69]
+- [x] [Review][Patch] `random` misses `pick_random()`, `shuffle()`, `seed()`, `rand_from_seed()` and `@GlobalScope.randf()` [game/tests/test_lint.gd:50]
+- [x] [Review][Patch] `print` misses `print_verbose`, `print_stack`, `print_tree*` [game/tests/test_lint.gd:37]
+- [x] [Review][Patch] `free` misses `call_deferred("free")` and `free.call_deferred()` [game/tests/test_lint.gd:40]
+- [x] [Review][Patch] `root_path` misses `$/root/…` and `get_tree().root.get_node(…)` [game/tests/test_lint.gd:43]
+- [x] [Review][Patch] `raw_input` misses `_gui_input` and the `gui_input` signal [game/tests/test_lint.gd:33]
+- [x] [Review][Patch] `rules_purity` misses most Node classes (`Timer`, `CharacterBody2D`), `get_tree`, `ResourceSaver`/`ConfigFile`, the `Audio` autoload and core/upper class names; and it fires on a sibling `preload("tuning.gd")` [game/tests/test_lint.gd:54]
+- [x] [Review][Patch] `core_layer` misses upper-layer autoloads (`Audio`) and annotated `class_name` lines (`@abstract class_name X`) [game/tests/test_lint.gd:350]
+- [x] [Review][Patch] Nothing stops `scripts/` from loading `res://tests/` (release exports exclude `tests/*`); add a `tests_ref` rule [game/tests/test_lint.gd:26]
+- [x] [Review][Patch] `uncited_consts` accepts `## GDD ` inside a string and never checks `var` lines in `spec.gd` [game/tests/test_lint.gd:375]
+- [x] [Review][Patch] Sample gaps: no comment-quiet sample for the `code` patterns (`core_layer`, `dev_ref`, `rules_purity` paths), no literal `PlayerInput.` near-miss (D4) [game/tests/test_lint.gd:213]
+- [x] [Review][Patch] `lint_text` is not static as D4 says (instance regex cache); the row shape and `strip(line, triple)` differ from D2/D3 unrecorded [game/tests/test_lint.gd:148]
+- [x] [Review][Patch] `telegraph_floor_errors` tries only none / each / all gear (A+B can go under the floor), crashes on two `set` rows, and the `crawler_hover_period` → 0 half of the closed ledger item is left with no owner [game/tests/test_tuning.gd:189]
+- [x] [Review][Patch] The ledger guard catches only two foreign formats; any other format with no list items still passes as "0 items"; D9 #12 (a DW block appended to the real ledger) was never run [game/tests/test_deferred_owners.gd:118]
+- [x] [Review][Patch] `smoke_shaft`: the telegraph is probed 50 ms under the floor, the hunt check depends on the tuning value (fails above ~1.07 s), and the chain-3 notice-floor check mixes its premise with its verdict and has no positive control [game/tests/smoke_shaft.gd:257]
+- [x] [Review][Patch] Stale docs: the `smoke_player_input` rows still claim the `Input.` check; D3 variances missing from architecture.md / component-inventory.md; game-architecture.md lines ~870 and ~1272 and project-context's `KEY_F` predate the wider rules; the Enforcement summary omits the `random` widening; "in a string" claim; `TESTS_DIR` must be relative [docs/architecture.md:194]
+- [x] [Review][Patch] The ledger's "aliasing through a local" closure reads as open work with no owner [_bmad-output/implementation-artifacts/deferred-work.md:209]
+- [x] [Review][Patch] Dev record says 89 samples (there are 87) and repeats the gds-create-story sentence [_bmad-output/implementation-artifacts/1-9-glob-test-runner-spec-and-the-architecture-lint.md:348]
 
 ## Dev Notes
 
@@ -328,12 +356,117 @@ It is test infrastructure only. **No gameplay script changes behaviour.** A lint
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18.
+
 ### Debug Log References
+
+- **Baseline** `b901497`: `./run_tests.sh` → `== ALL GREEN`, 11 tests from the hand-kept list.
+- **Task 1, glob runner:** the green run lists the same 11 tests (now in C sort order, unit first). Red checks:
+  1. a scratch `tests/test_zz_probe.gd` printing `FAIL` ran with no edit to `run_tests.sh`, and the suite failed (`== failed: test_zz_probe …`);
+  2. a scratch `tests/smoke_zz_probe.gd` with only `ok` lines → `FAILED (runner: no PASS line)`;
+  3. `TESTS_DIR` at an empty folder → `== NO TESTS FOUND …`, exit 1.
+
+  The probes and their `.uid` files were removed.
+- **Task 2, Spec:** `smoke_shaft` 30 → 34 `ok` (the telegraph vs Spec, base light ≤ `Spec.BASE_LIGHT`, chain 3 at 78.1 px never noticed, `Lurker.NOTICE_MIN_RADIUS` ≥ the floor). The bot's best chain is 8. `test_tuning`: the gear floor holds on the empty `Gear.TABLE`, and the probe table (`mul` 0.5) gives exactly 1 error (0.45 s < 0.75 s).
+- **Task 3, lint:** green on the first run, with no code changes needed: 22 files, 11 rules, 0 hits. 110 `ok`:
+  - 4 `strip` cases;
+  - 87 rule samples;
+  - 11 "has a firing sample" checks;
+  - the tree sentinels;
+  - the upper-class list (11 names collected);
+  - 2 `spec_citation` checks.
+- **Task 4, retired checks:**
+  - `test_state` 171 → 165 (the purity scan of 3 files);
+  - `test_tuning` 85 → 83 (−4 purity, +2 gear floor);
+  - `smoke_player_input` 60 → 59 (the `Input.` regex; its `_gd_files` walker went with it);
+  - `test_deferred_owners` 19 → 21 (the DW-format sample and the real-format negative).
+- **Task 6, D9 red checks.** Each was reverted after the run; `git status` showed only the intended files.
+  4. `print("x")` in `actors/player.gd` → `FAIL lint actors/player.gd:330 print`;
+  5. `Engine.time_scale = 1.0` in `world/camera_rig.gd` → `time_scale`;
+  6. `var _zz_e: InputEventKey` in `actors/player.gd` → `raw_input`;
+  7. `var _zz_n: Node` in `rules/gear.gd` → `rules_purity`;
+  8. `Game.settings.brightness = 2` in `world/world.gd` → `state_write`;
+  9. the `print` pattern broken (`zzprint|…`) → its "fires" sample fails;
+  10. an uncited const in `spec.gd` → `FAIL lint tests/spec.gd:12 spec_citation`;
+  11. `TELEGRAPH_MIN` 1.0 → `test_tuning`'s floor fails (0.900 < 1.00), and `smoke_shaft`'s telegraph checks fail (2);
+  12. `unknown_format()` returning `[]` → the DW sample fails.
+
+  Extra: `BOT_MIN_CHAIN` 9 → the bot check fails (best 8).
+- **Final:** `./run_tests.sh` → `== ALL GREEN (12 tests)`:
+  - `test_chain_state` 69, `test_clock` 15, `test_deferred_owners` 21, `test_lint` 110, `test_log` 7, `test_room_loader` 64, `test_state` 165, `test_tuning` 83;
+  - `smoke_player_input` 59, `smoke_room_swap` 39, `smoke_shaft` 34, `smoke_world` 60.
+
+  No `SCRIPT ERROR` / `ERROR:` lines.
+- **Code review (2026-11-18), 20 patches applied:**
+  - **`test_lint`** 110 → 162 `ok`:
+    - `strip()` handles `\` escapes in every string kind and carries a `\`-continued string to the next line;
+    - rules widened: `time_scale` compound and `Engine.set`; `state_write` nested fields and indexes, mutators, `.set(`, `tuning`; `random`; `print`; `free`; `root_path`; `raw_input` `_gui_input`;
+    - `rules_purity` and `core_layer` get run-time class names from `layer_names()` (annotated `class_name`, autoloads, ClassDB Node classes for `rules/`);
+    - new rule `tests_ref` (12 rules);
+    - `uncited_consts` reads the comment only and flags `var`;
+    - `lint_text` is static (D4);
+    - 132 samples, plus the comment-quiet `code` samples and the literal `PlayerInput.` near-miss.
+  - **`test_tuning`** 83 → 87: `stat_floor_errors()` tries every combination of gear rows, reports two `set` rows instead of crashing, and also floors `crawler_hover_period` > 0. Probes: a pair, two sets, zeroed hover.
+  - **`test_deferred_owners`** 21 → 25: `unknown_format()` also reports `status:` in any case, bulleted or bold, table rows, and a ledger with text under its sections but no items. D9 #12 is now a check on the real ledger with a DW block appended.
+  - **`smoke_shaft`** 34 → 36:
+    - the telegraph is measured (54 frames), no longer probed at 0.70 s, and the hunt check no longer depends on the tuning value;
+    - the notice floor finds the largest chain under 80 px (chain 3, 78.1 px) as its own setup check, and a control proves chain 4 (84 px) is noticed from the same spot.
+  - **Red checks, each reverted:**
+    - planted `pick_random()`, `Game.slot.flags.erase()`, a `res://tests/` preload, a `Timer` in `rules/`, `Player` in `core/` and a `static var` in Spec → `random`, `state_write`, `tests_ref`, `rules_purity`, `core_layer`, `spec_citation`;
+    - escapes disabled in `strip()` → 3 strip samples fail;
+    - singletons-only gear sets → the pair and two-set probes fail;
+    - the no-items guard disabled → its sample fails;
+    - telegraph 0.6 s → both telegraph checks fail;
+    - telegraph 1.5 s → passes (the old 0.35 s follow-up wait failed here);
+    - `Lurker.NOTICE_MIN_RADIUS` 70 → the verdict and the floor check fail.
+  - **Docs:** rule table, architecture and component rows, D3 variances, `game-architecture.md` layer and Input rows, project-context lint bullet, `run_tests.sh` `TESTS_DIR` note, four ledger closures (the hover half is now closed by a check; the aliasing note is a documented boundary, not deferred work).
+  - **Final:** `== ALL GREEN (12 tests)`:
+    - `test_chain_state` 69, `test_clock` 15, `test_deferred_owners` 25, `test_lint` 162, `test_log` 7, `test_room_loader` 64, `test_state` 165, `test_tuning` 87;
+    - `smoke_player_input` 59, `smoke_room_swap` 39, `smoke_shaft` 36, `smoke_world` 60.
 
 ### Completion Notes List
 
-- Story context created by gds-create-story on 2026-11-18. Ultimate context engine analysis completed - comprehensive developer guide created. Today's `game/scripts/` was scanned against every D3 rule with comments stripped (one allowed hit: `randf_range` in `camera_rig.gd`).
+- **AC1:** `run_tests.sh` builds its list from `test_*.gd` then `smoke_*.gd` (`nullglob`, `LC_ALL=C sort`); an empty glob fails; the runner (unchanged) still fails on no PASS, 120 s and engine errors; the 150 s wall-clock `timeout` stays. The final line is `== ALL GREEN (N tests)`, and a failure lists the failed tests. `TESTS_DIR` exists only for the empty-glob red check (header comment).
+- **AC2:** `tests/spec.gd` has the four consts with `## GDD` citations. `smoke_shaft` compares the bot, the telegraph, base light and the notice floor against `Spec`; `test_tuning`'s `telegraph_floor_errors()` covers every gear row (each alone and all together).
+- **AC3/AC4:** `tests/test_lint.gd` has a pure `strip()` and `lint_text()`, 11 data rules with stable ids, 87 sample lines (fires, allowed path, comment, string, near-misses), a real-tree scan with sentinels, upper-layer class names read from `class_name` lines, and `spec_citation`. It was green on today's 22 scripts with no code change.
+- **AC5:** the purity scans and the `Input.` regex are gone. `test_deferred_owners` fails on a DW-format ledger. All four 1.9-owned ledger items are closed.
+- **AC6:** all green; 12 red checks recorded above; the docs and `project-context.md` are updated (glob, Spec, lint rule table in the development guide, Enforcement section in `game-architecture.md`).
+- **D3 variances, all stricter than AR48:**
+  - `keycode` = every `KEY_*`;
+  - `raw_input` adds `InputMap`, `InputEvent*`, the `_input` callbacks and `Input` used as a value (this covers aliasing of `Input` itself);
+  - `rules_purity` adds the deferred prefixes plus `OS`, `Time`, file access and `load(`;
+  - `random` adds `randfn`, `randomize` and `RandomNumberGenerator`;
+  - `state_write` is new.
+- **Deviations from D2–D4, kept and recorded:**
+  - `strip(line, open)` returns `{code, bare, open}`, because a bool can't say which delimiter closes a carried string;
+  - rule rows are `{id, bare, code, only, skip, allow}`, so one rule can check identifiers and path strings;
+  - `lint_text(rel, text, names)` takes per-rule class names.
+- **Nothing deferred.** No gameplay script changed, so no feel check is needed.
+- Story context created by gds-create-story on 2026-11-18. Today's `game/scripts/` was scanned against every D3 rule with comments stripped (one allowed hit: `randf_range` in `camera_rig.gd`).
 
 ### File List
 
+- game/run_tests.sh (modified: glob discovery, empty-glob failure, failed-test list)
+- game/tests/spec.gd (new)
+- game/tests/spec.gd.uid (new)
+- game/tests/test_lint.gd (new)
+- game/tests/test_lint.gd.uid (new)
+- game/tests/smoke_shaft.gd (modified: bot, telegraph, base light and notice floor against Spec)
+- game/tests/test_tuning.gd (modified: purity removed, telegraph floor under every gear)
+- game/tests/test_state.gd (modified: purity removed)
+- game/tests/smoke_player_input.gd (modified: Input regex and its walker removed)
+- game/tests/test_deferred_owners.gd (modified: unknown_format())
+- docs/development-guide.md (modified: glob, Spec, lint rule table)
+- docs/architecture.md (modified)
+- docs/component-inventory.md (modified)
+- docs/source-tree-analysis.md (modified)
+- _bmad-output/project-context.md (modified: Current State, Last Updated)
+- _bmad-output/game-architecture.md (modified: Enforcement section)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified: four 1.9 items closed)
+- _bmad-output/implementation-artifacts/1-9-glob-test-runner-spec-and-the-architecture-lint.md (this file)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified: 1-9 → review)
+
 ### Change Log
+
+- 2026-11-18: Story 1.9 implemented. Glob test discovery in run_tests.sh; tests/spec.gd with the four GDD guarantees, used by smoke_shaft and test_tuning (telegraph floor under every gear); tests/test_lint.gd with 11 rules, samples and a Spec citation check; old purity scans and the Input regex retired; the ledger-format check. Status → review.
+- 2026-11-18: Code review: 20 patches applied (lint escapes and continuations, wider rules, run-time layer names, `tests_ref`, gear floors over every combination and the hover period, the ledger no-items guard, measured telegraph and a notice-floor control, docs). Status → done.

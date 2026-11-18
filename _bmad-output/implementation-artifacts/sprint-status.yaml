@@ -54,7 +54,7 @@ development_status:
   1-6-the-world-scene-replaces-the-m1-shaft: done
   1-7-room-swaps-physics-interpolation-and-retiring-shaft-gd: done
   1-8-playerinput-intents: done
-  1-9-glob-test-runner-spec-and-the-architecture-lint: ready-for-dev
+  1-9-glob-test-runner-spec-and-the-architecture-lint: done
   1-10-room-smoke-tests-and-the-reachability-bot: backlog
   1-11-devtools-entry-args-and-overlays: backlog
   1-12-worst-case-performance-scene: backlog
