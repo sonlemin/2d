@@ -25,6 +25,7 @@ func run() -> void:
 	_test_duplicate_ids()
 	_test_links()
 	_test_arrival()
+	_test_cling_wall()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -93,6 +94,18 @@ func _test_ledge_rows() -> void:
 	var side := _shaft(30, [])
 	side[10] = "." + ".".repeat(20) + "#"
 	check(not 11 in RoomSweep.ledge_rows(side, NO_HAZARDS), "the outer wall columns never make a ledge")
+	# The body is 20 px tall: a ledge needs two open cells above it (review 2026-11-19).
+	var notch := RoomSweep.ledge_rows(_shaft(30, [8, 10]), NO_HAZARDS)
+	check(notch == ([8, 29] as Array[int]), "a notch (one open cell above, a wall above that) is no ledge (got %s)" % [notch])
+	var room := RoomSweep.ledge_rows(_shaft(30, [7, 10]), NO_HAZARDS)
+	check(room == ([7, 10, 29] as Array[int]), "near miss: two open cells above make it a ledge (got %s)" % [room])
+	# A hazard tile is never a ledge itself: with every wall a "hazard", no row is one...
+	var walls: Array[String] = ["#"]
+	check(RoomSweep.ledge_rows(_shaft(30, [5]), walls).is_empty(), "a ledge made of hazard tiles is not a ledge (got %s)" % [RoomSweep.ledge_rows(_shaft(30, [5]), walls)])
+	# ...while one solid non-hazard cell (an in-wall L beside the wall) in the row still is.
+	var mixed := _shaft(30, [5])
+	mixed[5] = "#L###" + ".".repeat(16) + "#"
+	check(RoomSweep.ledge_rows(mixed, walls) == ([5] as Array[int]), "near miss: one solid cell that is no hazard keeps the ledge (got %s)" % [RoomSweep.ledge_rows(mixed, walls)])
 
 
 func _test_spine_gaps() -> void:
@@ -114,6 +127,20 @@ func _test_spine_gaps() -> void:
 	check(RoomSweep.spine_gap_errors("s", flat, none, NO_HAZARDS, MAX_ROWS) == (["s: a spine room with no ledge or cling stretch to land on"] as Array[String]),
 			"a spine room with nowhere to land fails, rather than passing with no gaps to measure (got %s)" % [RoomSweep.spine_gap_errors("s", flat, none, NO_HAZARDS, MAX_ROWS)])
 	check(RoomSweep.spine_gap_errors("s", flat, [Vector2i(2, 5)] as Array[Vector2i], NO_HAZARDS, MAX_ROWS).is_empty(), "near miss: a cling stretch alone is somewhere to land")
+	# FR57 is any fall: from the top entry to the first safe row, and from the last to the down exit.
+	var up := [{side = "up", target = "x", col = 3}]
+	var down := [{side = "down", target = "x", col = 1}]
+	check(RoomSweep.spine_gap_errors("s", _shaft(40, [20]), none, NO_HAZARDS, MAX_ROWS, up) == (["s: the fall from the top entry to row 20 is 20 rows, over 19"] as Array[String]),
+			"with an up exit, a first ledge 20 rows down fails (got %s)" % [RoomSweep.spine_gap_errors("s", _shaft(40, [20]), none, NO_HAZARDS, MAX_ROWS, up)])
+	check(RoomSweep.spine_gap_errors("s", _shaft(40, [19, 30]), none, NO_HAZARDS, MAX_ROWS, up).is_empty(), "near miss: 19 rows down is legal (got %s)" % [RoomSweep.spine_gap_errors("s", _shaft(40, [19, 30]), none, NO_HAZARDS, MAX_ROWS, up)])
+	check(RoomSweep.spine_gap_errors("s", _shaft(40, [20]), none, NO_HAZARDS, MAX_ROWS).is_empty(), "with no up exit, nothing falls in from the top")
+	var open_floor := _shaft(40, [5, 19])
+	open_floor[39] = "#" + ".".repeat(20) + "#"
+	check(RoomSweep.spine_gap_errors("s", open_floor, none, NO_HAZARDS, MAX_ROWS, down) == (["s: the fall from row 19 out of the down exit is 21 rows, over 19"] as Array[String]),
+			"with a down exit, a last ledge 21 rows above the floor fails (got %s)" % [RoomSweep.spine_gap_errors("s", open_floor, none, NO_HAZARDS, MAX_ROWS, down)])
+	var close_floor := _shaft(40, [5, 21])
+	close_floor[39] = "#" + ".".repeat(20) + "#"
+	check(RoomSweep.spine_gap_errors("s", close_floor, none, NO_HAZARDS, MAX_ROWS, down).is_empty(), "near miss: 19 rows above the floor is legal")
 	var part := RoomSweep.spine_gap_errors("s", _shaft(60, [5, 50]), [Vector2i(10, 20)] as Array[Vector2i], NO_HAZARDS, MAX_ROWS)
 	check(part == (["s: the fall from row 20 to row 50 is 30 rows, over 19 (no ledge or cling stretch between)"] as Array[String]),
 			"a stretch covering only part of a gap leaves the rest to fail, from the stretch's last row (got %s)" % [part])
@@ -222,6 +249,15 @@ func _test_links() -> void:
 	rooms.b.exits = [] as Array
 	check(RoomSweep.link_errors(rooms) == (["a: up exit arrives at b's down entry, but b has no down exit"] as Array[String]),
 			"an up exit into a room with no down exit fails (got %s)" % [RoomSweep.link_errors(rooms)])
+	# A shipped room never leads into rooms/dev/ (excluded from release exports, never swept).
+	var mixed := {
+		"a": {path = "res://rooms/l1/a.txt", exits = [{side = "down", target = "b", col = 1}]},
+		"b": {path = "res://rooms/dev/b.txt", exits = [{side = "up", target = "a", col = 3}]},
+	}
+	check(RoomSweep.link_errors(mixed) == (["a: down exit targets 'b', a dev room (never exported, never swept)"] as Array[String]),
+			"a layer room's exit into a dev room fails; the dev room's way back is fine (got %s)" % [RoomSweep.link_errors(mixed)])
+	mixed.b.path = "res://rooms/l2/b.txt"
+	check(RoomSweep.link_errors(mixed).is_empty(), "near miss: the same link into a layer room is quiet")
 
 
 func _test_arrival() -> void:
@@ -243,3 +279,20 @@ func _test_arrival() -> void:
 	check(at.call(Vector2i(5, 8), "L").size() == 1, "a lurker counts too")
 	check(at.call(Vector2i(5, 8), "#").is_empty() and at.call(Vector2i(5, 8), "P").is_empty(), "walls and the spawn char are not enemies")
 	check(RoomSweep.arrival_errors("s", base, [{side = "up", target = "x", col = 3}], 3).is_empty(), "a room with no down exit has no arrival from below")
+
+
+## D9's cling escape start, as a pure search (review 2026-11-19): either wall face, any thickness,
+## two empty columns beside it for CLING_ROWS rows (a crawler there would knock the player off).
+func _test_cling_wall() -> void:
+	check(RoomSweep.cling_wall(_shaft(20, [])) == {cell = Vector2i(1, 1), side = -1}, "the 1-tile left wall comes first (got %s)" % [RoomSweep.cling_wall(_shaft(20, []))])
+	var thick := _shaft(20, [])
+	for r in range(1, 19):
+		thick[r] = "##" + thick[r].substr(2)
+	check(RoomSweep.cling_wall(thick) == {cell = Vector2i(2, 1), side = -1}, "a thicker left wall is a wall face too (got %s)" % [RoomSweep.cling_wall(thick)])
+	var blocked := _shaft(20, [])
+	for r in range(1, 19):
+		blocked[r] = "#h" + blocked[r].substr(2)
+	check(RoomSweep.cling_wall(blocked) == {cell = Vector2i(20, 1), side = 1}, "a crawler beside the left wall blocks it, so the right wall is used (got %s)" % [RoomSweep.cling_wall(blocked)])
+	var short := _shaft(7, [])
+	check(RoomSweep.cling_wall(short).is_empty(), "near miss: 5 open rows are too few to set a cling up in (got %s)" % [RoomSweep.cling_wall(short)])
+	check(RoomSweep.cling_wall(_shaft(8, [])) == {cell = Vector2i(1, 1), side = -1}, "6 open rows are enough")

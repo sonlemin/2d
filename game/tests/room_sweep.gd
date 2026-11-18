@@ -7,15 +7,14 @@ extends RefCounted
 ## A helper, not a test (no test_/smoke_ prefix), and no class_name, like spec.gd:
 ##   const RoomSweep := preload("res://tests/room_sweep.gd")
 
+const Spec := preload("res://tests/spec.gd")
 const ROOT := "res://rooms"
 ## D11, the 1.7 review ("arriving from below can land next to an enemy"): no enemy spawns within
 ## this many cells (Chebyshev) of a down entry's stand cell. 3 cells is 48 px, about 1.9 s of
 ## walker travel at 25 px/s: time to see it and step or slash before it reaches you.
 const ARRIVAL_CLEAR_CELLS := 3
-## GDD Level Types, Narrow stretch: "6–10 tiles wide; no ledges; walls always within reach".
-## Every open run in a declared cling stretch's rows must be this wide (D6).
-const NARROW_MIN := 6
-const NARROW_MAX := 10
+## D9: a cling wall needs this many rows of open fall beside it, so a cling setup never lands.
+const CLING_ROWS := 6
 
 static var _exit_re := RegEx.create_from_string("^(up|down):([a-z][a-z0-9_]*)@x(\\d{1,4})$")
 static var _obj_re := RegEx.create_from_string("^([a-z][a-z0-9_]*)@(\\d{1,4}),(\\d{1,4})$")
@@ -84,20 +83,26 @@ static func cling_stretches(header: Array) -> Array[Vector2i]:
 	return out
 
 
-## D5: a row r in 1..h−1 where some inner column (1..w−2) is solid, is not a hazard, and has a cell
-## above it that is neither solid nor a hazard: somewhere to land. test_room_loader's definition,
-## plus the hazards, so a floor covered in spikes is never a ledge.
+## D5: a row r in 1..h−1 where some inner column (1..w−2) is solid, is not a hazard, and has two
+## cells above it that are neither solid nor a hazard: somewhere to land and stand (the body is
+## 20 px tall, so a one-cell notch is no ledge; RoomLoader.down_entry_cell() uses the same rule).
+## test_room_loader's definition, plus the hazards (a floor covered in spikes is never a ledge)
+## and the headroom.
 static func ledge_rows(grid: Array[String], hazards: Array[String]) -> Array[int]:
 	var out: Array[int] = []
 	for r in range(1, grid.size()):
 		for c in range(1, grid[r].length() - 1):
 			var cell := Vector2i(c, r)
-			var above := Vector2i(c, r - 1)
 			if RoomLoader.solid_at(grid, cell) and not _is_hazard(grid, cell, hazards) \
-					and not RoomLoader.solid_at(grid, above) and not _is_hazard(grid, above, hazards):
+					and _open(grid, cell + Vector2i.UP, hazards) and _open(grid, cell + Vector2i(0, -2), hazards):
 				out.append(r)
 				break
 	return out
+
+
+## Neither solid nor a hazard (outside the grid counts as open: row 0's ceiling is above it).
+static func _open(grid: Array[String], cell: Vector2i, hazards: Array[String]) -> bool:
+	return not RoomLoader.solid_at(grid, cell) and not _is_hazard(grid, cell, hazards)
 
 
 ## D5: the rows a fall can end safely on: every ledge row, and every row of a declared cling
@@ -116,13 +121,22 @@ static func safe_rows(grid: Array[String], stretches: Array[Vector2i], hazards: 
 
 
 ## D5, FR57: in a spine room, no fall between consecutive safe rows is over `max_rows`
-## (Spec.LEDGE_FALL_MAX in rows: 1.5 s at 210 px/s).
-static func spine_gap_errors(id: String, grid: Array[String], stretches: Array[Vector2i], hazards: Array[String], max_rows: int) -> Array[String]:
+## (Spec.LEDGE_FALL_MAX in rows: 1.5 s at 210 px/s). FR57 is any fall, so with an up exit the
+## fall from the top (row 0) to the first safe row counts, and with a down exit the fall from the
+## last safe row to the floor, whatever room is on the other side (review 2026-11-19).
+## `exits`: [{side, ...}] as record() gives them.
+static func spine_gap_errors(id: String, grid: Array[String], stretches: Array[Vector2i], hazards: Array[String], max_rows: int, exits := []) -> Array[String]:
 	var errors: Array[String] = []
 	var rows := safe_rows(grid, stretches, hazards)
 	if rows.is_empty():
 		# A sentinel: with no safe row there is no gap to measure, and nothing to land on.
 		errors.append("%s: a spine room with no ledge or cling stretch to land on" % id)
+		return errors
+	var sides := exits.map(func(e: Dictionary) -> String: return e.side)
+	if "up" in sides and rows[0] > max_rows:
+		errors.append("%s: the fall from the top entry to row %d is %d rows, over %d" % [id, rows[0], rows[0], max_rows])
+	if "down" in sides and grid.size() - rows[-1] > max_rows:
+		errors.append("%s: the fall from row %d out of the down exit is %d rows, over %d" % [id, rows[-1], grid.size() - rows[-1], max_rows])
 	for i in range(1, rows.size()):
 		var gap := rows[i] - rows[i - 1]
 		if gap > max_rows:
@@ -156,7 +170,7 @@ static func exit_fall_errors(rooms_by_id: Dictionary, hazards: Array[String], ma
 
 
 ## D6, GDD Narrow stretch: in every row of a declared cling stretch, every maximal run of open
-## (non-solid) cells is NARROW_MIN..NARROW_MAX wide, so the walls are always in reach.
+## (non-solid) cells is Spec.NARROW_MIN..NARROW_MAX wide, so the walls are always in reach.
 static func stretch_width_errors(id: String, grid: Array[String], stretches: Array[Vector2i]) -> Array[String]:
 	var errors: Array[String] = []
 	for s in stretches:
@@ -171,8 +185,8 @@ static func stretch_width_errors(id: String, grid: Array[String], stretches: Arr
 				while c < w and not RoomLoader.solid_at(grid, Vector2i(c, r)):
 					c += 1
 				var run := c - start
-				if run < NARROW_MIN or run > NARROW_MAX:
-					errors.append("%s: cling row %d has an open run %d wide at columns %d-%d; a narrow stretch is %d-%d wide" % [id, r, run, start, c - 1, NARROW_MIN, NARROW_MAX])
+				if run < Spec.NARROW_MIN or run > Spec.NARROW_MAX:
+					errors.append("%s: cling row %d has an open run %d wide at columns %d-%d; a narrow stretch is %d-%d wide" % [id, r, run, start, c - 1, Spec.NARROW_MIN, Spec.NARROW_MAX])
 	return errors
 
 
@@ -220,16 +234,21 @@ static func duplicate_id_errors(files: Array[Dictionary]) -> Array[String]:
 
 ## D4: every exit target is a room, and has the entry the crossing arrives at: a down exit arrives
 ## at the target's up entry, an up exit at its down entry (World._on_exit_reached; a swap into a
-## room without it push_errors and cancels). `rooms_by_id`: id -> {exits}, every file.
+## room without it push_errors and cancels). A room outside rooms/dev/ never leads into one:
+## release exports exclude rooms/dev/ and the sweeps skip it (review 2026-11-19).
+## `rooms_by_id`: id -> {exits, path}, every file (a record with no path is not a dev room).
 static func link_errors(rooms_by_id: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	var ids := rooms_by_id.keys()
 	ids.sort()
 	for id: String in ids:
+		var from_dev := is_dev(rooms_by_id[id].get("path", ""))
 		for e: Dictionary in rooms_by_id[id].exits:
 			if not rooms_by_id.has(e.target):
 				errors.append("%s: %s exit targets '%s', which is no room" % [id, e.side, e.target])
 				continue
+			if not from_dev and is_dev(rooms_by_id[e.target].get("path", "")):
+				errors.append("%s: %s exit targets '%s', a dev room (never exported, never swept)" % [id, e.side, e.target])
 			var entry := "up" if e.side == "down" else "down"
 			if not rooms_by_id[e.target].exits.any(func(t: Dictionary) -> bool: return t.side == entry):
 				errors.append("%s: %s exit arrives at %s's %s entry, but %s has no %s exit" % [id, e.side, e.target, entry, e.target, entry])
@@ -252,6 +271,30 @@ static func arrival_errors(id: String, grid: Array[String], exits: Array, clear_
 				if _is_enemy(grid[r][c]):
 					errors.append("%s: arriving from below at (%d, %d), a '%s' spawns at (%d, %d), within %d cells" % [id, stand.x, stand.y, grid[r][c], c, r, clear_cells])
 	return errors
+
+
+## D9: where a cling escape starts: falling beside a wall face with CLING_ROWS rows of empty cells
+## next to it (two columns, so the 10 px body fits; no spawn char, since a crawler there would knock
+## the player off). Left-facing walls first (D9's 1-tile left wall comes first in m1_shaft), then
+## right-facing, each by row then column. {cell: the first open cell beside the wall, side: -1 for a
+## wall on the left, 1 on the right}, or {} when the room has none.
+static func cling_wall(grid: Array[String]) -> Dictionary:
+	for side in [-1, 1]:
+		for r in range(1, grid.size() - CLING_ROWS):
+			for c in grid[r].length():
+				var clear := true
+				for k in CLING_ROWS:
+					var row := r + k
+					clear = clear and RoomLoader.solid_at(grid, Vector2i(c, row)) \
+							and _empty(grid, Vector2i(c - side, row)) and _empty(grid, Vector2i(c - 2 * side, row))
+				if clear:
+					return {cell = Vector2i(c - side, r), side = side}
+	return {}
+
+
+static func _empty(grid: Array[String], cell: Vector2i) -> bool:
+	return cell.y >= 0 and cell.y < grid.size() and cell.x >= 0 and cell.x < grid[cell.y].length() \
+			and grid[cell.y][cell.x] == RoomLegend.EMPTY
 
 
 ## Every spawn char is an enemy today (c, h, L). A persistent kind (the anchor `A`, 1.24) is not.

@@ -64,7 +64,12 @@ func _spine_rooms() -> Array[Dictionary]:
 func _play(rec: Dictionary) -> void:
 	var id: String = rec.id
 	var has_up: bool = rec.exits.any(func(e: Dictionary) -> bool: return e.side == "up")
+	var has_p: bool = rec.grid.any(func(row: String) -> bool: return row.contains(RoomLegend.SPAWN))
 	var down: Array = rec.exits.filter(func(e: Dictionary) -> bool: return e.side == "down")
+	if not has_up and not has_p:
+		# Room.entry_position() would assert (an engine error, not a named FAIL).
+		check(false, "%s: the bot has nowhere to start: no up exit and no P" % id)
+		return
 	# Where a diver arrives: the top entry, falling (else P, the start of the game).
 	_parts = RoomHarness.build_from_path(self, rec.path, &"up" if has_up else &"spawn")
 	_room = _parts.room
@@ -114,7 +119,7 @@ func _play(rec: Dictionary) -> void:
 			ending = "stuck"
 			break
 		var on_floor := _player.is_on_floor()
-		if down.is_empty() and on_floor and frame > 5 and floori((pos.y + 12.0) / Room.TILE) == floor_row:
+		if down.is_empty() and on_floor and frame > 5 and _feet_row(pos) == floor_row:
 			ending = "floor"
 			break
 		# Like a player: aim for the nearest crawler in a row below the one just swung at.
@@ -197,7 +202,7 @@ func _target(floor_y: float) -> Node2D:
 ## this floor and drop through (the cell under the feet open, the body's row clear on the way).
 ## `goal_x` itself when no such column is reachable (a hop may get past what blocks it).
 func _drop_x(grid: Array[String], pos: Vector2, goal_x: float) -> float:
-	var row := floori((pos.y + 13.0) / Room.TILE)  # the floor under the feet (body bottom = +12)
+	var row := _feet_row(pos)
 	var here := floori(pos.x / Room.TILE)
 	var best := goal_x
 	var best_d := INF
@@ -214,6 +219,13 @@ func _drop_x(grid: Array[String], pos: Vector2, goal_x: float) -> float:
 				break
 			c += dir
 	return best
+
+
+## The row under a standing body's feet. The body bottom is +12, and a resting body sits a hair above
+## the tile (y = 83.993 on a row-6 floor), so +12 alone floors to the row above; +13 is inside the
+## tile (review 2026-11-19).
+static func _feet_row(pos: Vector2) -> int:
+	return floori((pos.y + 13.0) / Room.TILE)
 
 
 ## A walker on the player's floor within SLASH_REACH, either side, or null.

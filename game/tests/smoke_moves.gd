@@ -6,6 +6,9 @@ extends Node
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd
 
 const RoomHarness := preload("res://tests/room_harness.gd")
+## By path, as smoke_rooms builds: a duplicate room id is smoke_rooms' named FAIL, never an index
+## push_error here.
+const M1_SHAFT := "res://rooms/l1/m1_shaft.txt"
 
 var _fail := 0
 var _parts: Dictionary
@@ -29,7 +32,7 @@ func seconds(s: float) -> void:
 
 
 func run() -> void:
-	_parts = RoomHarness.build(self, &"m1_shaft")
+	_parts = RoomHarness.build_from_path(self, M1_SHAFT)
 	_room = _parts.room
 	_player = _parts.player
 	for n in _room.get_children():
@@ -84,6 +87,7 @@ func test_pogo_builds_chain() -> void:
 func test_landing_breaks_chain() -> void:
 	_player.chain.add_hit()
 	_player.chain.add_hit()
+	check(_player.chain.count >= 2, "setup: a chain of %d before the landing" % _player.chain.count)
 	place(_room.entry_position(&"spawn") + Vector2(0, -40))  # above the spawn ledge
 	await seconds(1.0)
 	check(_player.is_on_floor(), "player landed on the spawn ledge")
@@ -118,7 +122,8 @@ func _measure_jump(hold: bool) -> float:
 
 
 ## Wall cling: hold Jump at a wall while falling -> chain paused + hidden; grace ends -> banks;
-## releasing Jump kicks you away from the wall. The row is the third hoverer row's, by position.
+## releasing Jump kicks you away from the wall. The row is _hovers()[2]'s: sorted by row then column
+## with two hoverers a row, that is the first hoverer of the second hoverer row (row 16).
 func test_wall_cling() -> void:
 	var y: float = _hovers()[2].global_position.y
 	var row := int(y / Room.TILE)
@@ -128,6 +133,9 @@ func test_wall_cling() -> void:
 	for i in 6:
 		_player.chain.add_hit()
 	var held: int = _player.chain.held
+	var banked := [0]
+	var on_bank := func(amount: int) -> void: banked[0] += amount
+	_player.chain.banked.connect(on_bank)
 	Input.action_press("move_left")
 	await frames(2)
 	Input.action_release("move_left")
@@ -137,7 +145,9 @@ func test_wall_cling() -> void:
 	check(_player.chain.count == 6 and _player.chain.held == held, "cling keeps the chain (got %d)" % _player.chain.count)
 	check(is_equal_approx(_player.light_radius(), ChainState.BASE_RADIUS), "cling hides the chain-light")
 	await seconds(0.8)
-	check(_player.chain.count == 0 and _player.chain.held == 0, "grace runs out -> the chain breaks (banks)")
+	check(_player.chain.count == 0 and _player.chain.held == 0 and held > 0 and banked[0] == held,
+			"grace runs out -> the chain breaks and banks its %d held embers, never loses them (banked %d)" % [held, banked[0]])
+	_player.chain.banked.disconnect(on_bank)
 	Input.action_release("jump")
 	await frames(2)
 	check(not _player._clinging and _player.velocity.x > 0.0, "releasing Jump kicks off the wall")
@@ -154,6 +164,8 @@ func test_snuff_release() -> void:
 	Input.action_press("light")
 	await frames(18)  # 0.3 s: past the default 0.12 s tap window
 	check(_player.chain.snuffed and _player.chain.count == 0, "setup: holding Light Snuffs and breaks the chain")
+	await frames(2)
+	check(_player.chain.snuffed, "control: still holding Light, the Snuff holds")
 	Input.action_release("light")
-	await frames(1)
+	await frames(2)  # a release after an await is first seen within two ticks (Story 1.8 frame math)
 	check(not _player.chain.snuffed, "releasing Light ends the Snuff")

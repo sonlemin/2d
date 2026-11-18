@@ -11,3 +11,5 @@ const BASE_LIGHT := 40.0  ## GDD Attack, pogo and chain: Chain-Light "40 px at 0
 const NOTICE_MIN_RADIUS := 80.0  ## GDD Predators: Lurker: "Wakes: when your light radius is ≥ 80 px (4 links)"; a floor: a lurker may wake later, never earlier.
 const LEDGE_FALL_TIME := 1.5  ## GDD Level Types: spine shaft "ledges every ≤ 1.5 s of fall"; Sequence Breaking: "a ledge or wall to cling to within a 210 px/s fall of 1.5 s".
 const LEDGE_FALL_MAX := 315.0  ## GDD Level Types / Sequence Breaking: 1.5 s at 210 px/s = 315 px; spine ledges and hazard pits are measured in rows against it.
+const NARROW_MIN := 6  ## GDD Level Types: Narrow stretch "6–10 tiles wide; no ledges; walls always within reach": the narrowest open run in a cling= stretch row.
+const NARROW_MAX := 10  ## GDD Level Types: Narrow stretch "6–10 tiles wide": the widest open run in a cling= stretch row, so both walls stay in reach.

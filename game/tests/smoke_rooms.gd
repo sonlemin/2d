@@ -17,9 +17,19 @@ const M1_SHAFT := "res://rooms/l1/m1_shaft.txt"
 const ESCAPE_CHAIN := 10
 ## D9: how far beside the player a forced hunt starts: about half a second at hunt speed.
 const ESCAPE_GAP := 48.0
+## M1's point-blank Snuff (playtest: "saw it, couldn't escape"): a hunt 18 px away, where a braking
+## lurker (≈ 10 px coast) does overlap the player, so "still alive" fails if it stays lethal.
+const POINT_BLANK_GAP := 18.0
 ## D9: the telegraph check's light: chain 10, 100 px from the lurker (in reach, on screen).
 const TELEGRAPH_GAP := 100.0
-const CLING_ROWS := 6  ## D9: the open fall beside the cling wall, so the setup never lands
+## M1's fixed bound ("Snuff -> loses track within 1 s"), kept beside D9's tuning-relative one so a
+## longer lurker_lose_track_time can't raise its own bound (review 2026-11-19, sonlm).
+const M1_LOSE_TRACK := 1.0
+## UX DESIGN.md Layout & Spacing: the 360 px play area, written out, never read from CameraRig
+## (as smoke_world does), so the stub can't drift with the code it stands in for.
+const PLAY_WIDTH := 360.0
+## The escapes, each on a fresh room: [kind, gap] (D9 plus M1's point-blank Snuff).
+const ESCAPES := [["Snuff", ESCAPE_GAP], ["Snuff point-blank", POINT_BLANK_GAP], ["landing", ESCAPE_GAP], ["cling", ESCAPE_GAP]]
 
 var _fail := 0
 var _parts: Dictionary
@@ -45,11 +55,12 @@ func seconds(s: float) -> void:
 func run() -> void:
 	var swept := _check_files()
 	_check_tuning()
-	var first := true
+	var with_entry := swept.filter(func(r: Dictionary) -> bool: return _entry(r) != &"")
+	if with_entry.is_empty():
+		check(false, "no swept room has an entry (P or an exit) to load the harness at")
+	else:
+		await _test_world_stub(with_entry[0])
 	for rec: Dictionary in swept:
-		if first:
-			await _test_world_stub(rec)
-			first = false
 		await _test_lurkers(rec)
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
 
@@ -83,6 +94,7 @@ func _check_files() -> Array[Dictionary]:
 		else:
 			check(true, "%s validates clean" % path)
 			swept.append(rec)
+		_check_record(path, rec)
 	_fail_each(RoomSweep.duplicate_id_errors(all), "room ids and obj ids are unique across all %d files" % all.size())
 	var every := {}
 	for rec in all:
@@ -99,10 +111,13 @@ func _check_files() -> Array[Dictionary]:
 			var worst := 0
 			for i in range(1, rows.size()):
 				worst = maxi(worst, rows[i] - rows[i - 1])
-			_fail_each(RoomSweep.spine_gap_errors(id, rec.grid, rec.clings, hazards, max_rows),
-					"%s: no fall between ledge rows (or cling stretches) is over %d rows, Spec.LEDGE_FALL_MAX (worst %d)" % [id, max_rows, worst])
+			if not rows.is_empty():
+				worst = maxi(worst, rows[0] if rec.exits.any(func(e: Dictionary) -> bool: return e.side == "up") else 0)
+				worst = maxi(worst, rec.grid.size() - rows[-1] if rec.exits.any(func(e: Dictionary) -> bool: return e.side == "down") else 0)
+			_fail_each(RoomSweep.spine_gap_errors(id, rec.grid, rec.clings, hazards, max_rows, rec.exits),
+					"%s: no fall from its top entry, between ledge rows (or cling stretches), or to its down exit is over %d rows, Spec.LEDGE_FALL_MAX (worst %d)" % [id, max_rows, worst])
 		_fail_each(RoomSweep.stretch_width_errors(id, rec.grid, rec.clings),
-				"%s: its %d cling stretches are 6-10 tiles wide (GDD Narrow stretch)" % [id, rec.clings.size()])
+				"%s: its %d cling stretches are %d-%d tiles wide (Spec.NARROW_MIN/MAX, GDD Narrow stretch)" % [id, rec.clings.size(), Spec.NARROW_MIN, Spec.NARROW_MAX])
 		_fail_each(RoomSweep.hazard_pit_errors(id, rec.grid, rec.clings, hazards, max_rows),
 				"%s: every hazard pit has a ledge or cling stretch within %d rows above it (%d hazard chars today)" % [id, max_rows, hazards.size()])
 		_fail_each(RoomSweep.arrival_errors(id, rec.grid, rec.exits, RoomSweep.ARRIVAL_CLEAR_CELLS),
@@ -110,6 +125,23 @@ func _check_files() -> Array[Dictionary]:
 	_fail_each(RoomSweep.exit_fall_errors(by_id, hazards, max_rows),
 			"no fall through a down exit into a spine room is over %d rows" % max_rows)
 	return swept
+
+
+## The sweeps read the header with RoomSweep.record(), not the loader: build the valid file and check
+## both agree on the exits and obj ids, so a header form the loader learns (E4's side exits) can't
+## drop silently out of the link and arrival sweeps (review 2026-11-19).
+func _check_record(path: String, rec: Dictionary) -> void:
+	var built := RoomLoader.load_room_from_path(path)
+	if built == null:
+		check(false, "%s validated clean but did not build" % path)
+		return
+	var exits := built.exits.map(func(e: Dictionary) -> Dictionary: return {side = String(e.side), target = String(e.target), col = e.col})
+	var objs := built.objects.keys().map(func(k: StringName) -> String: return String(k))
+	objs.sort()
+	var mine: Array = rec.objs.duplicate()
+	mine.sort()
+	check(exits == rec.exits and objs == mine, "%s: the sweeps read the same exits and obj ids the loader builds (exits %s vs %s, objs %s vs %s)" % [path, rec.exits, exits, mine, objs])
+	built.queue_free()
 
 
 ## One FAIL per error, or one ok line naming what held.
@@ -193,8 +225,8 @@ func _add_links(n: int) -> void:
 func _test_world_stub(rec: Dictionary) -> void:
 	await _build(rec)
 	var w := get_tree().get_first_node_in_group("world")
-	check(w == _parts.world and w.has_method("play_rect") and w.play_rect().size.x == CameraRig.PLAY_WIDTH,
-			"the harness's stub World is the one node in group world, with a 360 px play_rect()")
+	check(w == _parts.world and w.has_method("play_rect") and w.play_rect().size.x == PLAY_WIDTH,
+			"the harness's stub World is the one node in group world, with a %.0f px play_rect() (UX DESIGN.md)" % PLAY_WIDTH)
 	await _free()
 
 
@@ -213,8 +245,8 @@ func _test_lurkers(rec: Dictionary) -> void:
 	for i in count:
 		await _test_lurker(rec, i)
 	await _test_contact(rec)
-	for kind in ["Snuff", "landing", "cling"]:
-		await _test_escape(rec, kind)
+	for e: Array in ESCAPES:
+		await _test_escape(rec, e[0], e[1])
 
 
 ## The per-lurker checks, on a fresh room so one lurker's hunt never leaks into the next.
@@ -238,21 +270,29 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 	_add_links(under)
 	check(under > 0 and _player.light_radius() < Spec.NOTICE_MIN_RADIUS, "%s: setup: chain %d gives %.1f px, the largest light under Spec.NOTICE_MIN_RADIUS %.0f px" % [who, under, _player.light_radius(), Spec.NOTICE_MIN_RADIUS])
 	check(not lurker.senses(_player), "%s: light under Spec.NOTICE_MIN_RADIUS is never noticed, even point-blank (chain %d)" % [who, under])
-	while _player.light_radius() < Lurker.NOTICE_MIN_RADIUS and _player.chain.count < 30:
+	var added := 0  # bounded on its own: the chain caps at MAX_CHAIN, so a count bound could never end
+	while _player.light_radius() < Lurker.NOTICE_MIN_RADIUS and added < ChainState.MAX_CHAIN:
 		_player.chain.add_hit()
+		added += 1
 	check(lurker.senses(_player), "%s: control: chain %d (%.1f px) is noticed from the same spot" % [who, _player.chain.count, _player.light_radius()])
 	# 3. Off-screen: the biggest light, the lurker just outside the play rect but in its reach.
 	_player.chain.break_chain()
 	_add_links(ChainState.MAX_CHAIN)
 	var side := _place_off_screen(lurker)
 	if side == "":
-		check(true, "%s: off-screen skipped: no room above or below to put the lurker off screen within reach" % who)
+		check(true, "%s: off-screen skipped: no spot in the room puts the lurker off screen within reach" % who)
 	else:
 		var reach := _player.light_radius() * Lurker.NOTICE_FACTOR
 		var d := lurker.global_position.distance_to(_player.global_position)
 		check(d <= reach and not _parts.world.play_rect().has_point(lurker.global_position),
 				"%s: premise: the player %s it, %.0f px away (reach %.0f px), and it is just outside the play rect" % [who, side, d, reach])
 		check(not lurker.senses(_player), "%s: a lurker outside the play rect never notices, whatever the light (chain %d)" % [who, _player.chain.count])
+		# Control: the same light at the same distance with the lurker on screen is noticed, so the
+		# verdict above is the screen rule, not distance or light.
+		if _place_on_screen(lurker, d):
+			check(lurker.senses(_player), "%s: control: the same light %.0f px away with the lurker on screen is noticed" % [who, d])
+		else:
+			check(true, "%s: off-screen control skipped: no spot %.0f px away keeps the lurker on screen" % [who, d])
 	# 4. The telegraph, measured: frames seen in TELEGRAPH until it ends (it may have started up to a
 	# frame before we saw it, so the floor is checked to within one frame).
 	_player.chain.break_chain()
@@ -279,28 +319,44 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 	await _free()
 
 
-## Straight below the lurker, else straight above, at the first distance where it leaves the play
-## rect (AR20: "on screen" is the play rect, so the lurker's own SCREEN_MARGIN is what is tested).
-## The player stays inside the room and inside the light's reach. Returns "is below" / "is above",
-## or "" when neither side has such a spot.
+## Straight below the lurker, else above, else beside it (a room wider than the play area hides
+## it behind a gutter), at the first distance where it leaves the play rect (AR20: "on screen" is
+## the play rect, so the lurker's own SCREEN_MARGIN is what is tested). The player stays inside the
+## room and inside the light's reach. Returns where the player is, or "" when no direction works.
 func _place_off_screen(lurker: Lurker) -> String:
 	var reach := _player.light_radius() * Lurker.NOTICE_FACTOR
-	for dir: float in [1.0, -1.0]:
+	var dirs := {"is below": Vector2.DOWN, "is above": Vector2.UP, "is left of": Vector2.LEFT, "is right of": Vector2.RIGHT}
+	for label: String in dirs:
 		var d := 0.0
 		while d <= reach:
-			var pos := lurker.global_position + Vector2(0, dir * d)
+			var pos: Vector2 = lurker.global_position + dirs[label] * d
 			if not _room.bounds().has_point(pos):
 				break
 			place(pos)
 			if not _parts.world.play_rect().has_point(lurker.global_position):
-				return "is below" if dir > 0.0 else "is above"
+				return label
 			d += 1.0
 	return ""
 
 
-## Contact (the first lurker by position): an IDLE lurker is harmless, a HUNTING one kills. Both
-## in mid-air in the open, the lurker moved onto the player: in its wall pocket the body would be
-## pushed out of the tile, and a floor contact breaks the chain (the ground is a sanctuary).
+## The off-screen control: the player `d` px from the lurker (toward the room's middle first) with
+## the lurker on screen, inside the margin it notices in. False when no direction works.
+func _place_on_screen(lurker: Lurker, d: float) -> bool:
+	var toward := signf(_room.bounds().get_center().x - lurker.global_position.x)
+	for dir: Vector2 in [Vector2(toward if toward != 0.0 else 1.0, 0), Vector2(-toward, 0), Vector2.DOWN, Vector2.UP]:
+		var pos := lurker.global_position + dir * d
+		if dir == Vector2.ZERO or not _room.bounds().has_point(pos):
+			continue
+		place(pos)
+		if _parts.world.play_rect().grow(-Lurker.SCREEN_MARGIN).has_point(lurker.global_position):
+			return true
+	return false
+
+
+## Contact (the first lurker by position): an IDLE or a TELEGRAPHING lurker is harmless (Pillar 2:
+## the telegraph is the warning, never the attack), a HUNTING one kills. All in mid-air in the open,
+## the lurker moved onto the player: in its wall pocket the body would be pushed out of the tile,
+## and a floor contact breaks the chain (the ground is a sanctuary).
 func _test_contact(rec: Dictionary) -> void:
 	await _build(rec)
 	var spot := _open_spot(rec)
@@ -317,10 +373,20 @@ func _test_contact(rec: Dictionary) -> void:
 	await frames(3)
 	check(lurker.state == Lurker.State.IDLE and not died[0], "%s: touching an IDLE lurker does not kill (no telegraph yet)" % rec.id)
 	_add_links(ESCAPE_CHAIN)  # a big light: the lurker keeps the scent
-	lurker._enter(Lurker.State.HUNT)
+	lurker._enter(Lurker.State.TELEGRAPH)
 	lurker.global_position = _player.global_position
 	await frames(3)
-	check(died[0] and _player.is_dead, "%s: control: a HUNTING lurker kills on contact, in the same spot" % rec.id)
+	check(lurker.state == Lurker.State.TELEGRAPH and not lurker.monitorable and not died[0],
+			"%s: touching a TELEGRAPHING lurker does not kill, even with a big light (the telegraph is the warning)" % rec.id)
+	lurker._enter(Lurker.State.HUNT)
+	lurker.global_position = _player.global_position
+	var lethal := false
+	for i in 3:
+		await frames(1)
+		lethal = lethal or lurker.monitorable
+		if died[0]:
+			break
+	check(died[0] and _player.is_dead and lethal, "%s: control: a HUNTING lurker, lethal (monitorable) at contact, kills in the same spot" % rec.id)
 	await _free()
 
 
@@ -340,15 +406,18 @@ func _open_spot(rec: Dictionary) -> Vector2:
 
 
 ## Pillar 2 (M1 playtest: "saw it, couldn't escape"): a Snuff, a landing or a cling in time saves you
-## from a hunting lurker at full speed a body-length or two away. Each on a fresh room.
-func _test_escape(rec: Dictionary, kind: String) -> void:
+## from a hunting lurker at full speed `gap` px away (a Snuff also point-blank, as M1 tested it).
+## Each on a fresh room.
+func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	await _build(rec)
 	var lurker := _lurkers()[0]
 	_only(null)
-	var who := "%s %s escape" % [rec.id, kind]
+	var who := "%s %s escape (%.0f px)" % [rec.id, kind, gap]
+	var snuff := kind.begins_with("Snuff")
 	var start := Vector2.ZERO
+	var toward_wall := ""
 	match kind:
-		"Snuff":
+		"Snuff", "Snuff point-blank":
 			_player.set_physics_process(false)  # state level, as M1 tested it: the input can't undo it
 			start = _player.global_position
 		"landing":
@@ -359,41 +428,43 @@ func _test_escape(rec: Dictionary, kind: String) -> void:
 				return
 			start = stand + Vector2(0, -6)
 		"cling":
-			var wall := _cling_start(rec)
-			if wall == Vector2.INF:
+			var wall := RoomSweep.cling_wall(rec.grid)
+			if wall.is_empty():
 				check(true, "%s: skipped: no cling wall in %s" % [who, rec.id])
 				await _free()
 				return
-			start = wall
+			# The body (10 px wide) touches the wall face, mid-air.
+			var cell: Vector2i = wall.cell
+			start = Vector2(cell.x * Room.TILE + 5.5 if wall.side < 0 else (cell.x + 1) * Room.TILE - 5.5, (cell.y + 1) * Room.TILE)
+			toward_wall = "move_left" if wall.side < 0 else "move_right"
 	place(start)
 	if kind == "cling":
 		# Fall clear of coyote time first, holding toward the wall, so Jump clings, never jumps.
-		Input.action_press("move_left")
+		Input.action_press(toward_wall)
 		await frames(8)
 	_add_links(ESCAPE_CHAIN)
 	if kind == "landing":
 		_player.velocity.y = 60.0  # falling
 	var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
-	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * ESCAPE_GAP, 0)
+	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * gap, 0)
 	lurker._enter(Lurker.State.HUNT)
 	lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
 	_only(lurker)
 	await frames(1)
 	var before := lurker.monitorable
-	match kind:
-		"Snuff":
-			_player.chain.set_snuffed(true)
-		"cling":
-			Input.action_press("jump")
+	if snuff:
+		_player.chain.set_snuffed(true)
+	elif kind == "cling":
+		Input.action_press("jump")
 	# The escape frame: the Snuff's next tick, the first on the floor, the first clinging.
 	var waited := 0
 	while waited < 30:
 		await frames(1)
 		waited += 1
-		if kind == "Snuff" or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging):
+		if snuff or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging):
 			break
 		before = lurker.monitorable
-	var escaped := kind == "Snuff" or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging)
+	var escaped := snuff or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging)
 	check(escaped and before, "%s: premise: it escapes on frame %d, and the hunting lurker was lethal the frame before" % [who, waited])
 	var since := 0  # frames since the escape frame
 	var harmless := not lurker.monitorable
@@ -403,9 +474,10 @@ func _test_escape(rec: Dictionary, kind: String) -> void:
 		harmless = not lurker.monitorable
 	check(harmless, "%s: the lurker is harmless (monitorable off) on the escape frame or the one after" % who)
 	var lose := int(ceil((Game.tuning.f(&"lurker_lose_track_time") + 0.2) * Engine.physics_ticks_per_second))
+	var m1_lose := int(ceil(M1_LOSE_TRACK * Engine.physics_ticks_per_second))
 	var total := int(ceil(1.2 * Engine.physics_ticks_per_second))
 	var left := 0 if lurker.state != Lurker.State.HUNT else -1
-	while since < maxi(total, lose):
+	while since < maxi(total, maxi(lose, m1_lose)):
 		await frames(1)
 		since += 1
 		if left < 0 and lurker.state != Lurker.State.HUNT:
@@ -413,13 +485,14 @@ func _test_escape(rec: Dictionary, kind: String) -> void:
 		if since == total:
 			check(not _player.is_dead, "%s: still alive 1.2 s later" % who)
 	check(left >= 0 and left <= lose, "%s: the lurker leaves HUNT within lose-track + 0.2 s (%d frames; left after %d)" % [who, lose, left])
-	for a in ["move_left", "jump"]:
+	check(left >= 0 and left <= m1_lose, "%s: the lurker loses track within %.1f s, whatever the tuning (M1's bound; left after %d frames)" % [who, M1_LOSE_TRACK, left])
+	for a in ["move_left", "move_right", "jump"]:
 		Input.action_release(a)
 	await _free()
 
 
 ## D9: where a landing ends: the room's `P`, else its down entry, else the first ledge cell (row,
-## then column) with two open cells above. Vector2.INF when there is none.
+## then column) with two empty cells above (no crawler to knock the player off). Vector2.INF when none.
 func _stand_position(rec: Dictionary) -> Vector2:
 	if _room.has_entry(&"spawn"):
 		return _room.entry_position(&"spawn")
@@ -428,20 +501,6 @@ func _stand_position(rec: Dictionary) -> Vector2:
 	var g: Array[String] = rec.grid
 	for r in range(2, g.size()):
 		for c in range(1, g[r].length() - 1):
-			if RoomLoader.solid_at(g, Vector2i(c, r)) and not RoomLoader.solid_at(g, Vector2i(c, r - 1)) and not RoomLoader.solid_at(g, Vector2i(c, r - 2)):
+			if RoomLoader.solid_at(g, Vector2i(c, r)) and g[r - 1][c] == RoomLegend.EMPTY and g[r - 2][c] == RoomLegend.EMPTY:
 				return Vector2(c * Room.TILE + Room.TILE / 2.0, r * Room.TILE - 12)
-	return Vector2.INF
-
-
-## D9: falling beside the 1-tile left wall: the first row (from the top) where column 0 is solid and
-## columns 1–2 are open for CLING_ROWS rows. The body (10 px wide) touches the wall. Vector2.INF when none.
-func _cling_start(rec: Dictionary) -> Vector2:
-	var g: Array[String] = rec.grid
-	for r in range(1, g.size() - CLING_ROWS):
-		var clear := true
-		for k in CLING_ROWS:
-			var row := r + k
-			clear = clear and RoomLoader.solid_at(g, Vector2i(0, row)) and not RoomLoader.solid_at(g, Vector2i(1, row)) and not RoomLoader.solid_at(g, Vector2i(2, row))
-		if clear:
-			return Vector2(Room.TILE + 5.5, (r + 1) * Room.TILE)
 	return Vector2.INF
