@@ -3,7 +3,7 @@ baseline_commit: 9a55dc4
 ---
 # Story 1.10: Room smoke tests and the reachability bot
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -70,6 +70,31 @@ so that a layout change can never quietly break a guarantee.
   - [x] Run the D14 red checks, and record each in the Debug Log.
   - [x] Every new `.gd.uid` is staged.
   - [x] Report "tests green; needs a 1-minute look at the shaft's bottom on the laptop". D11 moved a walker: fall to the bottom, land, and walk to the hole.
+
+### Review Findings
+
+Code review 2026-11-19 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; scope `9a55dc4..cada033`).
+
+- [x] [Review][Decision] The lose-track bound moves with tuning — `smoke_rooms` checks "leaves HUNT within `lurker_lose_track_time` + 0.2 s" (D9), so raising the tuning value raises the bound and still passes. The deleted M1 check was a fixed "loses track within 1 s", and the Debug Log's "stricter" holds only at today's 0.6 s. Options: keep D9's bound and restore M1's fixed 1 s next to it (nothing lost, no new guarantee); add a cited `Spec.LOSE_TRACK_MAX` (GDD line first, with sonlm); or keep D9's bound alone and fix the wording. **Resolved (sonlm, 2026-11-19): keep both** (patch below).
+- [x] [Review][Decision] A testing rule was added to `project-context.md` beyond D13 — "a new per-room rule is a pure function in `tests/room_sweep.gd` with a firing sample and a near-miss, never a test on one room", plus the gate clause "(and, from E4, …)". The file says to *propose* rule changes. Keep or drop? **Resolved (sonlm, 2026-11-19): keep it**, no change.
+- [x] [Review][Patch] Restore M1's fixed "loses track within 1 s" next to D9's tuning-relative bound, and correct the Debug Log's "stricter" wording (decision above) [game/tests/smoke_rooms.gd:405]
+- [x] [Review][Patch] The point-blank Snuff escape was lost: M1 forced the hunt 18 px away, now every escape starts 48 px away, where a braking lurker (≈ 10 px coast) can't reach, so "alive 1.2 s later" can't fail through a lethality bug (AC6). Add the 18 px Snuff case [game/tests/smoke_rooms.gd:19]
+- [x] [Review][Patch] The notice-floor control loop can hang: it stops on `chain.count < 30`, but the chain caps at 20, so a lurker floor above 138.4 px never ends it [game/tests/smoke_rooms.gd:241]
+- [x] [Review][Patch] The off-screen verdict has no positive control at the same distance on screen, and the placement probes only up/down (a wider room's gutter case is never swept) [game/tests/smoke_rooms.gd:286]
+- [x] [Review][Patch] Contact never checks that a TELEGRAPHING lurker is harmless, and the HUNT control doesn't check the lurker was lethal (monitorable) at contact [game/tests/smoke_rooms.gd:304]
+- [x] [Review][Patch] The bot's no-down-exit "floor" ending is off by one: it uses feet = y + 12, a resting body sits at 83.993 and floors to the row above; `_drop_x` uses + 13. The branch never runs on m1_shaft; prove it on a scratch room [game/tests/smoke_bot.gd:117]
+- [x] [Review][Patch] A valid room with no `P` and no up exit asserts in `entry_position()` (engine error, not a named FAIL): the bot builds at `&"spawn"` unguarded, and `smoke_rooms` runs the world-stub check on the first swept room whatever its entry [game/tests/smoke_bot.gd:69]
+- [x] [Review][Patch] `record()` re-parses the header with its own regex copies and silently drops what doesn't match; nothing ties it to what the loader builds (E4's left/right exits would vanish from the link and arrival sweeps). Cross-check `record()` exits and obj ids against the built `Room` [game/tests/room_sweep.gd:54]
+- [x] [Review][Patch] Spine falls from the top entry to the first safe row, and from the last safe row to the down hole, are never measured unless the neighbour is a swept spine room (FR57 is any fall) [game/tests/room_sweep.gd:120]
+- [x] [Review][Patch] A production room may link into `rooms/dev/`, which release exports exclude and the sweeps skip [game/tests/room_sweep.gd:224]
+- [x] [Review][Patch] A notch counts as a ledge: one open cell above a solid one, with a wall right above that; the body needs two open cells (`down_entry_cell`'s rule) [game/tests/room_sweep.gd:90]
+- [x] [Review][Patch] The cling escape searches only a 1-tile left wall; a room whose only cling wall is on the right, or thicker, skips it; the cling and stand cells use `solid_at`, which treats a crawler cell as open [game/tests/smoke_rooms.gd:438]
+- [x] [Review][Patch] `NARROW_MIN` / `NARROW_MAX` are GDD guarantees living outside `Spec` (project rule: guarantees compare against `tests/spec.gd`; the citation lint can't see them) [game/tests/room_sweep.gd:17]
+- [x] [Review][Patch] The stub check compares against `CameraRig.PLAY_WIDTH`; M1 pinned 360 px and `smoke_world` writes UX numbers out, never reading them from CameraRig [game/tests/smoke_rooms.gd:196]
+- [x] [Review][Patch] `smoke_moves`: built through the id index (a duplicate id push_errors), no setup check before the landing, the cling grace check can't tell a bank from a loss, the Snuff release has no "still held" control and reads after one frame, and the comment names the wrong hoverer row [game/tests/smoke_moves.gd:32]
+- [x] [Review][Patch] The ledge rule's "a hazard tile is never a ledge" clause has no sample (only "hazard above" is exercised) [game/tests/test_room_sweep.gd:81]
+- [x] [Review][Patch] Docs: the development guide still names `set_lurkers_active`; rooms.md says "one more link" (the code adds links up to the lurker's floor) and that a new HAZARDS char needs "no edit" (it must also become a known legend char); README says every lurker gets the escapes (the first per room does); the last-run date and the bot's timing disagree; `project-context.md` Last Updated [docs/development-guide.md:71]
+- [x] [Review][Patch] AC7 "every new check is red-checked": no recorded red check for the invalid-file path (FAIL, never built, no `ERROR:`), the walk sentinels, the bot's "alive", the escapes' "alive" and "leaves HUNT", or the bot's floor ending [_bmad-output/implementation-artifacts/1-10-room-smoke-tests-and-the-reachability-bot.md]
 
 ## Dev Notes
 
@@ -414,7 +439,7 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
 - **Baseline** `9a55dc4`: `./run_tests.sh` → `== ALL GREEN (12 tests)`, 719 `ok`, 1 m 16 s.
 - **Final:** `== ALL GREEN (15 tests)`, 846 `ok`, 1 m 39 s, no `SCRIPT ERROR` / `ERROR:` lines; the same 9 `push_warning` lines as the baseline (`test_state`'s deliberate warnings).
 - **`ok` counts, test by test (before → after):** `smoke_shaft` 36 → deleted; `test_room_loader` 64 → 72 (+9 `cling=` cases, −1 FR57 gap check); new `test_room_sweep` 58, `smoke_rooms` 76, `smoke_bot` 6, `smoke_moves` 15. Unchanged: `test_clock` 15, `test_deferred_owners` 25, `test_lint` 162, `test_log` 7, `test_state` 165, `test_tuning` 87, `smoke_player_input` 59, `smoke_room_swap` 39, `smoke_world` 60. `smoke_rooms` 76 = 10 file/sweep checks + 3 tuning + 1 harness stub + 4 lurkers × 12 + 2 contact + 3 escapes × 4.
-- **D1, where each of `smoke_shaft`'s 36 checks went:** stub (1) → `smoke_rooms`; pogo (3), landing (2), jump (2), cling (6) → `smoke_moves`; bot (2) → `smoke_bot` (now the full descent); telegraph/hunt/lose (13) → `smoke_rooms` per lurker (telegraph seen, tuning ≥ Spec, measured frames, HUNT, **closes in** (added here, it had no other home), base ≤ 40, base never noticed, notice-floor setup/verdict/control, `Lurker.NOTICE_MIN_RADIUS` ≥ Spec, off-screen; "Snuff → loses track within 1 s" is the Snuff escape's stricter "leaves HUNT within 0.8 s"); Snuff escape (2) and lurker kills (2) → `smoke_rooms` per room; Snuff needs a hold (3): tap keeps the chain and hold Snuffs are covered by `smoke_player_input`'s `test_light_windows`, but **"releasing Light ends the Snuff" is not checked there**, so it moved to `smoke_moves` (with its setup check) instead of being dropped.
+- **D1, where each of `smoke_shaft`'s 36 checks went:** stub (1) → `smoke_rooms`; pogo (3), landing (2), jump (2), cling (6) → `smoke_moves`; bot (2) → `smoke_bot` (now the full descent); telegraph/hunt/lose (13) → `smoke_rooms` per lurker (telegraph seen, tuning ≥ Spec, measured frames, HUNT, **closes in** (added here, it had no other home), base ≤ 40, base never noticed, notice-floor setup/verdict/control, `Lurker.NOTICE_MIN_RADIUS` ≥ Spec, off-screen; "Snuff → loses track within 1 s" was first mapped to the Snuff escape's "leaves HUNT within lose-track + 0.2 s", which is 0.8 s only at today's tuning, so the code review restored M1's fixed 1 s next to it); Snuff escape (2) and lurker kills (2) → `smoke_rooms` per room; Snuff needs a hold (3): tap keeps the chain and hold Snuffs are covered by `smoke_player_input`'s `test_light_windows`, but **"releasing Light ends the Snuff" is not checked there**, so it moved to `smoke_moves` (with its setup check) instead of being dropped.
 - **Task 1:** the 9 `cling=` validator cases failed first on "unknown key 'cling'", then passed.
 - **Task 2:** `test_room_sweep` red first (the helper didn't exist), then 55/55; 8 mutations of `room_sweep.gd` each caught by a named sample (gap off by one, ledge ignores hazard cover, hazard window off by one, arrival rows narrowed, narrow max off by one, link entry side swapped, exit fall ignores the target, obj dedupe removed). A 9th rule found on review: a spine room with **no** safe row passed vacuously → sentinel added, red first (58 checks).
 - **Task 3:** first run of `smoke_rooms` had two FAILs: the arrival (expected, D14 #12) and the contact control (a HUNTING lurker didn't kill). Cause: the first lurker sits in the left wall, so placing the player on it embedded the body in a tile; the push-out registered a floor contact and broke the chain, so the lurker lost the scent. (M1's check passed only because earlier tests had dragged that lurker into open air.) Fix: contact in mid-air in the first open 3 × 4 block, the lurker moved onto the player.
@@ -434,6 +459,18 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
   12. Arrival: before Task 6 the walker at (4, 102) gave `FAIL m1_shaft: arriving from below at (3, 102), a 'c' spawns at (4, 102), within 3 cells`.
   13. `CLING_GRACE` 3.0 → `FAIL grace runs out -> the chain breaks (banks)`.
   14. (extra) `Lurker._ready()` `monitorable = true` → `FAIL m1_shaft: touching an IDLE lurker does not kill` (plus 24 knock-on failures).
+
+- **Code review 2026-11-19** (three layers; 2 decisions, 18 patches, 12 dismissed). Before the fixes, two scratch rooms reproduced the bugs: `rooms/l9/zz_floor.txt` (`m1_shaft` with no down exit) → `FAIL … with no down exit, the bot reaches the bottom ledge, row 103 (ended: stuck)` (+12 feet row), and `rooms/a0/zz_noentry.txt` (spine, no `P`, no exits) → `SCRIPT ERROR: Assertion failed: Room zz_noentry has no entry 'spawn'`. After them: `zz_floor` ends `floor`, `zz_noentry` is `FAIL zz_noentry: the bot has nowhere to start`, and `smoke_rooms` runs its stub check on `m1_shaft` with no engine error. Scratch rooms removed. Counts: `test_room_sweep` 58 → 74, `smoke_rooms` 76 → 90, `smoke_moves` 15 → 17; suite 846 → 878 `ok`, ALL GREEN (15 tests), the same 9 warnings.
+- **Review red checks** (break → named FAIL → restore; `md5sum` verified):
+  - R1 HUNT `monitorable = true` → the four "harmless" verdicts and **the point-blank Snuff's "still alive 1.2 s later"** fail (the 48 px cases can't fail "alive": the braking lurker stops short, the review's point).
+  - R2 `LURKER_LOSE_TRACK_TIME` 3.0 → M1's "loses track within 1.0 s" fails on all four escapes while D9's tuning-relative bound passes; R2b the lurker never gives up (`× 10`) → both bounds fail.
+  - R3 `Lurker._on_screen()` always false → the four off-screen **controls** fail while the verdicts pass.
+  - R4 TELEGRAPH monitorable → `FAIL … touching a TELEGRAPHING lurker does not kill`.
+  - R5 `record()`'s exit regex without `up` → `FAIL res://rooms/l1/m1_shaft.txt: the sweeps read the same exits and obj ids the loader builds …`.
+  - R6 the cling timeout calls `lose()` → `FAIL grace runs out -> the chain breaks and banks its 21 held embers … (banked 0)`.
+  - R7–R14 (`test_room_sweep`): notch clause removed, hazard-tile clause removed, top-entry and down-hole falls unmeasured, links into `rooms/dev/` allowed, cling wall ignoring crawlers, cling wall left-only, `Spec.NARROW_MAX` 11 → each fails its named sample.
+  - G1+G2 an invalid `rooms/l9/zz_bad.txt` (unknown char) with `m1_shaft` moved to `rooms/l2/` → `smoke_rooms`: `FAIL sentinel: …`, `FAIL res://rooms/l9/zz_bad.txt:20:3 unknown char 'x'` and nothing else for it (never built, no `ERROR:`); `smoke_bot`: `FAIL … zz_bad.txt: can't play it …`, `FAIL sentinel: …`.
+  - G3 the bot dies at frame 300 → `FAIL m1_shaft: the bot is alive at the end` (and the chain and exit checks).
 
 ### Completion Notes List
 
@@ -458,7 +495,8 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
   - `smoke_moves` pauses the lurkers (M1 left them active), so a move check never depends on a lurker.
   - Task 6 ran before Task 4: its red check (#12) was captured first, and it was the only thing between `smoke_rooms` and green.
 - **Deferred, with owner:** one item (Story 4.9): `smoke_bot` (≈ 28 s per spine room) and `smoke_rooms` (≈ 10 s per room) run every room in one runner process under the 120 s watchdog, and both sentinels name `rooms/l1/m1_shaft.txt`, which 4.9 moves to `rooms/dev/`.
-- **Needs a feel check on the laptop** (tests are green; headless can't judge it): D11 moved the bottom-left walker from column 4 to column 8. Fall to the bottom of the shaft, land, and walk to the hole (about 1 minute).
+- **Code review 2026-11-19:** sonlm kept the added project-context rule and chose to keep D9's lose-track bound with M1's fixed 1 s beside it. All 18 patches applied: the point-blank (18 px) Snuff escape; M1's 1 s lose-track bound; the notice-floor loop bounded by its own counter; an on-screen control for the off-screen verdict, probing above, below and beside; TELEGRAPH contact harmless and HUNT lethal at contact; the bot's feet row (+13, one helper) and a named FAIL for a spine room with no `up` exit or `P`; the stub check on the first room with an entry; `record()` cross-checked against the built `Room`; FR57 from the top entry and to the down hole; no exit from a layer room into `rooms/dev/`; a ledge needs two open cells above; the cling escape at either wall face, any thickness, crawler-free (`RoomSweep.cling_wall()`, unit-tested); `Spec.NARROW_MIN` / `NARROW_MAX`; the stub's 360 px written out; `smoke_moves` by path, with a landing setup check, a real bank check and a Snuff-release control; a sample for the hazard-tile ledge clause; docs. Nothing deferred by the review.
+- **Laptop feel check passed (sonlm, 2026-11-19):** D11 moved the bottom-left walker from column 4 to column 8. Played down to the bottom of the shaft, landed and walked to the hole: the walker felt fine, and the hole still loops to the top (R16).
 
 ### File List
 
@@ -475,9 +513,9 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
 - game/tests/smoke_shaft.gd (deleted)
 - game/tests/smoke_shaft.gd.uid (deleted)
 - game/tests/room_harness.gd (modified: `build_from_path()`)
-- game/tests/spec.gd (modified: `LEDGE_FALL_TIME`, `LEDGE_FALL_MAX`)
+- game/tests/spec.gd (modified: `LEDGE_FALL_TIME`, `LEDGE_FALL_MAX`; review: `NARROW_MIN`, `NARROW_MAX`)
 - game/tests/test_room_loader.gd (modified: `cling=` cases; FR57 gap check removed)
-- game/scripts/world/room_legend.gd (modified: `HAZARDS`)
+- game/scripts/world/room_legend.gd (modified: `HAZARDS`; review: its comment says 1.19 must also make the char known)
 - game/scripts/world/room_loader.gd (modified: `cling=` key, `REPEAT_KEYS`)
 - game/rooms/l1/m1_shaft.txt (modified: walker (4, 102) → (8, 102), header note)
 - game/README.md (modified: test list)
@@ -490,8 +528,10 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
 - _bmad-output/game-architecture.md (modified: the `smoke_rooms` excerpt)
 - _bmad-output/implementation-artifacts/deferred-work.md (modified: two 1.10 items closed, one item owned by Story 4.9)
 - _bmad-output/implementation-artifacts/1-10-room-smoke-tests-and-the-reachability-bot.md (this file)
-- _bmad-output/implementation-artifacts/sprint-status.yaml (modified: 1-10 → review)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified: 1-10 → review → done)
 
 ### Change Log
 
 - 2026-11-19: Story 1.10 implemented. `smoke_rooms` checks every room file (validation, unique ids, exit links, spine falls, cling stretches, hazard pits, a safe arrival from below, the lurker guarantees); `smoke_bot` plays every spine room top to bottom; pure sweeps in `room_sweep.gd` with `test_room_sweep`; `smoke_moves` keeps the M1 move checks; `smoke_shaft` deleted. `Spec.LEDGE_FALL_TIME` / `LEDGE_FALL_MAX`, `RoomLegend.HAZARDS`, the `cling=` key; `m1_shaft`'s bottom-left walker moved to column 8 (D11). Status → review.
+- 2026-11-19: Code review (Blind Hunter, Edge Case Hunter, Acceptance Auditor): 2 decisions (keep D9's lose-track bound plus M1's fixed 1 s; keep the project-context rule), 18 patches applied and red-checked, 12 dismissed, nothing deferred. ALL GREEN (15 tests, 878 ok). Status → done.
+- 2026-11-19: Laptop feel check passed (sonlm): the moved bottom-floor walker feels fine, and the R16 loop still works.

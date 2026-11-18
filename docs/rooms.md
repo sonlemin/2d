@@ -54,7 +54,7 @@ Entities spawn through `room.spawn(scene, cell_centre, args)` in grid order (row
 
 - **In-wall rule:** an `L` whose left or right neighbour is a wall **or the room edge** also gets a wall tile, so a lurker hiding in a wall leaves no hole. (M1 checked only the neighbours; with 1-tile walls a lurker sits in the edge column.) Such an `L` counts as solid everywhere below.
 - **Solid** means `#`, plus an `L` that the in-wall rule turns solid.
-- **Hazards:** `RoomLegend.HAZARDS` lists the tile chars that hurt on contact. It is empty until Story 1.19 adds the spike. A hazard is never a ledge, and neither is a floor cell whose open top is a hazard. The room checks below cover any char added to it, with no edit.
+- **Hazards:** `RoomLegend.HAZARDS` lists the tile chars that hurt on contact. It is empty until Story 1.19 adds the spike. A hazard is never a ledge, and neither is a floor cell whose open top is a hazard. Story 1.19 adds the spike to the legend (so the validator knows the char) and to `HAZARDS`; the room checks below then cover it with no test edit.
 - **Ledge rims:** every solid cell whose upper neighbour is in the grid and is neither solid nor `L` gets a faint unshaded 16 × 1 line, so places to land read in the dark (M1 finding 7).
 
 ### Adding a char
@@ -100,22 +100,23 @@ A missing file is `"<path>:0:0 file not found"`.
 
 Adding a room file adds its checks, with no edit to any test (Story 1.10, AR50). `smoke_rooms.gd` walks every `res://rooms/**/*.txt` itself, sorted by path (it needs at least one file, and `rooms/l1/m1_shaft.txt` among them). The pure sweeps live in `tests/room_sweep.gd`, unit-tested on inline grids in `test_room_sweep.gd`.
 
-**Every file:** `RoomLoader.parse()` + `validate()`; each error is one `FAIL`, and a file with errors is never built (so it never `push_error`s). Rooms are built by path, never through the id index, so a duplicate id is a named `FAIL` too.
+**Every file:** `RoomLoader.parse()` + `validate()`; each error is one `FAIL`, and a file with errors is never built (so it never `push_error`s). Rooms are built by path, never through the id index, so a duplicate id is a named `FAIL` too. Each valid file is also built once to check that the sweeps read the same exits and obj ids the loader builds (the sweeps parse the header themselves).
 
 **Across files (every file, `rooms/dev/` included):**
 - room ids (base names) and `obj=` ids are unique;
-- every exit target is a room, and has the entry the crossing arrives at: a `down` exit needs the target to have an `up` exit, an `up` exit a `down` one.
+- every exit target is a room, and has the entry the crossing arrives at: a `down` exit needs the target to have an `up` exit, an `up` exit a `down` one;
+- a room outside `rooms/dev/` never exits into one (release exports exclude it, and it is never swept).
 
 **Every swept room** (outside `rooms/dev/`):
-- **spine falls** (`spine=true` only): no fall between consecutive safe rows is over 19 rows, `Spec.LEDGE_FALL_MAX` (315 px: 1.5 s at the 210 px/s max fall, FR57). Safe rows are ledge rows (a solid inner cell, not a hazard, with an open, non-hazard cell above) plus every row of a `cling=` stretch. A spine room with no safe row fails. The fall out of a `down` exit into a spine target counts too: rows from the last safe row to the floor, plus the target's first safe row;
-- **cling stretches:** every open run in each declared row is 6–10 tiles wide;
+- **spine falls** (`spine=true` only): no fall is over 19 rows, `Spec.LEDGE_FALL_MAX` (315 px: 1.5 s at the 210 px/s max fall, FR57): between consecutive safe rows; from the top (with an `up` exit) to the first safe row; from the last safe row to the floor (with a `down` exit). Safe rows are ledge rows (a solid inner cell, not a hazard, with **two** open, non-hazard cells above, since the body is 20 px tall) plus every row of a `cling=` stretch. A spine room with no safe row fails. The fall out of a `down` exit into a spine target counts as one fall: rows from the last safe row to the floor, plus the target's first safe row;
+- **cling stretches:** every open run in each declared row is `Spec.NARROW_MIN`–`NARROW_MAX` (6–10) tiles wide;
 - **hazard pits:** every hazard cell that can be fallen onto has a safe row in the 19 rows above it (GDD Sequence Breaking);
 - **arrival from below:** no enemy spawn (a `RoomLegend.SPAWNS` char that isn't persistent) within 3 cells (Chebyshev) of the `down` entry's stand cell, about 1.9 s of walker travel (1.7 review, decided by sonlm 2026-11-18). `m1_shaft`'s bottom-left walker starts at column 8 for this;
-- **lurkers**, each sorted by position: base light (40 px) is never noticed point-blank; the largest light under 80 px is never noticed point-blank, while one more link is (a control); the biggest light never wakes a lurker just outside the play rect, though it is in reach; the telegraph lasts at least 0.75 s (measured in frames), then it hunts and closes in. For the first lurker, each on a fresh room: an IDLE lurker is harmless on contact and a HUNTING one kills; a Snuff, a landing and a cling, each in time against a lurker hunting 48 px away, make it harmless (`monitorable` off) on the escape frame or the one after, the player is alive 1.2 s later, and it leaves HUNT within the lose-track time + 0.2 s. A room with no stand cell or cling wall prints an `ok … skipped` line saying so.
+- **lurkers**, each sorted by position: base light (40 px) is never noticed point-blank; the largest light under 80 px is never noticed point-blank, while the first light at the lurker's own notice floor is (a control; chain 4 today); the biggest light never wakes a lurker just outside the play rect (the player above, below or beside it), though it is in reach, while the same light at the same distance with the lurker on screen does (a control); the telegraph lasts at least 0.75 s (measured in frames), then it hunts and closes in. For the first lurker in each room, each scenario on a fresh room: an IDLE or a TELEGRAPHING lurker is harmless on contact and a HUNTING one, lethal at contact, kills; a Snuff, a landing and a cling (at either wall face with two empty columns beside it), each in time against a lurker hunting 48 px away, and a point-blank Snuff 18 px away (M1's case, where the braking lurker does reach the player), make it harmless (`monitorable` off) on the escape frame or the one after, the player is alive 1.2 s later, and it leaves HUNT within the lose-track time + 0.2 s and within 1 s whatever the tuning. A room with no stand cell or cling wall prints an `ok … skipped` line saying so.
 
 Plus, once per run: the tuned max fall can't stretch `Spec.LEDGE_FALL_MAX` past 1.5 s, and the tuned telegraph and the lurker's notice floor are at least their `Spec` values.
 
-**`smoke_bot.gd`** plays every `spine=true` room outside `rooms/dev/`, sorted by path, from its `up` entry (else `P`) down to its `down` exit: plain movement, Attack, a hop only when blocked, never Dash, all lurkers paused. It aims for the nearest crawler in a row below the last one it swung at, pogoes it, walks off a ledge at the edge nearest its next target, and slashes a walker on its floor within 24 px. Per room it must reach a chain of `Spec.BOT_MIN_CHAIN` (5; `m1_shaft`: 8), have chain 0 whenever its body crosses an exit (the World backstop never fires on its line), reach the `down` exit (or, with none, the bottom ledge), and be alive. It prints a `bot <id>: frame …, best …` trace line.
+**`smoke_bot.gd`** plays every `spine=true` room outside `rooms/dev/`, sorted by path, from its `up` entry (else `P`) down to its `down` exit: plain movement, Attack, a hop only when blocked, never Dash, all lurkers paused. It aims for the nearest crawler in a row below the last one it swung at, pogoes it, walks off a ledge at the edge nearest its next target, and slashes a walker on its floor within 24 px. Per room it must reach a chain of `Spec.BOT_MIN_CHAIN` (5; `m1_shaft`: 8), have chain 0 whenever its body crosses an exit (the World backstop never fires on its line), reach the `down` exit (or, with none, the bottom ledge), and be alive. A spine room with neither an `up` exit nor `P` is a named `FAIL` (nowhere to start). It prints a `bot <id>: frame …, best …` trace line.
 
 **`rooms/dev/`** (the perf scene, Story 1.12) is validated and counts for unique ids and links, but is never swept or botted. Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
 
@@ -124,7 +125,7 @@ cd game && ./run_tests.sh       # everything
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd   # the validator, the build and m1_shaft's pins
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sweep.gd    # the pure sweeps on inline grids
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_rooms.gd        # every room file: validation, sweeps, lurkers
-godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd          # the descent bot in every spine room (~30 s per room)
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd          # the descent bot in every spine room (~28 s on m1_shaft)
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd        # the M1 move checks on m1_shaft
 ```
 
