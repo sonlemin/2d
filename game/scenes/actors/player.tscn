@@ -1,9 +1,10 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/player.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://art/player.png" id="2_player"]
 [ext_resource type="Texture2D" path="res://art/light.png" id="3_light"]
 [ext_resource type="Texture2D" path="res://art/slash.png" id="4_slash"]
+[ext_resource type="Script" uid="uid://2qqhbf1hqpmj" path="res://scripts/actors/player_input.gd" id="5_input"]
 
 [sub_resource type="RectangleShape2D" id="body_shape"]
 size = Vector2(10, 20)
@@ -75,3 +76,6 @@ monitorable = false
 [node name="Shape" type="CollisionShape2D" parent="Hurtbox"]
 position = Vector2(0, 2)
 shape = SubResource("hurt_shape")
+
+[node name="PlayerInput" type="Node" parent="."]
+script = ExtResource("5_input")

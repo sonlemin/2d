@@ -117,7 +117,8 @@ func _through_json(d: Dictionary) -> Dictionary:
 func _test_settings_defaults() -> void:
 	var s := Settings.new()
 	check(s.brightness == 1, "Settings: brightness defaults to 1, the M1 level (got %s)" % s.brightness)
-	check(s.to_dict() == {"brightness": 1}, "...and to_dict() is {brightness: 1} (got %s)" % s.to_dict())
+	check(s.light_tap_window == 0.12 and typeof(s.light_tap_window) == TYPE_FLOAT, "...and the Light tap window defaults to 0.12 s, M1's Snuff hold (Story 1.8 D5; got %s)" % s.light_tap_window)
+	check(s.to_dict() == {"brightness": 1, "light_tap_window": 0.12}, "...and to_dict() is {brightness: 1, light_tap_window: 0.12} (got %s)" % s.to_dict())
 	# {&"k": 1} == {"k": 1} is true, so the comparison above can't tell the key type.
 	check(s.to_dict().keys().all(func(k: Variant) -> bool: return k is String), "...with String keys, as SlotState and DiveState give (D4)")
 
@@ -148,10 +149,12 @@ func _test_settings_reset() -> void:
 	s.set_value(&"brightness", 0)
 	var got := []
 	s.changed.connect(func(key: StringName) -> void: got.append(key))
+	s.set_value(&"light_tap_window", 0.3)
 	s.reset()
-	check(s.brightness == 1 and got == [&"brightness"], "reset() restores brightness 1 in place and emits changed (D2; got %s, %s)" % [s.brightness, got])
+	check(s.brightness == 1 and s.light_tap_window == 0.12 and got == [&"light_tap_window", &"brightness", &"light_tap_window"], "reset() restores brightness 1 and the 0.12 s window in place and emits changed for every key (D2; got %s, %s, %s)" % [s.brightness, s.light_tap_window, got])
+	got.clear()
 	s.reset()
-	check(got == [&"brightness", &"brightness"], "...and a reset that changes nothing still emits (D2; got %s)" % [got])
+	check(got == [&"brightness", &"light_tap_window"], "...and a reset that changes nothing still emits (D2; got %s)" % [got])
 
 
 func _test_settings_round_trips() -> void:
@@ -163,11 +166,19 @@ func _test_settings_round_trips() -> void:
 	var clean := u.from_dict(_through_json(s.to_dict()))
 	check(clean and u.brightness == 2 and typeof(u.brightness) == TYPE_INT, "...through JSON too, as an int (D3: JSON numbers come back as floats; got %s, type %d)" % [u.brightness, typeof(u.brightness)])
 	var v := Settings.new()
-	check(v.from_dict({"brightness": 3, "unknown_key": true}) and v.brightness == 3, "an unknown key is ignored and the data is still clean (D3)")
+	check(v.from_dict({"brightness": 3, "light_tap_window": 0.12, "unknown_key": true}) and v.brightness == 3, "an unknown key is ignored and the data is still clean (D3)")
 	var got := []
 	v.changed.connect(func(key: StringName) -> void: got.append(key))
-	v.from_dict({"brightness": 3})
-	check(got == [&"brightness"], "from_dict() emits changed for every key, changed or not (D2; got %s)" % [got])
+	v.from_dict({"brightness": 3, "light_tap_window": 0.12})
+	check(got == [&"brightness", &"light_tap_window"], "from_dict() emits changed for every key, changed or not (D2; got %s)" % [got])
+	check(not Settings.new().from_dict({"brightness": 3}), "a file from before Story 1.8 (no light_tap_window) is unclean, so Game rewrites it with the default")
+	# Story 1.8 D5: a float setting survives JSON exactly, for every choice.
+	for w: float in Settings.SCHEMA[&"light_tap_window"].choices:
+		var a := Settings.new()
+		a.set_value(&"light_tap_window", w)
+		var b := Settings.new()
+		var ok := b.from_dict(_through_json(a.to_dict()))
+		check(ok and b.light_tap_window == w and typeof(b.light_tap_window) == TYPE_FLOAT, "light_tap_window %s survives JSON exactly, as a float (got %s)" % [w, b.light_tap_window])
 
 
 func _test_settings_fallbacks() -> void:
@@ -176,6 +187,12 @@ func _test_settings_fallbacks() -> void:
 		s.set_value(&"brightness", 3)
 		var clean := s.from_dict(bad)
 		check(not clean and s.brightness == 1, "from_dict(%s) is unclean and falls back to brightness 1 (D3; got %s)" % [bad, s.brightness])
+	# Story 1.8 D5: only the three windows; a whole JSON number is still a float, so 0 isn't 0.12.
+	for bad: Variant in [0.15, "0.2", true, 12, 0, null]:
+		var s := Settings.new()
+		s.set_value(&"light_tap_window", 0.3)
+		var clean := s.from_dict({"brightness": 1, "light_tap_window": bad})
+		check(not clean and s.light_tap_window == 0.12, "light_tap_window %s is unclean and falls back to 0.12 (got %s)" % [var_to_str(bad), s.light_tap_window])
 
 
 # --- SlotState ---
@@ -640,9 +657,10 @@ func _test_settings_file() -> void:
 	await get_tree().process_frame
 	check(Game.settings.brightness == 1 and _tmp_holds(1), "bad key: the default, rewritten (got %s)" % _read_tmp().c_escape())
 
-	await _prime('{"version": 1, "settings": {"brightness": 3}, "keep": true}', 0)
+	await _prime('{"version": 1, "settings": {"brightness": 3, "light_tap_window": 0.2}, "keep": true}', 0)
 	Game.load_settings()
 	check(Game.settings.brightness == 3 and typeof(Game.settings.brightness) == TYPE_INT, "valid file: brightness 3, as an int")
+	check(Game.settings.light_tap_window == 0.2, "...and the Light tap window 0.2 s (Story 1.8; got %s)" % Game.settings.light_tap_window)
 	await get_tree().process_frame
 	check(_read_tmp().contains("\"keep\""), "...and the file is kept, not rewritten")
 

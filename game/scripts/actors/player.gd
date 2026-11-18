@@ -2,7 +2,8 @@ class_name Player
 extends CharacterBody2D
 ## The descender. Runs, jumps, dashes, slashes on the ground and pogos (Attack in the air).
 ## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light (light radius).
-## Landing or holding Light (Snuff) breaks the chain. Touching a predator kills.
+## Landing or holding Light past the tap window (Snuff) breaks the chain. Touching a predator kills.
+## Reads only its PlayerInput's intents, never Input (AR34, Story 1.8).
 
 signal died
 signal chain_changed(count: int)
@@ -13,7 +14,6 @@ signal pogo_hit
 # These stay local because no system bends them (Story 1.3 D1).
 const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads chain.light_radius(), never this (M1 player.light_kick).
 const LIGHT_LERP := 10.0  ## 1/s easing of the visible light toward its target radius; presentation (M1 player.light_lerp).
-const SNUFF_HOLD := 0.12  ## s Light must be held to Snuff, so a tap never breaks the chain; becomes Settings.light_tap_window in 1.8, never a Tuning key (M1 player.snuff_hold).
 const HITSTOP_SCALE := 0.05  ## time scale during a pogo hitstop: it only makes the freeze a freeze; its length is Tuning hitstop (Story 1.3 D3).
 const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px
 
@@ -22,7 +22,6 @@ var is_dead := false
 
 var _facing := 1
 var _coyote := 0.0
-var _buffer := 0.0
 var _dash_left := 0.0
 var _dash_dir := 1
 var _jumping := false                   ## only a real jump may be cut short by releasing Jump
@@ -33,7 +32,6 @@ var _swing_is_pogo := false
 var _swing_hit := false                 ## a swing connects at most once for the chain
 var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
-var _light_held := 0.0
 var _clinging := false
 var _cling_side := 0
 var _cling_left := 0.0
@@ -44,6 +42,8 @@ var _kick_left := 0.0
 @onready var _slash: Area2D = $Slash
 @onready var _pogo: Area2D = $Pogo
 @onready var _hurtbox: Area2D = $Hurtbox
+## Public for tests and scripted moments (`player.input.lock()`).
+@onready var input: PlayerInput = $PlayerInput
 
 
 func _ready() -> void:
@@ -63,8 +63,9 @@ func light_radius() -> float:
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
+	input.sample()  # first, so every read this tick sees this tick's input (Story 1.8 D1)
 	_tick_timers(delta)
-	_handle_snuff(delta)
+	_handle_snuff()
 	if not _handle_cling(delta):
 		_handle_horizontal(delta)
 		_handle_vertical(delta)
@@ -90,18 +91,15 @@ func _process(delta: float) -> void:
 
 func _tick_timers(delta: float) -> void:
 	_coyote = maxf(_coyote - delta, 0.0)
-	_buffer = maxf(_buffer - delta, 0.0)
 	_swing_cd = maxf(_swing_cd - delta, 0.0)
 	_invuln = maxf(_invuln - delta, 0.0)
 	_sprite.visible = _invuln <= 0.0 or fmod(_invuln, 0.4) < 0.25  # 2.5 Hz blink stays under the 3 flashes/s cap
 
 
-## Hold = Snuff (the design's tap on Light is reserved for Flare Toss, later).
-func _handle_snuff(delta: float) -> void:
-	_light_held = _light_held + delta if Input.is_action_pressed("light") else 0.0
-	var snuff := _light_held >= SNUFF_HOLD
-	if snuff != chain.snuffed:
-		chain.set_snuffed(snuff)
+## Held past the tap window = Snuff; PlayerInput times it on real time (FR9). A tap is Flare Toss (1.23).
+func _handle_snuff() -> void:
+	if input.snuff_active != chain.snuffed:
+		chain.set_snuffed(input.snuff_active)
 
 
 ## Wall cling (hold Jump at a wall while falling): the chain pauses and its light hides.
@@ -110,14 +108,17 @@ func _handle_snuff(delta: float) -> void:
 func _handle_cling(delta: float) -> bool:
 	var t := Game.tuning
 	if not _clinging:
-		if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not Input.is_action_pressed("jump"):
+		if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not input.cling_held:
 			return false
 		_cling_side = _wall_side()
 		if _cling_side == 0:
 			return false
 		_clinging = true
 		chain.set_clinging(true)
-	if not Input.is_action_pressed("jump"):
+	# Jump is held all through a cling, so the only press that can be waiting is the one that
+	# started it: it went into the cling (M1 never buffered it), not into a jump after the kick.
+	input.consume(&"jump_pressed")
+	if not input.cling_held:
 		_end_cling()
 		velocity = Vector2(-_cling_side * t.f(&"wall_kick_x"), t.f(&"wall_kick_y"))
 		_facing = -_cling_side
@@ -125,7 +126,7 @@ func _handle_cling(delta: float) -> bool:
 		_kick_left = t.f(&"kick_lock")
 		_jumping = false
 		return true
-	if Input.is_action_pressed("move_down") or _wall_side() != _cling_side:
+	if input.down_held or _wall_side() != _cling_side:
 		_end_cling()
 		return false
 	_cling_left -= delta
@@ -151,7 +152,7 @@ func _wall_side() -> int:
 
 func _handle_horizontal(delta: float) -> void:
 	var t := Game.tuning
-	var dir := Input.get_axis("move_left", "move_right")
+	var dir := input.move.x
 	if dir != 0.0:
 		_facing = int(signf(dir))
 		_sprite.flip_h = _facing < 0
@@ -160,7 +161,7 @@ func _handle_horizontal(delta: float) -> void:
 		_dash_left -= delta
 		velocity.x = t.f(&"dash_speed") * _dash_dir  # direction is locked when the dash starts
 		return
-	if Input.is_action_just_pressed("dash") and _can_dash and not is_on_floor():
+	if input.dash_pressed and _can_dash and not is_on_floor():
 		_can_dash = false
 		_dash_left = t.f(&"dash_time")
 		_dash_dir = _facing
@@ -180,20 +181,22 @@ func _handle_vertical(delta: float) -> void:
 	var t := Game.tuning
 	var g := t.f(&"gravity") * (t.f(&"fall_gravity_scale") if velocity.y > 0.0 else 1.0)
 	velocity.y = minf(velocity.y + g * delta, t.f(&"max_fall"))
-	if Input.is_action_just_pressed("jump"):
-		_buffer = t.f(&"jump_buffer")
-	if _buffer > 0.0 and _coyote > 0.0:
+	# The press waits jump_buffer (FR1) of real time in PlayerInput, so a hitstop never eats it.
+	if input.jump_pressed and _coyote > 0.0:
 		velocity.y = t.f(&"jump_velocity")
 		_jumping = true
-		_buffer = 0.0
+		input.consume(&"jump_pressed")
 		_coyote = 0.0
-	if Input.is_action_just_released("jump") and _jumping and velocity.y < 0.0:
+	if input.jump_released and _jumping and velocity.y < 0.0:
 		velocity.y *= t.f(&"jump_cut")
 
 
 func _handle_attack() -> void:
-	if not Input.is_action_just_pressed("attack") or _swing_cd > 0.0:
+	# A press waits ATTACK_BUFFER of real time for the cooldown (Story 1.8 D9). The cooldown runs on
+	# game time, so a press in a pogo's hitstop still runs out first, as in M1 (sonlm, 2026-11-18).
+	if not input.attack_pressed or _swing_cd > 0.0:
 		return
+	input.consume(&"attack_pressed")
 	_swing_is_pogo = not is_on_floor()  # in the air, Attack always pogoes (one key, still timed)
 	_swing_left = Game.tuning.f(&"pogo_armed") if _swing_is_pogo else Game.tuning.f(&"slash_active")
 	_swing_cd = Game.tuning.f(&"attack_cooldown")

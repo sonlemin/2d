@@ -5,7 +5,7 @@ extends RefCounted
 ## `changed(key)` (AR18). The session's instance lives in `core/game.gd`.
 ## rules/ does no file I/O (R15): `core/save_store.gd` persists these as `settings.json`, and the
 ## session's instance decides when to write.
-## Only Brightness exists yet (Story 1.4 D1). Each story adds its own key as one SCHEMA entry plus
+## Brightness (Story 1.4) and the Light tap window (Story 1.8) exist so far. Each story adds its own key as one SCHEMA entry plus
 ## a typed var of the same name, and needs no version bump: a missing key takes its default.
 
 signal changed(key: StringName)
@@ -14,12 +14,17 @@ signal changed(key: StringName)
 ## var of the same name.
 const SCHEMA := {
 	&"brightness": {default = 1, choices = [0, 1, 2, 3]},
+	&"light_tap_window": {default = 0.12, choices = [0.12, 0.2, 0.3]},
 }
 
 ## Index of the world's ambient level (4 levels, UX A1 / R1); 1 is the M1 default (the M1 shaft's
 ## ambient_index). It changes only the world's ambient level, never light radii or what predators
 ## sense (architecture → UI → Brightness).
 var brightness := 1
+## s: a Light release inside this window is a tap (Flare Toss), a hold past it is Snuff, so a tap
+## never breaks the chain (FR9, UX-DR119; M1's 0.12 s Snuff hold is the default). Read by
+## PlayerInput at each tick; Options > Accessibility shows it from Story 1.36.
+var light_tap_window := 0.12
 
 
 func set_value(key: StringName, v: Variant) -> void:

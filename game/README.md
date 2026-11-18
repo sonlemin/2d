@@ -12,7 +12,8 @@ Open this folder in Godot 4.7 and press F5.
 | X on the ground | Slash sideways |
 | X in the air | **Pogo**: strike down, bounce off an enemy and add 1 to the chain |
 | C | Air dash (refilled by each pogo) |
-| Hold V | **Snuff** (hold about 0.12 s; a quick tap does nothing): go dark. Breaks the chain, and lurkers lose you |
+| Hold V | **Snuff** (hold past the tap window, 0.12 s by default; a quick tap does nothing yet, Flare Toss comes later): go dark. Breaks the chain, and lurkers lose you |
+| ↓ standing still on the ground | Interact: does nothing yet (stations come later) |
 
 ## The loop
 

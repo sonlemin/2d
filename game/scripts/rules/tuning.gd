@@ -31,7 +31,7 @@ const JUMP_BUFFER := 0.10  ## s; an early Jump press waits this long for the gro
 
 # --- Dash (GDD Movement "Air dash", FR2) ---
 const DASH_SPEED := 260.0  ## px/s; a horizontal burst that ignores gravity, once per airtime, refilled by a pogo hit (GDD Movement "Air dash", FR2; M1 player.dash_speed). M1 value, unchanged.
-const DASH_TIME := 0.12  ## s per dash; ≈ 31 px at DASH_SPEED (GDD Movement "Air dash", FR2; M1 player.dash_time). M1 value, unchanged.
+const DASH_TIME := 0.12  ## s per dash; player.gd checks the timer before counting it down, so a dash runs 8–9 ticks, ≈ 0.15 s and ≈ 39 px at DASH_SPEED (measured, Story 1.8; 1.15 decides: fix it or change the GDD) (GDD Movement "Air dash", FR2; M1 player.dash_time). M1 value, unchanged.
 
 # --- Cling (GDD Wall cling (M1) and the chain-end table, FR6/FR7) ---
 const CLING_GRACE := 1.0  ## s of paused chain per cling; a pogo hit refills it (GDD Wall cling, FR6/FR7; M1 player.cling_time). Silk Grip +0.25 (E6). M1 value, unchanged.

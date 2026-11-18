@@ -23,9 +23,10 @@ const ACTORS := {
 }
 
 ## The 44 M1 @export defaults (baseline 85bb1ed), copied from the M1 code, never from Tuning.
-## A row is moved to Tuning (`keys`), kept as a local const (`local`), or per instance (`instance`).
-## A `local` row whose const moved to another script names it in `home` (Story 1.6: the camera
-## consts moved to world/camera_rig.gd).
+## A row is moved to Tuning (`keys`), kept as a local const (`local`), per instance (`instance`),
+## or became a player setting (`setting`, Story 1.8: the Snuff hold is Settings.light_tap_window's
+## default, never a Tuning key). A `local` row whose const moved to another script names it in
+## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd).
 const M1: Array[Dictionary] = [
 	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
 	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
@@ -53,7 +54,7 @@ const M1: Array[Dictionary] = [
 	{m1 = "player.light_kick", value = 18.0, local = "LIGHT_KICK"},
 	{m1 = "player.knockback", value = Vector2(150, -150), keys = [&"knockback_x", &"knockback_y"]},
 	{m1 = "player.invuln_time", value = 0.6, keys = [&"invuln_time"]},
-	{m1 = "player.snuff_hold", value = 0.12, local = "SNUFF_HOLD"},
+	{m1 = "player.snuff_hold", value = 0.12, setting = &"light_tap_window", gone = "SNUFF_HOLD"},
 	{m1 = "player.light_lerp", value = 10.0, local = "LIGHT_LERP"},
 	{m1 = "crawler.hover", value = false, instance = true},
 	{m1 = "crawler.walk_speed", value = 25.0, keys = [&"crawler_walk_speed"]},
@@ -249,6 +250,10 @@ func _test_m1_fixture() -> void:
 				seen[k] = seen.get(k, 0) + 1
 			var got: Variant = t.f(keys[0]) if keys.size() == 1 else Vector2(t.f(keys[0]), t.f(keys[1]))
 			check(got == row.value and not vars.has(prop), "%s = %s is Tuning %s (got %s) and gone from %s.gd" % [row.m1, row.value, keys, got, actor])
+		elif row.has("setting"):
+			var got: Variant = Settings.SCHEMA[row.setting].default
+			var consts := script.get_script_constant_map()
+			check(got == row.value and not vars.has(prop) and not consts.has(row.gone), "%s = %s is the Settings.%s default (got %s), with no %s const or var left in %s.gd" % [row.m1, row.value, row.setting, got, row.gone, actor])
 		elif row.has("local"):
 			var home: String = row.get("home", ACTORS[actor])
 			var got: Variant = (load(home) as Script).get_script_constant_map().get(row.local)
