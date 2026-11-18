@@ -58,7 +58,26 @@ The core rules: chain count, light radius, Blade Bloom and embers. It has no sce
 
 No camera: `World`'s `CameraRig` follows the player (Story 1.6). **Signals:** `died`, `chain_changed(count)`, `pogo_hit` (World kicks the camera). `Fx` popups go to `World.current_room()` (falling back to the parent when there is no World).
 
-**Local consts** (no system bends them): `LIGHT_KICK` 18, `LIGHT_LERP` 10, `SNUFF_HOLD` 0.12 (becomes `Settings.light_tap_window` in 1.8), `HITSTOP_SCALE` 0.05, `LIGHT_TEXTURE_HALF` 64.
+**Local consts** (no system bends them): `LIGHT_KICK` 18, `LIGHT_LERP` 10, `HITSTOP_SCALE` 0.05, `LIGHT_TEXTURE_HALF` 64. M1's `SNUFF_HOLD` 0.12 is now the default of `Settings.light_tap_window` (Story 1.8).
+
+**Input:** the player reads only its `PlayerInput` child (`player.input`), never `Input`, and calls `input.sample()` first each tick.
+
+### PlayerInput — `scripts/actors/player_input.gd` (`Node`, `class_name PlayerInput`, child of `Player`)
+
+The only gameplay reader of `Input` (Story 1.8, AR34). It has no `_physics_process` of its own (a child ticks after its parent, which would lag every press a tick): `Player` calls `sample()`. It times everything in real ticks (`1 / physics_ticks_per_second` per sample), so a hitstop never stretches a buffer or the Light window, and a pause freezes them.
+
+| Intent | Meaning |
+|---|---|
+| `move` | `Vector2` of raw left/right and up/down strengths, each zeroed below `MOVE_DEADZONE` 0.2 |
+| `jump_held`, `dash_held`, `cling_held` | key down this tick (`cling_held` = `jump_held` until the 1.35 toggle) |
+| `down_held` | ↓ at or past 0.2 on its own, for the wall drop (↑ is also Jump, so `move.y` would cancel while clinging on ↑) |
+| `jump_released` | Jump went up this tick: the jump cut keeps M1's release edge |
+| `snuff_active` | Light held past `Settings.light_tap_window` (0.12 / 0.2 / 0.3 s: held tick 8 / 12 / 18), on until release. A hold starts on any held tick, so Light held through a pause or a respawn still Snuffs |
+| `jump_pressed` | a press waiting `jump_buffer` (0.10 s) of real time, until `consume(&"jump_pressed")` |
+| `attack_pressed` | a press waiting `ATTACK_BUFFER` (0.10 s) of real time for the cooldown, until consumed. The cooldown runs on game time, so a press in a pogo's hitstop still runs out first, as in M1 |
+| `dash_pressed`, `light_tap`, `interact` | edges, true for one sample. `light_tap` is a release inside the window (Flare Toss in 1.23); `interact` is ↓ crossing 0.6 (`INTERACT_FIRE`) on the ground with sideways < 0.2, re-armed below 0.3 (`INTERACT_REARM`) |
+
+`consume(intent)` clears a waiting press or an edge (the Player consumes the Jump press that starts a cling); `lock()` turns every intent off and clears buffers and the Light machine (a held Snuff ends); `unlock()` lets held keys count again, while a press, a Light hold and interact need a fresh press; `is_locked()`.
 
 ### Crawler — `scripts/actors/crawler.gd` + `scenes/actors/crawler.tscn` (`CharacterBody2D`, `class_name Crawler`)
 
@@ -146,7 +165,7 @@ Rooms as text (Story 1.5). The format, legend, validator errors and Room API are
 | `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
 | `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
 | `rules/gear.gd` | `class_name Gear` (pure data) | `TABLE` of `{id, stat, op, value}` rows (`set` / `add` / `mul` / `flag`); empty until E5 |
-| `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices |
+| `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` and `light_tap_window` (0.12 / 0.2 / 0.3 s, Story 1.8) so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices |
 | `rules/slot_state.gd` | `class_name SlotState` (`RefCounted`, pure); `Game.slot` | Per-slot state: `best_chain`, `deaths`, `difficulty` (`&"easy"`/`&"normal"`/`&"hard"`), story flags (`set_flag()` / `has_flag()`), visited rooms (`visit()` / `has_visited()`, `visits_changed`; Story 1.7). `to_dict()` becomes save format `slot_v1` at 1.41 |
 | `rules/dive_state.gd` | `class_name DiveState` (`RefCounted`, pure); `Game.dive` | Per-dive state: `carried` embers (`add_carried()`), the respawn point (`set_respawn()`), killed enemies (`mark_killed()` / `is_killed()`, never saved) |
 
@@ -206,12 +225,13 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 | `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
 | `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
 | `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), `rules/` purity, and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
-| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 153 checks) | headless |
+| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips, `rules/` purity), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 171 checks) | headless |
 | `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts), the build and the `Room` API, and the real `m1_shaft` (counts, ledge rows, FR57 gaps, exits) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change) | headless |
 | `tests/smoke_shaft.gd` | 10 scenario tests (30 checks) on `m1_shaft` loaded through the room harness, including a pathing bot | headless |
 | `tests/smoke_world.gd` | World: no boot, the tree, framing (limits, play rect, gutters), state wiring, popups in the room, death and respawn without a reload, a lurker behind a gutter, a hunt over a death, the R16 bottom loop, `ScreenRouter`, source checks | headless |
 | `tests/smoke_room_swap.gd` | Room swaps between `tests/rooms/swap/t_swap_a` and `t_swap_b`: deferral, the chain backstop, arrival from above and below, killed cells across swaps and a cross-room respawn, interpolation on | headless |
+| `tests/smoke_player_input.gd` | `tests/rooms/input/t_input.txt`: M1 movement pinned (run, coyote, jump buffer, air dash), the Light windows on both sides of each boundary, the Snuff latch, Light across a pause and a hitstop, real-time buffers, the attack buffer, ↓ interact, the wall drop on ↑, the cling press, `lock()` / `unlock()`, and no `Input.` outside `player_input.gd` | headless |
 | `tests/screenshot.gd` | 2 screenshots of `world.tscn` (gutters, darkness, framing) | needs a renderer |
 | `tests/room_harness.gd` | Not a test: `build(parent, room_id)` loads a room standalone with a test player, a `CameraRig` and a stub `World` (`play_rect()`, `current_room()`); `free_all()` | — |
 
