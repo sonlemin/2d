@@ -65,6 +65,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Exit targets are never checked to exist** — `game/scripts/world/room_loader.gd` `validate()` only checks the `exits=` shape, so `exits=down:m1_shatf@x1` validates clean, passes the export gate and fails only at runtime when 1.7 swaps rooms. `validate()` is per-file and pure; the check needs every room id. It must also check that the target has the arrival entry: crossing `down` arrives at the target's `up` entry and vice versa (World `push_error`s and cancels a swap into a room without it, Story 1.7).
   → **Owner: Story 1.10** — `smoke_rooms` already checks ids unique across all files; it can check every exit target resolves through `RoomLoader`'s index the same way.
+  → **Closed (Story 1.10): `smoke_rooms` runs `room_sweep.gd`'s `link_errors()` over every room file (`rooms/dev/` included): each exit target must be a room, and a `down` exit's target must have an `up` exit (an `up` exit's, a `down` one), each failure a named `FAIL`; room and obj ids are unique across files (`duplicate_id_errors()`).**
 - **A `down` entry puts the player over the exit hole** — `game/scripts/world/room.gd` `entry_position(&"down")` uses cell `(col, h-2)` with "feet on the tile below", but `validate()` requires that bottom-row tile to be open, so a player arriving from below (crossing an `up` exit arrives at the target's `down` entry) falls straight back out, and could loop between two rooms. `tests/test_room_loader.gd` pins the current value (`Vector2(88, 84)` in `ok_min`). Latent: nothing arrives from below until room swaps.
   → **Closed (Story 1.7): arrival stands on the floor beside the opening (D3), and the validator requires that floor.**
 
@@ -82,6 +83,13 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Arriving from below can land next to an enemy** — `game/scripts/world/room_loader.gd` `down_entry_cell()` checks only that the stand cell is open, not what spawns on that floor. In `m1_shaft` the stand cell (3, 102) is beside the walker at (4, 102). A probe with no input: the walker knocks the player into the hole and they loop to the top. Latent: `m1_shaft`'s ceiling gap is out of reach in play (P's ledge is ~84 px below it, the jump reaches 60 px), so only tests and DevTools arrive from below.
   → **Owner: Story 1.10** — its `smoke_rooms` / bot pass checks every arrival entry is safe (no enemy on the arrival floor, or a grace on arrival), with exit targets resolved across files.
+  → **Closed (Story 1.10): `arrival_errors()` in `smoke_rooms` fails any enemy spawn within 3 cells (Chebyshev, ≈ 1.9 s of walker travel) of a swept room's `down` entry stand cell; `m1_shaft`'s walker moved from (4, 102) to (8, 102) (D11 option A, approved by sonlm 2026-11-18).**
+
+
+## Deferred from: dev of 1-10-room-smoke-tests-and-the-reachability-bot.md (2026-11-19)
+
+- **`smoke_bot` and `smoke_rooms` run every room in one runner process** — `game/tests/smoke_bot.gd` takes ≈ 28 s per spine room (`m1_shaft`) and `smoke_rooms.gd` ≈ 10 s per room with 4 lurkers, under the runner's 120 s watchdog (150 s in `run_tests.sh`), so Layer 1's rooms push them over it at about four spine rooms. Both sentinels also name `rooms/l1/m1_shaft.txt`, which Story 4.9 moves to `rooms/dev/` (validated only, never swept or botted).
+  → **Owner: Story 4.9** — the first Layer 1 room, which moves `m1_shaft` to `rooms/dev/`: point both sentinels at `s1_lip`, re-time the two files, and split them per room (a room-path argument or one file per layer) before either nears 60 s; never skip a room or a lurker to fit.
 
 
 ## Deferred from: code review of 1-8-playerinput-intents.md (2026-11-18)

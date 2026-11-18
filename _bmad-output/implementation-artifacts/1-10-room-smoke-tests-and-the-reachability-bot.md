@@ -1,6 +1,9 @@
+---
+baseline_commit: 9a55dc4
+---
 # Story 1.10: Room smoke tests and the reachability bot
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -45,28 +48,28 @@ so that a layout change can never quietly break a guarantee.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Spec, legend and header (AC: 3).**
-  - [ ] Add `LEDGE_FALL_TIME` and `LEDGE_FALL_MAX` to `tests/spec.gd` with `## GDD` citations (D8). `test_lint`'s `spec_citation` must stay green.
-  - [ ] Add `const HAZARDS: Array[String] = []` to `scripts/world/room_legend.gd` (D7).
-  - [ ] `RoomLoader`: accept `cling=<from>-<to>` (repeatable) and validate it (D6). Add the validator cases to `test_room_loader.gd`.
-- [ ] **Task 2: The pure sweeps (AC: 2, 3).**
-  - [ ] Create `tests/room_sweep.gd` (helper: `extends RefCounted`, no `class_name`, static functions only) per D2 and D4–D7, plus D11 as decided.
-  - [ ] Create `tests/test_room_sweep.gd`. Inline-grid samples prove each function fires and stays quiet where it must, including near-misses.
-- [ ] **Task 3: `smoke_rooms.gd` (AC: 1–4).**
-  - [ ] The file walk, validation, cross-file and per-room sweeps (D3–D8, D11), and the `LEDGE_FALL_MAX` / max-fall check.
-  - [ ] The per-lurker and per-room lurker scenarios (D9), on a fresh harness per scenario where a death or state could leak.
-- [ ] **Task 4: `smoke_bot.gd` (AC: 5).** The full-room descent bot (D10).
-- [ ] **Task 5: Retire `smoke_shaft.gd` (AC: 6).**
-  - [ ] Create `tests/smoke_moves.gd` with the M1 move checks (D1).
-  - [ ] `git rm` `smoke_shaft.gd` and its `.uid`.
-  - [ ] Drop the FR57 gap check (and `LEDGE_GAP_MAX_ROWS`) from `test_room_loader.gd`; keep its ledge-row pin.
-- [ ] **Task 6: `m1_shaft` arrival (AC: 2).** Apply D11 option A (sonlm approved the edit, 2026-11-18): move the walker at (4, 102) to (8, 102). Red-check `arrival_errors` against the old position first (D14 #12).
-- [ ] **Task 7: Docs and ledger (AC: 7).** Per D13. Close the two 1.10-owned items in `deferred-work.md` with `→ **Closed (Story 1.10): …**` lines.
-- [ ] **Task 8: Verify (AC: 7).**
-  - [ ] `./run_tests.sh` → `== ALL GREEN (15 tests)`, with no `ERROR:` lines.
-  - [ ] Run the D14 red checks, and record each in the Debug Log.
-  - [ ] Every new `.gd.uid` is staged.
-  - [ ] Report "tests green; needs a 1-minute look at the shaft's bottom on the laptop". D11 moved a walker: fall to the bottom, land, and walk to the hole.
+- [x] **Task 1: Spec, legend and header (AC: 3).**
+  - [x] Add `LEDGE_FALL_TIME` and `LEDGE_FALL_MAX` to `tests/spec.gd` with `## GDD` citations (D8). `test_lint`'s `spec_citation` must stay green.
+  - [x] Add `const HAZARDS: Array[String] = []` to `scripts/world/room_legend.gd` (D7).
+  - [x] `RoomLoader`: accept `cling=<from>-<to>` (repeatable) and validate it (D6). Add the validator cases to `test_room_loader.gd`.
+- [x] **Task 2: The pure sweeps (AC: 2, 3).**
+  - [x] Create `tests/room_sweep.gd` (helper: `extends RefCounted`, no `class_name`, static functions only) per D2 and D4–D7, plus D11 as decided.
+  - [x] Create `tests/test_room_sweep.gd`. Inline-grid samples prove each function fires and stays quiet where it must, including near-misses.
+- [x] **Task 3: `smoke_rooms.gd` (AC: 1–4).**
+  - [x] The file walk, validation, cross-file and per-room sweeps (D3–D8, D11), and the `LEDGE_FALL_MAX` / max-fall check.
+  - [x] The per-lurker and per-room lurker scenarios (D9), on a fresh harness per scenario where a death or state could leak.
+- [x] **Task 4: `smoke_bot.gd` (AC: 5).** The full-room descent bot (D10).
+- [x] **Task 5: Retire `smoke_shaft.gd` (AC: 6).**
+  - [x] Create `tests/smoke_moves.gd` with the M1 move checks (D1).
+  - [x] `git rm` `smoke_shaft.gd` and its `.uid`.
+  - [x] Drop the FR57 gap check (and `LEDGE_GAP_MAX_ROWS`) from `test_room_loader.gd`; keep its ledge-row pin.
+- [x] **Task 6: `m1_shaft` arrival (AC: 2).** Apply D11 option A (sonlm approved the edit, 2026-11-18): move the walker at (4, 102) to (8, 102). Red-check `arrival_errors` against the old position first (D14 #12).
+- [x] **Task 7: Docs and ledger (AC: 7).** Per D13. Close the two 1.10-owned items in `deferred-work.md` with `→ **Closed (Story 1.10): …**` lines.
+- [x] **Task 8: Verify (AC: 7).**
+  - [x] `./run_tests.sh` → `== ALL GREEN (15 tests)`, with no `ERROR:` lines.
+  - [x] Run the D14 red checks, and record each in the Debug Log.
+  - [x] Every new `.gd.uid` is staged.
+  - [x] Report "tests green; needs a 1-minute look at the shaft's bottom on the laptop". D11 moved a walker: fall to the bottom, land, and walk to the hole.
 
 ## Dev Notes
 
@@ -404,10 +407,91 @@ Every `smoke_shaft` check is accounted for. Record the before → after `ok` cou
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-18 → 2026-11-19.
+
 ### Debug Log References
+
+- **Baseline** `9a55dc4`: `./run_tests.sh` → `== ALL GREEN (12 tests)`, 719 `ok`, 1 m 16 s.
+- **Final:** `== ALL GREEN (15 tests)`, 846 `ok`, 1 m 39 s, no `SCRIPT ERROR` / `ERROR:` lines; the same 9 `push_warning` lines as the baseline (`test_state`'s deliberate warnings).
+- **`ok` counts, test by test (before → after):** `smoke_shaft` 36 → deleted; `test_room_loader` 64 → 72 (+9 `cling=` cases, −1 FR57 gap check); new `test_room_sweep` 58, `smoke_rooms` 76, `smoke_bot` 6, `smoke_moves` 15. Unchanged: `test_clock` 15, `test_deferred_owners` 25, `test_lint` 162, `test_log` 7, `test_state` 165, `test_tuning` 87, `smoke_player_input` 59, `smoke_room_swap` 39, `smoke_world` 60. `smoke_rooms` 76 = 10 file/sweep checks + 3 tuning + 1 harness stub + 4 lurkers × 12 + 2 contact + 3 escapes × 4.
+- **D1, where each of `smoke_shaft`'s 36 checks went:** stub (1) → `smoke_rooms`; pogo (3), landing (2), jump (2), cling (6) → `smoke_moves`; bot (2) → `smoke_bot` (now the full descent); telegraph/hunt/lose (13) → `smoke_rooms` per lurker (telegraph seen, tuning ≥ Spec, measured frames, HUNT, **closes in** (added here, it had no other home), base ≤ 40, base never noticed, notice-floor setup/verdict/control, `Lurker.NOTICE_MIN_RADIUS` ≥ Spec, off-screen; "Snuff → loses track within 1 s" is the Snuff escape's stricter "leaves HUNT within 0.8 s"); Snuff escape (2) and lurker kills (2) → `smoke_rooms` per room; Snuff needs a hold (3): tap keeps the chain and hold Snuffs are covered by `smoke_player_input`'s `test_light_windows`, but **"releasing Light ends the Snuff" is not checked there**, so it moved to `smoke_moves` (with its setup check) instead of being dropped.
+- **Task 1:** the 9 `cling=` validator cases failed first on "unknown key 'cling'", then passed.
+- **Task 2:** `test_room_sweep` red first (the helper didn't exist), then 55/55; 8 mutations of `room_sweep.gd` each caught by a named sample (gap off by one, ledge ignores hazard cover, hazard window off by one, arrival rows narrowed, narrow max off by one, link entry side swapped, exit fall ignores the target, obj dedupe removed). A 9th rule found on review: a spine room with **no** safe row passed vacuously → sentinel added, red first (58 checks).
+- **Task 3:** first run of `smoke_rooms` had two FAILs: the arrival (expected, D14 #12) and the contact control (a HUNTING lurker didn't kill). Cause: the first lurker sits in the left wall, so placing the player on it embedded the body in a tile; the push-out registered a floor contact and broke the chain, so the lurker lost the scent. (M1's check passed only because earlier tests had dragged that lurker into open air.) Fix: contact in mid-air in the first open 3 × 4 block, the lurker moved onto the player.
+- **Task 4:** first bot run: best 7, stuck at row 40. Cause (trace): after pogoing the row-40 right walker it landed on the row-41 right ledge, directly above its next target (the column-17 hoverer under that ledge), and stood still with |dx| ≤ 3. Fix: on the floor it aims at the ledge's drop-off column nearest the target (`_drop_x()`). Then: frame 1628 (≈ 27 s), best 8, exit down with chain 0, alive; trace showed the floor slash firing on the row-84 walker and the bottom-floor walker; no hop needed.
+- **D14 red checks** (break → the named check fails → restore; restores verified by `diff` / `md5sum`, scratch files removed):
+  1. Unique ids: samples in `test_room_sweep` (room id and obj id across files). Scratch `rooms/l9/m1_shaft.txt` (+ `obj=dup_obj@3,3`) and `rooms/l9/zz_a.txt` (same obj) → `FAIL room id 'm1_shaft' is in both res://rooms/l1/m1_shaft.txt and res://rooms/l9/m1_shaft.txt`, `FAIL obj id 'dup_obj' is in both …`; no `ERROR:` line (rooms are built by path, never through the index).
+  2. Links: samples (a typo'd target; a down exit into a room with no up exit; an up exit into a room with no down exit).
+  3. Spine gap: row-57 ledge removed → `FAIL m1_shaft: the fall from row 41 to row 72 is 31 rows, over 19`.
+  4. Cling stretch: samples (11 wide → error; a 25-row gap covered by a stretch passes, uncovered fails; a partly covered gap fails from the stretch's last row).
+  5. Hazard pit: samples (25 rows below the last ledge → error; a ledge 10 rows above → quiet; 19 rows → quiet; 20 → error).
+  6. `MAX_FALL` 150 → `FAIL Spec.LEDGE_FALL_MAX 315 px at the tuned max fall 150 px/s takes 2.10 s …`.
+  7. `LURKER_TELEGRAPH_TIME` 0.6 → the tuning check and all 4 lurkers' measured telegraphs fail (36 frames < 45).
+  8. `Lurker.SCREEN_MARGIN` −200 → all 4 off-screen verdicts fail while their premises pass.
+  9. HUNT `monitorable = true` → the Snuff, landing and cling "harmless on the escape frame or the one after" verdicts all fail.
+  10. `Spec.BOT_MIN_CHAIN` 9 → `FAIL m1_shaft: the bot chains 9+ … (best 8)`.
+  11. Scratch `m1_shaft` with rows 103–104 opened at columns 1–18 (a legal wide opening, floor kept at 19–20) → `FAIL … the chain is 0 when the bot crosses an exit … (chain 1)`.
+  12. Arrival: before Task 6 the walker at (4, 102) gave `FAIL m1_shaft: arriving from below at (3, 102), a 'c' spawns at (4, 102), within 3 cells`.
+  13. `CLING_GRACE` 3.0 → `FAIL grace runs out -> the chain breaks (banks)`.
+  14. (extra) `Lurker._ready()` `monitorable = true` → `FAIL m1_shaft: touching an IDLE lurker does not kill` (plus 24 knock-on failures).
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-18. D11 decided by sonlm: option A (arrival rule, 3 cells; `m1_shaft` walker (4, 102) → (8, 102), layout edit approved).
+- **AC1:** `smoke_rooms` walks `res://rooms` itself (`RoomSweep.room_files()`, sorted), with sentinels (≥ 1 file, `m1_shaft` present); each validator error is a `FAIL`, a bad file is never built, `rooms/dev/` is validated only.
+- **AC2:** `duplicate_id_errors()` and `link_errors()` over every file; `arrival_errors()` on every swept room. Both 1.10-owned ledger items are closed.
+- **AC3:** `Spec.LEDGE_FALL_TIME` 1.5 and `LEDGE_FALL_MAX` 315 (cited); spine gaps, the fall through a down exit, cling widths and hazard pits over `RoomLegend.HAZARDS` (empty, proven on samples); the tuned max-fall check. `m1_shaft`'s worst gap is 18 rows.
+- **AC4:** per lurker (all 4, sorted by row then column): base light, notice floor with control, off-screen with premise, measured telegraph (54 frames), hunt and closes in; per room: contact and the three escapes, each on a fresh harness.
+- **AC5:** `smoke_bot` plays `m1_shaft` from its up entry to its down exit: best 8, chain 0 at the exit, alive.
+- **AC6:** `smoke_shaft.gd` and its `.uid` are `git rm`ed; every check is accounted for in the Debug Log; `test_room_loader` lost the FR57 check and kept the ledge-row pin.
+- **AC7:** 15 tests green; the red checks above; docs (`rooms.md`, development guide, architecture, component inventory, source tree, `game/README.md`), `project-context.md`, the `game-architecture.md` excerpt and the ledger updated. Game-code edits: `RoomLegend.HAZARDS`, the `cling=` key (`REPEAT_KEYS`), and the `m1_shaft` walker move. No gameplay script changes behaviour.
+- **Final `room_sweep.gd` API (D2):** `room_files(root)`, `is_dev(path, root)`, `record(path, parsed)` → `{id, path, grid, spine, exits, objs, clings}`, `cling_stretches(header)`, `ledge_rows(grid, hazards)`, `safe_rows(grid, stretches, hazards)`, `spine_gap_errors(id, grid, stretches, hazards, max_rows)`, `exit_fall_errors(rooms_by_id, hazards, max_rows)`, `stretch_width_errors(id, grid, stretches)`, `hazard_pit_errors(id, grid, stretches, hazards, max_rows)`, `duplicate_id_errors(files)`, `link_errors(rooms_by_id)`, `arrival_errors(id, grid, exits, clear_cells)`; consts `ARRIVAL_CLEAR_CELLS` 3, `NARROW_MIN` 6, `NARROW_MAX` 10.
+- **Deviations from the Dev Notes, kept and recorded:**
+  - **D9 off-screen:** the lurker is placed just outside `play_rect()` itself, not `play_rect().grow(-SCREEN_MARGIN)`. AC4 says "outside the play rect", and with the grown rect D14 #8 (margin −200) could never place it within reach and would skip instead of failing.
+  - **D9 contact:** in mid-air in the open with the lurker moved onto the player (see Debug Log, Task 3).
+  - **D10 floor policy:** the bot walks to the ledge's drop-off column nearest its target (`_drop_x()`), not straight at the target (see Debug Log, Task 4).
+  - **D5:** a floor cell whose open top is a hazard is not a ledge either ("a hazard never counts as a ledge"); `spine_gap_errors` fails a spine room with no safe row; the exit fall uses the last **safe** row (ledge or cling), consistent with D5's safe rows.
+  - **D11:** "enemy" = any `RoomLegend.SPAWNS` char that isn't `persistent`, so 1.24's anchor won't trip the rule.
+  - **D1:** "hunting lurker closes in" kept per lurker and "releasing Light ends the Snuff" kept in `smoke_moves` (neither had another home).
+  - **New harness entry point:** `RoomHarness.build_from_path()`, so a duplicate room id is a named `FAIL`, never the index's `push_error`.
+  - `NARROW_MIN` / `NARROW_MAX` / `ARRIVAL_CLEAR_CELLS` live in `room_sweep.gd` (the story named only two new Spec consts); the narrow width cites the GDD there.
+  - `smoke_moves` pauses the lurkers (M1 left them active), so a move check never depends on a lurker.
+  - Task 6 ran before Task 4: its red check (#12) was captured first, and it was the only thing between `smoke_rooms` and green.
+- **Deferred, with owner:** one item (Story 4.9): `smoke_bot` (≈ 28 s per spine room) and `smoke_rooms` (≈ 10 s per room) run every room in one runner process under the 120 s watchdog, and both sentinels name `rooms/l1/m1_shaft.txt`, which 4.9 moves to `rooms/dev/`.
+- **Needs a feel check on the laptop** (tests are green; headless can't judge it): D11 moved the bottom-left walker from column 4 to column 8. Fall to the bottom of the shaft, land, and walk to the hole (about 1 minute).
 
 ### File List
+
+- game/tests/room_sweep.gd (new)
+- game/tests/room_sweep.gd.uid (new)
+- game/tests/test_room_sweep.gd (new)
+- game/tests/test_room_sweep.gd.uid (new)
+- game/tests/smoke_rooms.gd (new)
+- game/tests/smoke_rooms.gd.uid (new)
+- game/tests/smoke_bot.gd (new)
+- game/tests/smoke_bot.gd.uid (new)
+- game/tests/smoke_moves.gd (new)
+- game/tests/smoke_moves.gd.uid (new)
+- game/tests/smoke_shaft.gd (deleted)
+- game/tests/smoke_shaft.gd.uid (deleted)
+- game/tests/room_harness.gd (modified: `build_from_path()`)
+- game/tests/spec.gd (modified: `LEDGE_FALL_TIME`, `LEDGE_FALL_MAX`)
+- game/tests/test_room_loader.gd (modified: `cling=` cases; FR57 gap check removed)
+- game/scripts/world/room_legend.gd (modified: `HAZARDS`)
+- game/scripts/world/room_loader.gd (modified: `cling=` key, `REPEAT_KEYS`)
+- game/rooms/l1/m1_shaft.txt (modified: walker (4, 102) → (8, 102), header note)
+- game/README.md (modified: test list)
+- docs/rooms.md (modified: `cling` key, obj ids across files, `HAZARDS`, validator list, Room checks)
+- docs/development-guide.md (modified)
+- docs/architecture.md (modified)
+- docs/component-inventory.md (modified)
+- docs/source-tree-analysis.md (modified)
+- _bmad-output/project-context.md (modified: Current State)
+- _bmad-output/game-architecture.md (modified: the `smoke_rooms` excerpt)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified: two 1.10 items closed, one item owned by Story 4.9)
+- _bmad-output/implementation-artifacts/1-10-room-smoke-tests-and-the-reachability-bot.md (this file)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified: 1-10 → review)
+
+### Change Log
+
+- 2026-11-19: Story 1.10 implemented. `smoke_rooms` checks every room file (validation, unique ids, exit links, spine falls, cling stretches, hazard pits, a safe arrival from below, the lurker guarantees); `smoke_bot` plays every spine room top to bottom; pure sweeps in `room_sweep.gd` with `test_room_sweep`; `smoke_moves` keeps the M1 move checks; `smoke_shaft` deleted. `Spec.LEDGE_FALL_TIME` / `LEDGE_FALL_MAX`, `RoomLegend.HAZARDS`, the `cling=` key; `m1_shaft`'s bottom-left walker moved to column 8 (D11). Status → review.

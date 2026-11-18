@@ -62,10 +62,14 @@ pixel_art_game/
 │   │   ├── test_tuning.gd        # Tuning API, gear order, floors under every gear combination, the 44 M1 exports fixture
 │   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
 │   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
+│   │   ├── test_room_sweep.gd    # The pure room sweeps on inline grids (fires + near-miss per rule)
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
 │   │   ├── spec.gd               # Helper: the GDD's guarantees as constants, preloaded by tests
-│   │   ├── smoke_shaft.gd        # Integration smoke test: m1_shaft via the room harness, simulated input, bot run
+│   │   ├── room_sweep.gd         # Helper: the pure room sweeps (falls, stretches, hazards, ids, links, arrival)
+│   │   ├── smoke_rooms.gd        # Every room file: validation, cross-file checks, sweeps, lurker guarantees
+│   │   ├── smoke_bot.gd          # The descent bot in every spine room: chain ≥ 5, no live chain at an exit
+│   │   ├── smoke_moves.gd        # The M1 move checks on m1_shaft: pogo, landing, jump, cling, Snuff release
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt

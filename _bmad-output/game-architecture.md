@@ -1155,13 +1155,15 @@ const TELEGRAPH_MIN := 0.75  ## GDD Predators: telegraph never below 0.75 s (Pil
 const BOT_MIN_CHAIN := 5     ## GDD Level validation: bot reaches ≥ 5 in every spine shaft
 const BASE_LIGHT := 40.0     ## GDD Chain: base light, never noticed
 
-# tests/smoke_rooms.gd (excerpt)
-for path in _all_room_files():
-	var room := RoomLoader.load_room_from_path(path)
-	_check(room != null, "%s builds" % path)
-	var lurkers := room.find_children("*", "", true, false).filter(func(n): return n is Lurker)
-	for lurker in _sorted_by_position(lurkers):
-		_check(Game.tuning.f(&"lurker_telegraph_time") >= Spec.TELEGRAPH_MIN, "%s telegraph ≥ %.2f" % [path, Spec.TELEGRAPH_MIN])
+# tests/smoke_rooms.gd (excerpt; Story 1.10). Validate first: a bad file is a FAIL per error and is
+# never built, so it never push_errors (which would fail the runner with an engine error instead).
+for path in RoomSweep.room_files():  # every res://rooms/**/*.txt, sorted; sentinel: m1_shaft
+	var parsed := RoomLoader.parse(FileAccess.get_file_as_string(path))
+	var errors := RoomLoader.validate(path, parsed)
+	for e in errors:
+		check(false, e)
+	if errors.is_empty() and not RoomSweep.is_dev(path):
+		swept.append(RoomSweep.record(path, parsed))  # pure sweeps, then lurker scenarios on a fresh harness each
 ```
 
 **Usage:** every new design guarantee in the GDD gets a `Spec` constant and a test before the feature is called done.

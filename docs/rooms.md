@@ -28,11 +28,12 @@ exits=up:m1_shaft@x3, down:m1_shaft@x1
 | `zone` | yes | `dusk`, `umber` or `violet` (the GDD's Layer 1 zones) |
 | `spine` | no (`false`) | `true` / `false`. A spine room must be exactly **22 columns wide, walls included** (352 px in the 360 px play area). |
 | `exits` | no | Comma-separated `<side>:<target_id>@x<col>`, side `up` or `down`, `col` in `1..width-2` (never a corner). At most one exit per side. |
-| `obj` | no, repeatable | `<id>@<col>,<row>`: a persistent object's id and cell. Ids are unique within the file here; across files from Story 1.10. |
+| `obj` | no, repeatable | `<id>@<col>,<row>`: a persistent object's id and cell. Ids are unique across every room file: the validator checks one file, `smoke_rooms` checks across files (Story 1.10). |
+| `cling` | no, repeatable | `<from>-<to>`: a **narrow cling stretch**, 0-based grid rows, inclusive (`from < to`, both inside the grid; stretches may overlap). Every row of it counts as somewhere to land for the spine-fall check, and every open run in those rows must be 6–10 tiles wide (GDD Narrow stretch). The build ignores it; only the room checks read it (Story 1.10). |
 
 Any other key is an error, so a typo can't pass silently. `map=` and left/right exits (`@y<row>`) arrive with E4.
 
-Columns and rows in `@x<col>` and `obj=` are **0-based grid cells**. Validator messages use **1-based file positions** (see below).
+Columns and rows in `@x<col>`, `obj=` and `cling=` are **0-based grid cells**. Validator messages use **1-based file positions** (see below).
 
 ### Exits
 
@@ -53,6 +54,7 @@ Entities spawn through `room.spawn(scene, cell_centre, args)` in grid order (row
 
 - **In-wall rule:** an `L` whose left or right neighbour is a wall **or the room edge** also gets a wall tile, so a lurker hiding in a wall leaves no hole. (M1 checked only the neighbours; with 1-tile walls a lurker sits in the edge column.) Such an `L` counts as solid everywhere below.
 - **Solid** means `#`, plus an `L` that the in-wall rule turns solid.
+- **Hazards:** `RoomLegend.HAZARDS` lists the tile chars that hurt on contact. It is empty until Story 1.19 adds the spike. A hazard is never a ledge, and neither is a floor cell whose open top is a hazard. The room checks below cover any char added to it, with no edit.
 - **Ledge rims:** every solid cell whose upper neighbour is in the grid and is neither solid nor `L` gets a faint unshaded 16 × 1 line, so places to land read in the dark (M1 finding 7).
 
 ### Adding a char
@@ -70,6 +72,7 @@ Entities spawn through `room.spawn(scene, cell_centre, args)` in grid order (row
 - an unknown key; a repeated `id`, `zone`, `spine` or `exits`
 - a bad `zone` or `spine` value
 - a malformed exit or `obj` (coordinates are at most 4 digits); two exits on one side; a duplicate `obj` id in the file
+- a malformed `cling` (not `<from>-<to>`, rows at most 4 digits); a `cling` whose `<from>` is not less than its `<to>`; a `cling` whose `<to>` is outside the grid (checked whenever the grid has rows, even if they are unequal)
 - an empty first grid row (a blank line right after `---`, reported alone); a grid smaller than 3 × 3; unequal rows (against row 1's width); an unknown char
 - a spine room that isn't 22 wide; every `P` after the first
 - **(only when every row has the same width)** a `P` with nothing solid below it; an `obj` cell outside the grid; an exit column on a corner (0 or width−1), outside the grid or on a solid cell; for `up`, a solid **entry cell** (one cell inside the opening, where an arriving player appears); for `down`, **no floor beside the opening to arrive on**: neither the column right of the opening nor the one left of it (side-edge columns don't count) has a solid run from the bottom row with two open cells above it (the stand cell and headroom for the body)
@@ -93,14 +96,36 @@ A missing file is `"<path>:0:0 file not found"`.
 
 `RoomLoader.load_room(id, dive = null)` resolves an id through an index of every `*.txt` under `res://rooms/`, built once (an id in two files is an error naming both). `load_room_from_path(path, dive = null)` loads one file directly. With a `DiveState`, killable spawns (`c`, `h`) whose cell it marked killed are not built; without one (tests, the harness) every enemy is. Killable spawns get `room_id` and `cell`, and a crawler's `take_hit()` marks its cell. Tests index their own rooms with `RoomLoader.add_root(dir)`: the swap rooms live in `tests/rooms/swap/`, apart from the validator fixtures in `tests/rooms/` (one of which repeats an id on purpose).
 
-## Running the checks
+## Room checks
+
+Adding a room file adds its checks, with no edit to any test (Story 1.10, AR50). `smoke_rooms.gd` walks every `res://rooms/**/*.txt` itself, sorted by path (it needs at least one file, and `rooms/l1/m1_shaft.txt` among them). The pure sweeps live in `tests/room_sweep.gd`, unit-tested on inline grids in `test_room_sweep.gd`.
+
+**Every file:** `RoomLoader.parse()` + `validate()`; each error is one `FAIL`, and a file with errors is never built (so it never `push_error`s). Rooms are built by path, never through the id index, so a duplicate id is a named `FAIL` too.
+
+**Across files (every file, `rooms/dev/` included):**
+- room ids (base names) and `obj=` ids are unique;
+- every exit target is a room, and has the entry the crossing arrives at: a `down` exit needs the target to have an `up` exit, an `up` exit a `down` one.
+
+**Every swept room** (outside `rooms/dev/`):
+- **spine falls** (`spine=true` only): no fall between consecutive safe rows is over 19 rows, `Spec.LEDGE_FALL_MAX` (315 px: 1.5 s at the 210 px/s max fall, FR57). Safe rows are ledge rows (a solid inner cell, not a hazard, with an open, non-hazard cell above) plus every row of a `cling=` stretch. A spine room with no safe row fails. The fall out of a `down` exit into a spine target counts too: rows from the last safe row to the floor, plus the target's first safe row;
+- **cling stretches:** every open run in each declared row is 6–10 tiles wide;
+- **hazard pits:** every hazard cell that can be fallen onto has a safe row in the 19 rows above it (GDD Sequence Breaking);
+- **arrival from below:** no enemy spawn (a `RoomLegend.SPAWNS` char that isn't persistent) within 3 cells (Chebyshev) of the `down` entry's stand cell, about 1.9 s of walker travel (1.7 review, decided by sonlm 2026-11-18). `m1_shaft`'s bottom-left walker starts at column 8 for this;
+- **lurkers**, each sorted by position: base light (40 px) is never noticed point-blank; the largest light under 80 px is never noticed point-blank, while one more link is (a control); the biggest light never wakes a lurker just outside the play rect, though it is in reach; the telegraph lasts at least 0.75 s (measured in frames), then it hunts and closes in. For the first lurker, each on a fresh room: an IDLE lurker is harmless on contact and a HUNTING one kills; a Snuff, a landing and a cling, each in time against a lurker hunting 48 px away, make it harmless (`monitorable` off) on the escape frame or the one after, the player is alive 1.2 s later, and it leaves HUNT within the lose-track time + 0.2 s. A room with no stand cell or cling wall prints an `ok … skipped` line saying so.
+
+Plus, once per run: the tuned max fall can't stretch `Spec.LEDGE_FALL_MAX` past 1.5 s, and the tuned telegraph and the lurker's notice floor are at least their `Spec` values.
+
+**`smoke_bot.gd`** plays every `spine=true` room outside `rooms/dev/`, sorted by path, from its `up` entry (else `P`) down to its `down` exit: plain movement, Attack, a hop only when blocked, never Dash, all lurkers paused. It aims for the nearest crawler in a row below the last one it swung at, pogoes it, walks off a ledge at the edge nearest its next target, and slashes a walker on its floor within 24 px. Per room it must reach a chain of `Spec.BOT_MIN_CHAIN` (5; `m1_shaft`: 8), have chain 0 whenever its body crosses an exit (the World backstop never fires on its line), reach the `down` exit (or, with none, the bottom ledge), and be alive. It prints a `bot <id>: frame …, best …` trace line.
+
+**`rooms/dev/`** (the perf scene, Story 1.12) is validated and counts for unique ids and links, but is never swept or botted. Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
 
 ```bash
-cd game && ./run_tests.sh       # everything; test_room_loader covers the validator, the build and m1_shaft
-godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd
-godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_shaft.gd   # plays m1_shaft; the bot needs chain ≥ 5
+cd game && ./run_tests.sh       # everything
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd   # the validator, the build and m1_shaft's pins
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sweep.gd    # the pure sweeps on inline grids
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_rooms.gd        # every room file: validation, sweeps, lurkers
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd          # the descent bot in every spine room (~30 s per room)
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd        # the M1 move checks on m1_shaft
 ```
 
-`test_room_loader.gd` checks `m1_shaft`'s ledge rows: no fall between two of them is over 19 rows (FR57: a ledge every ≤ 1.5 s of fall). From Story 1.10, `smoke_rooms.gd` loads every room file and sweeps this for all of them. Test-only rooms live in `game/tests/rooms/` and are never exported.
-
-To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` returns `{room, player, camera, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), a `CameraRig` following it with limits from the room, and a stub in group `world` with `play_rect()` and `current_room()`); free them with `RoomHarness.free_all()`.
+To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` (or `build_from_path(self, path)` for a file you have validated) returns `{room, player, camera, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), a `CameraRig` following it with limits from the room, and a stub in group `world` with `play_rect()` and `current_room()`); free them with `RoomHarness.free_all()`.
