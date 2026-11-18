@@ -14,6 +14,7 @@ var _fail := 0
 
 func run() -> void:
 	_test_scan_rules()
+	_test_unknown_format()
 	_test_real_ledger()
 	if _fail == 0:
 		print("PASS")
@@ -110,6 +111,43 @@ static func _title(bullet: String) -> String:
 	return plain if plain.length() <= 60 else plain.substr(0, 57) + "..."
 
 
+## Lines that show a ledger format scan() can't read, one reason each. bmad-loop's canonical
+## format (`### DW-n` headings with `status:` lines) has no list items, so scan() would see 0 items
+## and pass: the owner gate would switch itself off (deferred from the code review of 1.1). So
+## does any other foreign format, so beyond the known shapes (a DW-n heading, a `status:` line in
+## any case, bullet or bold, a table row) a ledger with text under its sections but no items at
+## all is reported too (code review of 1.9). A ledger of headings only (all archived) is fine.
+## Fenced code is skipped, as scan() skips it.
+static func unknown_format(text: String) -> Array[String]:
+	var dw_re := RegEx.create_from_string("^#{2,4}\\s+DW-\\d+")
+	var status_re := RegEx.create_from_string("(?i)^\\s*(?:[-*+]\\s+)?\\**status\\**\\s*:")
+	var reasons: Array[String] = []
+	var in_fence := false
+	var in_section := false
+	var first_text := 0
+	var lines := text.replace("\r", "").split("\n")
+	for i in lines.size():
+		var trimmed := lines[i].strip_edges()
+		if trimmed.begins_with("```") or trimmed.begins_with("~~~"):
+			in_fence = not in_fence
+			continue
+		if in_fence:
+			continue
+		if dw_re.search(lines[i]) != null:
+			reasons.append("%d: a DW-n heading" % (i + 1))
+		elif status_re.search(lines[i]) != null:
+			reasons.append("%d: a status: line" % (i + 1))
+		elif trimmed.begins_with("|"):
+			reasons.append("%d: a table row" % (i + 1))
+		elif lines[i].begins_with("## "):
+			in_section = true
+		elif in_section and trimmed != "" and not trimmed.begins_with("#") and first_text == 0:
+			first_text = i + 1
+	if reasons.is_empty() and first_text > 0 and scan(text).items == 0:
+		reasons.append("%d: text under a section, but no list items at all" % first_text)
+	return reasons
+
+
 static func _lines(entries: Array) -> Array:
 	return entries.map(func(e: Dictionary) -> int: return e.line)
 
@@ -165,6 +203,18 @@ func _test_scan_rules() -> void:
 	check(r.items == 1 and r.unowned.is_empty(), "fenced code holds no items")
 
 
+func _test_unknown_format() -> void:
+	var dw := "## Deferred\n\n### DW-1 Settings writes\nstatus: open\nowner: 1.21\n"
+	var reasons := unknown_format(dw)
+	check(reasons.size() == 2 and scan(dw).items == 0, "a bmad-loop DW-format ledger is reported, where scan() alone sees 0 items and would pass (%s)" % [reasons])
+	check(unknown_format("## A\n- **X** — x.\n  → **Owner: E1** — status: fine\n```\n### DW-9\nstatus: x\n```\n").is_empty(), "the real format, a status: word mid-line and fenced DW text are not reported")
+	reasons = unknown_format("## A\n\nStatus: open\n- **status:** open\n| id | owner |\n")
+	check(reasons.size() == 3, "a Status: line in any case, a bulleted bold status and a table row are reported (%s)" % [reasons])
+	reasons = unknown_format("# Deferred Work\n\nIntro.\n\n## Settings writes\n\nOpen, owner 1.21.\n")
+	check(reasons.size() == 1 and reasons[0].begins_with("7:"), "text under a section with no list items at all is reported (%s)" % [reasons])
+	check(unknown_format("# Deferred Work\n\nEverything is archived.\n\n## Old\n").is_empty(), "a ledger of headings only (all archived) is fine")
+
+
 func _test_real_ledger() -> void:
 	var path := ProjectSettings.globalize_path("res://").path_join(LEDGER).simplify_path()
 	# A missing or unreadable ledger fails rather than passes, so it can't switch the check off.
@@ -176,6 +226,12 @@ func _test_real_ledger() -> void:
 	if err != OK:
 		check(false, "ledger unreadable at %s: %s" % [path, error_string(err)])
 		return
+	for reason in unknown_format(text):
+		check(false, "deferred-work.md:%s: ledger format not readable by this check (bmad-loop DW-n?); convert it or teach scan()" % reason)
+	# D9 #12: the real ledger with one DW-format block appended is caught, so the guard works on
+	# the file it guards, not only on samples.
+	var probe := unknown_format(text + "\n### DW-99: probe\nstatus: open\n")
+	check(probe.size() == 2, "a DW-format block appended to the real ledger is reported (%s)" % [probe])
 	var r := scan(text)
 	for u in r.unowned:
 		check(false, "deferred-work.md:%d no owner: %s (add `  → **Owner: E#**`, or propose one)" % [u.line, u.title])

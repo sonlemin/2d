@@ -692,16 +692,9 @@ func test_lock() -> void:
 	await _settle_on_floor()
 
 
-## AC1 (a stopgap until 1.9's test_lint): no gameplay script reads Input but PlayerInput.
+## AC1: M1's Snuff hold is gone and the scene carries the sampler. "No Input. outside PlayerInput"
+## is test_lint's raw_input rule since Story 1.9 (wider: InputEvent, the _input callbacks).
 func test_sources() -> void:
-	var raw := RegEx.create_from_string("(?<![A-Za-z0-9_])Input\\.")
-	var offenders: Array[String] = []
-	for path in _gd_files("res://scripts"):
-		if path.ends_with("actors/player_input.gd"):
-			continue
-		if raw.search(FileAccess.get_file_as_string(path)) != null:
-			offenders.append(path)
-	check(offenders.is_empty(), "no Input. under scripts/ outside actors/player_input.gd (found in %s)" % [offenders])
 	var player_src := FileAccess.get_file_as_string("res://scripts/actors/player.gd")
 	check(not player_src.contains("SNUFF_HOLD") and not player_src.contains("_light_held"), "player.gd has no SNUFF_HOLD or _light_held left")
 	var p: Player = load("res://scenes/actors/player.tscn").instantiate()
@@ -709,12 +702,3 @@ func test_sources() -> void:
 	check(node is PlayerInput, "player.tscn has a PlayerInput child (got %s)" % node)
 	p.queue_free()
 
-
-func _gd_files(dir: String) -> Array[String]:
-	var out: Array[String] = []
-	for f in DirAccess.get_files_at(dir):
-		if f.ends_with(".gd"):
-			out.append(dir.path_join(f))
-	for d in DirAccess.get_directories_at(dir):
-		out.append_array(_gd_files(dir.path_join(d)))
-	return out

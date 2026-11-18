@@ -1,6 +1,6 @@
 extends Node
-## Tuning (AR15) and Gear (AR16): the API, the fixed set → add → mul order, rules/ purity, and
-## the Story 1.3 regression fixture: every M1 @export default still holds, wherever it now lives.
+## Tuning (AR15) and Gear (AR16): the API, the fixed set → add → mul order, the telegraph floor
+## under every gear (Spec, Story 1.9), and the Story 1.3 regression fixture: every M1 @export default still holds, wherever it now lives.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_tuning.gd
 ## Each API case builds a fresh Tuning; only the Game case reads Game.tuning.
 ## Not tested here, because a failed assert aborts the test: the unknown-key, unknown-flag,
@@ -14,7 +14,7 @@ const FIXTURE: Array[Dictionary] = [
 	{id = &"g_mul", stat = STAT, op = &"mul", value = 3.0},
 	{id = &"g_flag", stat = &"instant_snuff", op = &"flag", value = true},
 ]
-const PURE := ["res://scripts/rules/tuning.gd", "res://scripts/rules/gear.gd"]
+const Spec := preload("res://tests/spec.gd")
 const PlayerScene := preload("res://scenes/actors/player.tscn")
 const ACTORS := {
 	"player": "res://scripts/actors/player.gd",
@@ -87,7 +87,7 @@ func run() -> void:
 	_test_reset_in_place()
 	_test_gear_table_empty()
 	_test_game_holds_tuning()
-	_test_purity()
+	_test_gear_floors()
 	_test_key_literals()
 	_test_m1_fixture()
 	_test_fr_values()
@@ -182,16 +182,66 @@ func _test_game_holds_tuning() -> void:
 	check(Game.tuning.f(&"cling_grace") == 1.0, "...holding the base values (cling_grace 1.0, got %s)" % Game.tuning.f(&"cling_grace"))
 
 
-## AR58: rules/ never mentions the scene tree, raw input, the engine or the autoload. An
-## unreadable file must fail, never pass as "no match" (Story 1.1 review).
-func _test_purity() -> void:
-	var re := RegEx.create_from_string("\\b(Node|Input|Engine)\\b|\\bGame\\.")
-	for path: String in PURE:
-		var src := FileAccess.get_file_as_string(path)
-		var err := FileAccess.get_open_error()
-		check(err == OK and src != "", "%s is readable (error %d)" % [path, err])
-		var hit := re.search(src)
-		check(hit == null, "%s mentions no Node, Input, Engine or Game. (found: %s)" % [path, hit.get_string() if hit else ""])
+## A floor holds whatever gear is owned: `stat` never drops under `min_value` (or to it, unless
+## `inclusive`) for any combination of the gear rows that bend it, 2^k sets for k such gear (code
+## review of 1.3: the M1 editor range was the only floor, and gear could bend under it; code
+## review of 1.9: two rows that each pass alone can still go under together). A combination with
+## two `set` rows on the stat is reported, not applied: Tuning refuses it (assert). Pure; returns
+## one message per breach.
+static func stat_floor_errors(table: Array[Dictionary], stat: StringName, min_value: float, inclusive: bool) -> Array[String]:
+	var rows: Array[Dictionary] = []
+	var ids: Array[StringName] = []
+	for row in table:
+		if StringName(row.stat) != stat:
+			continue
+		rows.append(row)
+		if not StringName(row.id) in ids:
+			ids.append(StringName(row.id))
+	assert(ids.size() <= 12, "stat_floor_errors: %d gear bend %s; 2^n sets is too many" % [ids.size(), stat])
+	var errors: Array[String] = []
+	for mask in 1 << ids.size():
+		var owned: Array[StringName] = []
+		for b in ids.size():
+			if mask & (1 << b):
+				owned.append(ids[b])
+		var sets := rows.filter(func(r: Dictionary) -> bool: return StringName(r.id) in owned and StringName(r.op) == &"set").size()
+		if sets > 1:
+			errors.append("gear %s: %d rows set %s (Tuning refuses two)" % [owned, sets, stat])
+			continue
+		var t := Tuning.new()
+		t.apply_gear(owned, rows)
+		var v := t.f(stat)
+		if v < min_value or (not inclusive and v <= min_value):
+			errors.append("gear %s: %s %.3f, under %s %.2f" % [owned, stat, v, "the floor" if inclusive else "just above", min_value])
+	return errors
+
+
+func _test_gear_floors() -> void:
+	# Pillar 2: the lurker telegraph never drops under Spec.TELEGRAPH_MIN, whatever gear is owned.
+	var real := stat_floor_errors(Gear.TABLE, &"lurker_telegraph_time", Spec.TELEGRAPH_MIN, true)
+	check(real.is_empty(), "the lurker telegraph stays at or above Spec.TELEGRAPH_MIN under every combination of Gear.TABLE rows (%d rows; %s)" % [Gear.TABLE.size(), real])
+	var probe: Array[Dictionary] = [{id = &"probe_short_wick", stat = &"lurker_telegraph_time", op = &"mul", value = 0.5}]
+	var caught := stat_floor_errors(probe, &"lurker_telegraph_time", Spec.TELEGRAPH_MIN, true)
+	check(caught.size() == 1, "...a probe gear halving it is caught (%s)" % [caught])
+	var pair: Array[Dictionary] = [
+		{id = &"probe_a", stat = &"lurker_telegraph_time", op = &"add", value = -0.1},
+		{id = &"probe_b", stat = &"lurker_telegraph_time", op = &"add", value = -0.1},
+		{id = &"probe_c", stat = &"lurker_telegraph_time", op = &"add", value = 0.5}]
+	caught = stat_floor_errors(pair, &"lurker_telegraph_time", Spec.TELEGRAPH_MIN, true)
+	check(caught.size() == 1 and caught[0].contains("probe_a") and caught[0].contains("probe_b") and not caught[0].contains("probe_c"),
+			"...two gear that each pass alone but go under together are caught, though all three together pass (%s)" % [caught])
+	var two_sets: Array[Dictionary] = [
+		{id = &"probe_x", stat = &"lurker_telegraph_time", op = &"set", value = 1.0},
+		{id = &"probe_y", stat = &"lurker_telegraph_time", op = &"set", value = 1.2}]
+	caught = stat_floor_errors(two_sets, &"lurker_telegraph_time", Spec.TELEGRAPH_MIN, true)
+	check(caught.size() == 1 and caught[0].contains("Tuning refuses"), "...two gear that both set it are reported, not crashed on (%s)" % [caught])
+	# The crawler's hover phase is fposmod(…, period) and its drift sin(t / period): at 0 the
+	# crawler goes NaN (deferred from the code review of 1.3, closed here).
+	real = stat_floor_errors(Gear.TABLE, &"crawler_hover_period", 0.0, false)
+	check(real.is_empty(), "the crawler hover period stays above 0 under every combination of Gear.TABLE rows (%s)" % [real])
+	var flat: Array[Dictionary] = [{id = &"probe_flat", stat = &"crawler_hover_period", op = &"mul", value = 0.0}]
+	caught = stat_floor_errors(flat, &"crawler_hover_period", 0.0, false)
+	check(caught.size() == 1, "...and a probe gear zeroing it is caught (%s)" % [caught])
 
 
 ## Story 1.3 traded compile-checked export names for key literals, so a typo or a key no code reads

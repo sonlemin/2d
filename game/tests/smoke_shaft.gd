@@ -5,6 +5,7 @@ extends Node
 ## Exits 0 on pass. (Import the project once first so textures resolve.)
 
 const RoomHarness := preload("res://tests/room_harness.gd")
+const Spec := preload("res://tests/spec.gd")
 ## The long run: the hoverers between the row-41 ledge and the row-85 platform (M1's rows, kept).
 const LONG_RUN_ROWS := Vector2i(44, 84)
 
@@ -238,7 +239,7 @@ func test_bot_chains_long_run() -> void:
 	for a in ["move_left", "move_right"]:
 		Input.action_release(a)
 	print("     bot ended: frame %d, dead=%s, floor=%s, y=%d" % [i_end, _player.is_dead, _player.is_on_floor(), int(_player.global_position.y / 16)])
-	check(best >= 5, "bot chains 5+ pogos through the long run (best %d)" % best)
+	check(best >= Spec.BOT_MIN_CHAIN, "bot chains %d+ pogos through the long run (Spec.BOT_MIN_CHAIN; best %d)" % [Spec.BOT_MIN_CHAIN, best])
 	check(not _player.is_dead, "bot survived the reachability run (lurkers paused)")
 	set_lurkers_active(true)
 	_player.chain.break_chain()
@@ -251,11 +252,21 @@ func test_lurker_telegraph_hunt_lose() -> void:
 	place(lurker.global_position + Vector2(100, 0))
 	for i in 8:
 		_player.chain.add_hit()
-	await frames(2)
+	for i in 10:
+		await frames(1)
+		if lurker.state == Lurker.State.TELEGRAPH:
+			break
 	check(lurker.state == Lurker.State.TELEGRAPH, "big light in range -> lurker telegraphs")
-	await seconds(0.7)
-	check(lurker.state == Lurker.State.TELEGRAPH, "still telegraphing at 0.7 s (>= 0.75 s rule)")
-	await seconds(0.35)
+	var telegraph := Game.tuning.f(&"lurker_telegraph_time")
+	check(telegraph >= Spec.TELEGRAPH_MIN, "the telegraph lasts at least Spec.TELEGRAPH_MIN %.2f s (tuning %.2f s)" % [Spec.TELEGRAPH_MIN, telegraph])
+	# Measure it, rather than probe at a guess: frames seen in TELEGRAPH until it ends (it may
+	# have started up to a frame before we saw it, so the floor is checked to within one frame).
+	var held := 0
+	while lurker.state == Lurker.State.TELEGRAPH and held < 600:
+		await frames(1)
+		held += 1
+	var floor_frames := int(ceil(Spec.TELEGRAPH_MIN * Engine.physics_ticks_per_second))
+	check(held + 1 >= floor_frames, "the telegraph lasted %d frames, at least Spec.TELEGRAPH_MIN %.2f s (%d frames, to within one)" % [held, Spec.TELEGRAPH_MIN, floor_frames])
 	check(lurker.state == Lurker.State.HUNT, "hunting after the telegraph")
 	var d0 := lurker.global_position.distance_to(_player.global_position)
 	await seconds(0.3)
@@ -268,7 +279,27 @@ func test_lurker_telegraph_hunt_lose() -> void:
 	_player.chain.break_chain()
 	place(lurker.global_position)
 	await frames(1)
+	check(_player.light_radius() <= Spec.BASE_LIGHT, "base light is at most Spec.BASE_LIGHT %.0f px (got %.1f)" % [Spec.BASE_LIGHT, _player.light_radius()])
 	check(not lurker.senses(_player), "base light is never noticed, even point-blank")
+	# The largest light under the notice floor is never noticed either, even point-blank; one more
+	# link (over the lurker's own floor) is, from the same spot, so "never noticed" is not just
+	# "never on screen" or "never in range". The lurker is paused so it only answers senses().
+	set_lurkers_active(false)
+	var under := 0
+	while under < 30 and ChainState.radius_for(under + 1) < Spec.NOTICE_MIN_RADIUS:
+		under += 1
+	for i in under:
+		_player.chain.add_hit()
+	await frames(1)
+	check(under > 0 and _player.light_radius() < Spec.NOTICE_MIN_RADIUS, "setup: chain %d gives %.1f px, the largest light under Spec.NOTICE_MIN_RADIUS %.0f px" % [under, _player.light_radius(), Spec.NOTICE_MIN_RADIUS])
+	check(not lurker.senses(_player), "light under Spec.NOTICE_MIN_RADIUS is never noticed, even point-blank (chain %d)" % under)
+	while _player.light_radius() < Lurker.NOTICE_MIN_RADIUS and _player.chain.count < 30:
+		_player.chain.add_hit()
+	await frames(1)
+	check(lurker.senses(_player), "control: chain %d (%.1f px, over the lurker's floor) is noticed from the same spot" % [_player.chain.count, _player.light_radius()])
+	check(Lurker.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "a lurker never wakes below Spec.NOTICE_MIN_RADIUS (Lurker.NOTICE_MIN_RADIUS %.0f)" % Lurker.NOTICE_MIN_RADIUS)
+	_player.chain.break_chain()
+	set_lurkers_active(true)
 	# A big light whose lurker is off-screen must not be noticed (no off-screen ambush).
 	for i in 20:
 		_player.chain.add_hit()

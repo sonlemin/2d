@@ -1,7 +1,7 @@
 extends Node
 ## The session state objects (AR10, AR14, AR18): Settings, SlotState and DiveState. Their API, the
 ## signal rules (Story 1.4 D2), the fallbacks on bad data (D3), the to_dict() shapes (D4), the
-## round trips in memory and through JSON, and rules/ purity. Then `Game` (AR11): the same
+## round trips in memory and through JSON (rules/ purity is test_lint's, Story 1.9). Then `Game` (AR11): the same
 ## instances all session, `reset_for_tests()`, and `settings.json` through `SaveStore` (R15).
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.gd
 ## Each pure case builds fresh state objects. Only the Game and file cases use Game, and they
@@ -11,11 +11,6 @@ extends Node
 ## unknown-tier and negative-carried asserts, and the Game ref guards (D7). Code review checks
 ## them, as with Tuning's asserts.
 
-const PURE := [
-	"res://scripts/rules/settings.gd",
-	"res://scripts/rules/slot_state.gd",
-	"res://scripts/rules/dive_state.gd",
-]
 const TMP := "user://test_state_tmp"
 const REAL := "user://settings.json"
 
@@ -90,7 +85,6 @@ func run() -> void:
 	_test_dive_reset()
 	_test_dive_round_trips()
 	_test_dive_fallbacks()
-	_test_purity()
 	_test_game_holds_state()
 	_test_game_same_instances()
 	_test_game_reset_for_tests()
@@ -460,20 +454,6 @@ func _test_dive_fallbacks() -> void:
 	check(not d.from_dict({"carried": 4, "respawn_room": 12, "respawn_entry": "anchor_m1_1"}) and d.respawn_room == &"" and d.respawn_entry == &"" and d.carried == 4, "a respawn room that isn't a string is unclean and clears the whole point (got '%s' / '%s')" % [d.respawn_room, d.respawn_entry])
 	var f := _filled_dive()
 	check(not f.from_dict({"carried": 4, "respawn_room": "m1_shaft"}) and f.respawn_room == &"" and f.respawn_entry == &"" and f.carried == 4, "...and so does a missing entry (got '%s' / '%s')" % [f.respawn_room, f.respawn_entry])
-
-
-# --- rules/ purity ---
-
-## AR58 + R15: rules/ never mentions the scene tree, raw input, the engine or the autoload, and
-## does no file I/O. The scan covers comments too. An unreadable file must fail, never pass.
-func _test_purity() -> void:
-	var re := RegEx.create_from_string("\\b(Node|Input|Engine)\\b|\\bGame\\.|FileAccess|DirAccess")
-	for path: String in PURE:
-		var src := FileAccess.get_file_as_string(path)
-		var err := FileAccess.get_open_error()
-		check(err == OK and src != "", "%s is readable (error %d)" % [path, err])
-		var hit := re.search(src)
-		check(hit == null, "%s mentions no Node, Input, Engine, Game. or file access (found: %s)" % [path, hit.get_string() if hit else ""])
 
 
 # --- Game (AR11) ---
