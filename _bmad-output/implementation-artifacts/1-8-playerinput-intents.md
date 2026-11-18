@@ -516,6 +516,11 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-14.
   3. mashing X through pogo chains feels the same or better;
   4. ↓ standing on the ground does nothing visible.
 - **Feel check passed (sonlm, laptop, 2026-11-18), D13:** all four checks passed: movement feels like 1.7, a V tap does nothing while a held V Snuffs at the same moment as before and breaks the chain (by design, FR9), mashing X through pogo chains feels the same or better, ↓ on the ground does nothing. The 0.12 s default tap window stays.
+- **Post-review feel check passed (sonlm, laptop, 2026-11-18):** the review's input fixes landed after the D13 check, so four were played again, and all passed:
+  1. clinging with ↑ held, ↓ drops off the wall;
+  2. one Jump while clinging gives one clean wall kick, with no second jump after it;
+  3. a Light tap keeps the chain and a hold Snuffs and breaks it, with no noticeable change in timing;
+  4. a Light held through a pause doesn't Snuff on its own after unpausing; it needs a fresh press.
 - Story context created by gds-create-story on 2026-11-14. Ultimate context engine analysis completed - comprehensive developer guide created. Engine facts in "Verified engine facts" were probed on 4.7.2 in a scratch project, not in `game/`.
 
 ### File List
@@ -547,3 +552,4 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-14.
 - 2026-11-14: Story 1.8 implemented. PlayerInput intents with the Light tap/hold machine on real time, real-time Jump/Attack buffers, ↓ interact and lock(); Settings.light_tap_window; M1 movement pinned by smoke_player_input before the switch. Status → review.
 - 2026-11-18: Laptop feel check passed (all four D13 checks).
 - 2026-11-18: Code review: 13 patches applied (wall drop on ↑, Snuff latch, Light across pause/respawn, window boundaries, cling press, test gaps, docs), 3 items deferred with owners (1.15, 1.9, 1.24). Status → done.
+- 2026-11-18: Post-review laptop feel check passed (wall drop on ↓, one wall kick per Jump press, Light tap vs hold, Light across a pause).
