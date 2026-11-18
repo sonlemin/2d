@@ -643,10 +643,20 @@ These come from earlier decisions; listed here so every agent sees them together
 
 Rules nobody checks get broken quietly. These checks run in `./run_tests.sh`:
 
-- **Architecture lint** (`tests/test_lint.gd`, a plain text scan of `game/scripts/`): fails on
-  `Engine.time_scale =` outside `clock.gd`; `Input.is_action` / `Input.is_key` outside `player_input.gd`
-  and the UI kit; bare `print(`; `.free()` on nodes; absolute node paths (`"/root/`); `KEY_F` keycodes;
-  `randf`/`randi` outside camera shake. Each hit prints `FAIL lint <file>:<line> <rule>`.
+- **Architecture lint** (`tests/test_lint.gd`, a plain text scan of `game/scripts/`, comments dropped):
+  fails on a time-scale write outside `clock.gd`; raw input (`Input`, `InputMap`, `InputEvent*`, the
+  `_input`/`_gui_input` callbacks) outside `player_input.gd`, `core/devices.gd` and the UI kit; any
+  `print(` family call outside `core/log.gd`; `free()` in any form; absolute node paths; any `KEY_*`
+  keycode outside the UI kit; any randomness (`randf`/`randi`/`seed`/`pick_random`/`shuffle`/
+  `RandomNumberGenerator`, …) outside camera shake; the `rules/` purity and `core/` layer rules below;
+  `DevTools` or `dev/` paths outside `dev/`; any `res://tests/` path in game code (release exports
+  drop `tests/*`); writes to `Game.settings` / `slot` / `dive` / `tuning` state that skip a rule
+  method (assignments, nested fields, container mutators, `.set(`) or replace a `Game` instance,
+  outside `rules/`. Each hit prints `FAIL lint <file>:<line> <rule>`; every `tests/spec.gd` const must
+  cite the GDD. Story 1.9 and its code review widened the original list (all keycodes, event-based
+  input, more randomness, Node classes / `OS` / `Time` / file access / `load(` / upper-layer classes in
+  `rules/`, `tests_ref`, state writes); the rule ids and samples live in `test_lint.gd`, the table in
+  `docs/development-guide.md`.
 - **Test discovery:** `run_tests.sh` runs every `tests/test_*.gd` and `tests/smoke_*.gd` by glob, so a
   new test file can never be silently skipped (replaces the hand-maintained `for t in …` list).
 - **String keys, room files:** validated as content (see Error Handling).
@@ -861,7 +871,7 @@ rules/  ←  core/  ←  world/, actors/, objects/, moments/  ←  ui/, audio/  
 - **`dev/`** may touch anything; nothing outside `dev/` and `tests/` may reference `dev/`.
 - **`tools/`** live outside `game/` and write only into `game/art/` and `game/audio/sfx/`.
 - **Tests** may use anything; test-only data (`tests/rooms/`, `tests/fixtures/`) is never exported (export presets exclude `tests/*`).
-- **Enforced by `tests/test_lint.gd`:** files in `rules/` must not mention `Node`, `Input`, `Engine` or `Game.`; files in `core/` must not mention `world/`, `actors/`, `objects/`, `ui/` or `audio/` class names; nothing outside `dev/` and `tests/` references `DevTools`.
+- **Enforced by `tests/test_lint.gd`:** files in `rules/` must not mention any Node class, `Input*`, `Engine*`, `OS`, `Time`, file access, the autoloads (`Game`, `Audio`) or any class from `core/` and above (`rules_purity`); files in `core/` must not mention the class names, autoloads or paths of `world/`, `actors/`, `objects/`, `moments/`, `ui/`, `audio/` or `dev/` (`core_layer`); nothing outside `dev/` and `tests/` references `DevTools` (`dev_ref`).
 
 ## Implementation Patterns
 
@@ -1263,8 +1273,8 @@ Game.load_slot(2)
 | Pattern | Convention | Enforcement |
 |---|---|---|
 | Time scale | only `clock.gd` writes `Engine.time_scale` | `test_lint.gd` |
-| Input | gameplay reads `PlayerInput` intents; menus read `menu_*` actions | `test_lint.gd` (`Input.is_action` outside allowed files) |
-| Rules purity | `rules/` has no `Node`, `Input`, `Engine`, `Game.` | `test_lint.gd` |
+| Input | gameplay reads `PlayerInput` intents; menus read `menu_*` actions | `test_lint.gd` (`raw_input`: `Input`, `InputMap`, `InputEvent*`, input callbacks outside allowed files) |
+| Rules purity | `rules/` has no Node class, `Input`, `Engine`, `Game`, or class from a layer above | `test_lint.gd` |
 | Light sensing | predators sense through `LightSource` + `Sensing` only | review; `smoke_rooms.gd` guarantees |
 | Gear and tunable numbers | read `Game.tuning.f(key)`; never `has_gear` | review; `Tuning.f` asserts unknown keys |
 | Room swaps | deferred; through `World`; backstop banks the chain | `smoke_rooms.gd`, bot |

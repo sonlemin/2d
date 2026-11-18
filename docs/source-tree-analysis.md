@@ -15,7 +15,7 @@ pixel_art_game/
 ├── game/                         # Godot 4.7 project root (open this folder in the editor)
 │   ├── project.godot             # ★ Config: main scene, 480×270 viewport, input map, physics layer names
 │   ├── README.md                 # Controls, loop rules and how to run tests (player-facing)
-│   ├── run_tests.sh              # ★ Test entry point: imports, then runs every headless test
+│   ├── run_tests.sh              # ★ Test entry point: imports, then runs every tests/test_*.gd and tests/smoke_*.gd (glob)
 │   ├── rooms/
 │   │   └── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
 │   ├── scenes/
@@ -59,10 +59,12 @@ pixel_art_game/
 │   │   ├── test_chain_state.gd   # Unit tests for ChainState
 │   │   ├── test_log.gd           # Unit tests for Log
 │   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
-│   │   ├── test_tuning.gd        # Tuning API, gear order, rules/ purity, the 44 M1 exports regression fixture
+│   │   ├── test_tuning.gd        # Tuning API, gear order, floors under every gear combination, the 44 M1 exports fixture
 │   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
 │   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
+│   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
+│   │   ├── spec.gd               # Helper: the GDD's guarantees as constants, preloaded by tests
 │   │   ├── smoke_shaft.gd        # Integration smoke test: m1_shaft via the room harness, simulated input, bot run
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
@@ -133,7 +135,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 | What | Where |
 |---|---|
 | Game | `game/scenes/world/world.tscn` (`run/main_scene`) → `scripts/world/world.gd::_ready()` |
-| Tests | `game/run_tests.sh` → `tests/runner.tscn` → each test in its `for t in …` list |
+| Tests | `game/run_tests.sh` → `tests/runner.tscn` → every `tests/test_*.gd`, then `tests/smoke_*.gd` |
 | Screenshots | `tests/screenshot.gd` (manual, needs a display or xvfb) |
 | Sprites | `python3 tools/build_sprites.py` (from the repo root) |
 
