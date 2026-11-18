@@ -5,6 +5,9 @@ class_name RoomLegend
 const WALL := "#"
 const EMPTY := "."
 const SPAWN := "P"  ## the player's start; nothing is spawned for it (Room.entry_position(&"spawn"))
+## Tile chars that hurt on contact; 1.19 adds the spike. A hazard is never a ledge, and the room
+## sweep (Story 1.10) checks every hazard pit has a ledge or cling stretch within a 1.5 s fall above it.
+const HAZARDS: Array[String] = []
 
 ## Chars that spawn an entity through Room.spawn(): `args` are set before add_child (AR23).
 ## `in_wall = true`: next to a wall or the room edge, the cell also gets a wall tile, so a lurker

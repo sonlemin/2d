@@ -8,6 +8,10 @@ const ROOT := "res://rooms"
 const SPINE_WIDTH := 22  ## spine rooms are 22 columns wall to wall (decision log: 352 px in the 360 px play area)
 const ZONES: Array[String] = ["dusk", "umber", "violet"]  ## the GDD's Layer 1 zones
 const SINGLE_KEYS: Array[String] = ["id", "zone", "spine", "exits"]
+## Keys a header may repeat: `obj=` (a persistent object) and `cling=<from>-<to>` (a narrow cling
+## stretch, 0-based grid rows, inclusive; Story 1.10 D6). The build ignores `cling`: only the room
+## sweep reads it, to know where a long fall is meant to be clung through.
+const REPEAT_KEYS: Array[String] = ["obj", "cling"]
 const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's shaft background until the zone palettes (1.18)
 const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
 
@@ -18,6 +22,7 @@ static var _id_re := RegEx.create_from_string("^[a-z][a-z0-9_]*$")
 # an engine ERROR) and pass the bounds checks as the wrong cell.
 static var _exit_re := RegEx.create_from_string("^(up|down):([a-z][a-z0-9_]*)@x(\\d{1,4})$")
 static var _obj_re := RegEx.create_from_string("^([a-z][a-z0-9_]*)@(\\d{1,4}),(\\d{1,4})$")
+static var _cling_re := RegEx.create_from_string("^(\\d{1,4})-(\\d{1,4})$")
 # Shared by every room (project-context: cache materials and shared resources as statics).
 static var _tileset: TileSet
 static var _rim_material: CanvasItemMaterial
@@ -95,12 +100,13 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 	var exits: Array[Dictionary] = []
 	var objs := {}  # obj id -> true
 	var obj_cells: Array[Dictionary] = []  # {cell, line}
+	var clings: Array[Dictionary] = []  # {from, to, line}
 	for h: Dictionary in parsed.header:
 		var key: String = h.key
 		if not h.ok:
 			err.call(h.line, 1, "header line is not key=value")
 			continue
-		if not key in SINGLE_KEYS and key != "obj":
+		if not key in SINGLE_KEYS and not key in REPEAT_KEYS:
 			err.call(h.line, 1, "unknown key '%s'" % key)
 			continue
 		if key in SINGLE_KEYS:
@@ -140,6 +146,17 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 				else:
 					objs[m.get_string(1)] = true
 					obj_cells.append({cell = Vector2i(m.get_string(2).to_int(), m.get_string(3).to_int()), line = h.line})
+			"cling":
+				var m := _cling_re.search(h.value)
+				if m == null:
+					err.call(h.line, 1, "cling '%s' is not <from>-<to>" % h.value)
+					continue
+				var from := m.get_string(1).to_int()
+				var to := m.get_string(2).to_int()
+				if from >= to:
+					err.call(h.line, 1, "cling rows %d-%d: <from> must be less than <to>" % [from, to])
+				else:
+					clings.append({from = from, to = to, line = h.line})
 	for key in ["id", "zone"]:
 		if not seen.has(key):
 			err.call(1, 1, "missing '%s='" % key)
@@ -169,6 +186,10 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 		err.call(top, 1, "spine room is %d wide, must be %d" % [w, SPINE_WIDTH])
 	for i in range(1, spawns.size()):
 		err.call(top + spawns[i].y, spawns[i].x + 1, "second 'P' (one spawn per room)")
+	# Only the row count matters here, so this holds even when a row is the wrong width.
+	for cl: Dictionary in clings:
+		if cl.to >= grid.size():
+			err.call(cl.line, 1, "cling rows %d-%d are outside the %d-row grid" % [cl.from, cl.to, grid.size()])
 	# The cell checks need a rectangle; an unequal row has been reported above.
 	if not even:
 		return errors

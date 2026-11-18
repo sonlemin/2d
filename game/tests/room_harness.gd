@@ -27,6 +27,18 @@ class WorldStub extends Node2D:
 static func build(parent: Node, room_id: StringName, entry := &"spawn") -> Dictionary:
 	var room := RoomLoader.load_room(room_id)
 	assert(room != null, "RoomHarness: room '%s' failed to load (errors above)" % room_id)
+	return _assemble(parent, room, entry)
+
+
+## The same from a file the caller has already validated (Story 1.10): smoke_rooms and smoke_bot
+## build this way, so a duplicate room id is their named FAIL, never the index's push_error.
+static func build_from_path(parent: Node, path: String, entry := &"spawn") -> Dictionary:
+	var room := RoomLoader.load_room_from_path(path)
+	assert(room != null, "RoomHarness: %s failed to load (errors above)" % path)
+	return _assemble(parent, room, entry)
+
+
+static func _assemble(parent: Node, room: Room, entry: StringName) -> Dictionary:
 	parent.add_child(room)
 	var player: Player = PlayerScene.instantiate()
 	player.position = room.entry_position(entry)

@@ -6,9 +6,6 @@ extends Node
 
 const DIR := "res://tests/rooms/"
 const M1_SHAFT := "res://rooms/l1/m1_shaft.txt"
-## FR57: a ledge at least every 1.5 s of fall: 315 px at 210 px/s max fall, so ≤ 19 rows (304 px)
-## between ledge rows. Story 1.10's Spec.LEDGE_FALL_MAX and the smoke_rooms sweep take this over.
-const LEDGE_GAP_MAX_ROWS := 19
 
 var _fail := 0
 
@@ -105,6 +102,25 @@ func _test_inline_errors() -> void:
 	check(_inline(ok.replace("###...L", "###...#")).is_empty(), "an edge L counts as solid, like the wall it replaces")
 	var errs := _inline(ok.replace("zone=dusk", "zone=teal\ncolour=red"))
 	check(errs.size() == 2, "every error is reported, not just the first (got %s)" % [errs])
+	_test_cling_key(ok, p)
+
+
+## Story 1.10 D6: `cling=<from>-<to>` declares a narrow cling stretch, 0-based grid rows,
+## inclusive, repeatable like obj (overlaps allowed). ok_min's grid is 7 rows (0..6).
+func _test_cling_key(ok: String, p: String) -> void:
+	var cling := func(lines: String) -> Array[String]:
+		return _inline(ok.replace("zone=dusk", "zone=dusk\n" + lines))
+	check(cling.call("cling=1-5").is_empty(), "a cling stretch inside the grid validates clean (got %s)" % [cling.call("cling=1-5")])
+	check(cling.call("cling=1-3\ncling=2-6").is_empty(), "cling repeats, and stretches may overlap; the last row (6) is inside (got %s)" % [cling.call("cling=1-3\ncling=2-6")])
+	_has(cling.call("cling=1to5"), p + ":4:1 cling '1to5' is not <from>-<to>", "a malformed cling")
+	_has(cling.call("cling=-1-5"), p + ":4:1 cling '-1-5' is not <from>-<to>", "a negative cling row")
+	_has(cling.call("cling=12345-2"), p + ":4:1 cling '12345-2' is not <from>-<to>", "a cling row too long to be a row")
+	_has(cling.call("cling=5-1"), p + ":4:1 cling rows 5-1: <from> must be less than <to>", "a reversed cling")
+	_has(cling.call("cling=3-3"), p + ":4:1 cling rows 3-3: <from> must be less than <to>", "a one-row cling (from == to)")
+	_has(cling.call("cling=2-7"), p + ":4:1 cling rows 2-7 are outside the 7-row grid", "a cling past the last row")
+	var two: Array[String] = cling.call("cling=1-3\ncling=x\ncling=4-9")
+	check(two == ([p + ":5:1 cling 'x' is not <from>-<to>", p + ":6:1 cling rows 4-9 are outside the 7-row grid"] as Array[String]),
+			"each bad cling line is reported on its own line, the good one is not (got %s)" % [two])
 
 
 func _test_ok_min() -> void:
@@ -195,11 +211,8 @@ func _test_m1_shaft() -> void:
 			if room.is_solid(Vector2i(c, r)) and not room.is_solid(Vector2i(c, r - 1)):
 				ledges.append(r)
 				break
+	# This pins the layout sonlm approved; FR57's gap rule is smoke_rooms' sweep, for every spine room (1.10).
 	check(ledges == ([6, 24, 41, 57, 72, 85, 103] as Array[int]), "ledge rows 6, 24, 41, 57, 72, 85, 103 (got %s)" % [ledges])
-	var worst := 0
-	for i in range(1, ledges.size()):
-		worst = maxi(worst, ledges[i] - ledges[i - 1])
-	check(worst <= LEDGE_GAP_MAX_ROWS, "FR57: no fall between ledge rows is over %d rows (worst %d)" % [LEDGE_GAP_MAX_ROWS, worst])
 	check(room.exits == ([{side = &"up", target = &"m1_shaft", col = 3, entry_cell = Vector2i(3, 1)},
 			{side = &"down", target = &"m1_shaft", col = 1, entry_cell = Vector2i(3, 102)}] as Array[Dictionary]),
 			"R16: the exits are up@3 and down@1, both to m1_shaft; arrival from below stands at (3, 102) (got %s)" % [room.exits])
