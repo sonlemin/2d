@@ -10,6 +10,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pipeline } = require('node:stream');
 
 // .wasm must be application/wasm, or the browser can't compile it while it streams in.
 const TYPES = {
@@ -31,10 +32,19 @@ function stat(file) {
   }
 }
 
+function realpath(file) {
+  try {
+    return fs.realpathSync(file);
+  } catch {
+    return null;
+  }
+}
+
 if (!root || !stat(root)?.isDirectory()) {
   console.error('serve.js: set BUILD_DIR to a build folder, e.g. BUILD_DIR=builds/<version> node tools/web_smoke/serve.js');
   process.exit(1);
 }
+const realRoot = realpath(root);
 
 const server = http.createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -57,10 +67,22 @@ const server = http.createServer((req, res) => {
   }
   let st = stat(file);
   if (st?.isDirectory()) {
+    // The shell's index.js, .wasm and .pck are relative URLs: /web_debug would load them from /.
+    if (!rel.endsWith('/')) {
+      const url = new URL(req.url, 'http://x');
+      res.writeHead(301, { Location: `${url.pathname}/${url.search}` }).end();
+      return;
+    }
     file = path.join(file, 'index.html');
     st = stat(file);
   }
   if (!st?.isFile()) {
+    res.writeHead(404).end();
+    return;
+  }
+  // The check above is on the path's text; a symlink inside BUILD_DIR could still lead out of it.
+  const real = realpath(file);
+  if (!real || !real.startsWith(realRoot + path.sep)) {
     res.writeHead(404).end();
     return;
   }
@@ -73,7 +95,9 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
-  fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
+  // pipeline, not pipe: a client that aborts mid-download (a reload during the .wasm) must close
+  // the file too, or the long-running tunnel server leaks a descriptor each time.
+  pipeline(fs.createReadStream(file), res, () => {});
 });
 
 server.on('error', (e) => {

@@ -66,9 +66,9 @@ func _ready() -> void:
 	assert(_world != null, "DevTools: only World adds DevTools")
 	if get_tree().current_scene == _world:
 		tokens = real_tokens()
-		# AR53 (Story 1.13 D9): the web smoke's "booted" line. This node is World's first child, so
-		# the connection is made before World builds its first room; one-shot, so a respawn's
-		# rebuild prints no second line. A method, not a lambda: it drops with this node.
+		# AR53 (Story 1.13 D9): the web smoke's "booted" line. World's _ready() adds this node
+		# before it builds its first room, so the connection sees that room; one-shot, so a
+		# respawn's rebuild prints no second line. A method, not a lambda: it drops with this node.
 		_world.room_entered.connect(_on_first_room, CONNECT_ONE_SHOT)
 	overlays = Overlays.new()
 	overlays.name = "Overlays"

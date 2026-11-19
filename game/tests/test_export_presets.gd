@@ -86,7 +86,7 @@ static func matches_any(rel: String, list: PackedStringArray) -> bool:
 ## resource is in already, any other file only when an include pattern takes it; the exclude
 ## filter runs second and wins.
 static func exported(rel: String, include: PackedStringArray, exclude: PackedStringArray) -> bool:
-	var taken := rel.get_extension() != "txt" or matches_any(rel, include)
+	var taken := rel.get_extension().to_lower() != "txt" or matches_any(rel, include)
 	return taken and not matches_any(rel, exclude)
 
 
@@ -115,6 +115,10 @@ func _test_preset(cfg: ConfigFile, i: int) -> void:
 			"%s: export.sh calls it by name; platform %s (got '%s', '%s')" % [label, want.platform, name_got, platform_got])
 	var filter_got: String = str(cfg.get_value(sec, "export_filter", ""))
 	check(filter_got == "all_resources", "%s: export_filter is all_resources (got '%s')" % [label, filter_got])
+	# An editor re-save writes this key too, and a ticked "dedicated server" export strips the
+	# visual resources: the headless boot and the PCK checks would both still pass (code review).
+	var dedicated: Variant = cfg.get_value(sec, "dedicated_server", false)
+	check(dedicated is bool and dedicated == false, "%s: not a dedicated-server export (got %s)" % [label, dedicated])
 	var include := patterns(str(cfg.get_value(sec, "include_filter", "")))
 	check(ROOM_INCLUDE in include, "%s: include_filter holds %s (got %s)" % [label, ROOM_INCLUDE, include])
 	var exclude := Array(patterns(str(cfg.get_value(sec, "exclude_filter", ""))))
@@ -132,6 +136,8 @@ func _test_preset(cfg: ConfigFile, i: int) -> void:
 	else:
 		var v: Variant = cfg.get_value(opt, "binary_format/embed_pck", null) if has_opts else null
 		check(v is bool and v == false, "%s: embed_pck=false, so the PCK sits beside the binary for the release check (got %s)" % [label, v])
+		var arch: Variant = cfg.get_value(opt, "binary_format/architecture", "") if has_opts else ""
+		check(str(arch) == "x86_64", "%s: binary_format/architecture is x86_64, the one template installed (got '%s')" % [label, arch])
 	_test_no_machine_paths(cfg, label, sec, opt)
 
 
@@ -170,7 +176,9 @@ func _test_model() -> void:
 			"model: exclude runs after include and wins")
 	check(exported("scripts/world/world.gd", PackedStringArray(), PackedStringArray()) and not exported("scripts/dev/dev_tools.gd", inc, rel),
 			"model: a script is in through all_resources, out when an exclude pattern matches")
-	check(exported("ROOMS/L1/X.TXT", inc, PackedStringArray()), "model: matching ignores case")
+	# Through the matcher both ways: an include it must take and an exclude it must apply.
+	check(matches_any("ROOMS/L1/X.TXT", inc) and exported("ROOMS/L1/X.TXT", inc, PackedStringArray())
+			and not exported("TESTS/X.gd", PackedStringArray(), rel), "model: matching ignores case")
 
 
 ## D2 3.: every room in every preset, dev rooms in Web debug only, no test file anywhere, and
@@ -218,7 +226,7 @@ func _test_filters(cfg: ConfigFile) -> void:
 ## exporter skips them (and folders holding a .gdignore, of which there are none here).
 func _walk(dir: String, out: Array[String]) -> void:
 	for f in DirAccess.get_files_at(dir):
-		if f.get_extension() in MODELLED:
+		if f.get_extension().to_lower() in MODELLED:
 			out.append(dir.path_join(f).trim_prefix("res://"))
 	for d in DirAccess.get_directories_at(dir):
 		if not d.begins_with("."):

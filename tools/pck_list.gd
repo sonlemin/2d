@@ -12,20 +12,26 @@ extends SceneTree
 ## Lives outside game/, so it is never exported or linted, and may print.
 
 
+var _failed := false
+
+
 func _initialize() -> void:
 	var out := PackedStringArray()
 	_walk("res://", out)
 	out.sort()
 	for p in out:
 		print(p)
-	quit()
+	quit(1 if _failed else 0)
 
 
 ## Every file under `dir`, hidden ones too (.godot/ holds the import and uid caches).
 func _walk(dir: String, out: PackedStringArray) -> void:
 	var da := DirAccess.open(dir)
 	if da == null:
-		printerr("pck_list: cannot open %s (%s)" % [dir, error_string(DirAccess.get_open_error())])
+		# An `ERROR:` line and exit 1, both of which fail export.sh's listing step: a folder the
+		# walk skipped is exactly where dev or test content would hide (code review).
+		push_error("pck_list: cannot open %s (%s)" % [dir, error_string(DirAccess.get_open_error())])
+		_failed = true
 		return
 	da.include_hidden = true
 	for f in da.get_files():

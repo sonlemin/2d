@@ -27,6 +27,7 @@ var _draws := {}  # drawer name -> draw count
 var _warnings := Warnings.new()
 var _stand_in: Player  # test_chain_mid_tick_spawn's second player, added inside a tick
 var _room_at_marker: Array[bool] = []  # test_smoke_marker: whether World had its room as each marker printed
+var _entered := 0  # test_smoke_marker: room_entered emissions, so "no second marker" can't pass vacuously
 
 
 ## Collects DevTools' push_warning texts (they arrive as `code`, probed on 4.7.2, as test_state's
@@ -295,10 +296,12 @@ func test_smoke_marker() -> void:
 	Game.store.dir = TMP
 	_spawned.clear()
 	_room_at_marker.clear()
+	_entered = 0
 	_warnings.at_marker = _note_marker
 	_world = WorldScene.instantiate()
 	_world.child_entered_tree.connect(_make_current)
 	_world.player_spawned.connect(_on_spawned)  # before add_child: the first spawn is inside it
+	_world.room_entered.connect(_on_room_entered)
 	get_tree().root.add_child(_world)
 	get_tree().current_scene = runner
 	markers = _warnings.take_markers()
@@ -315,10 +318,14 @@ func test_smoke_marker() -> void:
 			break
 		await frames(1)
 	markers = _warnings.take_markers()
-	check(_spawned.size() == 2 and markers.is_empty(),
-			"...and a respawn, which rebuilds the room and emits room_entered again, prints no second marker (spawns %d, got %s)" % [_spawned.size(), markers])
+	check(_spawned.size() == 2 and _entered == 2 and markers.is_empty(),
+			"...and a respawn, which rebuilds the room and emits room_entered again, prints no second marker (spawns %d, room_entered %d, got %s)" % [_spawned.size(), _entered, markers])
 	_warnings.at_marker = Callable()
 	await _teardown()
+
+
+func _on_room_entered(_id: StringName) -> void:
+	_entered += 1
 
 
 ## Runs inside the marker's print (Warnings.at_marker): never print here.

@@ -23,6 +23,8 @@ module.exports = defineConfig({
   testDir: '.',
   workers: 1,
   retries: 0,
+  // A stray test.only would run one test and pass the build; export.sh also fails on a skipped one.
+  forbidOnly: true,
   reporter: 'line',
   // Playwright's 30 s default would cut the 60 s boot budget each page gets (smoke.spec.js).
   timeout: 150_000,

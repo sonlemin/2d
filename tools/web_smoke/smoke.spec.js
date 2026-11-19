@@ -15,9 +15,14 @@ const ALLOWED_CONSOLE_ERRORS = [];
 
 const BANNER = 'Godot Engine v4.7.2.stable'; // the pinned templates, checked on the web
 const MARKER = '[room] SMOKE boot ok'; // DevTools, on World's first room_entered (D9)
-const BOOT_MS = 60_000; // an empty project boots in 2–4 s headless (research)
-const RELEASE_SETTLE_MS = 5_000; // the release check's "5 s more with no error"
-const LOG_LINE = /^\[(save|room|input|clock|lurker|weaver|audio|ui)\] /; // scripts/core/log.gd's `[category] message`
+const BOOT_MS = 60_000; // per page, every boot wait together (D7); an empty project boots in 2–4 s headless (research)
+// After the boot, how long the page plays on before its checks: the release check's "5 s more
+// with no error", and in debug the first seconds of play, whose runtime SCRIPT ERRORs come after
+// the marker (it prints inside World's _ready, before the first physics tick).
+const SETTLE_MS = 5_000;
+// scripts/core/log.gd's `[category] message`, for any category, so a new one can't slip past the
+// release check. Chromium's own messages start "[.WebGL-0x…]", which this doesn't match.
+const LOG_LINE = /^\[[a-z_]+\] /;
 
 // Every console message ({type, text}) and page error, collected from before the first goto, so
 // a line that arrives early is never missed. On failure the whole console, Chromium's own warnings
@@ -43,17 +48,23 @@ const texts = (seen) => seen.console.map((m) => m.text);
 // Loads `url` and waits for the engine to start. #status-notice sits inside #status: a good boot
 // removes both, a failed one (missing WebGL2, a bad download) fills the notice. One poll races
 // the two, so a failed boot fails at once with its text instead of after the whole budget.
+// Every wait shares one BOOT_MS deadline; returns the time left on it, for the page's own waits.
 async function boot(page, seen, url) {
-  await page.goto(url);
+  const deadline = Date.now() + BOOT_MS;
+  const left = () => Math.max(1, deadline - Date.now());
+  const response = await page.goto(url, { timeout: left() });
+  // A 404 page has no #status either, which the poll below would read as "booted".
+  expect(response && response.status(), `${url} is served`).toBe(200);
   const handle = await page.waitForFunction(() => {
     if (!document.getElementById('status')) return 'booted';
     const notice = document.getElementById('status-notice');
     const text = notice ? notice.innerText.trim() : '';
     return text !== '' ? `notice: ${text}` : false;
-  }, null, { timeout: BOOT_MS, polling: 100 });
+  }, null, { timeout: left(), polling: 100 });
   expect(await handle.jsonValue(), 'the shell removes #status (the engine started) instead of showing a failure notice').toBe('booted');
   // Polled over the collected messages, never waitForEvent after goto: the line may be in already.
-  await expect.poll(() => texts(seen).some((t) => t.startsWith(BANNER)), { message: `the console shows "${BANNER}…"`, timeout: BOOT_MS }).toBe(true);
+  await expect.poll(() => texts(seen).some((t) => t.startsWith(BANNER)), { message: `the console shows "${BANNER}…"`, timeout: left() }).toBe(true);
+  return left;
 }
 
 // The checks every page gets, after its own waits.
@@ -67,14 +78,19 @@ async function expectClean(page, seen) {
   expect(errors, 'no console.error outside ALLOWED_CONSOLE_ERRORS (Godot prints warnings and errors there)').toEqual([]);
 }
 
-async function expectMarker(seen) {
-  await expect.poll(() => texts(seen).filter((t) => t === MARKER).length, { message: `"${MARKER}" appears once`, timeout: BOOT_MS }).toBe(1);
+// The marker within the boot budget, then SETTLE_MS of play, then exactly one: a second marker (a
+// broken one-shot) would come later too, and a poll for "1" passes the moment the first arrives.
+async function expectMarker(page, seen, left) {
+  const markers = () => texts(seen).filter((t) => t === MARKER).length;
+  await expect.poll(markers, { message: `"${MARKER}" appears`, timeout: left() }).toBeGreaterThan(0);
+  await page.waitForTimeout(SETTLE_MS);
+  expect(markers(), `"${MARKER}" appears once, ${SETTLE_MS / 1000} s into play`).toBe(1);
 }
 
 test.describe('Web debug', () => {
   test('boots to its first room', async ({ page, seen }) => {
-    await boot(page, seen, '/web_debug/index.html');
-    await expectMarker(seen);
+    const left = await boot(page, seen, '/web_debug/index.html');
+    await expectMarker(page, seen, left);
     await expectClean(page, seen);
   });
 
@@ -82,10 +98,12 @@ test.describe('Web debug', () => {
   // room (1.12: no perf run). Only ARGS keys are passed, so no foreign parameter can appear, and
   // any "WARNING: DevTools:" line fails (AC8: the ledger's foreign-parameter item).
   test('?room=perf_worst boots straight into that room', async ({ page, seen }) => {
-    await boot(page, seen, '/web_debug/index.html?room=perf_worst');
-    await expectMarker(seen);
+    const left = await boot(page, seen, '/web_debug/index.html?room=perf_worst');
+    await expectMarker(page, seen, left);
     const dev = texts(seen).filter((t) => t.startsWith('[room] dev: '));
     expect(dev, 'DevTools applied the query: one summary line, the room only').toEqual(['[room] dev: room perf_worst@spawn']);
+    // AC6's literal check. A perf run logs its `[room] dev: perf …` line only when it ends, so this
+    // can't fire this early; the summary line above is the proof, since a requested run shows in it.
     expect(texts(seen).filter((t) => t.startsWith('[room] dev: perf')), 'no perf run: it is the plain room').toEqual([]);
     expect(texts(seen).filter((t) => t.includes('WARNING: DevTools:')), 'no DevTools warning (no unknown or bad arg)').toEqual([]);
     await expectClean(page, seen);
@@ -97,7 +115,7 @@ test.describe('Web debug', () => {
 test.describe('Web (release)', () => {
   test('boots, and stays error-free for 5 s', async ({ page, seen }) => {
     await boot(page, seen, '/web/index.html');
-    await page.waitForTimeout(RELEASE_SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS);
     await expectClean(page, seen);
     // AC7: DevTools is absent and Log is silent in release. Log's own prefixes only: Chromium's GPU
     // messages also start with "[" ("[.WebGL-0x…]GL Driver Message …").
