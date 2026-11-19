@@ -205,7 +205,7 @@ AR6: Enable 2D physics interpolation (`physics/common/physics_interpolation = tr
 **Engine, display, platform**
 
 AR7: Godot 4.7.2 frozen for M2 (4.7.x maintenance only after the upgrade checklist; 4.8+ considered only at an epic boundary). Upgrade checklist: update editor + templates on laptop and server together → re-import → tests green → web smoke → commit changed `.import` files. [all]
-AR8: `core/display.gd`: 480×270, integer scale only, letterboxed, nearest; DPR-based integer scale via JavaScriptBridge on web with sub-×1 fit; fullscreen; PC minimum window. Verified in the E1 web build at the ×2 embed (960×540) and fullscreen. `OS.has_feature("web")` only in boot, `display.gd`, the storage check, the quit button and the audio gate. [E1]
+AR8: `core/display.gd`: 480×270, integer scale only, letterboxed, nearest; DPR-based integer scale via JavaScriptBridge on web with sub-×1 fit; fullscreen; PC minimum window. Verified in the E1 web build at the ×2 embed (960×540) and fullscreen. `OS.has_feature("web")` only in boot, `display.gd`, the storage check, the quit button and the audio gate. As built (Story 1.14): the engine's HiDPI canvas already gives the physical-pixel scale, so there is no JavaScriptBridge; the sub-×1 fit, the PC window and the web key guard are `display.gd` and the web presets' `html/head_include`. [E1]
 AR9: Autoloads: only `Game` (E1) and `Audio` (E3); no `class_name` on autoloads; a third autoload, an addon or a `.tres` is an architecture change. [E1 / E3]
 
 **State objects and rules**

@@ -4,7 +4,7 @@ baseline_commit: 1afcc65
 
 # Story 1.14: Display scaling and web input
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -134,11 +134,11 @@ so that pixels stay sharp and the page never scrolls under me.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 8).**
+- [x] **Task 1: Baseline (AC: 8).**
   - `cd game && ./run_tests.sh` should give `== ALL GREEN (21 tests)`, 1326 `ok` at `1afcc65` (the 1.13 review record). Record the number you get.
   - `tools/export.sh` should give `== BUILD OK`, about 81 s, `3 passed`.
   - The engine and browser facts this story relies on are already probed ("Verified facts").
-- [ ] **Task 2: `Display` and `Game` (AC: 1, 3), D2, D3, D4, D6.**
+- [x] **Task 2: `Display` and `Game` (AC: 1, 3), D2, D3, D4, D6.**
   - Write `scripts/core/display.gd`.
   - In `scripts/core/game.gd`:
     - add `var display := Display.new():` with the same assert setter as `clock`;
@@ -146,30 +146,30 @@ so that pixels stay sharp and the page never scrolls under me.
     - call `display.start()` at the end of `boot()`, after `load_settings()`, so 7.2's display settings are already loaded when it runs;
     - update the header comment and `boot()`'s doc.
   - Add `display` to `test_lint`'s `state_write` instance-replacement pattern, `(settings|slot|dive|tuning|clock|store|display)`.
-- [ ] **Task 3: `tests/test_display.gd` (AC: 6), D8.**
-- [ ] **Task 4: The presets (AC: 2, 4), D1, D5.**
+- [x] **Task 3: `tests/test_display.gd` (AC: 6), D8.**
+- [x] **Task 4: The presets (AC: 2, 4), D1, D5.**
   - Add `html/canvas_resize_policy=2`, `html/focus_canvas_on_start=true` and D5's `html/head_include` to `[preset.2.options]` and `[preset.3.options]`.
   - Extend `test_export_presets` (D8).
   - Red-check it (D10 1, 5).
-- [ ] **Task 5: `embed.html` and its route (AC: 5), D7.** Write `tools/web_smoke/embed.html`, then add the one exact-path route to `serve.js`.
-- [ ] **Task 6: The smoke (AC: 5), D7.**
+- [x] **Task 5: `embed.html` and its route (AC: 5), D7.** Write `tools/web_smoke/embed.html`, then add the one exact-path route to `serve.js`.
+- [x] **Task 6: The smoke (AC: 5), D7.**
   - Add the `Display scale` and `Web input` blocks to `smoke.spec.js`.
   - Update its header comment: 1.14 is done, 1.33, 1.39 and 3.3 are still to come.
   - Run it alone against a fresh build (`docs/build.md`).
-- [ ] **Task 7: Check the desktop under Xvfb (AC: 3), D4.**
+- [x] **Task 7: Check the desktop under Xvfb (AC: 3), D4.**
   - Run `godot --path game --rendering-driver opengl3 --audio-driver Dummy` under `xvfb-run -a -s '-screen 0 WxHx24'`:
     - at 1366×768: the window comes out 960×540 and centred, with the `window x2` line;
     - at 1920×1080: it stays 1440×810, with no window line;
     - with `--resolution 300x200`: it comes out 480×270;
     - with `--fullscreen`: no window line, and the scale line shows the screen's whole scale.
   - Record each line.
-- [ ] **Task 8: Docs (AC: 7), D9.**
-- [ ] **Task 9: Verify (AC: 8), D10.**
+- [x] **Task 8: Docs (AC: 7), D9.**
+- [x] **Task 9: Verify (AC: 8), D10.**
   - `./run_tests.sh` gives `== ALL GREEN (22 tests)` with no `ERROR:` lines.
   - `tools/export.sh` gives `== BUILD OK` with `7 passed`; record the end line.
   - Run every D10 red check in a detached worktree and record each failing line.
   - Stage the new files, each `.gd.uid` beside its `.gd`.
-- [ ] **Task 10: Report:** "export green; needs a 5-minute look on the laptop". The look:
+- [x] **Task 10: Report:** "export green; needs a 5-minute look on the laptop". The look:
   - **Desktop:**
     - the window opens at ×3, or ×2 on a small screen, centred;
     - drag-resizing steps through whole scales with black bars and stops at 480×270;
@@ -710,12 +710,66 @@ This story's work touches those same files: `serve.js`, `smoke.spec.js`, `test_e
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-19.
+
 ### Debug Log References
+
+- **Baseline (Task 1):** `./run_tests.sh` → `== ALL GREEN (21 tests)`, 1326 `ok`. `tools/export.sh` → `== BUILD OK builds/20261119-4f72f08-dirty … 84 s`, `3 passed (28.6s)`. It was dirty only from the story and sprint-status edits; `display.gd` was created mid-run, which is why Windows packed 74 files and Linux 76.
+- **F12, new probe (4.7.2 web debug, headless Chromium):** on a browser resize `get_window().size` and `DisplayServer.window_get_size()` follow the canvas backing (DPR 1: 1000×600, 400×225, 320×180; DPR 2: 2000×1200, 800×450, 640×360), and the viewport's visible rect stays 480×270 at every size, the fit included. **But `Window.size_changed` never fires** (no line in 8 resizes). The first smoke run failed because of it: `2 failed, 5 passed`, at DPR 1 400×225 (no fit, cropped) and DPR 2 320×180 (no new `scale 1` line). Fix: `start()` keeps the `size_changed` connection and also turns on a per-frame size check in `_process` (`PROCESS_MODE_ALWAYS`, off until `start()`). `apply()` returns early on a size it has seen.
+- **Probe: a stretch change re-emits `size_changed`?** It doesn't matter: `apply()` compares sizes first, and on web the signal never fires at all.
+- **`ConfigFile.get_value(sec, key, null)`** treats `null` as "no default" and prints an engine `ERROR:` when the key is missing (seen in red 1's first run). The new preset checks call `has_section_key()` first.
+- **Task 7 (Xvfb, `--rendering-driver opengl3 --audio-driver Dummy`, geometry from `xwininfo`):**
+  - 1366×768: `[ui] display: window x2 960x540 (screen 1366x768)`, `[ui] display: scale 2 in 960x540`, window 960x540+203+114 (centred);
+  - 1920×1080: `[ui] display: scale 3 in 1440x810`, no window line, 1440x810+240+135;
+  - `--resolution 300x200`: `[ui] display: scale 1 in 480x270`, window 480x270 (min_size grew it; no window line, since it only shrinks);
+  - `--fullscreen`: the server's Xvfb has no window manager, so the fullscreen request is never honoured. The window stays 1440×810 (`scale 3 in 1440x810`). At 1366×768 the window step is correctly skipped (no window line, mode not windowed). The real fullscreen look moves to the laptop (Task 10).
+- **Task 9:** `./run_tests.sh` → `== ALL GREEN (22 tests)`, 1381 `ok`, no `ERROR:` lines. `tools/export.sh` → `== BUILD OK builds/20261119-4f72f08-dirty, web download 10.3 MB (gzip; raw 40.0 MB), PCK files windows 76 / linux 76 / web 76 / web_debug 83, 119 s`, `7 passed (1.0m)`.
+- **D10 red checks** (detached worktree in the scratchpad with the uncommitted work applied, one at a time):
+  1. no `html/head_include` in `Web`: `FAIL preset.2 (Web): html/head_include holds the key guard (missing ["the key"])`, `FAIL Web and Web debug carry the same html/head_include`; export.sh `BUILD FAILED: web_smoke` with `Web input … Error: blurred: ArrowDown leaves the host page at scrollY 0`.
+  2. `apply()` always INTEGER: `FAIL apply 400x225: below 480x270 switches to the fit (… got 0.83333, integer …)` (2 FAILs); export.sh `BUILD FAILED`, `Display scale › DPR 1 … Error: 400x225 CSS at DPR 1: the engine draws x0.833, centred, both gutters showing`.
+  3. `scale_for` rounds: `FAIL scale_for 1439x810 = 2.00000, integer (got 3.00000, integer)`, plus 959×540, 960×539 and 1440×809 (FAILED (4)).
+  4. no headless guard in `start()`: `test_display` prints `[ui] display: scale 1 in 480x270` (min_size grows the 64×64 headless window first, so not the 0.133 fit D10 predicted) and fails `start() under headless leaves scale 0.0 (got 1.0)`, `...and connects nothing to size_changed`, `...and leaves the per-frame size check off`. `test_state` stays green.
+  5. `html/canvas_resize_policy=0`: `FAIL preset.2 (Web): html/canvas_resize_policy=2, written explicitly (got 0)` and the same for preset.3.
+  6. `serve.js` (port 8071 on the baseline build): `/embed.html` 200 `text/html`, `/embed.html?build=web_debug` 200, `/%2e%2e/tools/web_smoke/serve.js` 404, a symlink `web/evil.txt` → `/etc/hostname` 404, `/serve.js` 404, `/embed%2ehtml` 404, `/web_debug` 301. **`/embed.html/../web/index.html` gives 200**, not the 404 D10 expected. URL parsing collapses `..` to `/web/index.html`, a file inside `BUILD_DIR`, byte-identical to it (`cmp`). 1.13's `serve.js` gives the same 200, so this is unchanged behaviour, and nothing outside `BUILD_DIR` is reachable.
+  7. (added) no per-frame size check: export.sh `BUILD FAILED`, `2 failed`: DPR 1 at 400×225 and DPR 2 `the newest "[ui] display:" line names scale 1`.
 
 ### Completion Notes List
 
+- **`Display`** (`scripts/core/display.gd`, child of `Game` as `Game.display`, assert setter, `state_write` lint): `scale_for` / `stretch_for` / `window_scale_for` statics, `apply()` (stretch + `scale`, emit and one `Log.UI` line only on change), `start()` (inert under headless; on PC not web/embedded, `min_size` 480×270 and the shrink-to-fit plus centre for a windowed window; then apply, `size_changed`, and the per-frame check). `Game.boot()` calls `display.start()` after `load_settings()`. `project.godot` untouched.
+- **Deviation from AC1's mechanism, from probe F12:** AC1 names only the `size_changed` connection. On web that signal never fires, so `Display` also checks `get_window().size` each frame (one compare; nothing logs unless the scale changes). The connection stays, per AC1. The behaviour AC1/AC2 ask for is met, and the smoke proves it (red 7).
+- **Presets:** both web `.options` gained `html/canvas_resize_policy=2`, `html/focus_canvas_on_start=true` and D5's `html/head_include`, verbatim. `test_export_presets` checks them (60 → 67 checks), plus that the guard is identical in both presets.
+- **Smoke:** `embed.html` and its one exact `serve.js` route; `Display scale` (3 tests, screenshots measured in the browser, expected values from a table) and `Web input` (1 test, release in the embed, focused and blurred phases). A measure failure prints the whole measurement as JSON. Header comment updated.
+- **Tests:** new `test_display` (47 checks); `test_lint` sample `Game.display = x`. 22 tests, 1381 `ok`.
+- **Docs (D9):** `docs/build.md`, `architecture.md`, `component-inventory.md`, `source-tree-analysis.md`, `perf.md`, `development-guide.md` (run line, "add a web export option" row), `project-context.md` (Current State, one Platform rule, Last Updated), `game-architecture.md` (`:134`, `:230`, `:241`, tree, table), `epics.md` AR8 as built. `docs/index.md` needed nothing.
+- **Not verifiable on the server:** real fullscreen (no WM under Xvfb), F11/F12 in a real browser, browser zoom. These are in the laptop look (Task 10).
+- Report: **export green; needs a 5-minute look on the laptop.**
+
 ### File List
+
+- `game/scripts/core/display.gd` (new)
+- `game/scripts/core/display.gd.uid` (new)
+- `game/tests/test_display.gd` (new)
+- `game/tests/test_display.gd.uid` (new)
+- `tools/web_smoke/embed.html` (new)
+- `game/scripts/core/game.gd`
+- `game/export_presets.cfg`
+- `game/tests/test_export_presets.gd`
+- `game/tests/test_lint.gd`
+- `tools/web_smoke/serve.js`
+- `tools/web_smoke/smoke.spec.js`
+- `docs/build.md`
+- `docs/architecture.md`
+- `docs/component-inventory.md`
+- `docs/source-tree-analysis.md`
+- `docs/perf.md`
+- `docs/development-guide.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/planning-artifacts/epics.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-14-display-scaling-and-web-input.md`
 
 ## Change Log
 
 - 2026-11-19: Story created (create-story). Engine and browser behaviour probed on the server (F1–F11). Status ready-for-dev.
+- 2026-11-19: Implemented (dev-story). `Game.display`, the web presets' keys and key guard, `embed.html`, the `Display scale` and `Web input` smoke blocks, `test_display`, docs. New probe F12: the web root window never emits `size_changed` on a browser resize, so `Display` also checks the size each frame. 22 tests green (1381 ok); export BUILD OK, 7 passed; D10 red checks recorded. Status review.

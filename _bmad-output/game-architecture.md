@@ -132,7 +132,11 @@ Dev-only debug entry points and hotkeys are a pattern rule (see Implementation P
 - **Load:** < 2 s hub → Lift Station (laptop). Web: < 30 MB download, playable < 10 s at 50 Mbps.
 - **Memory:** ≤ 512 MB desktop, ≤ 300 MB web tab.
 - **Display:** 480×270 native, integer scale only (×2/×3/×4), letterboxed; scale chosen from physical
-  pixels (devicePixelRatio) on web; ~60 px HUD gutters each side → ~360 px play view.
+  pixels (devicePixelRatio) on web; ~60 px HUD gutters each side → ~360 px play view. As built
+  (Story 1.14): `Game.display` (`core/display.gd`) holds the rule; the engine's HiDPI canvas gives
+  physical pixels and its integer stretch draws the whole scale; below ×1 `Display` switches to a
+  fractional nearest fit (letterboxed) instead of the engine's crop; the PC window is ×3 or the
+  largest whole scale that fits the screen, minimum 480×270.
 - **Visible play rect:** one shared definition of the visible play area (inside the gutters). Lurker
   notice ("on screen"), off-screen stirring distance, edge cues, glyph-prompt clamps and the guarantee
   tests all use it — never the raw viewport. (M1's viewport check would let a lurker wake unseen behind a gutter: a Pillar 2 break.)
@@ -227,7 +231,7 @@ Guarantee tests run on desktop headless; the web build is covered by the web smo
 - **As built (Story 1.13):** `tools/web_smoke/` boots the `Web debug` and `Web` builds in headless Chromium
   (Playwright 1.65.1, served by `serve.js` on 127.0.0.1): the engine banner, the shell's `#status` gone, no page
   error and no `console.error`; the debug build must print `SMOKE boot ok` (also with `?room=perf_worst`), the
-  release build is boot-only. The gate (1.33), the DPR scale (1.14) and the save/reload (1.39) join it later.
+  release build is boot-only. The DPR scale and the web keys (1.14: `Display scale`, `Web input` in `embed.html`) have joined it; the gate (1.33) and the save/reload (1.39) join it later.
 
 ### Project Initialization
 
@@ -238,7 +242,7 @@ None — brownfield. Project root is `game/`; no starter template; no addons (ad
 | Component | Solution | Notes |
 |---|---|---|
 | Rendering | CanvasItem 2D on GL Compatibility (OpenGL 3.3 / WebGL 2); renders at native 480×270, then upscales | Post passes (glow) are cheap at native res; the cost driver is lights × lit canvas items. Glow listed as supported in Compatibility — web parity verified in the E1 perf scene |
-| Pixel display | Viewport stretch, integer scale, nearest filter, `snap_2d_transforms_to_pixel`; web canvas via `html/canvas_resize_policy` | DPR-based scale choice and sub-×1 fit are ours (JavaScriptBridge), verified in the E1 web build |
+| Pixel display | Viewport stretch, integer scale, nearest filter, `snap_2d_transforms_to_pixel`; web canvas via `html/canvas_resize_policy` | As built (1.14): the engine's HiDPI canvas (`allow_hidpi`, `canvas_resize_policy=2`) gives physical pixels, with no JavaScriptBridge; the sub-×1 fit, the PC window and the web key guard (`html/head_include`) are ours, verified by the web smoke |
 | Physics | Godot 2D physics, 60 ticks/s | `CharacterBody2D`, `Area2D`; deterministic enough for the bot (no randomness in level behaviour) |
 | Input | `InputMap` actions, physical keycodes, joypad API, runtime remapping | Browser pads appear only after a press; hold/tap logic, buffering, glyph swap are ours |
 | Scene management | `SceneTree`, `PackedScene`, autoloads, groups | Room/world model is ours |
@@ -706,9 +710,9 @@ pixel_art_game/
 │   ├── run_tests.sh                   # globs tests/test_*.gd + tests/smoke_*.gd, each run via tests/runner.tscn
 │   ├── scripts/
 │   │   ├── core/                      # session plumbing, no gameplay rules
-│   │   │   ├── game.gd                # autoload Game: settings, slot, dive, tuning, clock, devices
+│   │   │   ├── game.gd                # autoload Game: settings, slot, dive, tuning, clock, display, devices
 │   │   │   ├── clock.gd               # Node child of Game; only writer of Engine.time_scale
-│   │   │   ├── display.gd             # DPR (JavaScriptBridge), integer scale, sub-×1 fit, fullscreen, min window
+│   │   │   ├── display.gd             # Node child of Game: integer scale rule, sub-×1 fit, PC window, min window (fullscreen: 7.2)
 │   │   │   ├── devices.gd             # last-used device, glyph swap, active pad
 │   │   │   ├── save_store.gd          # JSON slots, atomic write, .bak, migrations
 │   │   │   ├── log.gd                 # static Log, category consts
@@ -836,7 +840,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 | Light sensing maths | `scripts/rules/sensing.gd` | notice / stir / sense / target choice |
 | Economy data | `scripts/rules/economy.gd` | prices (map 60, hint 25, gear 200–300, cosmetics 75–150), ember curve, journal payout |
 | NPC dialogue data | `scripts/rules/dialogue.gd` + `text/strings.csv` | per-NPC ordered line keys gated by slot flags; the narrative pass writes the strings |
-| Display scaling | `scripts/core/display.gd` | DPR-based integer scale, sub-×1 fit, fullscreen, PC minimum window |
+| Display scaling | `scripts/core/display.gd` | Integer scale from physical pixels (the engine's HiDPI canvas on web), sub-×1 fit, PC window fit and minimum; fullscreen in 7.2 |
 | World and rooms | `scripts/world/` + `rooms/` | room load/validate/build, swap, respawn, play rect, camera |
 | Player kit | `scripts/actors/player.gd`, `player_input.gd` | movement, attacks, Light, cling, Flare Toss, Swing |
 | Enemies and predators | `scripts/actors/` (`weaver/` for the boss) | crawler, lurker, spiderling, Weaver parts |

@@ -76,6 +76,7 @@ godot --headless --path game --import                                # first, an
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_chain_state.gd      # ChainState unit tests
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_log.gd              # Log
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_clock.gd            # Game.clock and the hitstop
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_display.gd          # Game.display: the scale rule, the window fit, inert under headless
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.gd            # Settings, SlotState, DiveState, Game and settings.json
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd      # room validator, build, Room API and m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sweep.gd       # the pure room sweeps on inline grids
@@ -167,6 +168,7 @@ The level is `game/rooms/l1/m1_shaft.txt`: a header, `---`, then the grid (`#` w
 | Measure performance | [perf.md](./perf.md): `godot --path game -- --room=perf_worst --perf`, then with `--glow=on` |
 | Make a build | on the server, `tools/export.sh` (after `./run_tests.sh` for a build you will share); output in `builds/<version>/`; [build.md](./build.md) |
 | Exclude something from release | add it to the three release presets' `exclude_filter` in `game/export_presets.cfg` and to `RELEASE_EXCLUDES` in `tests/test_export_presets.gd`; `tools/export.sh`'s PCK check names the forbidden prefixes |
+| Add a web export option | write it explicitly in both web presets (`[preset.2.options]` and `[preset.3.options]`) of `game/export_presets.cfg` and check it in `tests/test_export_presets.gd` (Story 1.14: `html/canvas_resize_policy`, `html/focus_canvas_on_start`, the `html/head_include` key guard) |
 
 After any rule change, update the matching GDD table. Note playtest-driven changes in `_bmad-output/implementation-artifacts/`.
 

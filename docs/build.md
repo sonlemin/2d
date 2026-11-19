@@ -79,6 +79,10 @@ builds/<version>/
 - Every preset: `export_filter="all_resources"` and the include filter `rooms/*.txt`. In Godot's matcher `*` crosses `/` and `**` is a plain `*`, so `rooms/*.txt` means every room file at any depth; `rooms/**/*.txt` would skip a room placed directly in `rooms/`. Matching is case-insensitive and anchored at the path's start, so it never takes `tests/rooms/…`.
 - Release presets exclude `rooms/dev/*, tests/*, scripts/dev/*`. `Web debug` excludes only `tests/*`: it keeps `perf_worst.txt` and DevTools, whose path-string `load()` in `world.gd` has no null check.
 - Web presets are single-threaded (`variant/thread_support=false`, `variant/extensions_support=false`, `progressive_web_app/enabled=false`), so they use the `web_nothreads_*` templates and need no COOP/COEP headers.
+- Web presets also write three `html/*` keys explicitly (Story 1.14), so a re-save that changes them fails the suite:
+  - `html/canvas_resize_policy=2` (Adaptive): with `display/window/dpi/allow_hidpi` (true by default; `test_display` checks the effective value) the canvas backing is the CSS size × devicePixelRatio, so the game's window is in physical pixels and the integer stretch picks the scale from them. There is no JavaScriptBridge.
+  - `html/focus_canvas_on_start=true`: the canvas has focus at boot, so keys reach the game.
+  - `html/head_include`: the key guard, the same text in both presets. It is a capture-phase `keydown` listener on `window` that calls `preventDefault()` for the arrows, Space, PageUp/PageDown, Home, End and F1–F12, and gives the canvas focus back if it lost it. Godot already prevents those keys on the focused canvas; the guard covers focus elsewhere in the game's page, where in an itch-style embed they scrolled the host page. It runs in `<head>` before the canvas exists, so it looks the canvas up when a key arrives. The JavaScript uses single quotes and no backslashes, so the cfg value needs no escapes.
 - No preset sets a `custom_template/*` path, an encryption key or an absolute `export_path`. Opening Project → Export on the laptop rewrites the file with every key; commit that only if `test_export_presets` still passes and the diff holds no machine path.
 
 ## `tools/pck_list.gd`
@@ -87,7 +91,7 @@ builds/<version>/
 godot --headless --main-pack /abs/path/game.pck -s /abs/path/tools/pck_list.gd
 ```
 
-It prints every file in the pack, one `res://…` path per line, after the engine banner (keep only `^res://` lines). A folder it can't open prints an `ERROR:` line and makes it exit 1, so a partial listing fails the step. The engine reads its own pack, so a PCK format change (v4 in 4.7) needs nothing here. Both paths must be absolute: a relative `-s` path resolves inside the pack. Caveat: `--main-pack` still instances the pack's autoloads. `Game._init()` only builds the Clock (disk access waits for `boot()`, which only World calls), so a listing touches nothing; **a future autoload must keep disk and network out of `_init()` and `_ready()`**.
+It prints every file in the pack, one `res://…` path per line, after the engine banner (keep only `^res://` lines). A folder it can't open prints an `ERROR:` line and makes it exit 1, so a partial listing fails the step. The engine reads its own pack, so a PCK format change (v4 in 4.7) needs nothing here. Both paths must be absolute: a relative `-s` path resolves inside the pack. Caveat: `--main-pack` still instances the pack's autoloads. `Game._init()` only builds the Clock and the Display (disk access and the window wait for `boot()`, which only World calls), so a listing touches nothing; **a future autoload must keep disk and network out of `_init()` and `_ready()`**.
 
 ## The web smoke
 
@@ -95,7 +99,9 @@ It prints every file in the pack, one `res://…` path per line, after the engin
 
 - every page: it is served (status 200); within one 60 s budget, the shell's `#status` overlay is removed and the console shows `Godot Engine v4.7.2.stable`; `#status-notice` stays empty; no page error; no `console.error` outside `ALLOWED_CONSOLE_ERRORS` (empty; every entry needs a reason). Godot sends `push_warning`, `push_error`, `printerr` and `SCRIPT ERROR` to `console.error`; Chromium's own `warning` messages (`GPU stall due to ReadPixels` under SwiftShader) are ignored;
 - `Web debug`: `[room] SMOKE boot ok` appears (DevTools prints it on World's first `room_entered`, in real runs only, before the first physics tick), then the page plays 5 s more and the marker must still appear exactly once, with the checks above run after that. Then again as `?room=perf_worst`: DevTools' summary is exactly `[room] dev: room perf_worst@spawn` (a requested perf run would show in it), with no `dev: perf` line and no `WARNING: DevTools:` line;
-- `Web` (release): the checks above, then 5 s more with no error, and no `[category]` Log line of any category (DevTools and `Log` are debug-only).
+- `Web` (release): the checks above, then 5 s more with no error, and no `[category]` Log line of any category (DevTools and `Log` are debug-only);
+- `Display scale` (Story 1.14), on `Web debug`: one test per devicePixelRatio (1, 1.5, 2). Each boots once, then resizes the viewport through its steps (DPR 1: 960×540 → 1000×600 → 400×225 → 1000×600; DPR 1.5: 960×540 → 1000×600; DPR 2: 960×540 → 320×180). Each step is measured from a device-pixel screenshot, decoded by the browser itself: the box of non-black pixels must be 480·s × 270·s (±1 px for the fit), centred to within 1 px, with the same colour at its outermost columns at mid-height (both gutters show, so nothing is cropped). The newest `[ui] display: scale …` line must name the same scale. Expected values are written in the test's table, never computed by a copy of the rule;
+- `Web input` (Story 1.14), on the release build inside `embed.html` (an itch-style host page: a header, the game in a 960×540 iframe, 3000 px of page): with the canvas focused, every guarded key except F11/F12 reaches the frame prevented and the host stays at `scrollY 0`; after `blur()` inside the frame, the same keys still leave the host at 0 and the first one gives the canvas focus back.
 
 On a failure the whole browser console is printed under the failing test's title, so `logs/web_smoke.log` shows it. It checks correctness only: headless WebGL runs on SwiftShader, so it says nothing about performance (that is [perf.md](./perf.md)).
 
@@ -105,7 +111,7 @@ Run it alone against a build, from the repo root:
 B="$PWD/builds/<version>"; (cd tools/web_smoke && BUILD_DIR="$B" npx playwright test)
 ```
 
-It serves on `127.0.0.1:8061` (`PORT` to change it).
+It serves on `127.0.0.1:8061` (`PORT` to change it). Seven tests: 2 `Web debug`, 1 `Web (release)`, 3 `Display scale`, 1 `Web input`.
 
 ## Playing builds on the laptop
 
@@ -120,9 +126,10 @@ rsync -a <server>:project/pixel_art_game/builds/<version>/linux/ ./uc-<version>/
 
 1. on the server: `BUILD_DIR=builds/<version> PORT=8060 node tools/web_smoke/serve.js`;
 2. on the laptop: `ssh -L 8060:127.0.0.1:8060 <server>`;
-3. open `http://localhost:8060/web_debug/index.html` (debug: DevTools' query args work, for example `?room=perf_worst&perf`) or `http://localhost:8060/web/index.html` (release).
+3. open `http://localhost:8060/web_debug/index.html` (debug: DevTools' query args work, for example `?room=perf_worst&perf`) or `http://localhost:8060/web/index.html` (release);
+4. for keys in an itch-style embed: `http://localhost:8060/embed.html?build=web` (or `?build=web_debug`). Arrows, Space, PageDown and F5 must never scroll or reload the host page while the game has focus. With the header text clicked, arrows scroll the host, which is correct: the game doesn't have focus.
 
-`serve.js` sends `.wasm` as `application/wasm`, ignores the query string, redirects a folder URL without its trailing slash (`/web_debug` → `/web_debug/`, since the shell's files are relative), never serves outside `BUILD_DIR` (symlinks included), and sends `Cache-Control: no-store`, so a rebuilt version at the same path is never stale.
+`serve.js` serves `BUILD_DIR` plus one exact path beside itself, `/embed.html`. It sends `.wasm` as `application/wasm`, ignores the query string, redirects a folder URL without its trailing slash (`/web_debug` → `/web_debug/`, since the shell's files are relative), never serves outside `BUILD_DIR` (symlinks included), and sends `Cache-Control: no-store`, so a rebuilt version at the same path is never stale.
 
 ## itch.io
 
@@ -139,7 +146,14 @@ For 4.7.x maintenance only (the engine is frozen on 4.7.x for M2; a minor upgrad
 2. Re-import (`godot --headless --path game --import`, or open the project).
 3. `cd game && ./run_tests.sh` gives `== ALL GREEN`.
 4. `tools/export.sh` gives `== BUILD OK`, which includes the web smoke. Update the smoke's `BANNER` to the new version first.
-5. A manual web look on the laptop (the tunnel above), debug and release.
-6. Commit the changed `.import` files.
+5. Recheck the display and web-input facts Story 1.14 relies on (its F1–F7) against the new templates. The web smoke covers most of them:
+   - the canvas backing is CSS size × devicePixelRatio;
+   - the integer stretch works on physical pixels, and below 480×270 it crops (which is why `Display` switches to the fractional fit there);
+   - the letterbox is pure black, and the fractional stretch blits nearest-neighbour;
+   - Godot calls `preventDefault()` on the keys the focused canvas gets;
+   - `$GODOT_HEAD_INCLUDE` is still in `<head>` of the template's shell;
+   - on web, the root window's `size_changed` still doesn't fire on a browser resize (`Display` polls the size; if it fires now, the poll is harmless).
+6. A manual web look on the laptop (the tunnel above), debug and release, and `embed.html`.
+7. Commit the changed `.import` files.
 
 A PCK format change (v4 in 4.7) needs nothing here: `pck_list.gd` uses the engine's own reader. When the Playwright pin moves, re-check `export.sh`'s browser preflight, which reads Playwright's internal registry module.

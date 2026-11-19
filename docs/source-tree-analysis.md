@@ -51,8 +51,9 @@ pixel_art_game/
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
 │   │   ├── core/
-│   │   │   ├── game.gd           # The Game autoload: refs to session state (`settings`, `slot`, `dive`, `tuning`, `clock`, `store`), boot(), no rules
+│   │   │   ├── game.gd           # The Game autoload: refs to session state (`settings`, `slot`, `dive`, `tuning`, `clock`, `display`, `store`), boot(), no rules
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
+│   │   │   ├── display.gd        # Display: the scale rule, the sub-×1 fit, the PC window; the only code touching the stretch or window (Story 1.14)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
 │   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
@@ -67,6 +68,7 @@ pixel_art_game/
 │   │   ├── test_chain_state.gd   # Unit tests for ChainState
 │   │   ├── test_log.gd           # Unit tests for Log
 │   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
+│   │   ├── test_display.gd       # Display: the scale table, window_scale_for, project display settings, inert until start() (Story 1.14)
 │   │   ├── test_tuning.gd        # Tuning API, gear order, floors under every gear combination, the 44 M1 exports fixture
 │   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
 │   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
@@ -104,10 +106,11 @@ pixel_art_game/
 │   ├── export.sh                 # ★ Builds every target into builds/<version>/ and checks each one (Story 1.13; docs/build.md)
 │   ├── pck_list.gd               # Lists a PCK's files through the engine's own reader (export.sh's release check)
 │   └── web_smoke/                # The web boot smoke: Playwright 1.65.1 (exact pin), Chromium headless
+│       ├── embed.html            # An itch-style host page with the game in a 960×540 iframe (Story 1.14's Web input test)
 │       ├── package.json  package-lock.json   # node_modules/ is ignored; npm ci
 │       ├── playwright.config.js  # Chromium only, serve.js as the webServer on 127.0.0.1:8061
-│       ├── serve.js              # Dependency-free static server for a build folder (also the laptop tunnel's, on 8060)
-│       └── smoke.spec.js         # Both web builds boot; the debug one prints SMOKE boot ok, also with ?room=perf_worst
+│       ├── serve.js              # Dependency-free static server for a build folder, plus /embed.html (also the laptop tunnel's, on 8060)
+│       └── smoke.spec.js         # Both web builds boot; the debug one prints SMOKE boot ok, also with ?room=perf_worst; Display scale, Web input (1.14)
 │
 ├── builds/                       # tools/export.sh output, one folder per version (gitignored)
 │

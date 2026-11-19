@@ -36,7 +36,7 @@ godot --path game -- --room=perf_worst --perf --glow=on
 
 In the editor: Debug → Customize Run Instances, with the args after `--` per instance. Never set Project Settings `editor/run/main_run_args` (it writes `project.godot`).
 
-**Web** (once Story 1.14 has landed too): the debug web build at the ×2 embed (960 × 540), in Chrome and Firefox with hardware acceleration on. Build it on the server with `tools/export.sh`, serve `builds/<version>/` with `serve.js` and open it on the laptop through an SSH tunnel ([build.md → Playing builds on the laptop](./build.md#playing-builds-on-the-laptop)):
+**Web:** the debug web build at the ×2 embed (960 × 540), in Chrome and Firefox with hardware acceleration on. Build it on the server with `tools/export.sh`, serve `builds/<version>/` with `serve.js` and open it on the laptop through an SSH tunnel ([build.md → Playing builds on the laptop](./build.md#playing-builds-on-the-laptop)):
 
 ```
 http://localhost:8060/web_debug/index.html?room=perf_worst&perf
