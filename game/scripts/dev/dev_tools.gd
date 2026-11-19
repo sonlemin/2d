@@ -9,19 +9,24 @@ extends Node
 ##   real run, the same gate as `Game.boot()`); a test sets `tokens` from World's
 ##   `child_entered_tree`, which fires before this node's `_ready()` (D3).
 ## - Overlays: the `dev_overlay` action (backquote) cycles four overlays, then off (overlays.gd).
+## - Perf (Story 1.12): `--glow=on` adds engine glow for the perf check; `--perf[=<s>]` starts the
+##   timed autopilot run (perf_run.gd). Both are dev-only until 1.15's verdict (docs/perf.md).
 ## - A bad arg is a warning, never an error or an assert: the game still starts (D4).
 
 const Overlays := preload("overlays.gd")
+const PerfRun := preload("perf_run.gd")
 
 ## One row per arg (D4): name -> {help, apply (the method that applies its values), repeat (may be
 ## given more than once)}. Rows apply in this order: log first, so the rest can log; set and room
-## at once; chain on every spawn. Later stories add one row each: glow (1.12), hp (1.19),
-## difficulty (1.22).
+## at once; chain on every spawn; glow before perf, so the run's summary knows it; perf last, since
+## it reads --chain. Later stories add one row each: hp (1.19), difficulty (1.22).
 const ARGS := {
 	"log": {help = "--log=<cat>,<cat>: turn on Log categories", apply = &"_apply_log", repeat = true},
 	"set": {help = "--set=<key>:<value>: a setting for this session only; nothing is saved", apply = &"_apply_set", repeat = true},
 	"room": {help = "--room=<id>: start the dive in that room", apply = &"_apply_room", repeat = false},
 	"chain": {help = "--chain=<n>: every life takes off with that chain", apply = &"_apply_chain", repeat = false},
+	"glow": {help = "--glow=on|off: engine glow (a WorldEnvironment) for the perf check; off unless given", apply = &"_apply_glow", repeat = false},
+	"perf": {help = "--perf[=<s>]: a timed perf run (default 60 s): the player locked on a fixed path, untouchable, holding --chain's n (default 20); the summary goes to the log and overlay 4", apply = &"_apply_perf", repeat = false},
 }
 ## The entry `--room=` starts at, by preference: the `P`, else arriving from above, else from below
 ## (D5; Story 2.1's weaver_test has no `P` and is entered from the top).
@@ -29,14 +34,21 @@ const ENTRY_ORDER: Array[StringName] = [&"spawn", &"up", &"down"]
 ## Integers longer than this are refused before to_int(): a 20-digit string passes is_valid_int()
 ## but makes to_int() print an engine ERROR (probed; room_loader.gd caps coordinates the same way).
 const MAX_INT_CHARS := 4
+const PERF_DEFAULT_S := 60  ## `--perf` alone: 60 s, the measurement procedure's run (docs/perf.md)
+const PERF_MAX_S := 600  ## 10 minutes: E7's Layer 1 performance pass (NFR1) can reuse the run
+const GLOW_INTENSITY := 1.0  ## D7 starting value for seeing glow's cost and look; the follow-up story tunes it if glow goes
+const GLOW_THRESHOLD := 0.5  ## D7: only bright pixels (lights, unshaded glows) bloom; the dark stays dark
 
 ## The args to apply. A real run replaces them with the command line and the URL query in
 ## `_ready()`; a test sets them before that.
 var tokens := PackedStringArray()
 var overlays: Node  ## overlays.gd; public for tests
+var perf: Node  ## perf_run.gd while --perf runs, else null; public for tests and the overlay
+var glow_on := false  ## --glow=on applied
 
 var _world: World
 var _chain := 0  # --chain's n, armed on every spawn (D6)
+var _chain_given := false  # a valid --chain was accepted: 0 alone can't tell it from none or a rejected one (1.12 D1)
 var _armed: Player  # the player still owed the chain; only read behind is_instance_valid()
 var _armed_frame := 0  # Engine.get_physics_frames() when _armed spawned
 
@@ -153,6 +165,44 @@ static func chain_value(text: String) -> Array:
 	if n < 0 or n > ChainState.MAX_CHAIN:
 		return [0, "--chain=%s is outside 0..%d" % [text, ChainState.MAX_CHAIN]]
 	return [n, ""]
+
+
+## [on, error] for `--glow=`: only `on` or `off`, lowercase (1.12 D7).
+static func glow_value(text: String) -> Array:
+	match text:
+		"on":
+			return [true, ""]
+		"off":
+			return [false, ""]
+	return [false, "--glow=%s is not on or off" % text]
+
+
+## [seconds, error] for `--perf[=<s>]`: "" is PERF_DEFAULT_S; else a whole number from 1 to
+## PERF_MAX_S, capped at MAX_INT_CHARS before to_int() (1.12 D1).
+static func perf_seconds(text: String) -> Array:
+	if text == "":
+		return [PERF_DEFAULT_S, ""]
+	if not text.is_valid_int() or text.length() > MAX_INT_CHARS:
+		return [0, "--perf=%s is not a whole number of seconds from 1 to %d" % [text, PERF_MAX_S]]
+	var n := text.to_int()
+	if n < 1 or n > PERF_MAX_S:
+		return [0, "--perf=%s is outside 1..%d s" % [text, PERF_MAX_S]]
+	return [n, ""]
+
+
+## The --glow=on Environment, built in code (no .tres): BG_CANVAS, which 2D glow needs; glow on at
+## the D7 values; bloom 0, because bloom 1.0 lifted the whole frame in the probe (Pillar 2: the
+## dark must stay dark). Default glow levels. Probed in GL Compatibility 2D without hdr_2d.
+static func glow_environment() -> Environment:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CANVAS
+	env.glow_enabled = true
+	env.glow_intensity = GLOW_INTENSITY
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.0
+	env.glow_hdr_threshold = GLOW_THRESHOLD
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+	return env
 
 
 ## [categories, errors] for one `--log=` value: comma-separated, any case, matched against
@@ -308,9 +358,48 @@ func _apply_chain(values: Array[String]) -> String:
 		_warn(r[1])
 		return ""
 	_chain = r[0]
+	_chain_given = true
 	if _chain > 0:
 		_world.player_spawned.connect(_on_player_spawned)  # a method: dropped with World
 	return "chain %d" % _chain
+
+
+## D7: `on` adds a WorldEnvironment (one per viewport; a later story that puts one in World
+## removes this one); `off` adds none. Game code gets no glow until 1.15's verdict.
+func _apply_glow(values: Array[String]) -> String:
+	var r := glow_value(values[-1])
+	if r[1] != "":
+		_warn(r[1])
+		return ""
+	if not r[0]:
+		return "glow off"
+	var env := WorldEnvironment.new()
+	env.name = "Glow"
+	env.environment = glow_environment()
+	add_child(env)
+	glow_on = true
+	return "glow on"
+
+
+## D1 (sonlm, 2026-11-19: the autopilot): the run holds --chain's n, or ChainState.MAX_CHAIN
+## without one, paid through the same take-off arming as --chain: no new pay path.
+func _apply_perf(values: Array[String]) -> String:
+	var r := perf_seconds(values[-1])
+	if r[1] != "":
+		_warn(r[1])
+		return ""
+	if not _chain_given:
+		_chain = ChainState.MAX_CHAIN
+		if not _world.player_spawned.is_connected(_on_player_spawned):
+			_world.player_spawned.connect(_on_player_spawned)
+	perf = PerfRun.new()
+	perf.seconds = r[0]
+	perf.hold_chain = _chain
+	perf.glow = glow_on
+	perf.world = _world
+	add_child(perf)
+	overlays.perf = perf
+	return "perf %d s, chain %d" % [r[0], _chain]
 
 
 func _on_player_spawned(player: Player) -> void:

@@ -82,6 +82,11 @@ const RULES: Array[Dictionary] = [
 	{id = &"dev_ref", bare = [r"\bDevTools\b"], code = [r"res://(scripts|scenes)/dev/"],
 		only = [], skip = ["dev/"], allow = [],
 		once = {"world/world.gd": ["if OS.is_debug_build():", "add_child(load(\"res://scripts/dev/dev_tools.gd\").new())"]}},
+	# AR46 (Story 1.12): every 2D light is a BudgetLight, or the ≤ 6 budget can't see it. A type
+	# annotation (`var l: PointLight2D`) is fine; building or extending a raw one is not.
+	# .tscn files are never linted, so test_light_budget's scene audit covers the scenes.
+	{id = &"raw_light", bare = [r"\bPointLight2D\s*\.\s*new\s*\(", r"\bextends\s+PointLight2D\b"], code = [],
+		only = [], skip = [], allow = ["core/budget_light.gd"]},
 	# Release exports exclude tests/* (Platform & Build), so game code that loads a test file
 	# (Spec included) breaks only in the shipped build (code review of 1.9).
 	{id = &"tests_ref", bare = [], code = [r"res://tests/"],
@@ -379,6 +384,16 @@ const SAMPLES: Array = [
 	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tpass\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
 	[&"dev_ref", "world/world.gd", "\tvar t: DevThing", true],
 	[&"dev_ref", "world/world.gd", "\tvar s := \"DevThing\"", false],
+	# Story 1.12 D11: raw lights, anywhere but BudgetLight itself; dev/ too (the perf run's stand-ins
+	# are BudgetLights).
+	[&"raw_light", "actors/flare.gd", "\tvar l := PointLight2D.new()", true],
+	[&"raw_light", "objects/ember_cache.gd", "extends PointLight2D", true],
+	[&"raw_light", "dev/perf_run.gd", "\tvar l := PointLight2D.new()", true],
+	[&"raw_light", "core/budget_light.gd", "extends PointLight2D", false],
+	[&"raw_light", "dev/perf_run.gd", "\tvar l := BudgetLight.new()", false],
+	[&"raw_light", "actors/flare.gd", "\t# PointLight2D.new()", false],
+	[&"raw_light", "actors/flare.gd", "\tvar s := \"PointLight2D.new()\"", false],
+	[&"raw_light", "actors/player.gd", "@onready var _light: PointLight2D = $Light", false],
 	[&"tests_ref", "world/world.gd", "const S := preload(\"res://tests/spec.gd\")", true],
 	[&"tests_ref", "core/game.gd", "\tvar p := \"res://tests/fixtures/slot_v1.json\"", true],
 	[&"tests_ref", "world/world.gd", "## the spec lives in res://tests/spec.gd", false],

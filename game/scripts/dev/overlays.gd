@@ -1,8 +1,8 @@
 extends Node
 ## The four DevTools overlays (AR54, Story 1.11 D9-D11), cycled by the `dev_overlay` action:
 ## 1 play rect and gutters, 2 light radii and notice rings, 3 room exits, entries and object ids,
-## 4 FPS, on-screen lights and active Clock requests, then off. Debug builds only; no class_name, so
-## dev/ adds one global name (DevTools preloads this script).
+## 4 FPS, the light budget, frame times, the perf run and active Clock requests, then off. Debug
+## builds only; no class_name, so dev/ adds one global name (DevTools preloads this script).
 ## Every mark reads the value the game uses (World.play_rect(), Player.light_radius(), Lurker's
 ## sensing constants, the Room's exits), never a copied number. Two drawers, both under DevTools:
 ## - WorldMarks draws in world space on World's canvas. The Darkness CanvasModulate would dim it to
@@ -12,12 +12,15 @@ extends Node
 ## - ScreenMarks draws in screen pixels on its own CanvasLayer above the UI, over the gutters.
 ## Nothing pulses or blinks (NFR8), and no colour is the reserved amber or red (NFR9).
 
+const PerfRun := preload("perf_run.gd")
 const MODES := 4  ## 0 is off
 const REFRESH_MS := 250  ## the readout text rebuilds at 4 Hz, not per frame
 const CLOCK_LINGER_MS := 500  ## an ended Clock request stays listed (greyed) this long: nothing blinks faster than 2 Hz
 const LAYER := 11  ## above World's UI layer (10), so screen marks draw over the opaque gutters
 const FONT_SIZE := 8
 const USABLE_INSET := 1.0  ## px: a gutter's usable band is 58 of its 60 px (UX DESIGN.md gutter-usable)
+const SUMMARY_ROW_CHARS := 90  ## the perf summary's rows: about 400 px of the size-8 fallback font, inside the 480 px screen (1.12 D8)
+const SUMMARY_ROWS := 3  ## at most; the last row takes the rest
 # Never #ffd27a (Light) or #d9473f (danger), NFR9.
 const WHITE := Color(1, 1, 1, 0.9)
 const GREY := Color(0.75, 0.75, 0.78, 0.9)
@@ -31,13 +34,19 @@ static var _unshaded: CanvasItemMaterial
 var mode := 0  ## 0 off, 1-4; public for tests
 var world: World  ## set by DevTools before add_child; never found through get_parent()
 var last_refresh_ms := -1  ## Time.get_ticks_msec() of the latest readout rebuild
-var light_count := 0  ## on-screen PointLight2Ds at the latest rebuild (mode 4)
+var light_count := 0  ## lit BudgetLights in World.light_rect() at the latest rebuild (mode 4): what the budget counts (1.12 D8)
+var sprite_count := 0  ## demoted BudgetLights showing their sprite glow, likewise
+var over_count := 0  ## ALWAYS lights past the budget, likewise
+var frame_ms := 0.0  ## the latest frame, in wall time (mode 4)
+var worst_frame_ms := 0.0  ## the worst frame since mode 4 opened, in wall time; cycle() resets it
+var perf: Node  ## perf_run.gd, set by DevTools for --perf; else null
+var readout := PackedStringArray()  ## mode 4's rows before the Clock rows; public for tests
 var clock_seen := {}  ## StringName -> {scale, ms}: every Clock request seen this frame or within the linger
 var clock_list: Array[Dictionary] = []  ## the readout's Clock rows at the latest rebuild: {id, scale, live}
 
 var _world_marks: Node2D
 var _screen_marks: Node2D
-var _readout := PackedStringArray()  # mode 4's first lines: FPS, lights
+var _last_frame_usec := 0  # Time.get_ticks_usec() at the previous mode-4 frame; 0 after cycle()
 
 
 func _ready() -> void:
@@ -68,6 +77,9 @@ static func unshaded_material() -> CanvasItemMaterial:
 ## Off -> 1 -> 2 -> 3 -> 4 -> off.
 func cycle() -> void:
 	mode = (mode + 1) % (MODES + 1)
+	frame_ms = 0.0
+	worst_frame_ms = 0.0
+	_last_frame_usec = 0
 	clock_seen.clear()
 	clock_list.clear()
 	last_refresh_ms = -1
@@ -79,6 +91,7 @@ func _process(_delta: float) -> void:
 		return
 	if mode == 4:
 		_sample_clock()
+		_sample_frame()
 		var now := Time.get_ticks_msec()
 		if last_refresh_ms < 0 or now - last_refresh_ms >= REFRESH_MS:
 			_rebuild_readout(now)
@@ -101,12 +114,37 @@ func _sample_clock() -> void:
 		clock_seen[id] = {scale = live[id], ms = now}
 
 
+## Wall time between frames (Time.get_ticks_usec(), never delta, which the time scale bends).
+func _sample_frame() -> void:
+	var now := Time.get_ticks_usec()
+	if _last_frame_usec > 0:
+		frame_ms = (now - _last_frame_usec) / 1000.0
+		worst_frame_ms = maxf(worst_frame_ms, frame_ms)
+	_last_frame_usec = now
+
+
+## D8: the light counts are BudgetLight.counts() on World.light_rect(), the budget's own rule and
+## rect, so the overlay shows exactly what the budget counts (a raw PointLight2D is not counted).
 func _rebuild_readout(now: int) -> void:
 	last_refresh_ms = now
-	light_count = _count_lights()
-	_readout = PackedStringArray([
+	var c := {lit = 0, sprites = 0, over = 0}
+	if is_instance_valid(world):
+		c = BudgetLight.counts(get_tree().get_nodes_in_group(BudgetLight.GROUP), world.light_rect())
+	light_count = c.lit
+	sprite_count = c.sprites
+	over_count = c.over
+	var lights := "lights %d/%d, sprites %d" % [light_count, BudgetLight.MAX_ON_SCREEN, sprite_count]
+	if over_count > 0:
+		lights += ", over %d" % over_count
+	readout = PackedStringArray([
 			"FPS %d" % Engine.get_frames_per_second(),
-			"lights %d" % light_count])
+			lights,
+			"frame %.1f ms, worst %.1f ms" % [frame_ms, worst_frame_ms]])
+	if is_instance_valid(perf):
+		if perf.done:
+			readout.append_array(summary_rows(PerfRun.summary_text(perf.result)))
+		else:
+			readout.append("perf %d / %d s" % [perf.elapsed_s(), perf.seconds])
 	clock_list = clock_rows(clock_seen, Game.clock.active(), now)
 	for id: StringName in clock_seen.keys():
 		if now - int(clock_seen[id].ms) >= CLOCK_LINGER_MS:
@@ -133,26 +171,18 @@ static func clock_rows(seen: Dictionary, live: Dictionary, now_ms: int) -> Array
 	return rows
 
 
-## D10: the PointLight2Ds under World that light the play rect. `owned = false`: the default skips
-## nodes built in code (probed). Story 1.12 moves this rule into game code for the light budget.
-func _count_lights() -> int:
-	if not is_instance_valid(world):
-		return 0
-	var rect := world.play_rect()
-	var n := 0
-	for light: Node in world.find_children("*", "PointLight2D", true, false):
-		if counts_on_screen(light as PointLight2D, rect):
-			n += 1
-	return n
-
-
-## A light counts when it is shown, on and has energy and a texture, and its texture rect meets
-## `rect` (AR20: on screen means the play rect). Idle lurker glows have energy 0 and are hidden.
-static func counts_on_screen(light: PointLight2D, rect: Rect2) -> bool:
-	if not (light.is_visible_in_tree() and light.enabled and light.energy > 0.0 and light.texture != null):
-		return false
-	var size := light.texture.get_size() * light.texture_scale * light.global_scale.abs()
-	return Rect2(light.to_global(light.offset) - size / 2.0, size).intersects(rect)
+## The perf summary over at most SUMMARY_ROWS rows, split only at its `; ` boundaries, each part
+## joined onto the row while it fits SUMMARY_ROW_CHARS; the last row takes the rest.
+static func summary_rows(text: String) -> PackedStringArray:
+	var rows := PackedStringArray()
+	for part in text.split("; "):
+		if rows.is_empty():
+			rows.append(part)
+		elif rows.size() < SUMMARY_ROWS and (rows[-1] + "; " + part).length() > SUMMARY_ROW_CHARS:
+			rows.append(part)
+		else:
+			rows[-1] += "; " + part
+	return rows
 
 
 # --- Mode 3: room items -----------------------------------------------------------------------------
@@ -262,7 +292,7 @@ func _draw_screen() -> void:
 				_text(_screen_marks, Vector2(x + 3, h - 12), "usable %d" % (g - 2.0 * USABLE_INSET), GREY)
 		4:
 			var y := 2.0
-			for line in _readout:
+			for line in readout:
 				_text(_screen_marks, Vector2(3, y), line, WHITE)
 				y += 10.0
 			for row in clock_list:

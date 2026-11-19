@@ -13,6 +13,8 @@ signal player_spawned(player: Player)
 signal room_entered(room_id: StringName)
 
 const PlayerScene := preload("res://scenes/actors/player.tscn")
+## Applies the ≤ 6 light budget each physics tick, after the actors (Story 1.12 D5).
+const LightBudgetNode := preload("res://scripts/world/light_budget.gd")
 ## The dive starts here until the slot's resume point replaces it (Stories 1.21 and 1.38).
 const START_ROOM := &"m1_shaft"
 ## s between a death and the respawn, the M1 value; the death card replaces this wait in 1.29.
@@ -41,6 +43,9 @@ func _ready() -> void:
 	if OS.is_debug_build():
 		add_child(load("res://scripts/dev/dev_tools.gd").new())  # path string, never preload: release presets exclude scripts/dev/ (1.13)
 	add_to_group("world")
+	var budget := LightBudgetNode.new()
+	budget.world = self
+	add_child(budget)
 	# The entry scene boots Game once: it loads settings.json and arms its writes (Story 1.4 D6).
 	# A test adds World by hand and is never the current scene, so tests can't touch the real
 	# settings.json even through World.
@@ -57,6 +62,12 @@ func _ready() -> void:
 ## AR20: what counts as "on screen", in world coordinates: the play area inside the gutters.
 func play_rect() -> Rect2:
 	return _camera.play_rect()
+
+
+## The rect the light budget counts as on screen (D2): the whole view, gutters included. A cost
+## rule (the engine draws and culls lights against the viewport), not AR20's fairness rule.
+func light_rect() -> Rect2:
+	return _camera.view_rect()
 
 
 func current_room() -> Room:

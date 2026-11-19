@@ -83,6 +83,15 @@ func play_rect() -> Rect2:
 	return Rect2(Vector2(_centre.x - PLAY_WIDTH / 2.0, _centre.y - h / 2.0), Vector2(PLAY_WIDTH, h))
 
 
+## The whole 480×270 view, gutters included, in world coordinates (Story 1.12 D2): the light
+## budget's rect. A cost rule: the engine draws and culls lights against the whole viewport, and a
+## light under an opaque gutter still costs a lit pass. Like play_rect(), built from the rig's own
+## centre, never the engine camera, and without the shake (≤ 2.5 px).
+func view_rect() -> Rect2:
+	var v := _view_size()
+	return Rect2(_centre - v / 2.0, v)
+
+
 ## After the player has moved this tick: the rig comes after the Player in World's tree.
 func _physics_process(delta: float) -> void:
 	if not _has_target():

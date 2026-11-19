@@ -3,17 +3,33 @@ class_name Fx
 
 const SPARK := Color(1.0, 0.82, 0.48)   ## chain-light amber
 
+static var _unshaded_material: CanvasItemMaterial
+static var _additive_material: CanvasItemMaterial
 
-static func _unshaded() -> CanvasItemMaterial:
-	var m := CanvasItemMaterial.new()
-	m.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
-	return m
+
+## Shared by every code-built effect, built once (project-context: cache materials as statics, never
+## one per effect; AR46). Unshaded, so it reads in the dark.
+static func unshaded() -> CanvasItemMaterial:
+	if _unshaded_material == null:
+		_unshaded_material = CanvasItemMaterial.new()
+		_unshaded_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	return _unshaded_material
+
+
+## Sprite glows (BudgetLight's fallback, Story 1.12): added onto the dark and unshaded, so a
+## demoted light still shows as a glow instead of vanishing under the darkness.
+static func additive() -> CanvasItemMaterial:
+	if _additive_material == null:
+		_additive_material = CanvasItemMaterial.new()
+		_additive_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		_additive_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	return _additive_material
 
 
 ## A burst of sparks where a crawler dies.
 static func pop(parent: Node, pos: Vector2, amount := 14) -> void:
 	var p := CPUParticles2D.new()
-	p.material = _unshaded()
+	p.material = unshaded()
 	p.one_shot = true
 	p.explosiveness = 1.0
 	p.amount = amount
@@ -40,7 +56,7 @@ static func chain_popup(parent: Node, pos: Vector2, count: int, embers: int) -> 
 ## Floating text that rises and fades.
 static func popup(parent: Node, pos: Vector2, text: String, color: Color, size := 8) -> void:
 	var l := Label.new()
-	l.material = _unshaded()
+	l.material = unshaded()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)

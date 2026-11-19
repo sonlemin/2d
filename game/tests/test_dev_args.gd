@@ -1,13 +1,15 @@
 extends Node
-## DevTools' pure parts (Story 1.11 D4, D5, D8, D9): the URL query, the arg grammar and registry,
-## each arg's validator, the `--room=` entry pick, the overlay's Clock rows and mode 2's light
-## marks. Static calls only:
+## DevTools' pure parts (Story 1.11 D4, D5, D8, D9; Story 1.12 D1, D7, D8): the URL query, the arg
+## grammar and registry, each arg's validator, the `--room=` entry pick, the overlay's Clock rows,
+## mode 2's light marks and the summary rows, the glow environment, and the perf run's path and
+## frame stats. Static calls only:
 ## no World, and no Game state changes.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_dev_args.gd
 ## Expected lists are written out here (the known args, Log's categories, the settings keys), so a
 ## wrong sort or a lost row shows; every "known: …" list is alphabetical (D4).
 
 const Overlays := preload("res://scripts/dev/overlays.gd")
+const PerfRun := preload("res://scripts/dev/perf_run.gd")
 const Spec := preload("res://tests/spec.gd")
 
 var _fail := 0
@@ -22,6 +24,12 @@ func run() -> void:
 	_test_room_entry()
 	_test_clock_rows()
 	_test_light_marks()
+	_test_glow_values()
+	_test_perf_seconds()
+	_test_glow_environment()
+	_test_path_point()
+	_test_stats()
+	_test_summary_rows()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -57,7 +65,7 @@ func _test_parse() -> void:
 	var r := DevTools.parse(PackedStringArray(["res://tests/x.gd", "out.png", "--room=a"]), reg)
 	check(r.values == {"room": ["a"]} and r.errors.is_empty(), "parse: tokens without -- are skipped, the runner's test path too (got %s)" % [r])
 	r = DevTools.parse(PackedStringArray(["--foo=1"]))
-	check(r.errors == ["unknown arg --foo (known: chain, log, room, set)"] and r.values.is_empty(),
+	check(r.errors == ["unknown arg --foo (known: chain, glow, log, perf, room, set)"] and r.values.is_empty(),
 			"parse: an unknown arg on ARGS is one error listing the known ones alphabetically (got %s)" % [r.errors])
 	r = DevTools.parse(PackedStringArray(["--room=a=b"]), reg)
 	check(r.values["room"] == ["a=b"], "parse: --room=a=b splits on the first = only (got %s)" % [r.values])
@@ -77,8 +85,9 @@ func _test_parse() -> void:
 		var row: Dictionary = DevTools.ARGS[arg]
 		check(row.help is String and row.help != "" and row.repeat is bool and row.apply is StringName and String(row.apply) in methods,
 				"ARGS '%s' has help, repeat and an apply method that exists (%s)" % [arg, row.apply])
-	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain"], "ARGS apply in the order log, set, room, chain (D4; got %s)" % [DevTools.ARGS.keys()])
-	check(DevTools.ARGS["set"].repeat and DevTools.ARGS["log"].repeat and not DevTools.ARGS["room"].repeat and not DevTools.ARGS["chain"].repeat,
+	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "glow", "perf"], "ARGS apply in the order log, set, room, chain, glow, perf (1.11 D4, 1.12 D1; got %s)" % [DevTools.ARGS.keys()])
+	check(DevTools.ARGS["set"].repeat and DevTools.ARGS["log"].repeat and not DevTools.ARGS["room"].repeat and not DevTools.ARGS["chain"].repeat
+			and not DevTools.ARGS["glow"].repeat and not DevTools.ARGS["perf"].repeat,
 			"only set and log may repeat")
 
 
@@ -186,3 +195,116 @@ func _test_light_marks() -> void:
 	check(m.noticeable and is_equal_approx(m.radius, Lurker.NOTICE_MIN_RADIUS) and is_equal_approx(m.reach, Lurker.NOTICE_MIN_RADIUS * Lurker.NOTICE_FACTOR),
 			"light_marks: at the notice radius it can, reach radius × %.1f (got %s)" % [Lurker.NOTICE_FACTOR, m])
 	check(Lurker.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "(premise) the lurker's notice radius is the GDD floor or later (%d >= %d)" % [Lurker.NOTICE_MIN_RADIUS, Spec.NOTICE_MIN_RADIUS])
+
+
+# --- Story 1.12: --glow, --perf and the perf run's pure parts ----------------------------------------
+
+## D7: only `on` / `off`, lowercase; anything else is an error listing both.
+func _test_glow_values() -> void:
+	var r := DevTools.glow_value("on")
+	check(r == [true, ""], "--glow=on is true (got %s)" % [r])
+	r = DevTools.glow_value("off")
+	check(r == [false, ""], "--glow=off is false (got %s)" % [r])
+	for bad in ["", "ON", "yes", "1"]:
+		r = DevTools.glow_value(bad)
+		check(r[0] == false and r[1].contains("on") and r[1].contains("off") and r[1].contains("--glow=%s" % bad),
+				"--glow=%s is an error naming on and off (%s)" % [bad, r[1]])
+
+
+## D1: "" is the 60 s default; a whole number 1-600; the 4-character cap goes first, so a 20-digit
+## string never reaches to_int() (which would print an engine ERROR and fail the runner).
+func _test_perf_seconds() -> void:
+	var r := DevTools.perf_seconds("")
+	check(r == [60, ""], "--perf alone is 60 s (got %s)" % [r])
+	for ok_text in ["1", "60", "600"]:
+		r = DevTools.perf_seconds(ok_text)
+		check(r == [ok_text.to_int(), ""], "--perf=%s is %s s (got %s)" % [ok_text, ok_text, r])
+	for bad in ["0", "601", "-5", "x", "12345", "12345678901234567890", "6.0"]:
+		r = DevTools.perf_seconds(bad)
+		check(r[1] != "" and r[0] == 0, "--perf=%s is an error (%s)" % [bad, r[1]])
+
+
+## D7's starting values: BG_CANVAS (2D glow needs the canvas as the background), glow on, bloom 0
+## (bloom 1.0 lifted the whole frame in the probe, breaking the darkness pillar).
+func _test_glow_environment() -> void:
+	var env := DevTools.glow_environment()
+	check(env != null and env.background_mode == Environment.BG_CANVAS, "glow_environment(): background BG_CANVAS")
+	check(env.glow_enabled and is_equal_approx(env.glow_intensity, DevTools.GLOW_INTENSITY) and is_equal_approx(env.glow_strength, 1.0),
+			"...glow on, intensity %.1f, strength 1.0 (got %s, %.2f, %.2f)" % [DevTools.GLOW_INTENSITY, env.glow_enabled, env.glow_intensity, env.glow_strength])
+	check(is_equal_approx(env.glow_bloom, 0.0) and is_equal_approx(env.glow_hdr_threshold, DevTools.GLOW_THRESHOLD)
+			and env.glow_blend_mode == Environment.GLOW_BLEND_MODE_ADDITIVE,
+			"...bloom 0, threshold %.1f, additive blend (got %.2f, %.2f, %d)" % [DevTools.GLOW_THRESHOLD, env.glow_bloom, env.glow_hdr_threshold, env.glow_blend_mode])
+	check(DevTools.glow_environment() != env, "...a fresh Environment per call (one WorldEnvironment per run)")
+
+
+## D1: a vertical ping-pong from a tick counter, never the wall clock. top 48, bottom 148, 100 px/s
+## at 60 ticks/s: the bottom at tick 60, the top again at tick 120.
+func _test_path_point() -> void:
+	var p := PerfRun.path_point(0, 48.0, 148.0, 100.0, 60)
+	check(is_equal_approx(p.x, 48.0) and p.y > 0.0, "path_point: tick 0 is the top, going down (got %s)" % [p])
+	p = PerfRun.path_point(30, 48.0, 148.0, 100.0, 60)
+	check(is_equal_approx(p.x, 98.0) and is_equal_approx(p.y, 100.0), "...half a second later, 50 px down at +100 px/s (got %s)" % [p])
+	p = PerfRun.path_point(60, 48.0, 148.0, 100.0, 60)
+	check(is_equal_approx(p.x, 148.0) and p.y > 0.0, "...after span / speed (1 s) it is at the bottom (got %s)" % [p])
+	p = PerfRun.path_point(61, 48.0, 148.0, 100.0, 60)
+	check(p.x < 148.0 and p.x > 146.0 and is_equal_approx(p.y, -100.0), "...one tick later it is going up (got %s)" % [p])
+	p = PerfRun.path_point(120, 48.0, 148.0, 100.0, 60)
+	check(is_equal_approx(p.x, 48.0) and p.y > 0.0, "...after 2 × span / speed it is back at the top, going down (got %s)" % [p])
+	check(PerfRun.path_point(7, 100.0, 100.0, 100.0, 60) == Vector2(100, 0) and PerfRun.path_point(7, 100.0, 40.0, 100.0, 60) == Vector2(100, 0),
+			"...a span of 0 or less stays at the top, still")
+
+
+func _frames(stats: Dictionary, n: int, dt: int) -> void:
+	for i in n:
+		PerfRun.add_frame(stats, dt, stats.sum_usec)
+
+
+## D1: counters and per-second buckets, never a per-frame array. A frame counts in the second it
+## starts in; min_fps is the fewest frames in any whole second of the run.
+func _test_stats() -> void:
+	var st := PerfRun.new_stats(1)
+	_frames(st, 60, 16_667)
+	var s := PerfRun.summary(st)
+	check(s.frames == 60 and absf(s.avg_fps - 60.0) <= 0.5 and s.min_fps == 60 and absf(s.worst_ms - 16.667) < 0.01 and s.slow_frames == 0,
+			"60 frames of 16 667 µs: avg ≈ 60, min 60, worst 16.7 ms, none slow (got %s)" % [s])
+	st = PerfRun.new_stats(1)
+	_frames(st, 30, 16_667)
+	PerfRun.add_frame(st, 25_000, 500_000)
+	s = PerfRun.summary(st)
+	check(s.slow_frames == 1 and is_equal_approx(s.worst_ms, 25.0) and is_equal_approx(s.worst_at_s, 0.5),
+			"one 25 000 µs frame at 0.5 s: 1 over 20 ms, the worst 25.0 ms at 0.5 s (got %s)" % [s])
+	PerfRun.add_frame(st, 20_000, 525_000)
+	check(PerfRun.summary(st).slow_frames == 1, "...a frame of exactly 20 ms is not over (NFR1: no frame over 20 ms)")
+	st = PerfRun.new_stats(2)
+	_frames(st, 60, 16_667)
+	_frames(st, 30, 33_334)
+	s = PerfRun.summary(st)
+	check(s.frames == 90 and s.min_fps == 30, "a second with only 30 frames gives min 30 fps, by time, not by frame count (got %s)" % [s])
+	check(Array(st.buckets) == [60, 30], "...60 frames in second 0 and 30 in second 1 (got %s)" % [st.buckets])
+	# At exactly 60 fps, buckets by frame count (every 60 frames) coincide with buckets by time, so
+	# the case above can't tell them apart (red check 19). A 50 fps second then a 70 fps one can.
+	st = PerfRun.new_stats(2)
+	_frames(st, 50, 20_000)
+	_frames(st, 70, 14_286)
+	s = PerfRun.summary(st)
+	check(s.min_fps == 50 and Array(st.buckets) == [50, 70], "a 50 fps second then a 70 fps one: min 50 fps, buckets [50, 70] (counting 60 frames per bucket would say 60; got %s, %s)" % [s.min_fps, st.buckets])
+	st = PerfRun.new_stats(1)
+	PerfRun.add_frame(st, 16_667, 2_000_000)
+	check(Array(st.buckets) == [0], "a frame starting past the run's last second lands in no bucket (got %s)" % [st.buckets])
+
+
+## D1's summary line, exactly, and D8's rows: split at `;` into at most three, so it fits the
+## 480 px screen at size 8.
+func _test_summary_rows() -> void:
+	var result := {seconds = 60, frames = 3598, avg_fps = 59.93, min_fps = 58, worst_ms = 21.42, worst_at_s = 12.31,
+			slow_frames = 2, max_lit = 6, max_sprites = 5, max_over = 0, chain = 20, breaks = 0, deaths = 0, glow = false,
+			window = Vector2i(1440, 810), os = "Linux", adapter = "Mesa Intel(R) HD Graphics 620"}
+	var text := PerfRun.summary_text(result)
+	var want := "perf 60 s: 3598 frames, avg 59.9 fps, min 58 fps, worst 21.4 ms at 12.3 s, 2 over 20 ms; lights max 6/6, sprites max 5, over 0; chain 20, breaks 0, deaths 0; glow off; window 1440x810; Linux, Mesa Intel(R) HD Graphics 620"
+	check(text == want, "summary_text is exactly D1's format (got '%s')" % text)
+	var rows := Overlays.summary_rows(text)
+	check(rows.size() >= 2 and rows.size() <= 3 and "; ".join(rows) == text, "summary_rows: 2-3 rows that rejoin to the whole line (got %s)" % [rows])
+	check(rows[0].begins_with("perf 60 s") and Array(rows).all(func(r: String) -> bool: return r.length() <= Overlays.SUMMARY_ROW_CHARS),
+			"...the first row starts 'perf 60 s', and each fits %d characters (got %s)" % [Overlays.SUMMARY_ROW_CHARS, Array(rows).map(func(r: String) -> int: return r.length())])
+	result.glow = true
+	check(PerfRun.summary_text(result).contains("; glow on;"), "...and glow on reads 'glow on'")

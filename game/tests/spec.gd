@@ -13,3 +13,4 @@ const LEDGE_FALL_TIME := 1.5  ## GDD Level Types: spine shaft "ledges every ≤ 
 const LEDGE_FALL_MAX := 315.0  ## GDD Level Types / Sequence Breaking: 1.5 s at 210 px/s = 315 px; spine ledges and hazard pits are measured in rows against it.
 const NARROW_MIN := 6  ## GDD Level Types: Narrow stretch "6–10 tiles wide; no ledges; walls always within reach": the narrowest open run in a cling= stretch row.
 const NARROW_MAX := 10  ## GDD Level Types: Narrow stretch "6–10 tiles wide": the widest open run in a cling= stretch row, so both walls stay in reach.
+const LIGHTS_ON_SCREEN_MAX := 6  ## GDD Open Questions: "The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs" (architecture AR46); a ceiling: 1.15 may tighten it, never loosen it without the GDD.

@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/lurker.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://art/lurker.png" id="2_body"]
 [ext_resource type="Texture2D" path="res://art/lurker_eyes.png" id="3_eyes"]
 [ext_resource type="Texture2D" path="res://art/light.png" id="4_light"]
+[ext_resource type="Script" path="res://scripts/core/budget_light.gd" id="5_budget"]
 
 [sub_resource type="CircleShape2D" id="shape"]
 radius = 7.0
@@ -31,6 +32,7 @@ color = Color(1, 0.25, 0.2, 1)
 energy = 0.0
 texture = ExtResource("4_light")
 texture_scale = 0.8
+script = ExtResource("5_budget")
 
 [node name="Shape" type="CollisionShape2D" parent="."]
 position = Vector2(0, -1)

@@ -204,7 +204,8 @@ func test_no_tokens() -> void:
 	check(ui == ["Gutters", "ScreenRouter"], "UI's children are unchanged (got %s)" % [ui])
 	check(_world.get_node("RoomHolder").get_child_count() == 1, "RoomHolder holds one Room")
 	var names := _world.get_children().filter(func(c: Node) -> bool: return not c is Player).map(func(c: Node) -> String: return String(c.name))
-	check(names == ["Darkness", "RoomHolder", "Camera", "UI", "DevTools"], "World's children: the scene's, the player and DevTools last (got %s)" % [names])
+	check(names == ["Darkness", "RoomHolder", "Camera", "UI", "DevTools", "LightBudget"],
+			"World's children: the scene's, the player, DevTools first of the added ones, then LightBudget (1.12 D5; got %s)" % [names])
 	var tree := _subtree(dev)
 	check(tree == ["Overlays", "Overlays/Screen", "Overlays/Screen/ScreenMarks", "Overlays/WorldMarks"],
 			"DevTools' own subtree is Overlays with WorldMarks and Screen/ScreenMarks, built in _ready (got %s)" % [tree])
@@ -301,7 +302,7 @@ func test_bad_args() -> void:
 	_build(["--foo=1", "--chain=99", "--log=nope,save", "--room=t_swap_a", "--room=t_dev_room"])
 	var w := _warnings.take()
 	var has := func(part: String) -> bool: return w.any(func(t: String) -> bool: return t.contains(part))
-	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, log, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
+	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, glow, log, perf, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
 			and has.call("--chain=99 is outside 0..%d" % ChainState.MAX_CHAIN) and has.call("--log: no category 'nope'"),
 			"bad args: one warning each for --foo, the repeated --room, --chain=99 and --log=nope (got %s)" % [w])
 	check(_room().id == &"t_dev_room" and Log.enabled(Log.SAVE) and not Log.enabled(Log.LURKER),
@@ -602,48 +603,49 @@ func test_clock_rows() -> void:
 	await _teardown()
 
 
-## D10: the per-light rule on stand-ins (in the tree, or none is ever visible), then the count at
-## m1_shaft's spawn: the player's light, found inside the instanced scene (owned = false).
+## 1.11 D10, moved by 1.12 D8: overlay 4 counts what the light budget counts, BudgetLight.counts()
+## on World.light_rect() (the per-light rule's stand-in cases moved to test_light_budget). The count
+## at m1_shaft's spawn is the player's light; code-built BudgetLights under the room count by D2's
+## rect, the whole view, gutters included; a raw PointLight2D is not the budget's, so not counted.
+## Then the frame-time rows, and cycle() resetting the worst frame.
 func test_lights() -> void:
-	var rect := Rect2(0, 0, 360, 270)
-	var cases := [
-		["inside", Vector2(100, 100), {}, true],
-		["hidden", Vector2(100, 100), {visible = false}, false],
-		["disabled", Vector2(100, 100), {enabled = false}, false],
-		["energy 0", Vector2(100, 100), {energy = 0.0}, false],
-		["no texture", Vector2(100, 100), {texture = null}, false],
-		["wholly outside", Vector2(1000, 1000), {}, false],
-		["straddling the edge", Vector2(390, 100), {}, true],
-	]
-	for c: Array in cases:
-		var light := PointLight2D.new()
-		light.texture = LightTexture
-		light.energy = 1.0
-		light.position = c[1]
-		for key: String in c[2]:
-			light.set(key, c[2][key])
-		add_child(light)
-		check(Overlays.counts_on_screen(light, rect) == c[3], "a light %s %s" % [c[0], "counts" if c[3] else "doesn't count"])
-		light.queue_free()
-	await get_tree().process_frame
 	_build([])
 	var ov := _dev().overlays
 	ov.mode = 4
 	await _await_refresh()
 	check(ov.light_count == 1, "m1_shaft at spawn: 1 light on screen, the player's (got %d)" % ov.light_count)
 	# Lights built in code under the room, with no owner, as flares will be: one by the player
-	# counts; one under the left gutter, in the camera's view but outside the play rect (AR20), doesn't.
+	# counts; one under the left gutter counts too (D2: the budget is a cost rule, and a light
+	# under an opaque gutter still costs a lit pass); one wholly outside the view doesn't.
 	var play := _world.play_rect()
+	var view := _world.light_rect()
 	_code_light(_spawned[0].global_position)
 	_code_light(Vector2(play.position.x - 30.0, play.get_center().y))
+	_code_light(view.get_center() + Vector2(-300.0, 0.0))
+	var raw := PointLight2D.new()  # tests aren't linted; game code can't build one (raw_light)
+	raw.texture = LightTexture
+	raw.texture_scale = 0.2
+	raw.energy = 1.0
+	raw.global_position = _spawned[0].global_position
+	_room().add_child(raw)
 	await _await_refresh()
-	check(ov.light_count == 2, "...plus a code-built light by the player counts and one under a gutter doesn't: 2 (got %d)" % ov.light_count)
+	check(ov.light_count == 3, "...plus a code-built light by the player and one under a gutter count, one outside the view doesn't: 3 (got %d)" % ov.light_count)
+	check(raw.is_visible_in_tree() and BudgetLight.lit_on_screen(raw, view), "(premise) the raw PointLight2D is lit in the view")
+	check(ov.light_count == 3, "...and the raw PointLight2D beside the player isn't counted: the overlay shows what the budget sees")
+	var rows := Array(ov.readout)
+	check(rows.any(func(r: String) -> bool: return r.begins_with("lights 3/6")), "the readout has a row 'lights 3/6…' (got %s)" % [rows])
+	check(rows.any(func(r: String) -> bool: return r.begins_with("frame ")), "...and a 'frame … ms, worst … ms' row")
+	check(ov.worst_frame_ms > 0.0, "(premise) the worst frame since mode 4 opened is above 0 (got %.2f ms)" % ov.worst_frame_ms)
+	for i in 5:
+		ov.cycle()
+	check(ov.mode == 4 and ov.worst_frame_ms == 0.0 and ov.frame_ms == 0.0, "five cycles back into mode 4 reset the frame times before any frame passes (got %.2f)" % ov.worst_frame_ms)
 	await _teardown()
 
 
 ## A 25.6 px light (light.png is 128 px), so one centred 30 px into a 60 px gutter stays under it.
+## A BudgetLight of rank GLOW, as every light in game code must be (lint raw_light).
 func _code_light(pos: Vector2) -> void:
-	var light := PointLight2D.new()
+	var light := BudgetLight.new()
 	light.texture = LightTexture
 	light.texture_scale = 0.2
 	light.energy = 1.0
