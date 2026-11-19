@@ -374,7 +374,7 @@ user://
 - **New Game** writes the slot immediately after the difficulty step (an overwrite takes effect at once).
 - **Retry:** a failed save retries at the next autosave trigger and on quit to title.
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
-- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten; a file that can't be opened, or that a newer build wrote, also falls back to defaults but is left untouched, and settings writes stay off for that session (Story 1.4 review, the same rule as a newer or damaged slot) (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; a test never boots against the real folder, and points `Game.store.dir` at a temp folder before it tests the file.
+- `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten; a file that can't be opened, or that a newer build wrote, also falls back to defaults but is left untouched, and settings writes stay off for that session (Story 1.4 review, the same rule as a newer or damaged slot) (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; a test never boots against the real folder, and points `Game.store.dir` at a temp folder before it tests the file. A DevTools `--set` session (Story 1.11) overrides values in memory through `Game.override_setting()` and writes no settings.json at all: not the override, not a load's rewrite, not a later change of another key. The overrides survive `boot()`'s load, and `reset_for_tests()` clears them (`user://` is shared by editor runs and exports, so a dev value must never reach the file the release builds read).
 - **Slot delete** removes `slot_N.json` and `.bak`.
 - Each death appends `{cause, room}` (a cause id, not text) to `SlotState.death_log` from E1, for the E7 Journal; the death card renders `DEATH_<CAUSE>_LINE` / `_TIP` from the cause id.
 
@@ -571,7 +571,7 @@ if Log.enabled(Log.LURKER):
 | Balancing / tuning values | `tuning.gd`: `const` base values, each with a `##` unit + intent comment and "was X" history; GDD table updated with any change | `Tuning` → effective values after gear modifiers |
 | Gear definitions | data in `tuning.gd` / gear table: `{id, stat, op, value}` | `Tuning` applies them |
 | Level data | `game/rooms/*.txt` | `Room` builder |
-| Player settings | `Settings` → `user://settings.json` (versioned; a bad or missing key falls back to its default, then the file is rewritten) | `Game.settings` + its signals |
+| Player settings | `Settings` → `user://settings.json` (versioned; a bad or missing key falls back to its default, then the file is rewritten; a DevTools `--set` session overrides values in memory and writes no settings.json) | `Game.settings` + its signals |
 | Player progress | `SlotState` / `DiveState` → `user://slot_N.json` (versioned) | `Game.slot`, `Game.dive` |
 | Player-facing text | `game/text/strings.csv` | `tr()` |
 | Platform differences | `OS.has_feature("web")` branches, only in boot, display scale, storage check, quit button and audio gate | — |
@@ -611,15 +611,18 @@ func _on_exit_reached(target: StringName) -> void:
 
 | Tool | What it does |
 |---|---|
-| **Entry args** | `godot --path game -- --room=weaver_arena --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena") |
-| **Overlays** (one dev action cycles them) | 1: play rect + gutters · 2: light radii + notice/sense rings · 3: room exits + persistent object ids · 4: FPS, `PointLight2D` count on screen, active Clock requests |
-| **Log categories** | `-- --log=lurker,clock` |
+| **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; `--glow` (1.12), `--hp` (1.19) and `--difficulty` (1.22) each add one row to DevTools' `ARGS` registry |
+| **Session settings** | `-- --set=brightness:0` sets any `Settings` key for this session only (typed by its default: int, float, bool `true`/`false`; repeatable) through `Game.override_setting()`; a session with any override writes no settings.json at all. Until Options (1.36) it is how brightness changes |
+| **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20) · 3: room exits, entries + persistent object ids · 4: FPS, `PointLight2D` count on screen (the play rect), active Clock requests |
+| **Log categories** | `-- --log=lurker,clock` (names from `Log.CATEGORIES`, any case) |
 | **Smoke markers** | debug web exports print console markers (`SMOKE boot ok`, `SMOKE save ok`) that the Playwright smoke check reads; the release web export gets a boot-only check |
 | **Tests and bot** | `./run_tests.sh`, the reachability bot, `screenshot.gd` (unchanged) |
 
-**Args source:** `OS.get_cmdline_user_args()` on desktop; the URL query (`?room=s3_gate&chain=4`) in web debug builds.
+**Args source:** `OS.get_cmdline_user_args()` on desktop; in web debug builds the URL query (`?room=s3_gate&chain=4`) through `JavaScriptBridge.eval("window.location.search")`, which returns null off the web, so there is no `OS.has_feature("web")` branch. Args apply only when World is the current scene (a real run); a test injects tokens through World's `child_entered_tree`, so every other test gets an inert DevTools. A bad arg is a `push_warning`, never an error: the game still starts (an unknown or invalid `--room` loads the default start room).
 
-**Activation:** `World` adds a `DevTools` node only when `OS.is_debug_build()` is true (editor runs and debug exports). Release exports never contain it. The overlay toggle is a dev-only input action on the backquote key (`` ` ``). **No function keys.** The M1 F1–F3 hotkeys are removed when E1 touches `shaft.gd` (F1 brightness moves into Options).
+**Arg phases:** the hook is the first statement of `World._ready()`, so DevTools applies `--log`, then `--set`, then `--room` at once, before `Game.boot()` and the first room (which is why `--set` must survive `boot()`'s load). `--chain` arms on every `player_spawned` and is paid as n `ChainState.add_hit()` calls on the first physics tick that ends with that player off the floor; it then breaks and banks like any chain, never pinned. `--room` sets `World.start_room` / `start_entry` (the `P`, else the up entry, else down) and never writes `Game.dive`'s respawn point.
+
+**Activation:** `World` adds a `DevTools` node only when `OS.is_debug_build()` is true (editor runs and debug exports). Release exports never contain it. The overlay toggle is a dev-only input action, `dev_overlay`, on the backquote key (`` ` ``, physical keycode 96); DevTools is `PROCESS_MODE_ALWAYS`, so it cycles while paused. **No function keys.**
 
 ```gdscript
 # world.gd
@@ -645,18 +648,23 @@ Rules nobody checks get broken quietly. These checks run in `./run_tests.sh`:
 
 - **Architecture lint** (`tests/test_lint.gd`, a plain text scan of `game/scripts/`, comments dropped):
   fails on a time-scale write outside `clock.gd`; raw input (`Input`, `InputMap`, `InputEvent*`, the
-  `_input`/`_gui_input` callbacks) outside `player_input.gd`, `core/devices.gd` and the UI kit; any
-  `print(` family call outside `core/log.gd`; `free()` in any form; absolute node paths; any `KEY_*`
-  keycode outside the UI kit; any randomness (`randf`/`randi`/`seed`/`pick_random`/`shuffle`/
-  `RandomNumberGenerator`, …) outside camera shake; the `rules/` purity and `core/` layer rules below;
-  `DevTools` or `dev/` paths outside `dev/`; any `res://tests/` path in game code (release exports
-  drop `tests/*`); writes to `Game.settings` / `slot` / `dive` / `tuning` state that skip a rule
-  method (assignments, nested fields, container mutators, `.set(`) or replace a `Game` instance,
-  outside `rules/`. Each hit prints `FAIL lint <file>:<line> <rule>`; every `tests/spec.gd` const must
-  cite the GDD. Story 1.9 and its code review widened the original list (all keycodes, event-based
-  input, more randomness, Node classes / `OS` / `Time` / file access / `load(` / upper-layer classes in
-  `rules/`, `tests_ref`, state writes); the rule ids and samples live in `test_lint.gd`, the table in
-  `docs/development-guide.md`.
+  `_input`/`_gui_input` callbacks) outside `player_input.gd`, `core/devices.gd`, the UI kit and `dev/`
+  (DevTools reads only its own `dev_*` action, ships in no release build and must work while the
+  player is dead, locked or absent); any `print(` family call outside `core/log.gd`; `free()` in any
+  form; absolute node paths; any `KEY_*` keycode outside the UI kit; any randomness (`randf`/`randi`/
+  `seed`/`pick_random`/`shuffle`/`RandomNumberGenerator`, …) outside camera shake; the `rules/`
+  purity and `core/` layer rules below; `DevTools`, any `class_name` declared under `dev/`, or a
+  `res://scripts/dev/` / `res://scenes/dev/` path outside `dev/` (`dev_ref`), except `world.gd`'s one guarded
+  `load()` line: exactly that line, once, right under its `if OS.is_debug_build():` (a tree check
+  proves the real `world.gd` holds it exactly once, so a stale exemption fails); any `res://tests/`
+  path in game code (release exports drop `tests/*`); writes to `Game.settings` / `slot` / `dive` /
+  `tuning` state that skip a rule method (assignments, nested fields, container mutators, `.set(`) or
+  replace a `Game` instance, outside `rules/`. Each hit prints `FAIL lint <file>:<line> <rule>`; every
+  `tests/spec.gd` const must cite the GDD. Story 1.9 and its code review widened the original list
+  (all keycodes, event-based input, more randomness, Node classes / `OS` / `Time` / file access /
+  `load(` / upper-layer classes in `rules/`, `tests_ref`, state writes), and Story 1.11 added the
+  `dev/` allowance and `dev_ref`'s guarded line; the rule ids and samples live in `test_lint.gd`, the
+  table in `docs/development-guide.md`.
 - **Test discovery:** `run_tests.sh` runs every `tests/test_*.gd` and `tests/smoke_*.gd` by glob, so a
   new test file can never be silently skipped (replaces the hand-maintained `for t in …` list).
 - **String keys, room files:** validated as content (see Error Handling).
@@ -868,10 +876,10 @@ rules/  ←  core/  ←  world/, actors/, objects/, moments/  ←  ui/, audio/  
 - **Scene code** (`world/`, `actors/`, `objects/`, `moments/`) reads `Game` state and `Tuning`, and changes state only through rule methods (`Game.slot.set_flag(id)`, `Game.dive.add_carried(n)`). Actors reach `World` only through the `world` group (duck-typed `play_rect()`, `request_respawn()`), never by path.
 - **`ui/`** subscribes to state signals and sends commands (`Game.save_now()`, `Game.load_slot(n)`, `world.fast_travel(id)`); it writes only `Settings` directly and never mutates gameplay state.
 - **`audio/`** only listens.
-- **`dev/`** may touch anything; nothing outside `dev/` and `tests/` may reference `dev/`.
+- **`dev/`** may touch anything; nothing outside `dev/` and `tests/` may reference `dev/`, except `world.gd`'s one guarded path-string `load()` that adds DevTools (Story 1.11).
 - **`tools/`** live outside `game/` and write only into `game/art/` and `game/audio/sfx/`.
 - **Tests** may use anything; test-only data (`tests/rooms/`, `tests/fixtures/`) is never exported (export presets exclude `tests/*`).
-- **Enforced by `tests/test_lint.gd`:** files in `rules/` must not mention any Node class, `Input*`, `Engine*`, `OS`, `Time`, file access, the autoloads (`Game`, `Audio`) or any class from `core/` and above (`rules_purity`); files in `core/` must not mention the class names, autoloads or paths of `world/`, `actors/`, `objects/`, `moments/`, `ui/`, `audio/` or `dev/` (`core_layer`); nothing outside `dev/` and `tests/` references `DevTools` (`dev_ref`).
+- **Enforced by `tests/test_lint.gd`:** files in `rules/` must not mention any Node class, `Input*`, `Engine*`, `OS`, `Time`, file access, the autoloads (`Game`, `Audio`) or any class from `core/` and above (`rules_purity`); files in `core/` must not mention the class names, autoloads or paths of `world/`, `actors/`, `objects/`, `moments/`, `ui/`, `audio/` or `dev/` (`core_layer`); nothing outside `dev/` and `tests/` references `DevTools`, a `class_name` declared under `dev/` or a `res://` path into `dev/`, except that one guarded line (`dev_ref`).
 
 ## Implementation Patterns
 

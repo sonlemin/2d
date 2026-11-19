@@ -1,6 +1,6 @@
 # The Unbroken Chain — Project Overview
 
-**Date:** 2026-11-11 · **Type:** game (Godot 4.7) · **Architecture:** scene-tree composition with a pure-logic core
+**Date:** 2026-11-11 · **Last Updated:** 2026-11-19 · **Type:** game (Godot 4.7) · **Architecture:** scene-tree composition with a pure-logic core
 
 ## Executive Summary
 
@@ -36,7 +36,8 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 - **Snuff** (hold Light): go dark and break the chain to escape
 - **Crawlers** (walkers and hoverers) as chain fuel
 - **Lurkers**: notice big lights on screen, telegraph 0.9 s, hunt, and give up when they lose the scent
-- Respawn at the shaft's spawn (`P`) until anchors and stations arrive (Story 1.24); debug HUD; 4 brightness levels
+- Respawn at the shaft's spawn (`P`) until anchors and stations arrive (Story 1.24); 4 brightness levels
+- No debug HUD and no function keys: since Story 1.11, debug builds have DevTools, with entry args (`--room`, `--chain`, `--log`, `--set`) and four overlays on the backquote key
 
 ## Architecture Highlights
 
@@ -48,7 +49,7 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 ## Development Overview
 
 - **Prerequisites:** Godot 4.7; Python 3 + Pillow for art.
-- **Run:** open `game/` in Godot and press F5.
+- **Run:** open `game/` in Godot and press F5. A debug run takes DevTools args: `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0` (in the editor: Debug → Customize Run Instances, never `editor/run/main_run_args`).
 - **Test:** `cd game && ./run_tests.sh`
 - **Art:** `python3 tools/build_sprites.py`
 

@@ -116,7 +116,7 @@ IDLE ──sensed──► TELEGRAPH ──timer 0.9 s──► HUNT ──unsen
 
 ### World — `scripts/world/world.gd` + `scenes/world/world.tscn` (`Node2D`, `class_name World`, main scene)
 
-The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current scene and applies the ambient from `Settings.brightness`. Every room goes through one swap path (Story 1.7): `RoomLoader.load_room(id, Game.dive)` (killed cells skipped), the old room `remove_child` + `queue_free`, the player placed (or spawned), camera limits + `snap()`, `Game.slot.visit(id)`, `room_entered`. The first room is the respawn point (`Game.dive.respawn_room`/`respawn_entry`, else `start_room`'s `spawn`). Exits are polled in `_physics_process`: the body centre past the floor or ceiling crosses that side's exit; a live chain is banked first (`break_chain()`), then `enter_room(target, entry)` (deferred). Arriving from above keeps the velocity; from below stands still beside the hole. A death waits `RESPAWN_DELAY` 0.6 s (pauses with the tree, ignores the time scale), clears the Clock and rebuilds the respawn room with a fresh player, with no reload; a bad respawn point falls back to `start_room`'s `P`. A swap queued before the player died is cancelled (no build, visit or `room_entered`), and `enter_room()` is ignored while the player is dead.
+The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current scene and applies the ambient from `Settings.brightness`. Every room goes through one swap path (Story 1.7): `RoomLoader.load_room(id, Game.dive)` (killed cells skipped), the old room `remove_child` + `queue_free`, the player placed (or spawned), camera limits + `snap()`, `Game.slot.visit(id)`, `room_entered`. The first room is the respawn point (`Game.dive.respawn_room`/`respawn_entry`, else `start_room` at `start_entry`, `spawn` by default). Exits are polled in `_physics_process`: the body centre past the floor or ceiling crosses that side's exit; a live chain is banked first (`break_chain()`), then `enter_room(target, entry)` (deferred). Arriving from above keeps the velocity; from below stands still beside the hole. A death waits `RESPAWN_DELAY` 0.6 s (pauses with the tree, ignores the time scale), clears the Clock and rebuilds the respawn room with a fresh player, with no reload; a bad respawn point falls back to `start_room` at `start_entry`. A swap queued before the player died is cancelled (no build, visit or `room_entered`), and `enter_room()` is ignored while the player is dead. In debug builds the first statement of `_ready()` adds [DevTools](#devtools--scriptsdev-debug-builds-only) with one path-string `load()` (Story 1.11).
 
 | Node | Type | Role |
 |---|---|---|
@@ -125,8 +125,9 @@ The game scene (Story 1.6). Group `world`. Boots `Game` when it is the current s
 | Player | player.tscn | Spawned in code, kept right after `RoomHolder` |
 | Camera | Camera2D + `camera_rig.gd` | Engine smoothing off; the rig smooths (8/s) on the physics tick |
 | UI | CanvasLayer (layer 10, `PROCESS_MODE_ALWAYS`) | `Gutters` then `ScreenRouter`, so screens draw over the gutters |
+| DevTools | Node (`dev_tools.gd`), debug builds only | Added in code, last child; holds the overlays (their screen marks on CanvasLayer 11, above UI) |
 
-**API:** `enter_room(room_id, entry)`, `play_rect()`, `current_room()`, `var start_room` (set before `add_child`), `signal player_spawned(player)`, `signal room_entered(room_id)`. **Consts:** `START_ROOM`, `RESPAWN_DELAY`, `AMBIENT_LEVELS`, `AMBIENT_TINT`.
+**API:** `enter_room(room_id, entry)`, `play_rect()`, `current_room()`, `var start_room` / `var start_entry` (default `&"spawn"`; set before `add_child`, or by DevTools' `--room=` inside `_ready`, before the first room is built), `signal player_spawned(player)`, `signal room_entered(room_id)`. **Consts:** `START_ROOM`, `RESPAWN_DELAY`, `AMBIENT_LEVELS`, `AMBIENT_TINT`.
 
 ### CameraRig — `scripts/world/camera_rig.gd` (`Camera2D`, `class_name CameraRig`)
 
@@ -152,20 +153,20 @@ Rooms as text (Story 1.5). The format, legend, validator errors and Room API are
 | Script | Role |
 |---|---|
 | `room_legend.gd` (`RoomLegend`) | The one definition of every grid char: `#` `.` `P`, and `SPAWNS` (`c`, `h`, `L` with their scene and args; `c` and `h` are `killable`, `L` is `in_wall`) |
-| `room_loader.gd` (`RoomLoader`, static) | `parse()`, the pure `validate()` (errors as `file:row:col`), `load_room_from_path(path, dive)`, `load_room(id, dive)` through an index of `res://rooms/**/*.txt` (tests add roots with `add_root(dir)`), `down_entry_cell()`, and the build (killable spawns get `room_id` + `cell`; with a `dive`, its killed cells are skipped). Caches the TileSet and the unshaded rim material as statics |
+| `room_loader.gd` (`RoomLoader`, static) | `parse()`, the pure `validate()` (errors as `file:row:col`), `load_room_from_path(path, dive)`, `load_room(id, dive)` through an index of `res://rooms/**/*.txt` (tests add roots with `add_root(dir)`), `room_ids()` (every indexed id, sorted as Strings) and `inspect(id)` (`{known, entries, errors}` without building the room or a `push_error`; DevTools' `--room=`, Story 1.11), `down_entry_cell()`, and the build (killable spawns get `room_id` + `cell`; with a `dive`, its killed cells are skipped). Caches the TileSet and the unshaded rim material as statics |
 | `room.gd` (`Room`, `Node2D`) | One built room: `Backdrop`, `Walls` (TileMapLayer), `Rims`, spawned entities. `spawn(scene, pos, args)`, `bounds()`, `entry_position()` / `has_entry()` / `exit(side)` (exits carry `entry_cell`), `is_solid()`, `cell_centre()` |
 
 ### Core — `scripts/core/`
 
 | Script | Kind | Role |
 |---|---|---|
-| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `settings`, `slot`, `dive`, `tuning`, `clock` (same instances all session; replacing one asserts) and `store`. `boot()` (once, from the entry scene) loads `settings.json` and arms its writes, at most one per frame (a file that can't be opened or is from a newer build is left untouched, and writes stay off for the session); `reset_for_tests()` resets everything in place |
+| `game.gd` | autoload `Game` (no `class_name`) | Holds refs to session state, never rules: `settings`, `slot`, `dive`, `tuning`, `clock` (same instances all session; replacing one asserts) and `store`. `boot()` (once, from the entry scene) loads `settings.json` and arms its writes, at most one per frame (a file that can't be opened or is from a newer build is left untouched, and writes stay off for the session); `override_setting(key, v)` sets a value for this session only (DevTools' `--set`, Story 1.11): it survives `boot()`'s load, and while any override exists the session writes no `settings.json` at all; `reset_for_tests()` resets everything in place, overrides included |
 | `save_store.gd` | `class_name SaveStore` (`RefCounted`), at `Game.store` | The only code that reads or writes the player's files: `read_settings()` / `write_settings()` for `user://settings.json` (`{"version": 1, "settings": {…}}`, `.tmp` then rename). `read_settings()` returns `{found, settings}`; `found` is a `SaveStore.Found` (USABLE, MISSING, CORRUPT, UNREADABLE, NEWER), which tells `Game` whether it may rewrite the file. Redirectable `dir`; never creates folders |
-| `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)` |
+| `clock.gd` | `class_name Clock`, child of `Game` | The only writer of `Engine.time_scale`. `request(id, scale, seconds)` multiplies with other ids, refreshes its own id, times out on real time and pauses with the tree; `clear()`, `is_active(id)`, `active()` (a copy, `{id: scale}`, of the live requests, for DevTools' overlay 4; Story 1.11) |
 | `log.gd` | static `class_name Log` | `Log.info(cat, msg)` / `Log.debug(cat, msg)` print `[cat] msg`, silent in release; `Log.enabled(cat)` guards hot paths. Categories `SAVE ROOM INPUT CLOCK LURKER WEAVER AUDIO UI` |
 | `rules/tuning.gd` | `class_name Tuning` (`RefCounted`, pure); one instance at `Game.tuning` | 34 gameplay consts listed in `BASE`. `f(&"key")` returns the current value; `flag(&"key")` a gear rule switch; `apply_gear(ids)` recomputes set → add → mul and emits `changed`; `apply_gear([])` resets in place |
 | `rules/gear.gd` | `class_name Gear` (pure data) | `TABLE` of `{id, stat, op, value}` rows (`set` / `add` / `mul` / `flag`); empty until E5 |
-| `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` and `light_tap_window` (0.12 / 0.2 / 0.3 s, Story 1.8) so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices |
+| `rules/settings.gd` | `class_name Settings` (`RefCounted`, pure); `Game.settings` | Global settings: `brightness` and `light_tap_window` (0.12 / 0.2 / 0.3 s, Story 1.8) so far. `set_value(&"key", v)` emits `changed(key)` on a change; `SCHEMA` lists each key, its default and its choices; static `is_valid(key, v, schema := SCHEMA)` is the one validity rule (type first, then the choices), shared with DevTools' `--set` (Story 1.11) |
 | `rules/slot_state.gd` | `class_name SlotState` (`RefCounted`, pure); `Game.slot` | Per-slot state: `best_chain`, `deaths`, `difficulty` (`&"easy"`/`&"normal"`/`&"hard"`), story flags (`set_flag()` / `has_flag()`), visited rooms (`visit()` / `has_visited()`, `visits_changed`; Story 1.7). `to_dict()` becomes save format `slot_v1` at 1.41 |
 | `rules/dive_state.gd` | `class_name DiveState` (`RefCounted`, pure); `Game.dive` | Per-dive state: `carried` embers (`add_carried()`), the respawn point (`set_respawn()`), killed enemies (`mark_killed()` / `is_killed()`, never saved) |
 
@@ -179,6 +180,39 @@ Rooms as text (Story 1.5). The format, legend, validator errors and Room API are
 
 Everything is unshaded and frees itself.
 
+## Dev Tools
+
+### DevTools — `scripts/dev/` (debug builds only)
+
+Entry args and overlays (Story 1.11, AR54). `World._ready()`'s first statement is `if OS.is_debug_build(): add_child(load("res://scripts/dev/dev_tools.gd").new())`: a path string, never `preload`, so `world.gd` still loads in a release export, whose presets exclude `scripts/dev/*` (Story 1.13). No `.tscn`. Nothing outside `dev/` and `tests/` names `DevTools`, a `dev/` class or a `dev/` path (the lint's `dev_ref`).
+
+| Script | Kind | Role |
+|---|---|---|
+| `dev_tools.gd` | `class_name DevTools` (`Node`, last child of `World`, `PROCESS_MODE_ALWAYS`, `process_physics_priority` 100) | Reads args only when World is the current scene (a real run): `OS.get_cmdline_user_args()`, then the URL query through `JavaScriptBridge.eval("window.location.search")`, which returns null off the web, so there is no `OS.has_feature("web")` branch. A test sets `tokens` from World's `child_entered_tree`, which fires before DevTools' `_ready()`. Pure statics: `query_tokens()`, `parse()`, `chain_value()`, `log_names()`, `set_value_of()`, `room_entry()`, `pick_entry()`. A bad arg is a `push_warning`, never an error or an assert: the game still starts. Polls `dev_overlay` in `_process` and cycles the overlays |
+| `overlays.gd` | no `class_name` (DevTools preloads it), `Node` | The four overlays; `mode` 0 (off) to 4. `WorldMarks` (`Node2D`, `z_index` 100) draws in world space with one cached unshaded `CanvasItemMaterial`, so it reads under the darkness; `ScreenMarks` draws in screen pixels on DevTools' own CanvasLayer 11, above the UI (10). The readout text rebuilds at 4 Hz. Statics `clock_rows()`, `counts_on_screen()`, `unshaded_material()`; `room_items()` is public for tests |
+
+**Args.** One row per arg in the `ARGS` registry, `{help, apply, repeat}`, applied in this order:
+
+| Arg | Effect |
+|---|---|
+| `--log=<cat>,<cat>` | Names from `Log.CATEGORIES`, any case; an unknown one warns and is skipped; repeatable. One `Log.set_enabled()` call with every value merged, made only when they name a valid category (none warns, and `Log` is left as it was) |
+| `--set=<key>:<value>` | Any `Settings` key, typed by its default (int, float, bool `true`/`false`); repeatable. Goes through `Game.override_setting()`: it survives `Game.boot()`'s load, and a session with any override writes no `settings.json` at all (not even a rewrite or another key's change). `--set=brightness:0..3` is how brightness changes until Options (1.36) |
+| `--room=<id>` | Starts the dive in that room, at the `P`, else the `up` entry (arriving from above), else `down`, through `World.start_room` / `start_entry`; a death respawns there while no respawn point is set. DevTools never writes `Game.dive`'s respawn point. An unknown id or an invalid room warns, and the default start room (`m1_shaft`) loads |
+| `--chain=<n>` | 0..20 (`ChainState.MAX_CHAIN`). Armed on every spawn (every life); paid on the first physics tick that ends with the player off the floor, as n `ChainState.add_hit()` calls (count n, held n(n+1)/2, best chain n). It then breaks and banks like any chain |
+
+On a web debug build the URL query (`?room=m1_shaft&chain=8`) gives the same tokens.
+
+**Overlays.** Each press of `dev_overlay` cycles 1 → 2 → 3 → 4 → off, also while paused. Nothing blinks.
+
+| Mode | Shows |
+|---|---|
+| 1 | `World.play_rect()`, the notice rect (the play rect shrunk by `Lurker.SCREEN_MARGIN`, 8 px), both 60 px gutters and their 58 px usable bands |
+| 2 | The player's light radius and its notice reach (× `Lurker.NOTICE_FACTOR`, 1.6), dashed and dim with "below notice" while the light is under 80 px; each predator's state, and a line to the player while it senses them |
+| 3 | Each exit (side → target), the `spawn` / `up` / `down` entries, each `obj=` id at its cell |
+| 4 | FPS, the on-screen `PointLight2D` count (on screen = `World.play_rect()`), active Clock requests (each stays listed, greyed, 0.5 s after it ends) |
+
+Every mark reads the value the game uses, never a copied number. Marks at actors sit at the actor's tick position, up to one physics tick off the interpolated sprite (accepted for a dev overlay).
+
 ## Input Actions (`project.godot`)
 
 | Action | Key(s) |
@@ -188,8 +222,9 @@ Everything is unshaded and frees itself.
 | `attack` | X |
 | `dash` | C |
 | `light` | V |
+| `dev_overlay` | `` ` `` (backquote, physical keycode 96). Read only by DevTools, so it does something only in debug builds (Story 1.11) |
 
-Keyboard only, bound by physical keycode. No function keys (the M1 shaft and its F1/F3 were deleted in Story 1.7).
+Keyboard only, bound by physical keycode. Still no function keys (the M1 shaft and its F1/F3 were deleted in Story 1.7): `smoke_dev_tools` checks that no project action has an F-key event and that `dev_overlay` has exactly one event, the physical backquote.
 
 ## Asset Inventory
 
@@ -223,22 +258,24 @@ Total: 7 PNGs, about 5.6 KB. No audio, fonts, shaders or 3D assets. The HUD uses
 |---|---|---|
 | `tests/test_chain_state.gd` | 10 test functions on ChainState | headless |
 | `tests/test_log.gd` | `Log.format`, the category list, `enabled` / `set_enabled` | headless |
-| `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear | headless |
+| `tests/test_clock.gd` | Clock: ids multiply, re-request refreshes, real-time expiry, pause freeze, `_exit_tree` and player death clear, `active()` is a copy | headless |
 | `tests/test_tuning.gd` | Tuning API (set → add → mul in every gear order, flags, `changed`, reset in place), the telegraph floor and the hover period under every combination of gear (`Spec`), and the regression fixture: all 44 M1 exports keep their value, plus the boxes, chain curve, bloom and hitstop depth | headless |
-| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips), the `Game` refs and `reset_for_tests()`, and `settings.json` through `SaveStore` (≈ 165 checks) | headless |
-| `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts, the `cling=` key), the build and the `Room` API, and the real `m1_shaft`'s pins (counts, ledge rows, exits) | headless |
+| `tests/test_state.gd` | Settings, SlotState and DiveState (signals, fallbacks, save shapes, JSON round trips), the `Game` refs and `reset_for_tests()`, `settings.json` through `SaveStore`, `Settings.is_valid()` and `Game.override_setting()` (an override survives the load and nothing is written; 180 checks) | headless |
+| `tests/test_room_loader.gd` | The room validator (fixtures in `tests/rooms/` and inline texts, the `cling=` key), the build and the `Room` API, the real `m1_shaft`'s pins (counts, ledge rows, exits), `room_ids()` and `inspect()` | headless |
 | `tests/test_room_sweep.gd` | The pure room sweeps on inline grids, each with a sample that fires and a near-miss (74 checks) | headless |
 | `tests/test_deferred_owners.gd` | Ledger scan rules, then every item in `deferred-work.md` has an owner (fails on a ledger edit, not only a code change), and fails on a ledger format it can't read (bmad-loop's `### DW-n`, `status:` lines, tables, or sections with no list items) | headless |
-| `tests/test_lint.gd` | The architecture lint over `scripts/` (12 rules, each with sample lines; stricter than AR48 on purpose: every `KEY_*`, wider `raw_input`, `random` and `rules_purity`, new `tests_ref` and `state_write`) and the `spec.gd` citations; see the development guide | headless |
+| `tests/test_lint.gd` | The architecture lint over `scripts/` (12 rules, each with sample lines; stricter than AR48 on purpose: every `KEY_*`, wider `raw_input`, `random` and `rules_purity`, new `tests_ref` and `state_write`; `raw_input` allows `dev/`, and `dev_ref` lets through only `world.gd`'s one guarded DevTools line, which a tree check finds exactly once) and the `spec.gd` citations; see the development guide | headless |
+| `tests/test_dev_args.gd` | DevTools' pure parts: the URL query, the arg grammar and registry, each validator, the `--room=` entry pick, the overlay's Clock rows (71 checks) | headless |
 | `tests/smoke_rooms.gd` | Every room file: validation, unique ids, exit links, spine falls, cling stretches, hazard pits, the arrival from below, and the lurker guarantees (per lurker and per room) against `Spec` (90 checks on `m1_shaft`) | headless |
 | `tests/smoke_bot.gd` | The descent bot in every spine room: chain ≥ 5, no live chain at an exit, reaches the down exit alive (~28 s on `m1_shaft`) | headless |
 | `tests/smoke_moves.gd` | The M1 move checks on `m1_shaft`: pogo, landing, jump height, wall cling (its timeout banks), the Snuff ending on release (17 checks) | headless |
 | `tests/smoke_world.gd` | World: no boot, the tree, framing (limits, play rect, gutters), state wiring, popups in the room, death and respawn without a reload, a lurker behind a gutter, a hunt over a death, the R16 bottom loop, `ScreenRouter`, source checks | headless |
 | `tests/smoke_room_swap.gd` | Room swaps between `tests/rooms/swap/t_swap_a` and `t_swap_b`: deferral, the chain backstop, arrival from above and below, killed cells across swaps and a cross-room respawn, interpolation on | headless |
 | `tests/smoke_player_input.gd` | `tests/rooms/input/t_input.txt`: M1 movement pinned (run, coyote, jump buffer, air dash), the Light windows on both sides of each boundary, the Snuff latch, Light across a pause and a hitstop, real-time buffers, the attack buffer, ↓ interact, the wall drop on ↑, the cling press, `lock()` / `unlock()` | headless |
+| `tests/smoke_dev_tools.gd` | DevTools in a real `world.tscn` (tokens injected through `child_entered_tree`): inert without args, the real command line (`real_tokens()` and the current-scene gate), each arg (`--chain` on `tests/rooms/dev_tools/t_dev_room.txt`, also for a player spawned inside a tick) and each bad one warned, the overlay cycle (paused too), mode 2 past the notice radius, the light count (code-built lights, the play rect), the Clock rows, mode 3's items, no function key (88 checks) | headless |
 | `tests/screenshot.gd` | 2 screenshots of `world.tscn` (gutters, darkness, framing) | needs a renderer |
 | `tests/spec.gd` | Not a test: the GDD's guarantees as constants (`TELEGRAPH_MIN`, `BOT_MIN_CHAIN`, `BASE_LIGHT`, `NOTICE_MIN_RADIUS`, `LEDGE_FALL_TIME`, `LEDGE_FALL_MAX`, `NARROW_MIN`, `NARROW_MAX`); tests `preload` it | — |
 | `tests/room_harness.gd` | Not a test: `build(parent, room_id)` (or `build_from_path(parent, path)`) loads a room standalone with a test player, a `CameraRig` and a stub `World` (`play_rect()`, `current_room()`); `free_all()` | — |
 | `tests/room_sweep.gd` | Not a test: the pure room sweeps (`room_files`, `is_dev`, `record`, `ledge_rows`, `safe_rows`, `spine_gap_errors`, `exit_fall_errors`, `stretch_width_errors`, `hazard_pit_errors`, `duplicate_id_errors`, `link_errors`, `arrival_errors`, `cling_wall`) | — |
 
-Helpers worth reusing: `place(pos)` (teleport and snap the camera) and `frames(n)` / `seconds(s)` (physics-frame waits) in every smoke test; `smoke_rooms.gd`'s `_build(rec)` / `_free()` (a fresh room per scenario, waiting until the old stub `World` is gone), `_lurkers()` (this room's lurkers sorted by row, then column) and `_only(lurker)` (pause every other lurker); `smoke_moves.gd`'s `_hovers()` (hovering crawlers sorted by depth).
+Helpers worth reusing: `place(pos)` (teleport and snap the camera) and `frames(n)` / `seconds(s)` (physics-frame waits) in every smoke test; `smoke_rooms.gd`'s `_build(rec)` / `_free()` (a fresh room per scenario, waiting until the old stub `World` is gone), `_lurkers()` (this room's lurkers sorted by row, then column) and `_only(lurker)` (pause every other lurker); `smoke_moves.gd`'s `_hovers()` (hovering crawlers sorted by depth); `smoke_dev_tools.gd`'s `_build(tokens)` (a `world.tscn` whose DevTools gets those tokens, as a real run gets the command line).

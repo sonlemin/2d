@@ -101,3 +101,28 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Closed (Story 1.9): `test_lint.gd` rule `raw_input` (`Input` / `InputMap` as identifiers, `InputEvent*`, the `_input` / `_gui_input` callbacks and the `gui_input` signal; comments and strings ignored); `test_sources` dropped its regex.**
 - **`lock()` mid-move: a clinging player is kicked off the wall, and a jump keeps full height** — `game/scripts/actors/player_input.gd` `_clear()` sets `cling_held = false`, which `player.gd` `_handle_cling` reads as "Jump released", so one locked tick fires a wall kick (probe: `velocity (-150, -260)`); `jump_released` is not sampled while locked, so a jump released during a lock is never cut. Latent: nothing calls `lock()` yet. Reason (sonlm): decide it with the first scripted moment.
   → **Owner: Story 1.24** — the first `lock()` caller (station rest); decide what a lock does to a cling or a rising jump (likely a drop with no kick, and a cut on unlock) and test it.
+
+
+## Deferred from: dev of 1-11-devtools-entry-args-and-overlays.md (2026-11-19)
+
+- **`--chain` starts at take-off and ends on its first break** — `game/scripts/dev/dev_tools.gd` pays n `ChainState.add_hit()` calls on each life's first airborne tick, and the chain then breaks and banks like any chain (a landing, Snuff, cling grace, a knock or an exit). `perf_worst`'s 60 s run needs the light held at chain 20 for the whole run.
+  → **Owner: Story 1.12** — the worst-case performance scene (`rooms/dev/perf_worst.txt`, "the player at chain 20") and its 60 s run are 1.12's; it decides how the light stays at chain 20 there.
+- **The on-screen light count lives only in `dev/`** — overlay 4's count (`counts_on_screen()` in `game/scripts/dev/overlays.gd`: shown, enabled, energy > 0, a texture, and its texture rect meets `World.play_rect()`) is the only code that knows which `PointLight2D`s are on screen. The ≤ 6 budget (AR46) needs the same rule in game code, and the engine itself culls lights against the whole 480×270 viewport, gutters included.
+  → **Owner: Story 1.12** — it keeps at most 6 `PointLight2D` lit on screen (lurker glows fall back to sprites first); decide there whether the budget counts the play rect or the viewport, move the rule into game code and point overlay 4 at it.
+- **Overlay 2 reads the sensing constants from `Lurker`** — `game/scripts/dev/overlays.gd` reads `Lurker.NOTICE_MIN_RADIUS`, `NOTICE_FACTOR` and `SCREEN_MARGIN`. When they move into `rules/sensing.gd`, `overlays.gd` must move in the same change, or every debug run fails to compile. Overlay 2 also gains sense/stir rings, plus a radius ring for every `light_source` (player, flare, cache), not only the player.
+  → **Owner: Story 1.20** — it adds `rules/sensing.gd` (`can_notice`, `can_sense`, `can_stir`), where those constants move.
+- **A dev session meets the save** — `World._respawn_point()` reads `Game.dive`'s respawn point before `--room`'s start, and DevTools never writes it. From 1.21 a loaded respawn point beats `--room`, and a dev session (`--room`, `--chain`) records dev room visits (`SlotState.visit()`) and `best_chain` into the slot.
+  → **Owner: Story 1.21** — the save store makes the respawn point and the slot save data; decide there what a dev session may write.
+- **`dev_overlay` ships, inert, in release builds** — `game/project.godot` binds it (backquote) in every build, so a list of player actions read from `InputMap` would show it. Build one filter for player actions (it skips `dev_*` and `ui_*`) together with the controls reference, with a test that it never lists `dev_overlay`; 1.37's pad defaults and glyph tables use the same filter.
+  → **Owner: Story 1.34** — the Pause controls reference (UX-DR52) is the first screen that lists bindings.
+- **Rebinding must skip `dev_*` actions** — rebinding and reset to defaults offer only the actions from that player-action filter, and the clash rule ignores `dev_*` actions.
+  → **Owner: Story 7.3** — rebinding (FR33, AR35) doesn't exist until E7.
+- **Overlay 3 draws only the `spawn` / `up` / `down` entries** — `game/scripts/dev/overlays.gd` `room_items()`. When anchors and stations become entries (`game/scripts/world/room.gd` `entry_position()`), add them to overlay 3's item list and its `smoke_dev_tools` case.
+  → **Owner: Story 1.24** — it extends `entry_position()`.
+- **Boot screens must not swallow `--room`** — when the title and web gate land as boot screens, a run with `--room` / `?room=` must still start straight in that room (1.12's perf run, 1.13's Playwright `?room=perf_worst`, 2.12's `?room=weaver_test`). World must stay the main scene, so the `current_scene == World` gate in `DevTools._ready()` (`game/scripts/dev/dev_tools.gd`) still fires. 1.33 decides whether the web gate still shows (it unlocks audio).
+  → **Owner: Story 1.33** — it adds the screens shown at boot.
+
+## Deferred from: code review of 1-11-devtools-entry-args-and-overlays.md (2026-11-19)
+
+- **Foreign URL query parameters warn on every web load** — `game/scripts/dev/dev_tools.gd` `real_tokens()` turns the whole `window.location.search` into tokens, and AC2 makes each unknown one a `push_warning` listing the known args. A web debug build whose host or test harness adds its own query parameter (a cache-buster, an embed option) prints one `DevTools: unknown arg --<name>` per parameter on every load. Harmless (debug builds only), but it is noise in the Playwright log.
+  → **Owner: Story 1.13** — it builds the web debug export and the Playwright `?room=` smoke; if either adds its own query parameter, apply only the `ARGS` keys from the URL and ignore the rest quietly, with a test.

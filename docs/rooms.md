@@ -94,7 +94,7 @@ A missing file is `"<path>:0:0 file not found"`.
 | `spawn(scene, pos, args := {})` | instances `scene`, sets each arg before `add_child` (so `_ready` sees it), and returns the node |
 | `is_solid(cell)`, `cell_centre(cell)` | for tests and the room sweep |
 
-`RoomLoader.load_room(id, dive = null)` resolves an id through an index of every `*.txt` under `res://rooms/`, built once (an id in two files is an error naming both). `load_room_from_path(path, dive = null)` loads one file directly. With a `DiveState`, killable spawns (`c`, `h`) whose cell it marked killed are not built; without one (tests, the harness) every enemy is. Killable spawns get `room_id` and `cell`, and a crawler's `take_hit()` marks its cell. Tests index their own rooms with `RoomLoader.add_root(dir)`: the swap rooms live in `tests/rooms/swap/`, apart from the validator fixtures in `tests/rooms/` (one of which repeats an id on purpose).
+`RoomLoader.load_room(id, dive = null)` resolves an id through an index of every `*.txt` under `res://rooms/`, built once (an id in two files is an error naming both). `load_room_from_path(path, dive = null)` loads one file directly. With a `DiveState`, killable spawns (`c`, `h`) whose cell it marked killed are not built; without one (tests, the harness) every enemy is. Killable spawns get `room_id` and `cell`, and a crawler's `take_hit()` marks its cell. Tests index their own rooms with `RoomLoader.add_root(dir)`: the swap rooms live in `tests/rooms/swap/` and DevTools' `t_dev_room` in `tests/rooms/dev_tools/`, apart from the validator fixtures in `tests/rooms/` (one of which repeats an id on purpose).
 
 ## Room checks
 
@@ -128,5 +128,7 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_rooms.
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd          # the descent bot in every spine room (~28 s on m1_shaft)
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd        # the M1 move checks on m1_shaft
 ```
+
+To play a room by hand, start any room with `-- --room=<id>` in a debug build (`godot --path game -- --room=m1_shaft`; `?room=<id>` in a web debug build): it starts at the `P`, else the `up` entry, else `down`, and an unknown or invalid room warns and loads `m1_shaft` ([development guide → DevTools](./development-guide.md#devtools-debug-builds-only)).
 
 To try a room in a test, use `tests/room_harness.gd`: `RoomHarness.build(self, &"m1_shaft")` (or `build_from_path(self, path)` for a file you have validated) returns `{room, player, camera, world}` (the room at the origin, a test player at an entry, `&"spawn"` by default (pass `&"up"` for a room without `P`), a `CameraRig` following it with limits from the room, and a stub in group `world` with `play_rect()` and `current_room()`); free them with `RoomHarness.free_all()`.

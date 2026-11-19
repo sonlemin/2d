@@ -1,6 +1,9 @@
+---
+baseline_commit: 65849f1
+---
 # Story 1.11: DevTools: entry args and overlays
 
-Status: ready-for-dev
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -96,31 +99,54 @@ so that I can jump straight into any room and state and see the invisible rules 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` gives `== ALL GREEN (15 tests)`. Record the per-test `ok` counts, which "Previous story intelligence" lists. Every engine fact this story relies on is already probed (see "Verified facts").
-- [ ] **Task 2: The small APIs below `dev/` (AC: 3, 6, 7, 10).**
-  - [ ] Add `Clock.active() -> Dictionary` (D11). Cases go in `test_clock.gd`.
-  - [ ] Add `Settings.is_valid(key, v, schema := SCHEMA) -> bool`, public and static, replacing the private `_valid` (D8). Cases go in `test_state.gd`.
-  - [ ] Add `Game.override_setting(key, v)`, plus `load_settings()` re-applying overrides without arming, and `reset_for_tests()` clearing them (D8). Cases go in `test_state.gd`, per D14.
-  - [ ] Add `RoomLoader.room_ids()` and `RoomLoader.inspect(id)`, which never `push_error` (D5). Cases go in `test_room_loader.gd`.
-  - [ ] In `world.gd`, add the hook line, `start_entry` and the fallback using `start_entry`, and update the comments that named 1.11 (D2, D5).
-  - [ ] Add the `dev_overlay` action to `project.godot`, copying the existing one-line event format with `"physical_keycode":96` (D13).
-- [ ] **Task 3: `scripts/dev/dev_tools.gd` (AC: 2–6, 9).** Write the pure parsers, the registry and the apply phases (D3–D8).
-- [ ] **Task 4: `scripts/dev/overlays.gd` (AC: 7).** Write the node layout, the four modes, the light count and the Clock rows (D9–D11).
-- [ ] **Task 5: The lint (AC: 1, 10).** Add `dev_ref`'s exact-line exemption and `dev/` class names, and the `dev/` allowance in `raw_input`, with samples and tree checks (D12).
-- [ ] **Task 6: Tests (AC: 2–9).**
-  - [ ] Create `tests/test_dev_args.gd`, `tests/smoke_dev_tools.gd` and the fixture `tests/rooms/dev_tools/t_dev_room.txt` (D14).
-  - [ ] Add cases to `test_lint`, `test_clock`, `test_state` and `test_room_loader`.
-- [ ] **Task 7: Docs and ledger (AC: 10).** Update everything D15 lists. Add the eight ledger items D15 names, each with its owner line.
-- [ ] **Task 8: Verify (AC: 10).**
-  - [ ] `./run_tests.sh` gives `== ALL GREEN (17 tests)`, with no `ERROR:` lines. Also grep the raw output for `ERROR:` printed after the runner exits (leaks).
-  - [ ] Run the D16 red checks and record each in the Debug Log, restoring with `git diff` clean on the touched file.
-  - [ ] Take one xvfb screenshot per overlay mode at brightness 0, and look at each. Record what you see. Use a scratch script **outside the repo**, run through the runner by its absolute path (the runner loads any path; probed):
+- [x] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` gives `== ALL GREEN (15 tests)`. Record the per-test `ok` counts, which "Previous story intelligence" lists. Every engine fact this story relies on is already probed (see "Verified facts").
+- [x] **Task 2: The small APIs below `dev/` (AC: 3, 6, 7, 10).**
+  - [x] Add `Clock.active() -> Dictionary` (D11). Cases go in `test_clock.gd`.
+  - [x] Add `Settings.is_valid(key, v, schema := SCHEMA) -> bool`, public and static, replacing the private `_valid` (D8). Cases go in `test_state.gd`.
+  - [x] Add `Game.override_setting(key, v)`, plus `load_settings()` re-applying overrides without arming, and `reset_for_tests()` clearing them (D8). Cases go in `test_state.gd`, per D14.
+  - [x] Add `RoomLoader.room_ids()` and `RoomLoader.inspect(id)`, which never `push_error` (D5). Cases go in `test_room_loader.gd`.
+  - [x] In `world.gd`, add the hook line, `start_entry` and the fallback using `start_entry`, and update the comments that named 1.11 (D2, D5).
+  - [x] Add the `dev_overlay` action to `project.godot`, copying the existing one-line event format with `"physical_keycode":96` (D13).
+- [x] **Task 3: `scripts/dev/dev_tools.gd` (AC: 2–6, 9).** Write the pure parsers, the registry and the apply phases (D3–D8).
+- [x] **Task 4: `scripts/dev/overlays.gd` (AC: 7).** Write the node layout, the four modes, the light count and the Clock rows (D9–D11).
+- [x] **Task 5: The lint (AC: 1, 10).** Add `dev_ref`'s exact-line exemption and `dev/` class names, and the `dev/` allowance in `raw_input`, with samples and tree checks (D12).
+- [x] **Task 6: Tests (AC: 2–9).**
+  - [x] Create `tests/test_dev_args.gd`, `tests/smoke_dev_tools.gd` and the fixture `tests/rooms/dev_tools/t_dev_room.txt` (D14).
+  - [x] Add cases to `test_lint`, `test_clock`, `test_state` and `test_room_loader`.
+- [x] **Task 7: Docs and ledger (AC: 10).** Update everything D15 lists. Add the eight ledger items D15 names, each with its owner line.
+- [x] **Task 8: Verify (AC: 10).**
+  - [x] `./run_tests.sh` gives `== ALL GREEN (17 tests)`, with no `ERROR:` lines. Also grep the raw output for `ERROR:` printed after the runner exits (leaks).
+  - [x] Run the D16 red checks and record each in the Debug Log, restoring with `git diff` clean on the touched file.
+  - [x] Take one xvfb screenshot per overlay mode at brightness 0, and look at each. Record what you see. Use a scratch script **outside the repo**, run through the runner by its absolute path (the runner loads any path; probed):
 
     `xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- /abs/path/shot_overlays.gd <out>`
 
     The script copies `screenshot.gd`'s approach. It injects `--set=brightness:0` through the D3 seam, then sets the DevTools overlays' `mode` to 1–4, waiting 2 process frames before each shot. It ends with `Game.reset_for_tests()`. Never commit it, and never put it under `tests/` (the glob would run a `smoke_*`).
-  - [ ] Stage every new `.gd` with its `.gd.uid`, and the fixture room.
-  - [ ] Report: "tests green; needs a 2-minute look on the laptop". The look is `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0`, then walk off the spawn ledge and cycle the overlays with the backquote key. In m1_shaft the chain shows 8 at take-off and usually ends on the first hoverer bump, not a landing (D14).
+  - [x] Stage every new `.gd` with its `.gd.uid`, and the fixture room.
+  - [x] Report: "tests green; needs a 2-minute look on the laptop". The look is `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0`, then walk off the spawn ledge and cycle the overlays with the backquote key. In m1_shaft the chain shows 8 at take-off and usually ends on the first hoverer bump, not a landing (D14).
+
+### Review Findings
+
+Code review 2026-11-19: five reviewer layers (blind, edge case, acceptance auditor, verification gap, docs) on Fable 5.2, each finding then checked by a refuting verifier. 31 raw: 7 merged as duplicates, 7 dismissed, 17 kept.
+
+- [x] [Review][Decision] How far the overlay tests check what is drawn — `test_overlay_cycle` counts `draw` signals, which fire on every `queue_redraw()`, so an empty `_draw_world` / `_draw_screen` passes. Content is asserted only for mode 3's item list, mode 4's rows and the light count; mode 1's play rect and notice margin and mode 2's light ring, dashed reach below `Lurker.NOTICE_MIN_RADIUS` and predator labels are not. Options: branch coverage only (the patches below), a pure `light_marks()` for mode 2's numbers tested at the 80 px boundary, or pure builders for modes 1–3. **sonlm (2026-11-19): `light_marks()` for mode 2** (done, with the branch coverage).
+- [x] [Review][Patch] `--chain` would pay a player that has not ticked yet if a later story spawns it from inside a physics tick (`is_on_floor()` is false before its first `move_and_slide()`); only pause is guarded. Also skip the spawn's own physics frame, D6's "only on ticks the player itself ran" [game/scripts/dev/dev_tools.gd:76]
+- [x] [Review][Patch] `real_tokens()` and the `current_scene == World` gate never run in the suite, so a break in reading the command line ships green; test both [game/scripts/dev/dev_tools.gd:54]
+- [x] [Review][Patch] `--log` with no valid category still calls `Log.set_enabled([])` and logs `dev: log `, and `--log=` gives no warning; warn and leave Log alone, like any other bad value [game/scripts/dev/dev_tools.gd:254]
+- [x] [Review][Patch] The bad-arg warnings (unknown arg, a repeated single-valued arg, a bad `--chain`, a bad `--log` name) are never observed through DevTools, only as pure error lists; one smoke case [game/tests/smoke_dev_tools.gd]
+- [x] [Review][Patch] AC5's "no `--log`, no `Log.set_enabled()` call" and "one merged call" pass either way; enable a category before the no-token build, and give `test_log` two `--log` tokens [game/tests/smoke_dev_tools.gd]
+- [x] [Review][Patch] The light count's play-rect argument is unpinned (the viewport rect also gives 1 at the spawn); add a code-built light inside the play rect and one under a gutter [game/scripts/dev/overlays.gd:141]
+- [x] [Review][Patch] Overlay 2's "can be noticed" branch and the predator sense line never run in a test; draw mode 2 past 80 px of light near a sensing lurker [game/scripts/dev/overlays.gd:233]
+- [x] [Review][Patch] Mode 3's `obj` drawing branch is never proven to draw: `test_room_items` reads the item list only, and the cycle test's m1_shaft has no `obj=` [game/tests/smoke_dev_tools.gd]
+- [x] [Review][Patch] AC10: new checks with no recorded red check (the shared cached material, Screen above UI, `room_items()`, the light filters other than hidden, `clock_rows` at 499/500 ms, `Settings.is_valid`, bad `--set` values); run and record them [story Debug Log]
+- [x] [Review][Patch] The StringName "premise" check turns FAIL whenever an unrelated change makes the interning order alphabetical; make it a warning, the pairwise check stays [game/tests/test_room_loader.gd:262]
+- [x] [Review][Patch] The lint `once` samples have no different guard (`if not OS.is_debug_build():`) and no statement between guard and line; `_test_world_hook` doesn't pin "the first statement of `_ready()`" [game/tests/test_lint.gd:371]
+- [x] [Review][Patch] Task 8 "Stage every new `.gd` with its `.gd.uid`, and the fixture room" is ticked, but nothing is staged [story Tasks]
+- [x] [Review][Patch] The Change Log says 11 extra red checks; the Debug Log lists 9 [story Change Log]
+- [x] [Review][Patch] project-context.md's release-preset exclusions omit `scripts/dev/*`, and the `world.gd` hook comment and the dev guide state the exclusion in the present tense before Story 1.13 adds the presets [_bmad-output/project-context.md:97]
+- [x] [Review][Patch] The docs say `dev_ref` catches any `scripts/dev/` path; the rule matches `res://` paths only [docs/development-guide.md:125]
+- [x] [Review][Patch] The dev guide's "no function key is bound anywhere" overstates the test, which skips the engine's `ui_*` actions [docs/development-guide.md:51]
+- [x] [Review][Defer] On a web debug build every foreign URL query parameter becomes an `unknown arg` warning on each load (AC2 as specified) [game/scripts/dev/dev_tools.gd:95] — deferred to Story 1.13
 
 ## Dev Notes
 
@@ -876,10 +902,98 @@ func _ready() -> void:
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-19. The red checks and the doc edits ran as one workflow (5 red-check agents, each in its own copy of `game/`; 3 doc agents on disjoint files); every result and doc diff was reviewed here.
+
 ### Debug Log References
+
+- **Baseline** `65849f1`: `./run_tests.sh` → `== ALL GREEN (15 tests)`, 878 `ok`, 1 m 41 s; the per-test counts matched "Previous story intelligence" exactly.
+- **Final:** `== ALL GREEN (17 tests)`, 1065 `ok`, 1 m 47 s, no `SCRIPT ERROR` / `ERROR:` lines. The only extra output is `at: push_warning` traces, as in the baseline (9 there): `smoke_dev_tools`' four deliberate bad-arg warnings bring it to 13.
+- **`ok` counts, test by test (before → after):** `test_lint` 162 → 176, `test_clock` 15 → 21, `test_room_loader` 72 → 80, `test_state` 165 → 180; new `test_dev_args` 71, `smoke_dev_tools` 73. Unchanged: `test_chain_state` (ALL PASS, 69 checks), `test_deferred_owners` 25, `test_log` 7, `test_room_sweep` 74, `test_tuning` 87, `smoke_bot` 6, `smoke_moves` 17, `smoke_player_input` 59, `smoke_room_swap` 39, `smoke_rooms` 90, `smoke_world` 60.
+- **First runs:** `test_lint` and `smoke_world` passed with DevTools in the tree on the first run; `test_dev_args` needed two fixes before its first run (a `Dictionary.set` method shadows `ARGS.set` dot access, so the tests index `ARGS["set"]`; the row check reads the script's method list instead of instancing a node). `smoke_dev_tools` passed its first full run (69); its `t_dev_room` walk-off took off, paid 8 / 36 and landed with the chain still 8, as D14 predicted.
+- **Task 8 screenshots** (xvfb, brightness 0, scratch script outside the repo, `Game.reset_for_tests()` at the end; 6 shots: modes 1–4, mode 2 at chain 10 by a telegraphing lurker, mode 3 in `t_dev_room`). Every mode reads at brightness 0: mode 1's play rect, dashed notice rect and both gutters with their usable bands; mode 2's 40 px ring with the dashed, dim reach ring ("below notice"), and at chain 10 the 109 / 175 px rings, `TELEGRAPH` and the magenta sense line; mode 3's exits, entries and the `lamp_t_dev_room_1` id; mode 4's `FPS 30`, `lights 1` and a greyed `hitstop ×0.05`. **The first pass showed two layout faults**, fixed in `overlays.gd` and re-shot: mode 2's reach label and the lurker's state label sat under the gutters, and mode 3's exit and entry labels overlapped at the top exit. Labels now sit beside their mark on the side facing the play rect's middle (`_beside()`), and mode 2's sit by the player.
+- **Red checks** (break → the named check fails → restore; each in a scratch copy of `game/` with its own `config/name`, so no `user://` was shared; every restore `diff`-clean against the repo; baselines green in each copy first):
+  1. world.gd `load` → `preload`: `FAIL lint world/world.gd:42 dev_ref`, `FAIL lint: world.gd holds the DevTools line exactly once (got 0)`.
+  2. The line moved out of its `if`: `FAIL lint world/world.gd:41 dev_ref`.
+  3. A second guarded copy: exactly one `FAIL lint world/world.gd:44 dev_ref` (the first copy exempt) and `… exactly once (got 2)`.
+  4. The exemption's path text changed (`dev_toolz.gd`): `… exactly once (got 0)`, `FAIL lint world/world.gd:42 dev_ref`, and the three samples that rely on it.
+  5. `dev/` dropped from `raw_input`'s allow: `FAIL lint dev/dev_tools.gd:66 raw_input` and the `dev/` sample.
+  6. The re-apply loop removed from `load_settings()`: `test_state` `FAIL (a) … the override is kept (brightness 1)`, `FAIL (c) … brightness is 3 (got 0)`; `smoke_dev_tools` `FAIL …and it survives the load boot() runs`.
+  7. The "no arming while overrides" return removed: `FAIL (a) …and the missing file is not written (1 writes)`, in TMP; (b) and (c) stay green (D16 allowed "(a) or (b)").
+  8. `--chain` paid at spawn: `FAIL first life: on the first airborne tick the chain is 8, held 36 (got 0, 0)` (and the landing, second-life and paused cases).
+  9. Armed on the first spawn only: `FAIL second life: on the first airborne tick the chain is 8, held 36 (got 0, 0)`, nothing else.
+  10. Entry forced to `spawn`: `ERROR: World: room 't_swap_b' has no entry 'spawn'`, the start-room assert, then `FAIL --room=t_swap_b (no P) starts at its up entry (got no room, spawn at [])`. On the first run the case read `_room().id` on a null room and aborted with a SCRIPT ERROR before any named FAIL; the case (and the falling-spawn case) now guard a missing room or player, and the re-run gives the named FAIL.
+  11. The `current_scene` gate dropped: `smoke_world.gd --chain=3` → `FAIL …with the chain of 3 banked first: carried +6, chain 0 when the room is entered (carried 27 -> 48)` (+21), the three `best_chain` checks still `ok`; `smoke_dev_tools.gd --log=save` → `FAIL ...no Log category is enabled` (plus 22 knock-on FAILs: the real tokens replace every case's own).
+  12. DevTools pausable: `FAIL …and it still cycles while the tree is paused (got 0)` and the "always processes" check.
+  13. The unshaded material removed: `FAIL WorldMarks draws unshaded: readable under the darkness`.
+  14. `active()` returns `_requests`: four `active()` FAILs, among them `FAIL active(): changing the returned copy changes nothing in the Clock`, then a SCRIPT ERROR in `Clock._apply` (the test wrote a float into the live dict).
+  15. `uri_decode()` dropped: `FAIL query_tokens: the D4 example gives the command-line tokens, %2C decoded …` (and the `%3D`/`%26` and `+` cases).
+  16. An F2 event added to `dev_overlay` in the copy's `project.godot`: `FAIL no project action is bound to a function key (got ["dev_overlay: F2"])`, `FAIL dev_overlay has exactly one event …`.
+  17. `is_visible_in_tree()` dropped: `FAIL a light hidden doesn't count`; the `m1_shaft` count stayed 1, as D16 said.
+  18. `--set` through `Game.settings.set_value()`: `FAIL --set=brightness:3: brightness 3, and writes disarmed`, `FAIL …and it survives the load boot() runs`. Its after-load file check stayed `ok`: `load_settings()` disarms writes before the deferred write runs, so it couldn't fail. A file check two frames after the build, before the load, was added; re-run, it fails (`FAIL …and settings.json still holds 1 two frames later: the override wrote nothing`). Separately, `_settings_armed = false` removed from `override_setting()`: the smoke's "writes disarmed" and `test_state` `FAIL (b) … no write, the file unchanged (1 writes)`.
+  19. `room_ids()` sorting StringNames: `FAIL …alphabetically, each id before the next as Strings (got [&"t_input", &"bad_unknown_char", …])`.
+  20. Clock sampled only at the rebuild: `FAIL a hitstop requested right after a rebuild is seen one frame later (got {  })` (and the greyed row).
+  - **Extras** for new checks D16 doesn't cover: dev/ class names not collected → `FAIL layer_names: dev_ref gets only dev/'s classes …` and the tree sentinel; `prev` updated on blank lines → the "blank line and comment between guard and line" sample fails; the paused guard removed → `FAIL --chain=8, spawned while paused: still 0 after 5 paused ticks (got 8)`; no disarm after paying → `FAIL …it lands with the chain still 8 on the tick before (got count 20)`; `ENTRY_ORDER` up first → `FAIL pick_entry([&"down", &"spawn", &"up"]) is spawn`; a single-valued arg keeping its first value → `FAIL parse: a repeated --room keeps the last …`; `.to_lower()` dropped → `FAIL --log=lurker,CLOCK gives both, any case`; ints typed through floats → `FAIL --set=brightness:3.0 is an error`; `inspect()` unsorted → `FAIL inspect(m1_shaft): … exactly down, spawn, up …`.
+- **Code review fixes (2026-11-19):** 16 patches and the `light_marks()` decision. Each new check and each unrecorded one (AC10) was red-checked in its own copy of `game/` (unique `config/name`, so its own `user://`; the real `settings.json` still dated 2026-11-12), every mutation matched exactly once; 30 of 31 caught by a named check or a run-failing `SCRIPT ERROR`:
+  - Older checks: `unshaded_material()` building a new material → `FAIL a second World's WorldMarks shares the same cached material`; `LAYER` 10 → `FAIL the screen marks' CanvasLayer is above UI (10 > 10)`; `room_items()` without objects → `FAIL …and the obj= id at its cell (got [])`; exit rows swapped → `FAIL …the up exit's opening …`; `counts_on_screen()` without `enabled` / `energy`, and by centre point → `FAIL a light disabled …`, `… energy 0 …`, `… straddling the edge counts`; a default size for no texture → `FAIL a light no texture …`; `return true` → `FAIL a light wholly outside …` (and the code-built count, 3); `clock_rows` with `<=` / `< 499` → `FAIL clock_rows: seen 500 ms ago …` / `… seen 499 ms ago …`; `is_valid()` without the choices / ignoring the passed schema → `FAIL is_valid: a value outside the choices …` / `… with a passed schema …`; `_apply_set()` without its warning → `FAIL bad --set values … (got [])`.
+  - `is_valid()` without its type clause stayed green: GDScript's `in` on an Array is already type-strict (probed: `1.0 in [0, 1, 2, 3]` is false, `1.0 == 1` is true), so the clause is a second guard. The type-mismatch check still fails on a loose match (`choices.any(c == v)` → `FAIL is_valid: a type mismatch is false …`).
+  - New checks: the spawn-frame guard removed → `FAIL --chain=8, a player spawned inside a tick: … (got 0, banked [36])`; `OS.get_cmdline_args()` → `FAIL off the web, real_tokens() is the command line after -- (got ["res://tests/runner.tscn"])`; the gate compared with `self` → `FAIL a World that is the current scene reads them itself (got [])`; parse errors, the `--chain` warning or the `--log` warning dropped → `FAIL bad args: one warning each …`; no-valid-category block removed → `FAIL --log=: one warning, and Log left as it was (got [])`; a stray `Log.set_enabled([])` in `_apply()` → `FAIL …Log untouched …`; `--log` values not merged → `FAIL --log=lurker --log=CLOCK: both on …`; the light count on the play rect plus the gutters → `FAIL …one under a gutter doesn't: 2 (got 3)`; `light_marks()` with `>` / reach × 1.5 → `FAIL light_marks: at the notice radius …` / `… the 40 px base light …`; a bad access in mode 2's notice ring, in the sense line, and in mode 3's obj label → each a `SCRIPT ERROR` that fails the run (before the review no test reached them); `_exempt()` ignoring the guard → `FAIL dev_ref fires on … if not OS.is_debug_build(): …` (and the `pass` between); the hook moved below `add_to_group()` → `FAIL lint: …under its guard, as the first statement of World._ready() …`.
+- **After the review:** `== ALL GREEN (17 tests)`, 1086 `ok` (`smoke_dev_tools` 88, `test_dev_args` 75, `test_lint` 179, `test_room_loader` 79: its StringName premise is now a warning), 1 m 48 s, no `ERROR:` lines.
 
 ### Completion Notes List
 
 - Story context created by gds-create-story on 2026-11-19. sonlm decided D6 and D8 the same day: `--chain` starts at take-off, as n pogo hits (held n(n+1)/2), on every life; a `--set` session saves no settings at all. An adversarial review of the draft (code accuracy, feasibility, requirements; each finding verified) was folded in before ready-for-dev.
+- **AC1:** the hook is `World._ready()`'s first statement, exactly the D2 text. `dev_ref` lets it through once, right under its guard (`once` field, read with `rule.get("once", {})`; only `dev_ref` has it); `layer_names()` returns a `dev_ref` list (dev/ classes and autoloads); a tree check finds the real line exactly once.
+- **AC2:** `DevTools.real_tokens()` (command line + `JavaScriptBridge.eval` query, gated on `current_scene == World`); pure `query_tokens()` and `parse()`; one `ARGS` row per arg. Bad args are `push_warning("DevTools: …")`.
+- **AC3:** `RoomLoader.room_ids()` / `inspect()`; `World.start_entry`; `room_entry()` / `pick_entry()`. `t_swap_a` starts at `P` and respawns there; `t_swap_b` starts at `up`, falling; `nope` and `bad_edge_hole` warn and load `m1_shaft`.
+- **AC4:** armed on every `player_spawned`, paid in `_physics_process` (priority 100) on the first tick the player ran that ends off the floor, skipped while paused, held behind `is_instance_valid()`.
+- **AC5–AC6:** `log_names()`; `set_value_of()` typed by the schema default, then `Settings.is_valid(key, v, schema)`; `Game.override_setting()`, `load_settings()` re-applies overrides and returns before arming, `reset_for_tests()` clears them.
+- **AC7:** `overlays.gd` as D9–D11 (WorldMarks unshaded, Screen on layer 11, 4 Hz readout, per-frame Clock sampling, `clock_rows()`, `counts_on_screen()`, `room_items()`); `Clock.active()`.
+- **AC8–AC9:** `dev_overlay` (physical 96) in `project.godot`; `smoke_dev_tools`' `test_actions` and its no-token case; `smoke_world` and `smoke_room_swap` unchanged and green.
+- **AC10:** 17 tests green, the red checks above, docs and ledger (below). Game-code edits outside `scripts/dev/` are exactly the AC10 list, plus comment updates in `world.gd` (the ambient and fallback comments that named 1.11).
+- **Final names (D1–D11 sketches → code):** `DevTools.tokens`, `overlays`; statics `real_tokens()`, `query_tokens()`, `parse(list, registry := ARGS)`, `chain_value(text) → [n, error]`, `log_names(text) → [cats, errors]`, `set_value_of(text, schema := Settings.SCHEMA) → [key, value, error]`, `schema_help(schema)`, `room_entry(id, info, known_ids) → [entry, error]`, `pick_entry(entries) → [entry, error]`, `sorted_names(names)`; consts `ARGS`, `ENTRY_ORDER`, `MAX_INT_CHARS` 4. Overlays: `mode`, `world`, `last_refresh_ms`, `light_count`, `clock_seen`, `clock_list`, `cycle()`, `room_items()`, statics `clock_rows()`, `counts_on_screen()`, `unshaded_material()`.
+- **Deviations from the Dev Notes, kept and recorded:**
+  - **D4:** `ARGS` keys are Strings (the tokens are), and `parse()` normalises a passed registry's keys to String. The apply order is `ARGS`' own order (log, set, room, chain), not a second list a new row could miss; a test pins it.
+  - **D5:** `room_entry()` has a third message for a valid room with no `P` and no exit (`inspect()` gives no errors and no entries there).
+  - **D6:** `--chain=0` connects nothing (paying 0 hits is a no-op).
+  - **D9:** labels sit beside their mark facing the play rect's middle, and mode 2's by the player, after the first screenshots showed them under the gutters (Debug Log). Exit labels use ASCII `->` (`up -> m1_shaft`), so the fallback font's glyph coverage never matters.
+  - **D14, checks added:** a spawn while paused (D6's paused guard had no check; extra red check), bad `--set` values (two warnings, no override), `inspect(t_swap_a)`, the `ARGS` row shape and order, a premise that the action walk saw the project's actions, a world-tree and DevTools-subtree check in the no-token case, the warning texts for bad rooms, the `t_dev_room` up-exit opening rect; the `--set` file check runs both before and after the second load (red check 18); null guards so a missing room or player is a named FAIL (red check 10).
+  - **D16 #16** (like every red check) ran on a scratch copy of `game/` with its own project name instead of editing the real `project.godot` and `git checkout`: the copy's InputMap comes from its own `project.godot`, so the check fails the same way, and the real tree was never touched.
+  - **D12 samples added:** a blank line and a comment between guard and line stay quiet; `"DevThing"` inside a string stays quiet. `_test_layer_names` gained a `dev/` class and a `dev/` autoload, so its `core_layer` / `rules_purity` expectations grew by those two names.
+- **Docs (D15):** development guide (run notes, a DevTools section with the arg table and overlay list, test list, lint table, Common Tasks), `rooms.md`, `game/README.md` (run note under "press F5", the backquote row, the brightness line, the Tests list), `architecture.md` (tree, state rows, Component Overview, Testing Strategy rows, the Enforcement variance paragraph, Last run 17 tests, the Input gaps row), `component-inventory.md` (a Dev Tools section, World, Core, RoomLoader, Input Actions, Test Components), `source-tree-analysis.md`, `index.md`, `project-overview.md` (the "debug HUD" line), `project-context.md` (the four D15 edits only), `game-architecture.md` (Debug Tools with `--room=weaver_test` and the arg phases, Enforcement, Settings persistence, Configuration). Accuracy fixes beyond D15's bullets, all caused by `start_entry` or the one-line exception: the dev guide's "Edit the Level" fallback sentence, `rooms.md`'s test-room folders, `architecture.md`'s respawn row and death flow, `component-inventory.md`'s World text, `source-tree-analysis.md`'s class_name sentence and Entry Points row, and `game-architecture.md`'s two boundary lines (≈ `:879`, `:882`). Older drift left alone (not this story's): the dev guide's and README's per-test lists still lack `test_lint`, `test_tuning` and `smoke_player_input`.
+- **Deferred, with owners** (ledger section "Deferred from: dev of 1-11-…", `test_deferred_owners` PASS: 31 items, 0 unowned):
+  1. `--chain` ends on its first break; `perf_worst`'s 60 s run needs chain 20 held → **Story 1.12**.
+  2. The on-screen light count rule lives only in `dev/`; the ≤ 6 budget needs it in game code → **Story 1.12**.
+  3. Overlay 2 reads `Lurker`'s sensing constants; they move with `rules/sensing.gd`, plus sense/stir rings and a ring per light source → **Story 1.20**.
+  4. A loaded respawn point beats `--room`; a dev session writes room visits and `best_chain` to the slot → **Story 1.21**.
+  5. `dev_overlay` ships inert; one player-action filter (skips `dev_*`, `ui_*`) with the controls reference → **Story 1.34**.
+  6. Rebinding and its clash rule skip `dev_*` → **Story 7.3**.
+  7. Overlay 3's entries gain anchors and stations → **Story 1.24**.
+  8. Boot screens must not swallow `--room` / `?room=` → **Story 1.33**.
+- **Tests green; needs a 2-minute look on the laptop:** `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0`, walk off the spawn ledge (the chain shows 8 at take-off and usually ends on the first hoverer bump), and cycle the overlays with the backquote key. The game has no pause key yet, so cycling while paused is covered only by `smoke_dev_tools`.
 
 ### File List
+
+New:
+- `game/scripts/dev/dev_tools.gd`, `game/scripts/dev/dev_tools.gd.uid`
+- `game/scripts/dev/overlays.gd`, `game/scripts/dev/overlays.gd.uid`
+- `game/tests/test_dev_args.gd`, `game/tests/test_dev_args.gd.uid`
+- `game/tests/smoke_dev_tools.gd`, `game/tests/smoke_dev_tools.gd.uid`
+- `game/tests/rooms/dev_tools/t_dev_room.txt`
+
+Modified:
+- `game/project.godot` (`dev_overlay`)
+- `game/scripts/world/world.gd` (hook line, `start_entry`, fallback, comments)
+- `game/scripts/world/room_loader.gd` (`room_ids()`, `inspect()`)
+- `game/scripts/rules/settings.gd` (`is_valid()`)
+- `game/scripts/core/game.gd` (`override_setting()`, load and reset)
+- `game/scripts/core/clock.gd` (`active()`)
+- `game/tests/test_lint.gd`, `game/tests/test_clock.gd`, `game/tests/test_state.gd`, `game/tests/test_room_loader.gd`
+- `game/README.md`
+- `docs/development-guide.md`, `docs/architecture.md`, `docs/component-inventory.md`, `docs/source-tree-analysis.md`, `docs/index.md`, `docs/project-overview.md`, `docs/rooms.md`
+- `_bmad-output/project-context.md`, `_bmad-output/game-architecture.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`, this story file
+
+### Change Log
+
+- 2026-11-19: Code review (five layers on Fable 5.2, refuting verifiers): 1 decision, 16 patches, 1 deferred (to 1.13), 7 dismissed. `--chain` also skips the spawn's own physics frame; `--log` with no valid category warns and leaves `Log` alone; `Overlays.light_marks()` (mode 2's numbers, tested at 80 px); new smoke cases for the real command line, every bad-arg warning, a mid-tick spawn, merged `--log`, mode 2 past the notice radius, code-built lights and mode 3's draw; lint samples and the first-statement check; the StringName premise is a warning; docs (`scripts/dev/*` in the release exclusions, `dev_ref` matches `res://` paths, function-key wording). 31 red checks. ALL GREEN (17 tests, 1086 ok). Status → done.
+- 2026-11-19: Story 1.11 implemented. Debug-only `DevTools` (`scripts/dev/dev_tools.gd`, `overlays.gd`), added by `World._ready()`'s one guarded path-string `load()`: entry args `--room`, `--chain`, `--log`, `--set` (the URL query on web debug builds) and four overlays on the backquote key (`dev_overlay`). Small APIs: `World.start_entry`, `RoomLoader.room_ids()` / `inspect()`, `Settings.is_valid()` (public, optional schema), `Game.override_setting()`, `Clock.active()`. Lint: `dev_ref`'s exact guarded line and `dev/` class names; `raw_input` allows `dev/`. New `test_dev_args`, `smoke_dev_tools` and `tests/rooms/dev_tools/t_dev_room.txt`; 20 D16 red checks plus 9 extras. Docs and 8 ledger items. ALL GREEN (17 tests, 1065 ok). Status → review.

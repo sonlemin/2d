@@ -3,7 +3,7 @@
 **Type:** monolith (one Godot game + an asset tool)
 **Primary Language:** GDScript
 **Architecture:** scene-tree composition with a pure-logic core
-**Last Updated:** 2026-11-11 (initial scan, exhaustive)
+**Last Updated:** 2026-11-19 (DevTools, Story 1.11; initial scan 2026-11-11, exhaustive)
 
 ## Project Overview
 
@@ -62,6 +62,14 @@ Godot 4.7 (Python 3 + Pillow only to rebuild art).
 ### Run
 
 Open `game/` in Godot and press F5.
+
+Debug runs take DevTools args (Story 1.11):
+
+```bash
+godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0   # also --log=<cat>,<cat>; ?room=…&chain=… on a web debug build
+```
+
+In the editor, set them in Debug → Customize Run Instances (per-instance arguments, stored in `.godot/`), never in Project Settings `editor/run/main_run_args`, which is written into the committed `project.godot`. The backquote key (`` ` ``) cycles the four overlays, then off. Details: [Development Guide](./development-guide.md).
 
 ### Run Tests
 
