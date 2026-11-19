@@ -4,7 +4,7 @@ baseline_commit: 21e15df
 
 # Story 1.13: Export pipeline and web boot smoke
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -145,40 +145,40 @@ so that every build I play on the laptop is known to boot.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` gives `== ALL GREEN (20 tests)`, 1261 `ok` (baseline `21e15df`). The engine and browser facts this story relies on are probed already (see "Verified facts").
-- [ ] **Task 2: The server's toolchain (AC: 2, 6), D1.**
+- [x] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` gives `== ALL GREEN (20 tests)`, 1261 `ok` (baseline `21e15df`). The engine and browser facts this story relies on are probed already (see "Verified facts").
+- [x] **Task 2: The server's toolchain (AC: 2, 6), D1.**
   - Install the two web templates by D1's procedure: download the `.tpz`, check its SHA-512, extract the two zips, delete the `.tpz`. Record the checked hash and the two zip sizes in the Debug Log.
   - In `tools/web_smoke/`:
     1. Write `package.json` first: `"name": "web-smoke"`, `"private": true`, `"engines": {"node": ">=24"}`, `"scripts": {"test": "playwright test"}`.
     2. Run `npm install -D --save-exact @playwright/test@1.65.1`. Writing `package.json` after the install would desync the lock's root entry.
     3. Run `npx playwright install --only-shell --no-remove chromium`. `--no-remove` keeps revision 1217, which the Playwright MCP plugin uses. If the flag is rejected, use `PLAYWRIGHT_SKIP_BROWSER_GC=1 npx playwright install --only-shell chromium`.
   - Record the versions in the Debug Log.
-- [ ] **Task 3: The presets and their test (AC: 1), D2.**
+- [x] **Task 3: The presets and their test (AC: 1), D2.**
   - Write `game/export_presets.cfg` from D2's text.
   - Write `tests/test_export_presets.gd` (D2).
   - Red-check it (D14 1–3).
-- [ ] **Task 4: The boot marker (AC: 7), D9.**
+- [x] **Task 4: The boot marker (AC: 7), D9.**
   - In `scripts/dev/dev_tools.gd`'s real-run branch, connect to World's `room_entered` once (`CONNECT_ONE_SHOT`, a method, not a lambda) and print the marker.
   - Add `smoke_dev_tools`'s `test_smoke_marker`.
-- [ ] **Task 5: `tools/pck_list.gd` (AC: 3), D4.**
-- [ ] **Task 6: `tools/web_smoke/` (AC: 6, 8), D7, D8.** Write `package.json`, the lock file, `playwright.config.js`, `serve.js` and `smoke.spec.js`.
-- [ ] **Task 7: `tools/export.sh` (AC: 2–6), D3, D5, D6, D12, D13.** Make it executable (`git update-index --chmod=+x` if needed).
-- [ ] **Task 8: `.gitignore`** gets:
+- [x] **Task 5: `tools/pck_list.gd` (AC: 3), D4.**
+- [x] **Task 6: `tools/web_smoke/` (AC: 6, 8), D7, D8.** Write `package.json`, the lock file, `playwright.config.js`, `serve.js` and `smoke.spec.js`.
+- [x] **Task 7: `tools/export.sh` (AC: 2–6), D3, D5, D6, D12, D13.** Make it executable (`git update-index --chmod=+x` if needed).
+- [x] **Task 8: `.gitignore`** gets:
   - `/builds/` (anchored: only the repo-root output folder)
   - `tools/web_smoke/node_modules/`
   - `tools/web_smoke/test-results/`
   - `tools/web_smoke/playwright-report/`
-- [ ] **Task 9: The ledger (AC: 8, 9), D10.**
+- [x] **Task 9: The ledger (AC: 8, 9), D10.**
   - Close the 1.11 item with a `→ **Closed (Story 1.13): …**` line.
   - Add the Windows-boot item with its `→ **Owner: Story 7.15** — …` line.
   - `tests/test_deferred_owners.gd` stays green.
-- [ ] **Task 10: Docs (AC: 9), D11.**
-- [ ] **Task 11: Verify (AC: 10), D14.**
+- [x] **Task 10: Docs (AC: 9), D11.**
+- [x] **Task 11: Verify (AC: 10), D14.**
   - `./run_tests.sh` gives `== ALL GREEN (21 tests)` with no `ERROR:` lines.
   - `tools/export.sh` gives `== BUILD OK`. Record the end line, the sizes and the PCK file counts.
   - Run every D14 red check, each in a detached git worktree in the scratchpad, and record each one's failing line.
   - Stage the new files, with `.gd.uid` files beside any new `.gd` under `game/`. `tools/pck_list.gd` is outside the project and gets no `.uid`.
-- [ ] **Task 12: Report:** "export green; needs a 5-minute look on the laptop". The look:
+- [x] **Task 12: Report:** "export green; needs a 5-minute look on the laptop". The look:
   - pull the branch;
   - rsync `builds/<version>/linux` (or `windows`) and run it;
   - open the web debug build through the tunnel (`docs/build.md`), plain and with `?room=perf_worst`;
@@ -801,10 +801,129 @@ It is the build pipeline: four committed presets, one script that validates cont
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story.
+
 ### Debug Log References
+
+- **Baseline (Task 1):** HEAD `372cc32` (the story file only, over `21e15df`): `== ALL GREEN (20 tests)`, 1261 `ok`.
+- **Final (Task 11, after the last change):** `== ALL GREEN (21 tests)`, 1320 `ok`, plus `test_chain_state`'s `ALL PASS (69 checks)`. No `FAIL`, `SCRIPT ERROR` or `ERROR:` line anywhere in the raw output. Only two tests changed:
+  - `test_export_presets`: new, 54;
+  - `smoke_dev_tools`: 93 → 98, from `test_smoke_marker` (a test World prints none; a real run prints exactly one, inside `_ready`, after the room and the player exist; no second marker on a respawn) plus `test_real_tokens`' marker check.
+
+  Every other test's count is unchanged.
+- **Toolchain (Task 2):**
+  - The 4.7.2-stable `SHA512-SUMS.txt` lists `ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079` for the export-templates `.tpz`. The download was 1,281,349,702 bytes and `sha512sum -c` said OK. `version.txt` reads `4.7.2.stable`.
+  - Extracted `web_nothreads_release.zip` (10,245,903 B) and `web_nothreads_debug.zip` (10,232,720 B), then deleted the `.tpz`.
+  - Node v24.14.0, npm 11.21.1, `@playwright/test` 1.65.1 (`playwright-core` 1.65.1).
+  - `npx playwright install --only-shell --no-remove chromium` accepted the flag. It installed `chromium_headless_shell-1255` (plus `ffmpeg-1013`) and kept revision 1217 for the MCP plugin.
+- **Browser path (AC2's "record which"):** `chromium.executablePath()` returns the **full** Chromium (`~/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome`), which `--only-shell` does not install.
+  - The preflight checks the shell instead, through Playwright's registry: `require('playwright-core/lib/coreBundle').registry.registry.findExecutable('chromium-headless-shell').executablePath()`, which gives `~/.cache/ms-playwright/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell`.
+- **Matcher probes (4.7.2), behind D2's filter and the test's model:**
+  - `rooms/*.txt` matches `rooms/zz_top.txt` and `rooms/l1/x.txt`;
+  - `rooms/**/*.txt` misses `rooms/zz_top.txt`;
+  - `"res://rooms/dev/x.txt".matchn("rooms/dev/*")` is false, while the plain form matches, so `exported()` tries both;
+  - the match is case-insensitive;
+  - `"C:/x".is_absolute_path()` is true;
+  - `ConfigFile.get_value()` with a default on a missing section prints no error.
+- **PCK listings against the test's matchn model:** windows, linux and web list 74 files each; web_debug lists 81. The extra 7 are `res://rooms/dev/perf_worst.txt` plus each of the 3 `scripts/dev/` scripts as `.gdc` and `.gd.remap`. That is the set `test_export_presets` predicts, and no listing has a `res://tests/` path. The three release PCKs are byte-identical (99,492 bytes); the web_debug PCK is 130,608 bytes.
+- **`tools/export.sh` (final, Task 11):** `== BUILD OK builds/20261119-372cc32-dirty, web download 10.3 MB (gzip; raw 39.9 MB), PCK files windows 74 / linux 74 / web 74 / web_debug 81, 83 s`.
+  - Web download: 10,272,294 bytes `gzip -9` against the 30,000,000 limit; 39,948,881 bytes raw (`index.wasm` 39,514,754).
+  - Folder sizes: windows 109,227,172, linux 73,618,908, web_debug 38,403,212 bytes.
+  - Linux boot: exit 124 after 5 s, no error line. Web smoke: 3 passed (21.6 s).
+  - The first full run gave the same figures, with 86 s and the old end-line format.
+- **D14 red checks.** Each ran in a detached worktree in the scratchpad that carried the uncommitted work (`git diff HEAD --binary | git apply`, untracked files copied with rsync), with `npm ci` in `tools/web_smoke`, one at a time.
+  1. **`Linux` exclude without `scripts/dev/*`:**
+     - test (Task 3): `test_export_presets` `FAILED (2)`: `preset.1 (Linux): exclude_filter is exactly […] (got ["rooms/dev/*", "tests/*"])` and `every scripts/dev/ script (3) …` (`Linux: scripts/dev/dev_tools.gd in`, …);
+     - export: the pck step listed `res://scripts/dev/dev_tools.gd.remap` and the rest, then `== BUILD FAILED: pck: the linux release PCK carries dev or test content (6 paths under res://rooms/dev/, res://tests/ or res://scripts/dev/)`.
+  2. **The include filter back to `rooms/**/*.txt`, plus a scratch `rooms/zz_top.txt`** (Task 3): `FAILED (5)`, the include filter ×4 and `every room outside rooms/dev/ (2) is in every preset (out: ["Windows: rooms/zz_top.txt", …])`.
+  3. **`Web debug` excluding `rooms/dev/*`:**
+     - test (Task 3): `FAILED (2)`: `preset.3 exclude_filter is exactly ["tests/*"]` and `every rooms/dev/ room (1) is in Web debug only (wrong: ["Web debug: rooms/dev/perf_worst.txt out"])`;
+     - export: `== BUILD FAILED: pck: the web_debug PCK has no ^res://rooms/dev/perf_worst.txt$ (80 files listed)`.
+  4. **`world.gd` preloading DevTools:**
+     - export, boot step: `SCRIPT ERROR: Parse Error: Preload file "res://scripts/dev/dev_tools.gd" does not exist.` and `ERROR: Failed to load script "res://scripts/world/world.gd" with error "Parse error".`, then `== BUILD FAILED: boot: the Linux release build printed error lines (exit 124)`;
+     - the web smoke alone against that build: `Web (release)` failed on `no console.error outside ALLOWED_CONSOLE_ERRORS`, receiving the same two lines and their `at:` lines (`GDScript::reload (res://scripts/world/world.gd:44)`). Result: 1 failed, 2 passed; `Web debug` keeps `scripts/dev/`, so its preload resolves.
+  5. **The marker removed** (`_on_first_room` body → `pass`):
+     - `smoke_dev_tools` gave `SMOKE FAILED (3)`: `…and, as a real run, prints the boot marker once (got [])`, `a real-run World prints exactly one [room] SMOKE boot ok, inside its _ready (got [])`, `…after its first room is built and the player spawned (got [])`;
+     - export: both `Web debug` tests failed on `"[room] SMOKE boot ok" appears once`, Expected 1, Received 0, `Timeout 60000ms exceeded`. Result: 2 failed, 1 passed (2.3 m), then `== BUILD FAILED: web_smoke: exit 1`.
+     - **This check found a defect:** the failure log showed only 4 lines of the browser console, the last cut to `[save] ...`. Playwright 1.65.1's line reporter (`lib/runner/index.js`) cuts a text attachment at 300 characters. Fixed: see Completion Notes.
+  6. **A broken room**, `rooms/l1/zz_broken.txt` (a copy of `m1_shaft.txt` with its own id and self exits, and `Q` at row 12, column 2): `FAIL res://rooms/l1/zz_broken.txt:12:2 unknown char 'Q'`, `SMOKE FAILED (1)`, then `== BUILD FAILED: content: error lines in its log (exit 1)`. Only `import.log`, `content.log` and `summary.txt` were written; the four output folders stayed empty.
+  7. **`WEB_DOWNLOAD_MAX_BYTES=1000`:** `== BUILD FAILED: size: web download 10272294 bytes gzip (raw 39948881) is not under 1000 (NFR5)`.
+  8. **`TEMPLATES` → a scratch folder with only the desktop templates and `version.txt`:**
+     - `missing: export template web_nothreads_release.zip in <folder> (docs/build.md: templates)`, then the same for `web_nothreads_debug.zip`;
+     - `== BUILD FAILED: preflight: 2 missing (nothing was built)`; no `builds/` folder was created.
+  9. **`&foo=1` added to the `?room=perf_worst` URL:** the test failed on `no DevTools warning (no unknown or bad arg)`, receiving `["WARNING: DevTools: unknown arg --foo (known: chain, glow, log, perf, room, set)"]`, then `== BUILD FAILED: web_smoke: exit 1`.
+     - The log now holds the whole browser console (13 lines, the warning's GDScript backtrace included) and no escape codes.
+     - The first attempt edited by line number and missed, because the fix had moved the line by two. That build passed; the re-run edited by pattern.
+  - **Extra** (D9's one-shot): with `CONNECT_ONE_SHOT` dropped, `smoke_dev_tools` failed with `FAIL …and a respawn, which rebuilds the room and emits room_entered again, prints no second marker (spawns 2, got ["[room] SMOKE boot ok"])`.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed: comprehensive developer guide created (create-story, 2026-11-19).
+- **Built:**
+  - `game/export_presets.cfg` (AC1) and `tests/test_export_presets.gd` (54 checks), which pin the presets and run `matchn` over the real files;
+  - `tools/export.sh`, with the steps preflight, version, import, content, export, pck, size, boot, web_smoke and summary (AC2–5);
+  - `tools/pck_list.gd` (AC3);
+  - `tools/web_smoke/`: `serve.js`, `playwright.config.js` and `smoke.spec.js`, Playwright pinned at 1.65.1 (AC6);
+  - DevTools' `SMOKE boot ok` marker and `smoke_dev_tools`' `test_smoke_marker` (AC7);
+  - the ledger (AC8, AC9), `docs/build.md` and the doc sweep (AC9).
+- **AC10:** the suite and `export.sh` are green (Debug Log), and every D14 red check failed at its named step. The laptop look is still to do (Task 12).
+- **Decisions made while implementing, beyond the story text:**
+  - **The failed test's browser console goes to stdout, not into an attachment.** Dev Notes (D7) say to attach it so `logs/web_smoke.log` shows it, but Playwright's line reporter cuts a text attachment at 300 characters (red check 5). The fixture now prints the whole console, framed by `--- browser console (N lines) ---` lines, to the test's stdout, which the line reporter writes in full under the test's title. `export.sh` strips every escape sequence from that log, not just colours, because the line reporter also moves the cursor around a test's stdout. `docs/build.md` and `component-inventory.md` say so.
+  - **The browser preflight reads Playwright's registry** (AC2 allowed this; Debug Log). The path goes through `playwright-core/lib/coreBundle`, an internal module, and holds while Playwright stays pinned at 1.65.1. `docs/build.md` says to recheck it when the pin moves. If the module moves, it fails safe: the `require` throws, so the preflight reports the headless shell as missing and builds nothing.
+  - **The release web smoke also asserts that no Log line appears** (`/^\[(save|room|input|clock|lurker|weaver|audio|ui)\] /`). That is AC7's "release builds print nothing", checked on the web. Log's category list is used rather than any leading `[`, because Chromium's GPU warnings start with `[.WebGL-…]`.
+  - **End line:** `== BUILD OK builds/<version>, web download <gzip MB> (gzip; raw <MB>), PCK files windows N / linux N / web N / web_debug N, <s> s`. `logs/summary.txt` repeats it, followed by exact bytes, the commit, the Godot version and each step's result.
+- **Ledger:**
+  - the 1.11 foreign-parameter item is closed as not triggered (AC8);
+  - new: "the Windows build is never booted on the server" → **Owner: Story 7.15**, which ships the final Windows build and boots it on Windows, or under wine on the server, before the tester round.
+- **Size headroom:** the web download is 10.3 MB of 30 MB. The engine's `index.wasm` is 10,084,297 bytes of that once gzipped, and the game's `index.pck` is 76,969, so content has about 19.7 MB of headroom.
+- **Needs a 5-minute look on the laptop** (Task 12). The build to look at is `builds/20261119-372cc32-dirty/`. The final `export.sh` run rebuilt it from this tree, and a rebuild after the commit gets the commit's sha.
 
 ### File List
+
+New:
+
+- `game/export_presets.cfg`
+- `game/tests/test_export_presets.gd`
+- `game/tests/test_export_presets.gd.uid`
+- `tools/export.sh` (executable)
+- `tools/pck_list.gd`
+- `tools/web_smoke/package.json`
+- `tools/web_smoke/package-lock.json`
+- `tools/web_smoke/serve.js`
+- `tools/web_smoke/playwright.config.js`
+- `tools/web_smoke/smoke.spec.js`
+- `docs/build.md`
+
+Modified:
+
+- `game/scripts/dev/dev_tools.gd`
+- `game/tests/smoke_dev_tools.gd`
+- `.gitignore`
+- `docs/index.md`
+- `docs/development-guide.md`
+- `docs/architecture.md`
+- `docs/source-tree-analysis.md`
+- `docs/component-inventory.md`
+- `docs/rooms.md`
+- `docs/perf.md`
+- `docs/project-overview.md`
+- `game/README.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/planning-artifacts/epics.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-13-export-pipeline-and-web-boot-smoke.md`
+
+Outside the repo (server setup, not committed): `~/.local/share/godot/export_templates/4.7.2.stable/web_nothreads_{release,debug}.zip`; `~/.cache/ms-playwright/chromium_headless_shell-1255/`; `tools/web_smoke/node_modules/` and `builds/` (both gitignored).
+
+## Change Log
+
+- 2026-11-19: Story 1.13 implemented (gds-dev-story):
+  - the four export presets and `test_export_presets`;
+  - `tools/export.sh`, `tools/pck_list.gd` and the Playwright web smoke (`tools/web_smoke/`);
+  - DevTools' `SMOKE boot ok` marker;
+  - the web templates installed by SHA-512;
+  - the 1.11 foreign-parameter item closed, and the Windows boot deferred to Story 7.15;
+  - `docs/build.md` and the doc sweep.
+  - Red check 5 found that Playwright's line reporter cuts attachments at 300 characters; the smoke now prints a failed test's browser console to stdout. Status → review.

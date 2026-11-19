@@ -105,7 +105,7 @@ Adding a room file adds its checks, with no edit to any test (Story 1.10, AR50).
 **Across files (every file, `rooms/dev/` included):**
 - room ids (base names) and `obj=` ids are unique;
 - every exit target is a room, and has the entry the crossing arrives at: a `down` exit needs the target to have an `up` exit, an `up` exit a `down` one;
-- a room outside `rooms/dev/` never exits into one (release exports exclude it, and it is never swept).
+- a room outside `rooms/dev/` never exits into one (the release presets exclude it, and it is never swept).
 
 **Every swept room** (outside `rooms/dev/`):
 - **spine falls** (`spine=true` only): no fall is over 19 rows, `Spec.LEDGE_FALL_MAX` (315 px: 1.5 s at the 210 px/s max fall, FR57): between consecutive safe rows; from the top (with an `up` exit) to the first safe row; from the last safe row to the floor (with a `down` exit). Safe rows are ledge rows (a solid inner cell, not a hazard, with **two** open, non-hazard cells above, since the body is 20 px tall) plus every row of a `cling=` stretch. A spine room with no safe row fails. The fall out of a `down` exit into a spine target counts as one fall: rows from the last safe row to the floor, plus the target's first safe row;
@@ -118,7 +118,9 @@ Plus, once per run: the tuned max fall can't stretch `Spec.LEDGE_FALL_MAX` past 
 
 **`smoke_bot.gd`** plays every `spine=true` room outside `rooms/dev/`, sorted by path, from its `up` entry (else `P`) down to its `down` exit: plain movement, Attack, a hop only when blocked, never Dash, all lurkers paused. It aims for the nearest crawler in a row below the last one it swung at, pogoes it, walks off a ledge at the edge nearest its next target, and slashes a walker on its floor within 24 px. Per room it must reach a chain of `Spec.BOT_MIN_CHAIN` (5; `m1_shaft`: 8), have chain 0 whenever its body crosses an exit (the World backstop never fires on its line), reach the `down` exit (or, with none, the bottom ledge), and be alive. A spine room with neither an `up` exit nor `P` is a named `FAIL` (nowhere to start). It prints a `bot <id>: frame …, best …` trace line.
 
-**`rooms/dev/`** holds `perf_worst.txt` (Story 1.12): the Old Mine at its worst for the `--perf` run ([perf.md](./perf.md)), 30 × 68 cells with 10 lurkers in wall stubs inside the play rect, 44 hoverers and 4 walkers, its centre columns 13–16 open top to bottom for the run's path. It is validated and counts for unique ids and links, but is never swept or botted, and it is not a level: the fairness rules don't apply. Release presets exclude `rooms/dev/*` (Story 1.13). Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
+**`rooms/dev/`** holds `perf_worst.txt` (Story 1.12): the Old Mine at its worst for the `--perf` run ([perf.md](./perf.md)), 30 × 68 cells with 10 lurkers in wall stubs inside the play rect, 44 hoverers and 4 walkers, its centre columns 13–16 open top to bottom for the run's path. It is validated and counts for unique ids and links, but is never swept or botted, and it is not a level: the fairness rules don't apply. The release presets exclude `rooms/dev/*`; only the `Web debug` preset keeps it (Story 1.13; `tools/export.sh` checks every PCK, [build.md](./build.md)). Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
+
+**Exports.** Every preset takes room files with the include filter `rooms/*.txt`: in Godot's export matcher `*` crosses `/`, so that is every `.txt` under `rooms/` at any depth (`rooms/**/*.txt` would skip a file placed directly in `rooms/`). A new room folder needs no preset edit; a new folder that must stay out of release goes in the release presets' exclude filter and in `tests/test_export_presets.gd`.
 
 ```bash
 cd game && ./run_tests.sh       # everything

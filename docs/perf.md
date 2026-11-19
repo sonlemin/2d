@@ -36,12 +36,14 @@ godot --path game -- --room=perf_worst --perf --glow=on
 
 In the editor: Debug → Customize Run Instances, with the args after `--` per instance. Never set Project Settings `editor/run/main_run_args` (it writes `project.godot`).
 
-**Web** (once Stories 1.13 and 1.14 have landed): the debug web build at the ×2 embed (960 × 540), in Chrome and Firefox with hardware acceleration on:
+**Web** (once Story 1.14 has landed too): the debug web build at the ×2 embed (960 × 540), in Chrome and Firefox with hardware acceleration on. Build it on the server with `tools/export.sh`, serve `builds/<version>/` with `serve.js` and open it on the laptop through an SSH tunnel ([build.md → Playing builds on the laptop](./build.md#playing-builds-on-the-laptop)):
 
 ```
-…/index.html?room=perf_worst&perf
-…/index.html?room=perf_worst&perf&glow=on
+http://localhost:8060/web_debug/index.html?room=perf_worst&perf
+http://localhost:8060/web_debug/index.html?room=perf_worst&perf&glow=on
 ```
+
+The server's web smoke runs on SwiftShader, so it says nothing about performance: only these laptop runs count.
 
 **HD 620-class machine:** the same two runs, if one is available. If none is, write "not available" in the results and say so in the 1.15 verdict.
 

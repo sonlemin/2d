@@ -281,7 +281,7 @@ AR50: `tests/smoke_rooms.gd` (replaces `smoke_shaft`) loads every `rooms/**/*.tx
 
 **Build, export, CI**
 
-AR51: Committed `game/export_presets.cfg`: Windows, Linux, Web (single-threaded), templates pinned to 4.7.2; include filter `rooms/**/*.txt`; release presets exclude `rooms/dev/*` and `tests/*`; a debug web preset for the full smoke (save/reload markers) and `perf_worst`. [E1]
+AR51: Committed `game/export_presets.cfg`: Windows, Linux, Web (single-threaded), templates pinned to 4.7.2; include filter `rooms/*.txt` (in Godot's export matcher `*` crosses `/`, so it takes every room at any depth; Story 1.13 D2); release presets exclude `rooms/dev/*`, `tests/*` and `scripts/dev/*`; a debug web preset for the full smoke (save/reload markers) and `perf_worst`. [E1]
 AR52: `tools/export.sh`: validate every room file and string key (any error stops the build) → headless export of the 3 targets → copy `OFL.txt` + `LICENSES/` → web download < 30 MB (plan B: custom web template with 3D disabled) → Playwright web smoke → `builds/<version>/` (gitignored). [E1, E7]
 AR53: `tools/web_smoke/` (outside `game/`; `package.json` with Playwright pinned; Node 24; headless Chromium): boot → click-to-play gate → game starts → write a save → reload → save persists; check the scale for a simulated DPR; pogo pitch (E3). Debug web exports print `SMOKE boot ok` / `SMOKE save ok`; release gets a boot-only check. Manual web smoke on the laptop at every epic end and engine upgrade. [E1]
 
@@ -1659,7 +1659,7 @@ So that every build I play on the laptop is known to boot.
 
 **Given** a committed `game/export_presets.cfg`
 **When** it is inspected
-**Then** it has Windows, Linux and Web (single-threaded) release presets plus a debug web preset; templates are pinned to 4.7.2; the include filter has `rooms/**/*.txt`; release presets exclude `rooms/dev/*`, `tests/*` and `scripts/dev/*`; the debug web preset includes `rooms/dev/perf_worst.txt` (Story 1.12); all built from Godot 4.7.2 with the Compatibility renderer (AR51, NFR7)
+**Then** it has Windows, Linux and Web (single-threaded) release presets plus a debug web preset; templates are pinned to 4.7.2; the include filter has `rooms/*.txt` (`*` crosses `/` in Godot's matcher, so every room at any depth; as built, Story 1.13 D2); release presets exclude `rooms/dev/*`, `tests/*` and `scripts/dev/*`; the debug web preset includes `rooms/dev/perf_worst.txt` (Story 1.12); all built from Godot 4.7.2 with the Compatibility renderer (AR51, NFR7)
 
 **Given** `tools/export.sh`
 **When** it runs on the server

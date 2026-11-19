@@ -45,7 +45,7 @@ brief: '_bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/b
 |---|---|---|
 | Godot editor + export templates | laptop and server | 4.7.2 stable (must match) |
 | Python 3 + Pillow | server | Pillow 12 (sprite pipeline; SFX pipeline from E3) |
-| Node.js + Playwright (Chromium headless) | server | Node 24; Playwright pinned in `tools/web_smoke/package.json` at setup |
+| Node.js + Playwright (Chromium headless) | server | Node 24; `@playwright/test` pinned to exactly 1.65.1 in `tools/web_smoke/package.json` (Story 1.13; headless shell revision 1255) |
 | xvfb (`xvfb-run`) | server | for `tests/screenshot.gd` |
 | Fusion Pixel Font 8px proportional (latin) | repo `game/fonts/` | GitHub release tag pinned at download (E1), with `OFL.txt` + `LICENSES/` |
 | git | both | — |
@@ -67,8 +67,8 @@ godot --version                                   # expect 4.7.2.stable
 python3 tools/build_sprites.py                    # sprites → game/art/
 godot --headless --path game --import             # re-import after pipeline runs
 (cd game && ./run_tests.sh)                       # expect: == ALL GREEN
-(cd tools/web_smoke && npm ci && npx playwright install chromium)   # once, after E1 adds it
-tools/export.sh                                   # after E1 adds presets + script
+(cd tools/web_smoke && npm ci && npx playwright install --only-shell --no-remove chromium)   # once (Story 1.13); --no-remove keeps other tools' browser revisions
+tools/export.sh                                   # expect: == BUILD OK builds/<yyyymmdd>-<sha7>, … (docs/build.md)
 ```
 
 ### First Steps
@@ -212,7 +212,9 @@ the test suite and exports on the dev server. Export templates must match 4.7.2.
 upgrade checklist passes. A minor upgrade (4.8+) is only *considered* at an epic boundary, never mid-epic.
 
 **Engine upgrade checklist (4.7.x):** update editor + export templates on laptop and server together →
-re-import → `run_tests.sh` green → web smoke check → commit changed `.import` files.
+re-import → `run_tests.sh` green → web smoke check → commit changed `.import` files. As built (Story 1.13),
+the full procedure is `docs/build.md` → Engine upgrade checklist: templates from the release's `.tpz`,
+checked against its SHA-512; the web smoke check is `tools/export.sh` green; then a manual web look on the laptop.
 Guarantee tests run on desktop headless; the web build is covered by the web smoke check.
 
 **Web smoke check** (two layers):
@@ -222,6 +224,10 @@ Guarantee tests run on desktop headless; the web build is covered by the web smo
   WebGL in software, so it says nothing about performance or feel.
 - **Manual (laptop browser, every epic end and every engine upgrade):** boot/gate, audio, save survives
   reload, DPR scale (×2 embed and fullscreen), gamepad connect/disconnect, 60 FPS feel.
+- **As built (Story 1.13):** `tools/web_smoke/` boots the `Web debug` and `Web` builds in headless Chromium
+  (Playwright 1.65.1, served by `serve.js` on 127.0.0.1): the engine banner, the shell's `#status` gone, no page
+  error and no `console.error`; the debug build must print `SMOKE boot ok` (also with `?room=perf_worst`), the
+  release build is boot-only. The gate (1.33), the DPR scale (1.14) and the save/reload (1.39) join it later.
 
 ### Project Initialization
 
@@ -286,7 +292,7 @@ Taken in dependency order in step 4:
 | 14 | Lighting | ≤ 6 `PointLight2D` on screen; small glows are unshaded sprites; engine glow off until the E1 perf scene passes on web | — | Lights × lit items is the cost driver at 480×270 |
 | 15 | Scripted moments | One-off scripts on shared primitives (Clock, input lock, camera hooks, audio cues); no sequence runner in M2 | — | Cheap now; consistent behaviour; revisit at Layer 2 |
 | 16 | Asset loading | Per-room load on transition (behind the cut); small assets preloaded; no threaded loading | — | Content is tiny; web export is single-threaded |
-| 17 | Build pipeline | Server builds all targets headless via `tools/export.sh`; laptop plays | Godot 4.7.2 templates; Playwright pinned at setup (latest found 1.64.1, unconfirmed); Node 24 on server | One reproducible build machine; runs the web smoke check |
+| 17 | Build pipeline | Server builds all targets headless via `tools/export.sh`; laptop plays | Godot 4.7.2 templates; `@playwright/test` 1.65.1, exact pin (Story 1.13); Node 24 on server | One reproducible build machine; runs the web smoke check |
 | 18 | UI font | Fusion Pixel Font 8px proportional (latin), OFL 1.1 | Pin the GitHub release tag at download (E1) | UX decision O1; licence files ship in every build |
 
 ### State Management
@@ -463,6 +469,12 @@ user://
 - Export presets (Windows, Linux, Web single-threaded) are committed. Export templates are pinned to 4.7.2 on the server.
 - `tools/export.sh`: headless `--export-release` for all three targets → copy `OFL.txt` + `LICENSES/` into each build → check the web download < 30 MB → run the Playwright web smoke check → `builds/<version>/`.
 - The laptop downloads or pulls builds to play. Manual web smoke check at each epic end.
+- **As built (Story 1.13; `docs/build.md`):**
+  - `game/export_presets.cfg` has four presets, called by name: `Windows`, `Linux`, `Web` (release) and `Web debug`. All use `all_resources` plus the include filter `rooms/*.txt` (in Godot's matcher `*` crosses `/`, so that is every room file at any depth). The release three exclude `rooms/dev/*, tests/*, scripts/dev/*`; `Web debug` excludes `tests/*` only, keeping `perf_worst` and DevTools. Web is single-threaded (`web_nothreads_*` templates); desktop PCKs sit beside the binary. `tests/test_export_presets.gd` pins all of it.
+  - `tools/export.sh` (no flags): preflight (Godot 4.7.2, the four templates, Node ≥ 24, Playwright 1.65.1 and its headless shell) → version → import → content (`smoke_rooms`; string keys from 1.17) → the four exports → PCK checks → size → Linux boot → web smoke → summary. Every Godot step runs under `timeout` and fails on a non-zero exit or any `ERROR:` / `SCRIPT ERROR` / `FAIL` line, because Godot exits 0 on some errors.
+  - **Release checks:** every PCK is listed with `tools/pck_list.gd` (the engine's own reader, `--main-pack`); a release PCK fails on any `res://rooms/dev/`, `res://tests/` or `res://scripts/dev/` path and must hold `m1_shaft.txt` and `world.gd`. The Linux release build runs headless for 5 s and must still be running (exit 124) with no error line: a release build prints parse and load errors but no runtime script errors, so this proves `world.gd` loads without `scripts/dev/`. The release web build gets the boot-only smoke; the debug web build is the runtime check. The Windows build is exported and PCK-checked but never booted on the server (ledger, Story 7.15).
+  - **Size:** the web download is the sum of each `web/` file's `gzip -9` size (what itch.io's CDN sends), under 30,000,000 bytes (NFR5; decided by sonlm 2026-11-19). 4.7.2's release folder is about 10 MB compressed, 40 MB raw, so plan B (a custom web template) is not needed.
+  - **Layout and version:** `builds/<yyyymmdd>-<sha7>[-dirty]/{windows,linux,web,web_debug,logs}`, the version computed before the export; the playtest records' "build version" is this string. A rebuild of the same version replaces its folder.
 
 ### Architecture Decision Records
 
@@ -618,7 +630,7 @@ func _on_exit_reached(target: StringName) -> void:
 | **Session settings** | `-- --set=brightness:0` sets any `Settings` key for this session only (typed by its default: int, float, bool `true`/`false`; repeatable) through `Game.override_setting()`; a session with any override writes no settings.json at all. Until Options (1.36) it is how brightness changes |
 | **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20) · 3: room exits, entries + persistent object ids · 4: FPS, `lights n/6, sprites m` (+ `over k`) from `BudgetLight.counts()` on `World.light_rect()` (what the budget counts, Story 1.12), wall-clock frame and worst-frame times, the perf run's progress and summary, active Clock requests |
 | **Log categories** | `-- --log=lurker,clock` (names from `Log.CATEGORIES`, any case) |
-| **Smoke markers** | debug web exports print console markers (`SMOKE boot ok`, `SMOKE save ok`) that the Playwright smoke check reads; the release web export gets a boot-only check |
+| **Smoke markers** | debug web exports print console markers (`SMOKE boot ok`, `SMOKE save ok`) that the Playwright smoke check reads; the release web export gets a boot-only check. As built (Story 1.13): DevTools prints `[room] SMOKE boot ok` (`Log.ROOM`) once, on World's first `room_entered` (one-shot), in real runs only (the current-scene gate the args use), so tests never print it; `SMOKE save ok` comes with 1.39 |
 | **Tests and bot** | `./run_tests.sh`, the reachability bot, `screenshot.gd` (unchanged) |
 
 **Args source:** `OS.get_cmdline_user_args()` on desktop; in web debug builds the URL query (`?room=s3_gate&chain=4`) through `JavaScriptBridge.eval("window.location.search")`, which returns null off the web, so there is no `OS.has_feature("web")` branch. Args apply only when World is the current scene (a real run); a test injects tokens through World's `child_entered_tree`, so every other test gets an inert DevTools. A bad arg is a `push_warning`, never an error: the game still starts (an unknown or invalid `--room` loads the default start room).
@@ -690,7 +702,7 @@ Rules nobody checks get broken quietly. These checks run in `./run_tests.sh`:
 pixel_art_game/
 ├── game/                              # Godot project root (res://)
 │   ├── project.godot                  # autoloads: Game, Audio (E3) — nothing else
-│   ├── export_presets.cfg             # Windows, Linux, Web; include filter rooms/**/*.txt
+│   ├── export_presets.cfg             # Windows, Linux, Web, Web debug; include filter rooms/*.txt (`*` crosses `/`); test_export_presets pins it
 │   ├── run_tests.sh                   # globs tests/test_*.gd + tests/smoke_*.gd, each run via tests/runner.tscn
 │   ├── scripts/
 │   │   ├── core/                      # session plumbing, no gameplay rules
@@ -797,8 +809,9 @@ pixel_art_game/
 │   ├── sprites/
 │   ├── build_sfx.py                   # E3; sfx/*.txt parameter files
 │   ├── sfx/
-│   ├── export.sh                      # validate content → export 3 targets → licences → size check → web smoke
-│   └── web_smoke/                     # Playwright (package.json, smoke.spec.js); outside game/ so Godot never scans node_modules
+│   ├── export.sh                      # validate content → export 3 targets (+ Web debug) → PCK checks → size check → Linux boot → web smoke (licences from 1.17)
+│   ├── pck_list.gd                    # lists a PCK through the engine's own reader (--main-pack); export.sh's release check
+│   └── web_smoke/                     # Playwright (package.json + lock, playwright.config.js, serve.js, smoke.spec.js); outside game/ so Godot never scans node_modules
 ├── builds/                            # export output (gitignored)
 ├── docs/                              # as-built docs; docs/rooms.md documents the room format + legend
 └── _bmad-output/                      # planning artefacts (GDD, UX, this document)
@@ -835,7 +848,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 | Strings | `text/strings.csv` | every player-facing string, including NPC lines (`NPC_SMITH_GREET_1`) and journal text (`JOURNAL_A_1_BODY`) written by the narrative pass |
 | Dev tools | `scripts/dev/` | debug-build-only entry args, overlays, the perf run (`perf_run.gd`), smoke markers |
 | Sprites / SFX pipelines | `tools/` → `game/art/`, `game/audio/sfx/` | text sources → build output |
-| Builds | `tools/export.sh`, `tools/web_smoke/` → `builds/` | validate, export, licences, size, smoke |
+| Builds | `tools/export.sh`, `tools/pck_list.gd`, `tools/web_smoke/` → `builds/` | validate, export, PCK checks, size, boot, smoke (licences from 1.17) |
 | Tests | `game/tests/` | unit, smoke, bot, lint, fixtures |
 
 ### Naming Conventions

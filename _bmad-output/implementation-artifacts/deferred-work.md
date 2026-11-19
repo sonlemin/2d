@@ -139,6 +139,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Foreign URL query parameters warn on every web load** — `game/scripts/dev/dev_tools.gd` `real_tokens()` turns the whole `window.location.search` into tokens, and AC2 makes each unknown one a `push_warning` listing the known args. A web debug build whose host or test harness adds its own query parameter (a cache-buster, an embed option) prints one `DevTools: unknown arg --<name>` per parameter on every load. Harmless (debug builds only), but it is noise in the Playwright log.
   → **Owner: Story 1.13** — it builds the web debug export and the Playwright `?room=` smoke; if either adds its own query parameter, apply only the `ARGS` keys from the URL and ignore the rest quietly, with a test.
+  → **Closed (Story 1.13): not triggered — the web smoke (tools/web_smoke/) passes only ARGS keys and fails on any "WARNING: DevTools:" line; Godot's shell and serve.js add no query parameters.**
 
 ## Deferred from: code review of 1-12-worst-case-performance-scene.md (2026-11-19)
 
@@ -155,3 +156,8 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
   sonlm on the laptop: "still a bit shaky but better". A possible fix: put the labels on a child of each predator, and place a line's far end by interpolating both ends by hand (the previous and current tick positions plus `Engine.get_physics_interpolation_fraction()`). That fix can only be checked on the laptop, not headless.
   → **Owner: Story 1.20** — it already reworks overlay 2 (sensing moves to `rules/sensing.gd`, and overlay 2 gains sense and stir rings for every `light_source`), so it can draw the new rings and lines the steady way from the start (sonlm, 2026-11-19: log it for 1.20).
+
+## Deferred from: dev of 1-13-export-pipeline-and-web-boot-smoke.md (2026-11-19)
+
+- **The Windows build is never booted on the server** — `tools/export.sh` exports it and checks its PCK (AC3), but the server has no Windows or wine to run it, so nothing proves the `.exe` starts. Its PCK comes from the same filters as Linux's: the Windows, Linux and web release PCKs of the 2026-11-19 build are byte-identical (99,492 bytes), and the Linux build boots and the web build passes its smoke.
+  → **Owner: Story 7.15** — it ships the final Windows build; boot it there on Windows (or under wine on the server) before the tester round.

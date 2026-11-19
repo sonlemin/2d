@@ -52,11 +52,13 @@ The repository holds the **M1 core-loop prototype**: one hand-built shaft with c
 - **Run:** open `game/` in Godot and press F5. A debug run takes DevTools args: `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0` (in the editor: Debug → Customize Run Instances, never `editor/run/main_run_args`).
 - **Test:** `cd game && ./run_tests.sh`
 - **Art:** `python3 tools/build_sprites.py`
+- **Build (server):** `tools/export.sh` validates the rooms, exports Windows, Linux, web and web debug to `builds/<yyyymmdd>-<sha7>/`, checks no release carries dev or test content, boots the Linux release and smoke-tests both web builds in headless Chromium ([build.md](./build.md))
 
 ## Documentation Map
 
 - [Architecture](./architecture.md) — including the gaps against the M2 design
 - [Component Inventory](./component-inventory.md)
 - [Source Tree Analysis](./source-tree-analysis.md)
+- [Builds and the Export Pipeline](./build.md)
 - [Development Guide](./development-guide.md)
 - [Index](./index.md)

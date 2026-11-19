@@ -3,7 +3,7 @@
 **Type:** monolith (one Godot game + an asset tool)
 **Primary Language:** GDScript
 **Architecture:** scene-tree composition with a pure-logic core
-**Last Updated:** 2026-11-19 (the light budget and the perf scene, Story 1.12; initial scan 2026-11-11, exhaustive)
+**Last Updated:** 2026-11-19 (the export pipeline and the web boot smoke, Story 1.13; initial scan 2026-11-11, exhaustive)
 
 ## Project Overview
 
@@ -16,7 +16,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - **Core rules:** `game/scripts/rules/chain_state.gd` (pure, unit-tested)
 - **Architecture pattern:** scene tree + node-free rules class + rooms as text files (`game/rooms/`, built by `RoomLoader`) + session state in pure objects held by the `Game` autoload
 - **Database / API:** none
-- **Deployment:** none yet (played from the editor); M2 targets Windows, Linux, web/itch.io
+- **Deployment:** builds come from the server with `tools/export.sh` (Windows, Linux, web; Story 1.13) and are played on the laptop; itch.io for web
 
 ## Generated Documentation
 
@@ -27,8 +27,9 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - [Development Guide](./development-guide.md) — run, test, edit art and levels, common tasks
 - [Rooms](./rooms.md) — the room file format, legend, validator errors and `Room` API
 - [Performance Measurement](./perf.md) — the CP1 perf procedure: `perf_worst`, `--perf`, `--glow`, what to record (Story 1.15 fills the results)
+- [Builds and the Export Pipeline](./build.md) — `tools/export.sh`, the presets, the PCK and boot checks, the web smoke, playing builds on the laptop, itch.io, the engine upgrade checklist
 
-Not generated (nothing to document): API contracts, data models, deployment guide, contribution guide, integration architecture.
+Not generated (nothing to document): API contracts, data models, contribution guide, integration architecture. Deployment is [build.md](./build.md).
 
 ## Existing Documentation
 
@@ -58,7 +59,7 @@ Not generated (nothing to document): API contracts, data models, deployment guid
 
 ### Prerequisites
 
-Godot 4.7 (Python 3 + Pillow only to rebuild art).
+Godot 4.7 (Python 3 + Pillow only to rebuild art). Builds, on the server only: the 4.7.2 export templates, Node 24 and Playwright ([build.md](./build.md)).
 
 ### Run
 
@@ -78,6 +79,12 @@ In the editor, set them in Debug → Customize Run Instances (per-instance argum
 cd game && ./run_tests.sh      # GODOT=/path/to/godot if not on PATH
 ```
 
+### Build
+
+```bash
+tools/export.sh                # on the server: validate content, export all targets, boot-check them
+```
+
 ### Rebuild Art
 
 ```bash
@@ -91,7 +98,7 @@ python3 tools/build_sprites.py
 - **New enemy or predator:** `component-inventory.md` (Crawler/Lurker) and `development-guide.md` → Common Tasks. Respect the layers, groups and the `monitorable` kill rule.
 - **Level work:** `rooms.md` (format, legend, validator) and `architecture.md` → Level Data. Edit `game/rooms/l1/m1_shaft.txt`; run `test_room_loader` and the smoke test's bot after changing it.
 - **M2 architecture** (`gds-game-architecture`): start from `architecture.md` → *Gaps against the M2 design*, the GDD and UX `EXPERIENCE.md`'s `[NOTE FOR ARCHITECTURE]` items.
-- **Build/deploy:** no config yet; see the GDD Platform-Specific Details.
+- **Build/deploy:** [build.md](./build.md): `game/export_presets.cfg` (pinned by `test_export_presets`), `tools/export.sh`, `tools/web_smoke/`. A new release exclusion goes in the presets and in that test.
 
 ---
 

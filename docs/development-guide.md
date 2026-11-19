@@ -9,7 +9,7 @@ Development is split across two machines:
 | Machine | Used for |
 |---|---|
 | **Laptop** (Godot editor with a display) | Playing builds (F5), feel tuning, editor work |
-| **Headless server** (SSH) | Headless tests, the sprite pipeline, git, docs |
+| **Headless server** (SSH) | Headless tests, the sprite pipeline, builds (`tools/export.sh`), git, docs |
 
 ## Prerequisites
 
@@ -18,8 +18,11 @@ Development is split across two machines:
 | Godot | 4.7.2 stable | Everything in `game/` |
 | Python 3 + Pillow | Pillow 12.1.1 | `tools/build_sprites.py` only |
 | `xvfb-run` (optional) | — | `tests/screenshot.gd` on the headless server |
+| Godot export templates | 4.7.2 stable (`linux_release`, `windows_release`, `web_nothreads_*`) | `tools/export.sh`, server only |
+| Node | 24.14 | `tools/web_smoke/` (the web boot smoke), server only |
+| `@playwright/test` + its headless Chromium shell | 1.65.1 (exact pin), shell revision 1255 | `tools/web_smoke/`, server only |
 
-No package manager, addons or environment variables are needed. Optional: set `GODOT=/path/to/godot` if `godot` is not on your PATH. `run_tests.sh` falls back to `~/.local/bin/godot`.
+The game itself needs no package manager, addons or environment variables. The web smoke's npm packages live in `tools/web_smoke/` (`npm ci`; setup in [build.md](./build.md)). Optional: set `GODOT=/path/to/godot` if `godot` is not on your PATH. `run_tests.sh` and `tools/export.sh` fall back to `~/.local/bin/godot`.
 
 ## Run the Game
 
@@ -29,7 +32,7 @@ Brightness keeps the level saved in `user://settings.json` unless the run passes
 
 ### DevTools (debug builds only)
 
-`World._ready()` adds `DevTools` (`scripts/dev/dev_tools.gd`) in its first statement: `if OS.is_debug_build(): add_child(load("res://scripts/dev/dev_tools.gd").new())`, a path string, never `preload`. From Story 1.13 the release presets exclude `scripts/dev/*`, so none of it ships (until then a release build simply never loads it); editor runs and debug exports have it. It builds its nodes in code (no `.tscn`), and in a run with no args it changes nothing.
+`World._ready()` adds `DevTools` (`scripts/dev/dev_tools.gd`) in its first statement: `if OS.is_debug_build(): add_child(load("res://scripts/dev/dev_tools.gd").new())`, a path string, never `preload`. The release presets exclude `scripts/dev/*`, so none of it ships (`tools/export.sh` checks every release PCK and boots the Linux one); editor runs and the `Web debug` export have it. In every real debug run it prints `[room] SMOKE boot ok` once, when World's first room is in (`room_entered`): the web smoke waits for that line. It builds its nodes in code (no `.tscn`), and in a run with no args it changes nothing.
 
 **Entry args** go after `--`:
 
@@ -77,6 +80,7 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.g
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd      # room validator, build, Room API and m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sweep.gd       # the pure room sweeps on inline grids
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_export_presets.gd  # the four export presets and their filters, through the exporter's own matcher over the real files
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_dev_args.gd         # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, mode 2's light marks, --glow/--perf, the perf run's path, stats and summary
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_fx.gd               # Fx's shared materials, built once; effects free themselves
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_light_budget.gd     # BudgetLight: the rule, apply() on nodes, the sprite fallback, the scene audit
@@ -85,7 +89,7 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd           # the M1 move checks on m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_world.gd           # World: tree, framing, state wiring, respawn without a reload, R16 loop
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_room_swap.gd       # room swaps on the test rooms in tests/rooms/swap/
-godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd       # DevTools in World: inert without args, the real command line, each arg and bad arg, the overlay modes, light count, Clock rows, no function key
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd       # DevTools in World: inert without args, the real command line, the SMOKE boot marker, each arg and bad arg, the overlay modes, light count, Clock rows, no function key
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_perf.gd            # the perf kit in World: --perf=3 in perf_worst holds the chain and the budget every tick, the summary; --glow, bad --perf, the view rect, m1_shaft unchanged
 ```
 
@@ -161,15 +165,17 @@ The level is `game/rooms/l1/m1_shaft.txt`: a header, `---`, then the grid (`#` w
 | Add an input action | `project.godot` `[input]` (Project Settings → Input Map) and `game/README.md` |
 | Add a DevTools arg | one `ARGS` row in `scripts/dev/dev_tools.gd` (`{help, apply, repeat}`) + its apply method + a pure static validator + `test_dev_args` cases (+ a `smoke_dev_tools` case when it touches the scene) |
 | Measure performance | [perf.md](./perf.md): `godot --path game -- --room=perf_worst --perf`, then with `--glow=on` |
+| Make a build | on the server, `tools/export.sh` (after `./run_tests.sh` for a build you will share); output in `builds/<version>/`; [build.md](./build.md) |
+| Exclude something from release | add it to the three release presets' `exclude_filter` in `game/export_presets.cfg` and to `RELEASE_EXCLUDES` in `tests/test_export_presets.gd`; `tools/export.sh`'s PCK check names the forbidden prefixes |
 
 After any rule change, update the matching GDD table. Note playtest-driven changes in `_bmad-output/implementation-artifacts/`.
 
 ## Build and Deploy
 
-No export presets or CI yet. M1 is played from the editor. The GDD targets Windows, Linux and web/itch.io (960×540 embed) for M2; see [Architecture → Gaps](./architecture.md#gaps-against-the-m2-design).
+Builds come from the server: `tools/export.sh` validates the rooms, exports `Windows`, `Linux`, `Web` and `Web debug` from the committed `game/export_presets.cfg`, checks every PCK for dev and test content, measures the web download (gzip, under 30 MB), boots the Linux release build and runs the web smoke (`tools/web_smoke/`, headless Chromium). The output is `builds/<yyyymmdd>-<sha7>[-dirty]/`. Setup, the step table, playing builds on the laptop (rsync, or the web build through an SSH tunnel), itch.io and the engine upgrade checklist are in [build.md](./build.md). There is no CI: the server runs it by hand.
 
 ## Git
 
 - Work happens on feature branches (`feat/m1-prototype` now); `main` is the PR base.
 - Planning commits use the `docs:` prefix (Conventional Commits style).
-- `game/.godot/` and `game/export/` are ignored. `.uid` and `.import` files are committed.
+- `game/.godot/`, `game/export/`, `/builds/` and the web smoke's `node_modules/`, `test-results/` and `playwright-report/` are ignored. `.uid` and `.import` files are committed, and so is `tools/web_smoke/package-lock.json`.

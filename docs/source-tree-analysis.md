@@ -1,10 +1,10 @@
 # The Unbroken Chain — Source Tree Analysis
 
-**Date:** 2026-11-11 · **Branch:** `feat/m1-prototype` · **Scan:** exhaustive
+**Date:** 2026-11-11 (updated through Story 1.13, 2026-11-19) · **Branch:** `feat/m1-prototype` · **Scan:** exhaustive
 
 ## Overview
 
-A single repository holding one Godot 4.7 game (`game/`), the Python sprite pipeline that produces its art (`tools/`), and BMAD planning output (`_bmad-output/`). The code is the **M1 core-loop prototype**: one hand-built shaft, two enemy types and the chain/light/embers loop.
+A single repository holding one Godot 4.7 game (`game/`), the tools around it (`tools/`: the Python sprite pipeline that produces its art, and the export pipeline with its web boot smoke), and BMAD planning output (`_bmad-output/`). The code is the **M1 core-loop prototype**: one hand-built shaft, two enemy types and the chain/light/embers loop.
 
 **Size:** 6 gameplay scripts (943 lines), 3 test scripts (502 lines), 4 scenes, 7 PNGs, 1 Python tool (99 lines) and 7 sprite text files.
 
@@ -14,6 +14,7 @@ A single repository holding one Godot 4.7 game (`game/`), the Python sprite pipe
 pixel_art_game/
 ├── game/                         # Godot 4.7 project root (open this folder in the editor)
 │   ├── project.godot             # ★ Config: main scene, 480×270 viewport, input map, physics layer names
+│   ├── export_presets.cfg        # The four export presets (Windows, Linux, Web, Web debug; Story 1.13), pinned by test_export_presets
 │   ├── README.md                 # Controls, loop rules and how to run tests (player-facing)
 │   ├── run_tests.sh              # ★ Test entry point: imports, then runs every tests/test_*.gd and tests/smoke_*.gd (glob)
 │   ├── rooms/
@@ -56,7 +57,7 @@ pixel_art_game/
 │   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
 │   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
-│   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; release presets (1.13) exclude it
+│   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; the release presets exclude it (export.sh checks)
 │   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --log, --set, --glow, --perf; ?… on web), the overlay key
 │   │   │   ├── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/light budget/frames/perf/Clock); no class_name
 │   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, stand-in lights, frame stats and summary (docs/perf.md); no class_name
@@ -72,6 +73,7 @@ pixel_art_game/
 │   │   ├── test_room_sweep.gd    # The pure room sweeps on inline grids (fires + near-miss per rule)
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
+│   │   ├── test_export_presets.gd # The export presets and their filters, through the exporter's own matcher (Story 1.13)
 │   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, --glow/--perf, perf stats
 │   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves
 │   │   ├── test_light_budget.gd  # BudgetLight: the rule, jitter, apply() on nodes, sprite fallback, scene audit
@@ -83,7 +85,7 @@ pixel_art_game/
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
-│   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, each arg, the overlay cycle, no F-key
+│   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, the SMOKE boot marker, each arg, the overlay cycle, no F-key
 │   │   ├── smoke_perf.gd         # The perf kit in world.tscn: --perf=3 in perf_worst, budget held every tick, the summary
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
@@ -93,12 +95,21 @@ pixel_art_game/
 │       ├── light.png             # 128×128 radial gradient used by every PointLight2D
 │       └── *.png.import          # Godot import settings (committed)
 │
-├── tools/                        # Asset pipeline (runs outside Godot)
+├── tools/                        # Run outside the game: never exported, never linted
 │   ├── build_sprites.py          # ★ Text pixel grids + palette → game/art/*.png (needs Pillow)
-│   └── sprites/
-│       ├── palette_edge.txt      # "Edge of the Abyss" palette: one `char #hex` per line
-│       └── player.txt crawler.txt lurker.txt lurker_eyes.txt slash.txt tile.txt
-│                                 # One char = one pixel; '.' = transparent
+│   ├── sprites/
+│   │   ├── palette_edge.txt      # "Edge of the Abyss" palette: one `char #hex` per line
+│   │   └── player.txt crawler.txt lurker.txt lurker_eyes.txt slash.txt tile.txt
+│   │                             # One char = one pixel; '.' = transparent
+│   ├── export.sh                 # ★ Builds every target into builds/<version>/ and checks each one (Story 1.13; docs/build.md)
+│   ├── pck_list.gd               # Lists a PCK's files through the engine's own reader (export.sh's release check)
+│   └── web_smoke/                # The web boot smoke: Playwright 1.65.1 (exact pin), Chromium headless
+│       ├── package.json  package-lock.json   # node_modules/ is ignored; npm ci
+│       ├── playwright.config.js  # Chromium only, serve.js as the webServer on 127.0.0.1:8061
+│       ├── serve.js              # Dependency-free static server for a build folder (also the laptop tunnel's, on 8060)
+│       └── smoke.spec.js         # Both web builds boot; the debug one prints SMOKE boot ok, also with ?room=perf_worst
+│
+├── builds/                       # tools/export.sh output, one folder per version (gitignored)
 │
 ├── docs/                         # Generated project documentation (this folder)
 │
@@ -119,7 +130,7 @@ pixel_art_game/
 └── .claude/                      # Claude Code skills for this repo — not game code
 ```
 
-★ = start here. Ignored by git: `game/.godot/` (import cache) and `game/export/`.
+★ = start here. Ignored by git: `game/.godot/` (import cache), `game/export/`, `/builds/` and the web smoke's `node_modules/`, `test-results/` and `playwright-report/`.
 
 ## Critical Directories
 
@@ -156,6 +167,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 | Tests | `game/run_tests.sh` → `tests/runner.tscn` → every `tests/test_*.gd`, then `tests/smoke_*.gd` |
 | Screenshots | `tests/screenshot.gd` (manual, needs a display or xvfb) |
 | Sprites | `python3 tools/build_sprites.py` (from the repo root) |
+| Builds (server) | `tools/export.sh` → `builds/<yyyymmdd>-<sha7>[-dirty]/`; the web smoke alone: `cd tools/web_smoke && BUILD_DIR=<abs build folder> npx playwright test` ([build.md](./build.md)) |
 
 ## File Organization Patterns
 
@@ -171,6 +183,8 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 | `game/project.godot` | Main scene, window/stretch, input actions, physics layer names, renderer, pixel snap |
 | `game/art/*.png.import` | Per-texture import settings |
 | `tools/sprites/palette_edge.txt` | The colour palette for the sprite pipeline |
-| `.gitignore` | Ignores `game/.godot/`, `game/export/`, BMAD loop caches, `__pycache__/` |
+| `game/export_presets.cfg` | The four export presets `tools/export.sh` calls by name (Story 1.13); `test_export_presets` pins them |
+| `tools/web_smoke/package.json` + `package-lock.json` | The web smoke's one dependency, `@playwright/test` pinned exactly; Node ≥ 24 |
+| `.gitignore` | Ignores `game/.godot/`, `game/export/`, `/builds/`, the web smoke's `node_modules/` and Playwright output, BMAD loop caches, `__pycache__/` |
 
-There is no `export_presets.cfg`, CI configuration, `.env` or localisation folder.
+There is no CI configuration, `.env` or localisation folder.
