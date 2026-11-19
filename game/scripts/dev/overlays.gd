@@ -7,9 +7,13 @@ extends Node
 ## sensing constants, the Room's exits), never a copied number. Two drawers, both under DevTools:
 ## - WorldMarks draws in world space on World's canvas. The Darkness CanvasModulate would dim it to
 ##   a tenth (probed: light_mask = 0 doesn't escape it), so it uses one cached unshaded material.
-##   It never moves, so it stays registered with the room tiles under physics interpolation; a mark
-##   at an actor sits at its tick position, up to one tick off the interpolated sprite (accepted).
-## - ScreenMarks draws in screen pixels on its own CanvasLayer above the UI, over the gutters.
+##   It never moves, so it stays registered with the room tiles under physics interpolation. A
+##   predator's label sits at its tick position, up to a tick of its travel off its interpolated
+##   sprite (at most 1.6 px at a hunt's 95 px/s; accepted).
+## - Mode 2's light marks ride on the player instead, on a child the engine interpolates with its
+##   sprite: at its tick position they shook while it fell (sonlm, laptop 2026-11-19).
+## - ScreenMarks draws in screen pixels on its own CanvasLayer above the UI, over the gutters. Mode
+##   1's play rect is here too: it moves with the camera, so in world space it shook while falling.
 ## Nothing pulses or blinks (NFR8), and no colour is the reserved amber or red (NFR9).
 
 const PerfRun := preload("perf_run.gd")
@@ -43,6 +47,7 @@ var perf: Node  ## perf_run.gd, set by DevTools for --perf; else null
 var readout := PackedStringArray()  ## mode 4's rows before the Clock rows; public for tests
 var clock_seen := {}  ## StringName -> {scale, ms}: every Clock request seen this frame or within the linger
 var clock_list: Array[Dictionary] = []  ## the readout's Clock rows at the latest rebuild: {id, scale, live}
+var player_marks: Node2D  ## mode 2's light marks, a child of the live player; else null. Public for tests
 
 var _world_marks: Node2D
 var _screen_marks: Node2D
@@ -87,6 +92,7 @@ func cycle() -> void:
 
 
 func _process(_delta: float) -> void:
+	_place_player_marks()
 	if mode == 0:
 		return
 	if mode == 4:
@@ -100,6 +106,8 @@ func _process(_delta: float) -> void:
 
 func _redraw() -> void:
 	_world_marks.queue_redraw()
+	if is_instance_valid(player_marks):
+		player_marks.queue_redraw()
 	_screen_marks.queue_redraw()
 
 
@@ -230,12 +238,6 @@ func _draw_world() -> void:
 	if not is_instance_valid(world):
 		return
 	match mode:
-		1:
-			var r := world.play_rect()
-			_world_marks.draw_rect(r, WHITE, false, 1.0)
-			_dashed_rect(_world_marks, r.grow(-Lurker.SCREEN_MARGIN), GREY)
-			_text(_world_marks, r.position + Vector2(4, 2), "play rect %d x %d" % [r.size.x, r.size.y], WHITE)
-			_text(_world_marks, r.position + Vector2(4, 12), "notice: %d px inside" % Lurker.SCREEN_MARGIN, GREY)
 		2:
 			_draw_light()
 		3:
@@ -263,37 +265,83 @@ static func light_marks(r: float) -> Dictionary:
 	return {radius = r, reach = r * Lurker.NOTICE_FACTOR, noticeable = r >= Lurker.NOTICE_MIN_RADIUS}
 
 
-## A light that can't be noticed has its reach ring drawn dashed and dim, which shows the 40 px
-## base light as safe.
+## Mode 2 in world space: each predator's state beside it. The player's marks are drawn on the
+## player itself (_draw_player_marks()).
 func _draw_light() -> void:
-	var player := get_tree().get_first_node_in_group("player") as Player
-	var alive := is_instance_valid(player) and not player.is_dead
-	if alive:
-		var c := player.global_position
-		var m := light_marks(player.light_radius())
-		_world_marks.draw_arc(c, m.radius, 0.0, TAU, 48, CYAN, 1.0)
-		# Labels by the player, whom the camera keeps near the middle: at a ring's edge they would
-		# fall under a gutter once the light grows.
-		_text(_world_marks, c + Vector2(8, 4), "light %d px" % m.radius, CYAN)
-		if not m.noticeable:
-			_dashed_circle(_world_marks, c, m.reach, DIM)
-			_text(_world_marks, c + Vector2(8, 14), "reach %d px: below notice (< %d px)" % [m.reach, Lurker.NOTICE_MIN_RADIUS], DIM)
-		else:
-			_world_marks.draw_arc(c, m.reach, 0.0, TAU, 64, CYAN, 1.0)
-			_text(_world_marks, c + Vector2(8, 14), "notice reach %d px" % m.reach, CYAN)
 	for p: Node in get_tree().get_nodes_in_group("predator"):
 		if not is_instance_valid(p) or not ("state" in p) or not p is Node2D:
 			continue
 		var pos: Vector2 = p.global_position
 		var state_name: String = Lurker.State.keys()[p.state] if p is Lurker else str(p.state)
 		_beside(pos.x - 8, pos.x + 8, pos.y - 10, state_name, MAGENTA)  # lurkers sit in the walls, by the gutters
-		if alive and p.has_method(&"senses") and p.senses(player):
-			_world_marks.draw_line(pos, player.global_position, MAGENTA, 1.0)
+
+
+## Mode 2's marks ride on the live player: a child at its origin, which the engine interpolates
+## with its sprite. At the player's tick position they trailed and shook against the sprite while
+## it fell (sonlm, laptop 2026-11-19). The Player node never mirrors (only its sprite flips), so
+## the labels read the right way round. After a respawn the old marks go with the old player and
+## the next frame puts new ones on; outside mode 2 there are none.
+func _place_player_marks() -> void:
+	var player: Player = (get_tree().get_first_node_in_group("player") as Player) if mode == 2 else null
+	if is_instance_valid(player_marks) and player_marks.get_parent() == player:
+		return
+	if is_instance_valid(player_marks):
+		player_marks.queue_free()
+	player_marks = null
+	if player == null:
+		return
+	player_marks = Node2D.new()
+	player_marks.name = "DevLightMarks"
+	player_marks.z_index = 100
+	player_marks.material = unshaded_material()  # must read under the darkness, like WorldMarks
+	# Bound to its own node: a draw already queued on old marks runs after the field moved on.
+	player_marks.draw.connect(_draw_player_marks.bind(player_marks))
+	player.add_child(player_marks)
+
+
+## In the player's own space (the origin is the player). A light that can't be noticed has its
+## reach ring drawn dashed and dim, which shows the 40 px base light as safe. A sense line's
+## player end is exact; its far end is the predator's tick offset, so it can sit up to a tick of
+## their relative travel off the predator's sprite.
+func _draw_player_marks(marks: Node2D) -> void:
+	var player := marks.get_parent() as Player
+	if not is_instance_valid(player) or player.is_dead:
+		return
+	var m := light_marks(player.light_radius())
+	marks.draw_arc(Vector2.ZERO, m.radius, 0.0, TAU, 48, CYAN, 1.0)
+	# Labels by the player, whom the camera keeps near the middle: at a ring's edge they would
+	# fall under a gutter once the light grows.
+	_text(marks, Vector2(8, 4), "light %d px" % m.radius, CYAN)
+	if not m.noticeable:
+		_dashed_circle(marks, Vector2.ZERO, m.reach, DIM)
+		_text(marks, Vector2(8, 14), "reach %d px: below notice (< %d px)" % [m.reach, Lurker.NOTICE_MIN_RADIUS], DIM)
+	else:
+		marks.draw_arc(Vector2.ZERO, m.reach, 0.0, TAU, 64, CYAN, 1.0)
+		_text(marks, Vector2(8, 14), "notice reach %d px" % m.reach, CYAN)
+	for p: Node in get_tree().get_nodes_in_group("predator"):
+		if is_instance_valid(p) and p is Node2D and p.has_method(&"senses") and p.senses(player):
+			marks.draw_line(Vector2.ZERO, marks.to_local((p as Node2D).global_position), MAGENTA, 1.0)
+
+
+## Mode 1's play rect in screen pixels: World.play_rect() placed by its offset inside the view of
+## the same tick (World.light_rect()), so it is the game's own rect yet sits still on screen. Never
+## drawn in world space: the engine draws the view interpolated between physics ticks while
+## play_rect() moves only on ticks, so a world-space frame shook by up to a tick of camera travel
+## while falling (sonlm, laptop 2026-11-19; probed: 4-12 px at 400 px/s). Public for tests.
+func play_rect_on_screen() -> Rect2:
+	var play := world.play_rect()
+	return Rect2(play.position - world.light_rect().position, play.size)
 
 
 func _draw_screen() -> void:
 	match mode:
 		1:
+			if is_instance_valid(world):
+				var r := play_rect_on_screen()
+				_screen_marks.draw_rect(r, WHITE, false, 1.0)
+				_dashed_rect(_screen_marks, r.grow(-Lurker.SCREEN_MARGIN), GREY)
+				_text(_screen_marks, r.position + Vector2(4, 2), "play rect %d x %d" % [r.size.x, r.size.y], WHITE)
+				_text(_screen_marks, r.position + Vector2(4, 12), "notice: %d px inside" % Lurker.SCREEN_MARGIN, GREY)
 			var h := _screen_marks.get_viewport_rect().size.y
 			var g := CameraRig.GUTTER_WIDTH
 			for x in [0.0, g + CameraRig.PLAY_WIDTH]:

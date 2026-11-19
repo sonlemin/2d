@@ -94,7 +94,9 @@ func run() -> void:
 	await test_log()
 	await test_set()
 	await test_overlay_cycle()
+	await test_overlay_play_rect_steady()
 	await test_overlay_light()
+	await test_overlay_light_respawn()
 	await test_clock_rows()
 	await test_lights()
 	await test_room_items()
@@ -549,6 +551,36 @@ func _on_draw(which: String) -> void:
 	_draws[which] = _draws.get(which, 0) + 1
 
 
+## Mode 1 during a fall (sonlm, laptop 2026-11-19: the play rect shook while falling). The engine
+## draws the view interpolated between physics ticks, while play_rect() moves only on ticks, so a
+## frame drawn in world space was off by up to a tick of camera travel, a different amount every
+## frame. On screen the play rect must sit still: sampled every rendered frame, several per tick,
+## while the player falls down m1_shaft's open centre (x 176 is clear down to row 85).
+func test_overlay_play_rect_steady() -> void:
+	_build([])
+	await frames(2)
+	var ov := _dev().overlays
+	await _press_overlay()
+	var p := _spawned[0]
+	p.global_position = Vector2(176, 120)
+	p.reset_physics_interpolation()  # AR6: a teleport
+	var want := Rect2(Vector2(CameraRig.GUTTER_WIDTH, 0.0), Vector2(CameraRig.PLAY_WIDTH, 270.0))
+	var view_y := _world.light_rect().position.y
+	var start_tick := Engine.get_physics_frames()
+	var samples := 0
+	var off: Array[Rect2] = []
+	while Engine.get_physics_frames() - start_tick < 30 and samples < 100_000:
+		await get_tree().process_frame
+		samples += 1
+		var r: Rect2 = ov.play_rect_on_screen()
+		if r != want and off.size() < 3:
+			off.append(r)
+	var fell := _world.light_rect().position.y - view_y
+	check(ov.mode == 1 and fell > 30.0 and samples > 30, "(premise) mode 1 while the camera falls %.0f px, %d frames over 30 ticks" % [fell, samples])
+	check(off.is_empty(), "mode 1's play rect sits still on screen at %s every frame of the fall (got %s)" % [want, off])
+	await _teardown()
+
+
 ## AC7 mode 2 past the notice radius, beside a lurker that senses the player (the cycle test's
 ## chain-0 spawn reaches only the dashed branch): the solid reach ring, the label and the sense line
 ## draw with no error, and light_marks() agrees with the lurker's own decision. The player is held
@@ -580,8 +612,45 @@ func test_overlay_light() -> void:
 	(ov.get_node("WorldMarks") as Node2D).draw.connect(_on_draw.bind("world"))
 	ov.mode = 2
 	await get_tree().process_frame
+	# sonlm, laptop 2026-11-19: overlay marks drawn in world space at the player's tick position
+	# trail and shake against its interpolated sprite while it falls. On a child of the player, the
+	# engine interpolates them with it.
+	var marks: Node2D = ov.player_marks
+	check(is_instance_valid(marks) and marks.get_parent() == p and marks.position == Vector2.ZERO and marks.material == Overlays.unshaded_material(),
+			"mode 2's light marks ride on the player: a child at its origin, unshaded (got %s)" % [marks])
+	if is_instance_valid(marks):
+		marks.draw.connect(_on_draw.bind("player"))
 	await get_tree().process_frame
-	check(_draws.get("world", 0) > 0, "mode 2 draws the notice-reach ring and the sense line, with no error")
+	await get_tree().process_frame
+	check(_draws.get("player", 0) > 0 and _draws.get("world", 0) > 0,
+			"mode 2 draws the notice-reach ring and the sense line on the player's marks and the lurker labels in the world, with no error (got %s)" % [_draws])
+	ov.mode = 3
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(not is_instance_valid(marks) and ov.player_marks == null, "...and leaving mode 2 takes the player's marks away")
+	await _teardown()
+
+
+## Mode 2 across a death: the marks go with the old player, and the next frame puts new ones on
+## the respawned player.
+func test_overlay_light_respawn() -> void:
+	_build([])
+	await frames(2)
+	var ov := _dev().overlays
+	ov.mode = 2
+	await get_tree().process_frame  # resumes before this frame's _process: the marks come in it
+	await get_tree().process_frame
+	var first: Node2D = ov.player_marks
+	check(is_instance_valid(first) and first.get_parent() == _spawned[0], "(premise) mode 2's marks ride on the first player")
+	_spawned[0].die()
+	var start_ms := Time.get_ticks_msec()
+	while _spawned.size() < 2 and Time.get_ticks_msec() - start_ms < 3000:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var q: Player = _spawned[1] if _spawned.size() == 2 else null
+	check(q != null and not is_instance_valid(first) and is_instance_valid(ov.player_marks) and ov.player_marks.get_parent() == q,
+			"after a death the marks are gone with the old player and ride on the respawned one")
 	await _teardown()
 
 
