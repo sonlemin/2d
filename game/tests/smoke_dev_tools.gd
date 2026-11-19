@@ -1,11 +1,12 @@
 extends Node
 ## DevTools in a real World (Story 1.11 D14): inert without args, the real command line, each
 ## entry arg applied and each bad one warned, the overlay key and its four modes, the light count,
-## the Clock rows and "no function key".
+## the Clock rows and "no function key"; and the boot marker the web smoke waits for (Story 1.13).
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd
 ## A test World is never the current scene, so DevTools never reads the command line here: each
 ## case sets its tokens from World's child_entered_tree, which fires before DevTools' _ready (D3).
-## test_real_tokens alone makes its World the current scene, to run the real path.
+## test_real_tokens and test_smoke_marker alone make their World the current scene, to run the
+## real path.
 ## One World at a time (two would put two nodes in groups world and player); each case starts with
 ## the store on TMP (reset_for_tests() points it home) and ends in _teardown().
 ## UX numbers are written out (the 60 px gutter is CameraRig's, checked in smoke_world).
@@ -25,13 +26,19 @@ var _banked: Array[int] = []
 var _draws := {}  # drawer name -> draw count
 var _warnings := Warnings.new()
 var _stand_in: Player  # test_chain_mid_tick_spawn's second player, added inside a tick
+var _room_at_marker: Array[bool] = []  # test_smoke_marker: whether World had its room as each marker printed
 
 
 ## Collects DevTools' push_warning texts (they arrive as `code`, probed on 4.7.2, as test_state's
-## WarningCounter reads them). The runner ignores warnings; this is how the test sees them.
+## WarningCounter reads them), and the `[room] SMOKE …` marker lines (Story 1.13 D9). The runner
+## ignores warnings and `[category]` lines; this is how the test sees them.
 class Warnings extends Logger:
 	var _lock := Mutex.new()
 	var _got: Array[String] = []
+	var _markers: Array[String] = []
+	## Called as each marker prints, on the printing thread (the main thread: Log.info), so the
+	## test can look at World at that instant. Must not print.
+	var at_marker := Callable()
 
 	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
 			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
@@ -41,11 +48,30 @@ class Warnings extends Logger:
 		_got.append(code)
 		_lock.unlock()
 
+	## The prefix, not "contains SMOKE": this logger also sees the test's own `ok …` lines and its
+	## final `SMOKE PASS`.
+	func _log_message(message: String, _error: bool) -> void:
+		if not message.begins_with("[room] SMOKE "):
+			return
+		if at_marker.is_valid():
+			at_marker.call()
+		_lock.lock()
+		_markers.append(message.trim_suffix("\n"))
+		_lock.unlock()
+
 	## The warnings since the last take().
 	func take() -> Array[String]:
 		_lock.lock()
 		var out := _got.duplicate()
 		_got.clear()
+		_lock.unlock()
+		return out
+
+	## The marker lines since the last take_markers().
+	func take_markers() -> Array[String]:
+		_lock.lock()
+		var out := _markers.duplicate()
+		_markers.clear()
 		_lock.unlock()
 		return out
 
@@ -84,6 +110,7 @@ func run() -> void:
 	OS.add_logger(_warnings)
 	await test_no_tokens()
 	await test_real_tokens()
+	await test_smoke_marker()
 	await test_room()
 	await test_bad_room()
 	await test_bad_args()
@@ -228,6 +255,7 @@ func _subtree(root: Node) -> Array[String]:
 ## test's own path, which isn't a `--` arg, so nothing applies. This World is made the current scene
 ## from child_entered_tree, before DevTools' _ready, as it is in a real run.
 func test_real_tokens() -> void:
+	_warnings.take_markers()
 	var user_args := OS.get_cmdline_user_args()
 	var got := DevTools.real_tokens()
 	check(got == user_args and not user_args.is_empty(), "off the web, real_tokens() is the command line after -- (got %s)" % [got])
@@ -241,12 +269,61 @@ func test_real_tokens() -> void:
 	var dev := _dev()
 	check(dev != null and dev.tokens == user_args, "a World that is the current scene reads them itself (got %s)" % [dev.tokens if dev else "no DevTools"])
 	check(_room().id == &"m1_shaft" and _warnings.take().is_empty(), "...and the runner's own args change nothing, with no warning")
+	var markers := _warnings.take_markers()
+	check(markers == (["[room] SMOKE boot ok"] as Array[String]), "...and, as a real run, prints the boot marker once (got %s)" % [markers])
 	await _teardown()
 
 
 func _make_current(node: Node) -> void:
 	if node is DevTools:
 		get_tree().current_scene = _world
+
+
+## AC7 (Story 1.13 D9): the web smoke's "the game booted" line. A real run prints
+## `[room] SMOKE boot ok` once, on World's first room_entered, with the room built and the player
+## in; a test World prints none (not the current scene, like the args), and a respawn's rebuild
+## of the room prints no second one.
+func test_smoke_marker() -> void:
+	_warnings.take_markers()
+	_build([])
+	await frames(2)
+	var markers := _warnings.take_markers()
+	check(_room() != null and markers.is_empty(), "a test World (not the current scene) prints no SMOKE marker (got %s)" % [markers])
+	await _teardown()
+
+	var runner := get_tree().current_scene
+	Game.store.dir = TMP
+	_spawned.clear()
+	_room_at_marker.clear()
+	_warnings.at_marker = _note_marker
+	_world = WorldScene.instantiate()
+	_world.child_entered_tree.connect(_make_current)
+	_world.player_spawned.connect(_on_spawned)  # before add_child: the first spawn is inside it
+	get_tree().root.add_child(_world)
+	get_tree().current_scene = runner
+	markers = _warnings.take_markers()
+	check(markers == (["[room] SMOKE boot ok"] as Array[String]),
+			"a real-run World prints exactly one `[room] SMOKE boot ok`, inside its _ready (got %s)" % [markers])
+	check(_room_at_marker == ([true] as Array[bool]), "...after its first room is built and the player spawned (got %s)" % [_room_at_marker])
+	if _spawned.is_empty():
+		_warnings.at_marker = Callable()
+		await _teardown()
+		return
+	_spawned[0].die()
+	for i in int((World.RESPAWN_DELAY + 1.0) * Engine.physics_ticks_per_second):
+		if _spawned.size() > 1:
+			break
+		await frames(1)
+	markers = _warnings.take_markers()
+	check(_spawned.size() == 2 and markers.is_empty(),
+			"...and a respawn, which rebuilds the room and emits room_entered again, prints no second marker (spawns %d, got %s)" % [_spawned.size(), markers])
+	_warnings.at_marker = Callable()
+	await _teardown()
+
+
+## Runs inside the marker's print (Warnings.at_marker): never print here.
+func _note_marker() -> void:
+	_room_at_marker.append(is_instance_valid(_world) and _room() != null and not _spawned.is_empty())
 
 
 ## AC3: --room= with a P starts there; without one it starts at the up entry, falling; a death

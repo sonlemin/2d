@@ -66,6 +66,10 @@ func _ready() -> void:
 	assert(_world != null, "DevTools: only World adds DevTools")
 	if get_tree().current_scene == _world:
 		tokens = real_tokens()
+		# AR53 (Story 1.13 D9): the web smoke's "booted" line. This node is World's first child, so
+		# the connection is made before World builds its first room; one-shot, so a respawn's
+		# rebuild prints no second line. A method, not a lambda: it drops with this node.
+		_world.room_entered.connect(_on_first_room, CONNECT_ONE_SHOT)
 	overlays = Overlays.new()
 	overlays.name = "Overlays"
 	overlays.world = _world
@@ -405,6 +409,14 @@ func _apply_perf(values: Array[String]) -> String:
 func _on_player_spawned(player: Player) -> void:
 	_armed = player
 	_armed_frame = Engine.get_physics_frames()
+
+
+## D9: World emits room_entered after the room is built and the player spawned, so a broken room
+## or player script means no marker (or a SCRIPT ERROR first). The room category, like _apply()'s
+## summary: AR55's category list is fixed (no DEV). Release builds print nothing: DevTools is
+## absent there and Log is silent.
+func _on_first_room(_id: StringName) -> void:
+	Log.info(Log.ROOM, "SMOKE boot ok")
 
 
 ## The runner tolerates warnings; an error or an assert would fail it and stop a real run.

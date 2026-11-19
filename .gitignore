@@ -9,3 +9,9 @@ __pycache__/
 game/.godot/
 game/export/
 *.tmp
+# Builds from tools/export.sh (Story 1.13): only the repo-root output folder
+/builds/
+# The web smoke's npm install and Playwright output (tools/web_smoke/package-lock.json is committed)
+tools/web_smoke/node_modules/
+tools/web_smoke/test-results/
+tools/web_smoke/playwright-report/
