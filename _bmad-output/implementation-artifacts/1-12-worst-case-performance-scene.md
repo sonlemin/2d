@@ -4,7 +4,7 @@ baseline_commit: cc53560efa6177a3401b60433ebd9c3ab4451cea
 
 # Story 1.12: Worst-case performance scene
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -157,6 +157,40 @@ so that the light budget and bloom are decided on data before any art depends on
     - Cycle the overlays to mode 4 with the backquote key.
     - Watch the lurker glows turn into sprites past 6 lights, and read the summary.
     - The measurements themselves are 1.15's.
+
+### Review Findings
+
+Code review 2026-11-19 (`cc53560..25da8d4`): three reviewer layers (blind, edge case, acceptance auditor) on Opus 5.5, each finding then checked against the code. 31 raw → 21 after merging duplicates and grouping the doc drift; 9 dismissed, 12 kept (one later disproved by a probe, below). The auditor found no AC violated. Red checks, each run in a scratch copy of `game/` and each failing as intended, except R1 (see its finding):
+  - R2: `_on_banked` counts nothing → `test_breaks` fails 2.
+  - R3: `_check_path` never warns → `test_blocked_path` fails 1.
+  - R4: no wrap → `test_dev_args` fails 2 (rows 92, 76 and 107 characters).
+  - R5: spawn 16 px off the `P` → `test_room_alone` fails 1.
+  - R6: `rank` set after `add_child` → `Assertion failed`.
+  - R7: an owner relights a demoted GLOW → `Assertion failed`, and counts show lit 7 with sprites 2: light and sprite both drawn.
+  - R8: a leftover time scale of 0.5 → `test_fx` fails with the old real-time timer and passes with the scaled one.
+
+  After the patches: `== ALL GREEN (20 tests)`, 1255 ok.
+
+- [x] [Review][Decision] The budget has no hysteresis at the view edge — `choose()` leaves an off-screen light's own state alone, but an ALWAYS or CACHE light that crosses `light_rect()`'s edge still adds or frees a slot. While the budget is full, a GLOW light swaps light ↔ sprite on every crossing. A flare stuck near the edge, with the view bobbing to the pogo, could swap several times a second (NFR8: ≤ 3 flashes/s). Today only the perf stand-ins can be there, and they never cross. Options: defer to 1.23 (the first real flare), add hysteresis now (a margin on `on_screen` for a light already counted), or dismiss. **sonlm (2026-11-19): defer to Story 1.23** — the first real flare; ledger item with its owner.
+- [x] [Review][Defer] The light budget has no hysteresis at the view edge [game/scripts/core/budget_light.gd:101] — deferred to Story 1.23: unreachable until a real flare (1.23) or cache (1.22) can sit at the edge
+- [x] [Review][Patch] On a respawn during `--perf`, `_place(0)` moves the last life's stand-ins after World has taken their room out of the tree (`set_global_position` reads an out-of-tree parent's transform, which prints an engine `ERROR:`). Clear `stand_ins` first [game/scripts/dev/perf_run.gd:78] — **not a bug, no code change:** a probe on 4.7.2 shows `global_position` under an out-of-tree parent computes from the detached chain with no error, and red check R1 (the clear removed) stays green. The old stand-ins get one harmless move before their room frees them. Kept `smoke_perf`'s `test_death_mid_run`: the death path (the `deaths` count, retaking the new player, new stand-ins in the rebuilt room) had no test
+- [x] [Review][Patch] `apply()` ends with a full `counts()` pass (every `texture_rect()` again, plus a Dictionary) that `LightBudget` throws away every tick. D5's "no allocation beyond the group array" also overstates: there is one Dictionary per light. Make `apply()` return nothing and have callers call `counts()`; correct the cost note in the Dev Agent Record [game/scripts/core/budget_light.gd:149]
+- [x] [Review][Patch] Nothing checks "only the budget writes `enabled`", and `apply()` compares only `demoted`: an owner that relights a demoted light draws both light and sprite, and nothing counts it. Assert `enabled == not demoted` in `apply()` [game/scripts/core/budget_light.gd:138]
+- [x] [Review][Patch] A `rank` set after `_ready()` leaves a CACHE or GLOW light without its fallback sprite, so a demotion makes it vanish. Assert in a `rank` setter that the node is not ready yet [game/scripts/core/budget_light.gd:17]
+- [x] [Review][Patch] Overlay 4's summary rows can run past 480 px. A `; ` part longer than `SUMMARY_ROW_CHARS` is never split, and the last row takes the rest. A Chrome web build's adapter name ("ANGLE (Intel, Intel(R) UHD Graphics 620 … Direct3D11 vs_5_0 ps_5_0, D3D11)") makes row 3 about 110 characters. Wrap overlong rows at a space, and test with that string [game/scripts/dev/overlays.gd:176]
+- [x] [Review][Patch] A hidden browser tab or a minimised window stops frames mid-run, and the next frame spans the gap (no focus-loss pause exists yet). That gives one giant frame, a bogus worst time, and maybe an early end. Say so in the procedure [docs/perf.md]
+- [x] [Review][Patch] The path warning (`_check_path`) and the `breaks` counter never fire in a test. Run `--perf=1` on m1_shaft (its middle ledge blocks the path) for the warning, and break the chain mid-run for `breaks == 1` [game/tests/smoke_perf.gd]
+- [x] [Review][Patch] `test_room_alone` checks neither AC1's "at its `P`" nor "at chain 0" [game/tests/smoke_perf.gd:256]
+- [x] [Review][Patch] `test_fx`'s sparks timer ignores the time scale "so a time scale left by another test can't stretch it", but the particles' lifetime runs on game time, so a leftover time scale below 1 would fail the test. Use a scaled timer and fix the comment [game/tests/test_fx.gd:45]
+- [x] [Review][Patch] project-context.md's predator rule still says "on screen" *always* means `play_rect()`, never the viewport. The budget's whole-view rect is the exception, recorded only in Performance Rules. Point to it [_bmad-output/project-context.md:43]
+- [x] [Review][Patch] Doc drift:
+  - component-inventory.md calls DevTools the "last child of `World`" (`:195`), and its `spec.gd` row omits `LIGHTS_ON_SCREEN_MAX` (`:287`).
+  - source-tree-analysis.md names only `Game` and `overlays.gd` as lacking a `class_name` (`:128`).
+  - architecture.md says LightBudget is added in debug builds, as the statement after DevTools (`:121`).
+  - The 1.11 ledger closure says the path "never touches a floor", which is true of `perf_worst` only.
+  - The `lights 3/6` readout check (D12 said `lights 1/6`) is missing from the deviations.
+
+  [docs/component-inventory.md:195]
 
 ## Dev Notes
 
@@ -1090,7 +1124,9 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-19.
 - **Deviations from the Dev Notes** (none changes an AC):
   - `BudgetLight` processes only while demoted (`set_process(on and sprite)` in `set_demoted()`), not every frame for every light; `set_demoted()` syncs the sprite at once, so the light and its sprite always swap in the same call.
   - `PerfRun`'s held chain is `hold_chain` (D1 sketched `chain`); it adds `elapsed_s()` for overlay 4's progress row; the stand-ins are named `PerfFlare` / `PerfCache`. A paused frame is skipped and left out of the run's time (D1 didn't say). The path check reads the player's `Body` shape (10 × 20 at +2 px) for the columns and rows it tests.
-  - Overlay 4 splits the summary with a pure `summary_rows()`: parts at `; `, joined greedily up to `SUMMARY_ROW_CHARS` (90), at most 3 rows, the last taking the rest. The D1 example gives 3 rows, each ≤ 90 characters.
+  - Overlay 4 splits the summary with a pure `summary_rows()`: parts at `; `, joined greedily up to `SUMMARY_ROW_CHARS` (90), at most 3 rows, the last taking the rest. The D1 example gives 3 rows, each ≤ 90 characters. (Code review: a row still over 90 characters now wraps at a space, for a web adapter name.)
+  - `smoke_dev_tools`' readout check expects `lights 3/6`, not D12's `lights 1/6`: the case adds a code-built light by the player and one under a gutter before it reads the row (recorded by the code review).
+  - D5's cost note ("no allocation beyond the group array") overstates. Each tick, `apply()` builds one entry Dictionary per wanting light, plus the sort's arrays: about 13 entries in `perf_worst`. The code review removed its redundant `counts()` pass, so `apply()` now returns nothing.
   - Tests beyond D12: `test_light_budget` also checks `counts()` skips a raw `PointLight2D`, the scene audit's premise uses named sentinels (player, lurker, world) instead of a count; `smoke_perf` adds `--chain=5 --perf=1` holds 5, the summary logged exactly once (a `Logger` captures it), and the `LightBudget` priority window (after red check 20a); `test_dev_args` adds the 50/70 fps stats case (after red check 19), "a frame of exactly 20 ms is not over", "a frame starting past the run lands in no bucket", the summary rows and "glow on".
   - `game-architecture.md`'s "Other Cross-cutting Rules → Play rect" bullet got a pointer to the light-rect exception (not in D13's list; without it that bullet contradicts D2). No `project-context.md` rule beyond D13's list.
 - **Ledger** (`deferred-work.md`): closed 1.11's "`--chain` starts at take-off and ends on its first break" (by `--perf`, D1) and "The on-screen light count lives only in `dev/`" (by `BudgetLight` + `World.light_rect()` + overlay 4 on `counts()`, D2–D5, D8). Added under "Deferred from: dev of 1-12-…": `LightSource` drives the owner's `BudgetLight` → **Owner: Story 1.20**; the Ember Cache's glow is a CACHE `BudgetLight` and the stand-in reads its radius from `Tuning` → **Owner: Story 1.22**; a flare is an ALWAYS `BudgetLight`, compared with the stand-in → **Owner: Story 1.23**; engine glow lives only in DevTools until the verdict → **Owner: Story 1.15**.
@@ -1134,3 +1170,16 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-19.
 ## Change Log
 
 - 2026-11-19: Story 1.12 implemented (gds-dev-story): `BudgetLight` and World's `LightBudget` (≤ 6 lights lit in the whole view, sprite fallback, ALWAYS never demoted), `Fx` shared materials, lint `raw_light`, `rooms/dev/perf_worst.txt`, DevTools `--glow` and `--perf` (the autopilot perf run) with overlay 4's budget, frame and summary rows, `docs/perf.md`; three new tests (`test_fx`, `test_light_budget`, `smoke_perf`), 22 red checks run (two tests strengthened after red checks 19 and 20a), the desktop debug export checked. Status → review.
+- 2026-11-19: Code review (gds-code-review, `cc53560..25da8d4`).
+  - 1 decision, deferred to Story 1.23 with sonlm: no hysteresis at the view edge.
+  - 10 patches applied:
+    - `apply()` returns nothing;
+    - asserts on `enabled` and on a late `rank`;
+    - the summary rows wrap;
+    - four `smoke_perf` cases and checks: a death mid-run, `breaks`, the path warning, and the plain room at its `P`;
+    - the `test_fx` timer runs on game time;
+    - `docs/perf.md`'s focus note;
+    - a project-context exception pointer;
+    - doc drift.
+  - 1 disproved by a probe (the respawn stand-ins print no engine error on 4.7.2), with its test kept.
+  - 9 dismissed. Red checks R1–R8. 1255 ok. Status → done; the 5-minute laptop look is still open.

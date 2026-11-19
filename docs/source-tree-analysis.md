@@ -125,7 +125,7 @@ pixel_art_game/
 
 ### `game/scripts/`
 
-All gameplay code. Every script declares a `class_name` (`ChainState`, `Player`, `Crawler`, `Lurker`, `Fx`, `Room`, `RoomLoader`, `RoomLegend`, …) except the `Game` autoload and `dev/overlays.gd` (DevTools preloads it), so other scripts and tests use the types directly. `dev/` is debug-only: nothing outside `dev/` and `tests/` names it, except `world.gd`'s one guarded line (the lint's `dev_ref`).
+All gameplay code. Every script declares a `class_name` (`ChainState`, `Player`, `Crawler`, `Lurker`, `Fx`, `Room`, `RoomLoader`, `RoomLegend`, …) except the `Game` autoload, `dev/overlays.gd` and `dev/perf_run.gd` (DevTools preloads them) and `world/light_budget.gd` (World preloads it), so other scripts and tests use the types directly. `dev/` is debug-only: nothing outside `dev/` and `tests/` names it, except `world.gd`'s one guarded line (the lint's `dev_ref`).
 
 - **Entry point:** `world/world.gd` runs on the main scene and loads the room through `world/room_loader.gd`.
 - **Key file:** `chain_state.gd` — the one place the core rules and their constants live.

@@ -50,6 +50,7 @@ In the editor: Debug → Customize Run Instances, with the args after `--` per i
 - vsync on (the default); note the display's refresh rate (the target is 60 FPS, so a 120 Hz display shows about 120);
 - on mains power, other heavy apps closed;
 - overlays off during the run (they cost a little);
+- keep the window in front and the browser tab visible for the whole run: a minimised window or a hidden tab stops frames (there is no focus-loss pause before its own story), and the first frame back spans the whole gap, so `worst` and `min` are void and the run may end early. If that happens, run it again;
 - read the summary from the terminal or the browser console (`[room] dev: perf …`), or press backquote until overlay 4 after the run (the autopilot keeps going, so the load stays).
 
 ## What to record
