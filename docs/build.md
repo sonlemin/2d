@@ -31,24 +31,26 @@ Steps run in order and the first failure stops the build. The last line is `== B
 
 | Step | Checks |
 |---|---|
-| **preflight** | Godot is 4.7.2; each of the four templates is installed with `version.txt` = `4.7.2.stable`; Node ≥ 24; Playwright `1.65.1` in `tools/web_smoke/node_modules`; its headless shell is installed (by Playwright's own registry: `chromium.executablePath()` names the full Chromium, which an `--only-shell` install lacks). Every missing item is named, and nothing is built |
+| **preflight** | Godot is 4.7.2; each of the four templates is installed with `version.txt` = `4.7.2.stable`; Node ≥ 24 and `npx`; Playwright `1.65.1` in `tools/web_smoke/node_modules` (read from its `package.json`, without Node); its headless shell is installed (by Playwright's own registry: `chromium.executablePath()` names the full Chromium, which an `--only-shell` install lacks; without Node or Playwright it is named as not checked); port 8061 is free. Every missing item is named in one run, and nothing is built |
 | **version** | `<yyyymmdd>-<sha7>`, plus `-dirty` when `git status --porcelain` shows anything. Computed before the export, which can create `.godot/` and `.uid` files |
 | **import** | `godot --headless --path game --import` |
-| **content** | `tests/smoke_rooms.gd` through the runner: every `rooms/**/*.txt` file (validation, unique ids and exit links, the per-room guarantees), in about 12 s. Runs before any export. Story 1.17 adds the string keys here, Story 5.7 the flags and lengths |
+| **content** | `tests/smoke_rooms.gd` through the runner: every `rooms/**/*.txt` file (validation, unique ids and exit links, the per-room guarantees), in about 12 s. Passes on the runner's exit 0, no error line and its `SMOKE PASS` line. Runs before any export. Story 1.17 adds the string keys here, Story 5.7 the flags and lengths |
 | **export** | `Windows`, `Linux`, `Web` (release) and `Web debug`, headless, to absolute paths |
-| **pck** | Lists each PCK with `tools/pck_list.gd` (below). A release PCK (Windows, Linux, Web) fails on any path under `res://rooms/dev/`, `res://tests/` or `res://scripts/dev/`, and must hold `res://rooms/l1/m1_shaft.txt` and `res://scripts/world/world.gd…`; the `Web debug` PCK must hold `res://rooms/dev/perf_worst.txt` and `res://scripts/dev/dev_tools.gd…`, so an empty or wrong listing can't pass |
+| **pck** | Lists each PCK with `tools/pck_list.gd` (below). No PCK may hold a path under `res://tests/`, and a release PCK (Windows, Linux, Web) none under `res://rooms/dev/`, `res://scenes/dev/` or `res://scripts/dev/` (`scenes/dev/` has no files yet; the first one fails here until its exclusion is in the presets and `test_export_presets`). So an empty or wrong listing can't pass, a release PCK must hold `res://scripts/world/world.gd…` and every room file outside `rooms/dev/`, and the `Web debug` PCK `res://scripts/dev/dev_tools.gd…` and every room file, `rooms/dev/perf_worst.txt` included |
 | **size** | The web download, NFR5: the sum of each `web/` file's `gzip -9` size must be under 30,000,000 bytes (`WEB_DOWNLOAD_MAX_BYTES`). It is what itch.io's CDN sends, since it gzips `html`, `js`, `wasm` and `pck`. The raw size is printed beside it (4.7.2's `index.wasm` alone is 39.5 MB raw, about 10 MB compressed) |
 | **boot** | The Linux release build runs headless for 5 s. It passes only if `timeout` ends it (exit 124: still running) and it printed no `ERROR` / `SCRIPT ERROR` line |
-| **web_smoke** | `tools/web_smoke/`: both web builds in headless Chromium (below) |
+| **web_smoke** | `tools/web_smoke/`: both web builds in headless Chromium (below), under a 600 s `timeout`. Passes on exit 0 with an `N passed` line and no skipped, flaky, unrun or interrupted test (`forbidOnly` in the config stops a stray `test.only`) |
 | **summary** | Writes `logs/summary.txt` and prints the end line |
 
-Every Godot step runs under `timeout` (600 s for exports, 150 s for content, 60 s for listings) and fails on a non-zero exit **or** any `ERROR:` / `SCRIPT ERROR` / `FAIL` line in its log, scanned with the colours stripped: Godot exits 0 on some errors (a missing preset options section, a parse error in a release build).
+Every Godot step runs under `timeout` (600 s for exports, 150 s for content, 60 s for listings) and fails on a non-zero exit **or** any `ERROR:` / `SCRIPT ERROR` / `FAIL` line in its log, scanned with the colours stripped: Godot exits 0 on some errors (a missing preset options section, a parse error in a release build). A Ctrl-C or a TERM still ends with `== BUILD FAILED: <step>: interrupted` and `logs/summary.txt`.
+
+The PCK listings and the Linux boot run with `XDG_DATA_HOME` set to the build's own `logs/xdg_data/`, so the game's `user://` is fresh for every build: a boot never reads what an earlier build left (an older or newer settings or save schema) and never writes the server's own. Exports keep the real `XDG_DATA_HOME`, where the templates live.
 
 **What each build can prove.** A release build prints parse and load errors but no runtime script errors (the VM's runtime error report is debug-only), and a Linux release build prints nothing at all when it is fine. So:
 
 - the **Linux release boot** proves `world.gd` loads without `scripts/dev/` (a `preload` of DevTools there prints `SCRIPT ERROR: Parse Error: Preload file … does not exist`, while its export exits 0);
 - the **release web smoke** is boot-only: the engine starts and nothing errors for 5 s;
-- the **debug web smoke** is the runtime check: `SMOKE boot ok` plus no `console.error`, since debug builds print runtime `SCRIPT ERROR`s;
+- the **debug web smoke** is the runtime check: `SMOKE boot ok`, then 5 s of play with no `console.error`, since debug builds print runtime `SCRIPT ERROR`s;
 - the **Windows build is never booted on the server** (no Windows or wine). Its PCK is checked and is byte-identical to Linux's (ledger, owner Story 7.15).
 
 ## Output
@@ -61,7 +63,8 @@ builds/<version>/
       index.audio.position.worklet.js, index.png, index.icon.png, index.apple-touch-icon.png
   web_debug/(the same names)
   logs/import.log, content.log, export_{windows,linux,web,web_debug}.log,
-       pck_{windows,linux,web,web_debug}.txt, boot_linux.log, web_smoke.log, summary.txt
+       pck_{windows,linux,web,web_debug}.txt, boot_linux.log, web_smoke.log, summary.txt,
+       xdg_data/ (the user:// of the listings and the boot)
 ```
 
 - `builds/` is gitignored. A rebuild of the same version replaces its folder; nothing outside it is deleted.
@@ -84,15 +87,15 @@ builds/<version>/
 godot --headless --main-pack /abs/path/game.pck -s /abs/path/tools/pck_list.gd
 ```
 
-It prints every file in the pack, one `res://…` path per line, after the engine banner (keep only `^res://` lines). The engine reads its own pack, so a PCK format change (v4 in 4.7) needs nothing here. Both paths must be absolute: a relative `-s` path resolves inside the pack. Caveat: `--main-pack` still instances the pack's autoloads. `Game._init()` only builds the Clock (disk access waits for `boot()`, which only World calls), so a listing touches nothing; **a future autoload must keep disk and network out of `_init()` and `_ready()`**.
+It prints every file in the pack, one `res://…` path per line, after the engine banner (keep only `^res://` lines). A folder it can't open prints an `ERROR:` line and makes it exit 1, so a partial listing fails the step. The engine reads its own pack, so a PCK format change (v4 in 4.7) needs nothing here. Both paths must be absolute: a relative `-s` path resolves inside the pack. Caveat: `--main-pack` still instances the pack's autoloads. `Game._init()` only builds the Clock (disk access waits for `boot()`, which only World calls), so a listing touches nothing; **a future autoload must keep disk and network out of `_init()` and `_ready()`**.
 
 ## The web smoke
 
 `tools/web_smoke/` (Playwright, Chromium only, headless) serves the build folder with `serve.js` and boots both web builds:
 
-- every page: the console shows `Godot Engine v4.7.2.stable`; the shell's `#status` overlay is removed and `#status-notice` stays empty; no page error; no `console.error` outside `ALLOWED_CONSOLE_ERRORS` (empty; every entry needs a reason). Godot sends `push_warning`, `push_error`, `printerr` and `SCRIPT ERROR` to `console.error`; Chromium's own `warning` messages (`GPU stall due to ReadPixels` under SwiftShader) are ignored;
-- `Web debug`: `[room] SMOKE boot ok` appears once (DevTools prints it on World's first `room_entered`, in real runs only). Then again as `?room=perf_worst`: DevTools' summary is exactly `[room] dev: room perf_worst@spawn`, with no `dev: perf` line and no `WARNING: DevTools:` line;
-- `Web` (release): the checks above, then 5 s more with no error, and no `[category]` Log line (DevTools and `Log` are debug-only).
+- every page: it is served (status 200); within one 60 s budget, the shell's `#status` overlay is removed and the console shows `Godot Engine v4.7.2.stable`; `#status-notice` stays empty; no page error; no `console.error` outside `ALLOWED_CONSOLE_ERRORS` (empty; every entry needs a reason). Godot sends `push_warning`, `push_error`, `printerr` and `SCRIPT ERROR` to `console.error`; Chromium's own `warning` messages (`GPU stall due to ReadPixels` under SwiftShader) are ignored;
+- `Web debug`: `[room] SMOKE boot ok` appears (DevTools prints it on World's first `room_entered`, in real runs only, before the first physics tick), then the page plays 5 s more and the marker must still appear exactly once, with the checks above run after that. Then again as `?room=perf_worst`: DevTools' summary is exactly `[room] dev: room perf_worst@spawn` (a requested perf run would show in it), with no `dev: perf` line and no `WARNING: DevTools:` line;
+- `Web` (release): the checks above, then 5 s more with no error, and no `[category]` Log line of any category (DevTools and `Log` are debug-only).
 
 On a failure the whole browser console is printed under the failing test's title, so `logs/web_smoke.log` shows it. It checks correctness only: headless WebGL runs on SwiftShader, so it says nothing about performance (that is [perf.md](./perf.md)).
 
@@ -119,7 +122,7 @@ rsync -a <server>:project/pixel_art_game/builds/<version>/linux/ ./uc-<version>/
 2. on the laptop: `ssh -L 8060:127.0.0.1:8060 <server>`;
 3. open `http://localhost:8060/web_debug/index.html` (debug: DevTools' query args work, for example `?room=perf_worst&perf`) or `http://localhost:8060/web/index.html` (release).
 
-`serve.js` sends `.wasm` as `application/wasm`, ignores the query string, never serves outside `BUILD_DIR`, and sends `Cache-Control: no-store`, so a rebuilt version at the same path is never stale.
+`serve.js` sends `.wasm` as `application/wasm`, ignores the query string, redirects a folder URL without its trailing slash (`/web_debug` → `/web_debug/`, since the shell's files are relative), never serves outside `BUILD_DIR` (symlinks included), and sends `Cache-Control: no-store`, so a rebuilt version at the same path is never stale.
 
 ## itch.io
 

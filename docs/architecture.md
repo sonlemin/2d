@@ -1,6 +1,6 @@
 # The Unbroken Chain — Architecture (as built, M1)
 
-**Date:** 2026-11-11 (updated through Story 1.13, 2026-11-19) · **Branch:** `feat/m1-prototype` · **Scope:** the code in `game/` and `tools/`, including the export pipeline (`tools/export.sh`, `tools/web_smoke/`)
+**Date:** 2026-11-11 (updated through Story 1.13, 2026-11-19) · **Branch:** `feat/m1-prototype` (M1), `feat/m2-e1` (Epic 1) · **Scope:** the code in `game/` and `tools/`, including the export pipeline (`tools/export.sh`, `tools/web_smoke/`)
 
 This document describes the M1 prototype **as it is**. The design target for M2 lives in the [GDD](../_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md) and the [UX spines](../_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/). Where the code and those documents differ, see [Gaps against the M2 design](#gaps-against-the-m2-design). That section lists observations, not decisions.
 

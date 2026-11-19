@@ -4,7 +4,7 @@ baseline_commit: 21e15df
 
 # Story 1.13: Export pipeline and web boot smoke
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -183,6 +183,60 @@ so that every build I play on the laptop is known to boot.
   - rsync `builds/<version>/linux` (or `windows`) and run it;
   - open the web debug build through the tunnel (`docs/build.md`), plain and with `?room=perf_worst`;
   - then the release web build.
+
+### Review Findings
+
+Code review 2026-11-19 (uncommitted work over `372cc32`): three reviewer layers (blind, edge case, acceptance auditor) on Opus 5.5, then each finding checked against the code. 52 raw findings became 32 after merging duplicates: 1 decision, 21 patches, 10 dismissed. The auditor found no blocking AC violation; its one medium finding is the preflight item below. The ERR-trap finding was reproduced in bash 5.2.21 against a copy of `fail()` and the trap: `echo "$(grep …)"` with no match printed `== BUILD FAILED`, overwrote `summary.txt`, then printed `== BUILD OK` and exited 0. A subshell-aware trap was probed to fix it. sonlm resolved the decision (a fresh `user://` per build) and chose to apply every patch.
+
+Red checks after the patches, each in a detached worktree carrying the uncommitted work (D14), each failing as intended:
+  - Every smoke test skipped (`test.describe.skip` ×2): `== BUILD FAILED: web_smoke: not every test passed (3 skipped)`, with no `BUILD OK` after it.
+  - A stray `test.only`: `Error: item focused with '.only' is not allowed due to the 'forbidOnly' option in 'playwright.config.js'`.
+  - A runtime error 3 s into play (`light_budget.gd`: a null `get_name()` at physics frame 180):
+    - export: `== BUILD FAILED: boot: the Linux release build ended within 5 s (exit 139)`, a release segfault (D5's research);
+    - the web smoke alone against that build: the **pre-review** spec gives `3 passed`, which is the gap; the patched spec gives `2 failed, 1 passed`, both debug tests on `SCRIPT ERROR: Cannot call method 'get_name' on a null value.` (release skips it silently, as D5 says).
+  - `Web debug` with `exclude_filter=""`: `test_export_presets` `FAILED (2)` (the exclude set, and 27 test scripts and scenes in `Web debug`); export: `== BUILD FAILED: pck: the web_debug PCK carries test content (under res://tests/): 53 paths`.
+  - A valid room copy `rooms/l1/zz_copy.txt` excluded from `Linux` only: `test_export_presets` `FAILED (2)`; export: `== BUILD FAILED: pck: the linux PCK misses 1 of the repo's room files (rooms/l1/zz_copy.txt)`.
+  - A TERM 25 s into a build: `== BUILD FAILED: content: interrupted`, and `summary.txt` holds the same line. Bash runs the trap once the step's Godot call returns.
+  - `pck_list.gd` walking a missing `res://zz_missing` too: `ERROR: pck_list: cannot open res://zz_missing (Invalid parameter)`, exit 1.
+  - Preflight, each in one run with nothing built:
+    - system Node 18 first on `PATH`: Node (got `18.19.1`), plus the browser as not checked;
+    - no Node at all: Node, `npx`, and the browser as not checked;
+    - no `node_modules` (a bare worktree): Playwright, and the browser as not checked;
+    - a server on 8061: the port.
+
+    **The first run of the system-Node case found a defect in the preflight patch:** the browser check ran on Node 18, which can't load Playwright's registry, and reported the shell as missing. It now waits for a Node ≥ 24.
+  - `serve.js` on a scratch folder:
+    - `/web_debug` → 301 to `/web_debug/`, and `/web_debug?room=perf_worst` → 301 to `/web_debug/?room=perf_worst`;
+    - a symlink out of `BUILD_DIR`, `..`, `%2e%2e` and `%00` all → 404, a malformed escape → 400;
+    - after 40 aborted `.wasm` downloads, the server holds 22 open descriptors.
+  - The fresh `user://`: the boot wrote `logs/xdg_data/godot/app_userdata/…/settings.json`, and the server's own `settings.json` kept its earlier timestamp.
+
+  After the patches: `== ALL GREEN (21 tests)`, 1326 ok (`test_export_presets` 54 → 60); `tools/export.sh` → `== BUILD OK builds/20261119-372cc32-dirty, web download 10.3 MB (gzip; raw 39.9 MB), PCK files windows 74 / linux 74 / web 74 / web_debug 81, 82 s` (web smoke 3 passed, 26.7 s).
+
+- [x] [Review][Decision] The Linux boot and the PCK listings use the server's real `user://` — D5 accepted that `Game.boot()` may write `settings.json` there. But each boot also reads whatever earlier boots left: an older or newer settings or save schema can print `ERROR:` lines and fail or skew a rebuild of an older commit, so the boot isn't reproducible. Options: (a) run both with `XDG_DATA_HOME` set to a fresh folder under `builds/<v>/` (deleted with the rebuild); (b) keep D5 as written. **sonlm (2026-11-19): (a).** Both now run with `XDG_DATA_HOME="$LOGS/xdg_data"`; the exports keep the real one, where the templates live.
+- [x] [Review][Patch] Under `set -E`, the ERR trap runs `fail()` inside `$(…)`: a missing `N passed` line (`:255`, `:270`) prints BUILD FAILED inside an echo, overwrites `summary.txt`, then BUILD OK with exit 0; a failed `gzip` (`:218`) dies on `BUILD: unbound variable` with no end line; a failed `git status` (`:140`) labels a dirty tree clean. Make the trap exit quietly in subshells (`[ "$BASHPID" = "$$" ] || exit 1;`) and capture each of those explicitly [tools/export.sh:58]
+- [x] [Review][Patch] Any Playwright exit 0 is accepted: a stray `test.only` or `test.skip` gives a green build with fewer or no boots. Set `forbidOnly: true`; `export.sh` requires an `N passed` line and fails on `skipped`, `flaky`, `did not run` or `interrupted` [tools/web_smoke/playwright.config.js:107]
+- [x] [Review][Patch] The debug tests check the console as soon as the marker appears, which is inside World's `_ready`, before any physics tick: a `SCRIPT ERROR` in the first ticks is missed, and `expect.poll(…).toBe(1)` passes at the first marker, so a later duplicate is missed too. Settle 5 s after the marker, then assert exactly one marker and `expectClean` [tools/web_smoke/smoke.spec.js:70]
+- [x] [Review][Patch] `pck_list.gd`'s failed `DirAccess.open()` goes to `printerr` (no `ERROR:`) and `quit()` exits 0, so a partial listing passes the forbidden-prefix check, the one place dev or test content would hide. Use `push_error` and exit 1 [tools/pck_list.gd:28]
+- [x] [Review][Patch] The `Web debug` PCK is never checked for `res://tests/`, so only the matchn model covers its `tests/*` exclude; and `scenes/dev/`, which the `dev_ref` lint already treats as dev, is in no release check. Forbid `^res://tests/` in every listing, and add `scenes/dev/` to the release prefixes (the presets keep AC1's sets: the first `scenes/dev/` file then fails the build until its exclusion is added) [tools/export.sh:195]
+- [x] [Review][Patch] Each wait gets its own 60 s (banner, `#status`, marker: up to 180 s), against D7's "60 s budget per page" and the 150 s test timeout, so a slow boot fails as a generic "Test timeout exceeded"; and the `web_smoke` step is the only one with no `timeout`. Share one per-page deadline across the waits; run the step under `timeout -k 5 600` [tools/web_smoke/smoke.spec.js:46]
+- [x] [Review][Patch] AC2 "each missing item is named": the preflight nests its checks, so a missing Node hides Playwright and the browser, and a missing Playwright hides the browser; and `npx` and a busy port 8061 only fail at step 9, after the whole build. Check Playwright's `package.json` without Node, name the browser as "not checked until Playwright is installed", and check `npx` and the port [tools/export.sh:113]
+- [x] [Review][Patch] `test_export_presets` doesn't pin AC1's `x86_64` (`binary_format/architecture`), or `dedicated_server=false`, which an editor re-save could tick (it strips visual resources, and no server check would notice) [game/tests/test_export_presets.gd:132]
+- [x] [Review][Patch] The "matching ignores case" model check can't fail: `"ROOMS/L1/X.TXT".get_extension()` is `TXT`, not `txt`, so `exported()` treats it as a resource and never calls the matcher. Test `matches_any()` directly [game/tests/test_export_presets.gd:173]
+- [x] [Review][Patch] `test_smoke_marker`'s respawn case never proves the respawn emitted `room_entered` again, so it would pass vacuously if World stopped re-emitting. Count `room_entered` and assert 2 [game/tests/smoke_dev_tools.gd:312]
+- [x] [Review][Patch] The content step's second net, `grep -q 'PASS'`, matches the substring anywhere; match the runner's verdict line, `^SMOKE PASS$` [tools/export.sh:162]
+- [x] [Review][Patch] `serve.js`: a folder without a trailing slash (`/web_debug`) serves `index.html`, whose relative `index.js` then 404s (redirect with 301); `.pipe(res)` never destroys the file stream when the client aborts, which leaks a descriptor on the long-lived tunnel server (`stream.pipeline`); the check is lexical, so a symlink escapes `BUILD_DIR`, against the docs (compare `realpath`s) [tools/web_smoke/serve.js:59]
+- [x] [Review][Patch] `page.goto()`'s response is unchecked: a 404 page has no `#status`, so `boot()` reports "booted" at once and the failure surfaces 60 s later as a banner timeout. Assert status 200 [tools/web_smoke/smoke.spec.js:47]
+- [x] [Review][Patch] `LOG_LINE` copies `Log.CATEGORIES` by hand, so a new category escapes the release "no Log line" check. Match any `[lowercase]` prefix; Chromium's `[.WebGL-…]` still doesn't match [tools/web_smoke/smoke.spec.js:20]
+- [x] [Review][Patch] The boot step reports exit 137 (a build that ignored SIGTERM, or an OOM kill) as "ended within 5 s, so it did not boot". Name 137 separately [tools/export.sh:238]
+- [x] [Review][Patch] Ctrl-C or a TERM mid-build leaves a partial `builds/<v>/` with no end line and no `summary.txt`. Trap INT and TERM into `fail` [tools/export.sh:58]
+- [x] [Review][Patch] No real listing backs "every room in every preset": the release check needs only `m1_shaft.txt`, so the matchn model is the only guard, beyond Task 11's one manual comparison. Compare each listing's `res://rooms/…txt` with `game/rooms/**/*.txt` (minus `rooms/dev/` for release) [tools/export.sh:204]
+- [x] [Review][Patch] The marker's comment says "This node is World's first child": it is the fifth (`test_no_tokens` pins Darkness, RoomHolder, Camera, UI, DevTools, LightBudget). The real reason is that World's `_ready()` adds it before it calls `_swap_room()` [game/scripts/dev/dev_tools.gd:69]
+- [x] [Review][Patch] The `?room=` test's "no `[room] dev: perf` line" can't fail at boot: a perf run logs that line when it ends (`perf_run.gd:261`). Keep AC6's assertion, but say in the comment that the exact summary-line check (no `perf` in it) is the proof [tools/web_smoke/smoke.spec.js:89]
+- [x] [Review][Patch] Doc drift. `project-context.md`'s build rule says `export.sh` "validates rooms and string keys" and "copies the font licences": both come in 1.17, so mark them. `docs/architecture.md:3` still says `feat/m1-prototype` on a line now "updated through Story 1.13" [_bmad-output/project-context.md:99]
+- [x] [Review][Patch] The Dev Agent Record has no "Deviations from the Dev Notes" list, which 1.11 and 1.12 keep. It should hold: the `rooms/*.txt` include filter (D2 says record it), project-context's rules beyond D11's list, `waitForFunction` in place of `locator.waitFor`, `set -E` with the ERR trap, and `serve.js`'s 405, folder fallback and `no-store` [_bmad-output/implementation-artifacts/1-13-export-pipeline-and-web-boot-smoke.md:870]
+
+Dismissed (10): `--quit-after` in place of the 5 s boot (D5 decided; the debug smoke catches hangs in the shared code); dirty rebuilds of a version replacing the folder (AC2, D3); the version computed before import (D3; import writes `.godot/`, which is ignored); `flock` against concurrent runs (one developer, manual runs; the port is now in the preflight); `g`-flag regexes in the empty allowlist; the content scan's possible false red on an `ok` line (fails safe and visibly); Task 12 ticked before the look (recorded, status `review`); `BANNER` and `GODOT_VERSION` duplicated (`build.md`'s upgrade checklist names both); `build.md` presenting `WEB_DOWNLOAD_MAX_BYTES` as a knob (it names the constant; D14 edits the script); building into a staging folder (BUILD FAILED and `summary.txt` already mark a failed build; the INT/TERM patch covers the interrupted case).
 
 ## Dev Notes
 
@@ -872,6 +926,12 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story.
   - **The browser preflight reads Playwright's registry** (AC2 allowed this; Debug Log). The path goes through `playwright-core/lib/coreBundle`, an internal module, and holds while Playwright stays pinned at 1.65.1. `docs/build.md` says to recheck it when the pin moves. If the module moves, it fails safe: the `require` throws, so the preflight reports the headless shell as missing and builds nothing.
   - **The release web smoke also asserts that no Log line appears** (`/^\[(save|room|input|clock|lurker|weaver|audio|ui)\] /`). That is AC7's "release builds print nothing", checked on the web. Log's category list is used rather than any leading `[`, because Chromium's GPU warnings start with `[.WebGL-…]`.
   - **End line:** `== BUILD OK builds/<version>, web download <gzip MB> (gzip; raw <MB>), PCK files windows N / linux N / web N / web_debug N, <s> s`. `logs/summary.txt` repeats it, followed by exact bytes, the commit, the Godot version and each step's result.
+- **Deviations from the Dev Notes** (none changes an AC; recorded by the code review). The four decisions above count too.
+  - **The include filter is `rooms/*.txt`, not the epic's and the architecture's `rooms/**/*.txt`** (D2, the variance in Project Structure Notes). In Godot's matcher `*` crosses `/` and `**` is a plain `*`, so `rooms/**/*.txt` would skip a room placed directly in `rooms/` (probed, Debug Log). AR51 in `epics.md`, the architecture's `export_presets.cfg` line and project-context's build rule say so now. Every `rooms/**/*.txt` that describes `smoke_rooms`' walk is unchanged.
+  - **`project-context.md` gained rules beyond D11's list.** In Platform & Build Rules: "a new release exclusion goes in the presets **and** `test_export_presets`"; "every path handed to Godot's exporter is absolute … Godot exits 0 on some errors, so scan logs too"; the `(< 30 MB, measured gzip …)` aside; and the `(SMOKE boot ok, no console.error)` aside on the debug web smoke. Each is a rule an agent would otherwise get wrong, which is what the file is for.
+  - **`boot()` in `smoke.spec.js` polls `#status` and `#status-notice` together with one `waitForFunction`,** instead of D7's `locator('#status').waitFor({state: 'detached'})`. One poll can race the two, which is D7's fail-fast intent.
+  - **`export.sh` uses `set -Eeuo pipefail` with an `ERR` trap,** not D13's `set -euo pipefail`. This gives every unexpected failure an end line. After the review, the trap exits quietly in a `$(…)` subshell, and INT and TERM have a trap too.
+  - **`serve.js` goes beyond D8:** a 405 for anything but GET and HEAD, `index.html` for a folder URL, and `Cache-Control: no-store`, so a rebuilt version at the same path is never stale. After the review it also redirects a folder URL to its trailing slash, checks `realpath`s against `BUILD_DIR`, and streams with `pipeline`.
 - **Ledger:**
   - the 1.11 foreign-parameter item is closed as not triggered (AC8);
   - new: "the Windows build is never booted on the server" → **Owner: Story 7.15**, which ships the final Windows build and boots it on Windows, or under wine on the server, before the tester round.
@@ -927,3 +987,14 @@ Outside the repo (server setup, not committed): `~/.local/share/godot/export_tem
   - the 1.11 foreign-parameter item closed, and the Windows boot deferred to Story 7.15;
   - `docs/build.md` and the doc sweep.
   - Red check 5 found that Playwright's line reporter cuts attachments at 300 characters; the smoke now prints a failed test's browser console to stdout. Status → review.
+- 2026-11-19: Code review (gds-code-review): 1 decision (a fresh `user://` per build, sonlm), 21 patches applied, 10 dismissed. Among them:
+  - `export.sh`'s ERR trap no longer runs `fail()` inside `$(…)`;
+  - the smoke requires every test to pass, with `forbidOnly`;
+  - the debug smoke plays 5 s before its checks;
+  - `pck_list.gd` fails loudly;
+  - every listing is checked for `tests/` and for every room file;
+  - the preflight names everything in one run;
+  - `serve.js` is hardened;
+  - the test gaps and the doc drift are fixed.
+
+  Red checks are recorded under Review Findings. Status → done; the laptop look (Task 12) is still to do.
