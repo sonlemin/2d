@@ -18,14 +18,15 @@ const START_ROOM := &"m1_shaft"
 ## s between a death and the respawn, the M1 value; the death card replaces this wait in 1.29.
 const RESPAWN_DELAY := 0.6
 ## Ambient brightness of the dark (CanvasModulate value). `Settings.brightness` picks the level;
-## DevTools sets it from 1.11 until Options (1.36). Lower = more tension; too low and darkness
-## turns into confusion (Pillar 2).
+## until Options (1.36) it changes only through DevTools' `--set=brightness:N`, for one session.
+## Lower = more tension; too low and darkness turns into confusion (Pillar 2).
 const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
 const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
 
-## Where a dive with no respawn point starts. Set before add_child: tests do, and DevTools'
-## --room= will (1.11).
+## Where a dive with no respawn point starts, and at which entry. Tests set them before add_child;
+## DevTools' --room= sets them from inside _ready, before the first room is built (Story 1.11 D5).
 var start_room: StringName = START_ROOM
+var start_entry: StringName = &"spawn"
 
 var _room: Room
 var _player: Player
@@ -37,6 +38,8 @@ var _swap_pending := false
 
 
 func _ready() -> void:
+	if OS.is_debug_build():
+		add_child(load("res://scripts/dev/dev_tools.gd").new())  # path string, never preload: release presets exclude scripts/dev/ (1.13)
 	add_to_group("world")
 	# The entry scene boots Game once: it loads settings.json and arms its writes (Story 1.4 D6).
 	# A test adds World by hand and is never the current scene, so tests can't touch the real
@@ -114,9 +117,10 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_swap_pending = false
 		if not respawn:
 			_player.die()  # outside the room with nowhere to go: never fall forever
-		elif room_id != start_room or entry != &"spawn":
-			# A bad respawn point (save data, DevTools --room=): the dive's start instead.
-			_swap_room(start_room, &"spawn", true)
+		elif room_id != start_room or entry != start_entry:
+			# A bad respawn point (save data from 1.21): the dive's start instead. DevTools checks
+			# --room= before it sets the start, so this never runs for a dev room.
+			_swap_room(start_room, start_entry, true)
 		else:
 			assert(false, "World: the start room '%s' failed to load (errors above)" % start_room)
 		return
@@ -152,11 +156,11 @@ func _player_alive() -> bool:
 	return is_instance_valid(_player) and not _player.is_dead
 
 
-## The dive's respawn point, or the start room's spawn while none is set (DiveState's rule; anchors
+## The dive's respawn point, or the dive's start while none is set (DiveState's rule; anchors
 ## and stations set it from Story 1.24).
 func _respawn_point() -> Array[StringName]:
 	var room_id := Game.dive.respawn_room if Game.dive.respawn_room != &"" else start_room
-	var entry := Game.dive.respawn_entry if Game.dive.respawn_entry != &"" else &"spawn"
+	var entry := Game.dive.respawn_entry if Game.dive.respawn_entry != &"" else start_entry
 	return [room_id, entry]
 
 

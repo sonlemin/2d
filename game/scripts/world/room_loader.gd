@@ -42,6 +42,52 @@ static func load_room(id: StringName, dive: DiveState = null) -> Room:
 	return load_room_from_path(index[id], dive)
 
 
+## Every room id the index knows (rooms/ and any added root), sorted as Strings: a StringName
+## array sorts in pointer order, not alphabetically. For DevTools' `--room=` messages (Story 1.11 D5).
+static func room_ids() -> Array[StringName]:
+	var names := PackedStringArray()
+	for id: StringName in _get_index():
+		names.append(String(id))
+	names.sort()
+	var out: Array[StringName] = []
+	for n in names:
+		out.append(StringName(n))
+	return out
+
+
+## What a room offers, without building it or pushing an error (DevTools' `--room=`, Story 1.11 D5):
+## {known, entries, errors}. `known` is false for an id the index doesn't have; `errors` is
+## validate()'s list; `entries` is empty unless the file is valid, and then holds `spawn` when the
+## grid has a `P` plus each exit side, sorted as Strings (m1_shaft: down, spawn, up).
+static func inspect(id: StringName) -> Dictionary:
+	var entries: Array[StringName] = []
+	var errors: Array[String] = []
+	var index := _get_index()
+	if not index.has(id):
+		return {known = false, entries = entries, errors = errors}
+	var path: String = index[id]
+	if not FileAccess.file_exists(path):  # gone since it was indexed; get_file_as_string() would print an ERROR
+		errors.append("%s:0:0 file not found" % path)
+		return {known = true, entries = entries, errors = errors}
+	var parsed := parse(FileAccess.get_file_as_string(path))
+	errors = validate(path, parsed)
+	if not errors.is_empty():
+		return {known = true, entries = entries, errors = errors}
+	var names := PackedStringArray()
+	for row: String in parsed.grid:
+		if row.contains(RoomLegend.SPAWN):
+			names.append("spawn")
+			break
+	for h: Dictionary in parsed.header:
+		if h.key == "exits":
+			for part in String(h.value).split(",", false):
+				names.append(_exit_re.search(part.strip_edges()).get_string(1))  # valid, so it matches
+	names.sort()
+	for n in names:
+		entries.append(StringName(n))
+	return {known = true, entries = entries, errors = errors}
+
+
 ## Tests only (release exports exclude tests/*): indexes the rooms under `dir_path` too, so
 ## enter_room() can reach test rooms by id (Story 1.7 D6). Ids stay unique across all roots.
 static func add_root(dir_path: String) -> void:

@@ -21,6 +21,7 @@ func run() -> void:
 	_test_exit_tree_clears()
 	await _test_pogo_requests_hitstop()
 	await _test_death_clears()
+	await _test_active()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -142,3 +143,27 @@ func _test_death_clears() -> void:
 	check(not Game.clock.is_active(&"hitstop") and absf(Engine.time_scale - 1.0) < EPS, "player death clears every request (got %.4f)" % Engine.time_scale)
 	Game.clock.clear()  # leave the session clock clean even if the check failed
 	player.queue_free()
+
+
+## Story 1.11 D11: active() is a read-only copy for DevTools' overlay, {id: scale}.
+func _test_active() -> void:
+	var c := _fresh()
+	check(c.active().is_empty(), "active(): empty at start")
+	var early := probe(0.03)
+	c.request(&"hitstop", 0.05, 0.075)
+	check(c.active() == {&"hitstop": 0.05}, "active(): after a hitstop request it holds {hitstop: 0.05} (got %s)" % [c.active()])
+	c.request(&"hitstop", 0.5, 0.075)
+	check(c.active() == {&"hitstop": 0.5}, "active(): a refresh shows the latest scale (got %s)" % [c.active()])
+	var copy := c.active()
+	copy[&"hitstop"] = 0.9
+	copy[&"other"] = 0.1
+	copy.erase(&"hitstop")
+	check(c.active() == {&"hitstop": 0.5} and c.is_active(&"hitstop") and not c.is_active(&"other") and absf(Engine.time_scale - 0.5) < EPS,
+			"active(): changing the returned copy changes nothing in the Clock (got %s, scale %.4f)" % [c.active(), Engine.time_scale])
+	await early.timeout
+	await wait(0.15)
+	check(c.active().is_empty(), "active(): empty again after the request expires (got %s)" % [c.active()])
+	c.request(&"a", 0.5, 5.0)
+	c.clear()
+	check(c.active().is_empty(), "active(): empty after clear()")
+	_drop(c)

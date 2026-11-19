@@ -17,6 +17,7 @@ func run() -> void:
 	await _test_spawn_args_before_ready()
 	await _test_m1_shaft()
 	await _test_killed_cells()
+	_test_index_queries()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
 
@@ -250,3 +251,33 @@ func _test_killed_cells() -> void:
 	all.queue_free()
 	some.queue_free()
 	await get_tree().process_frame
+
+
+## Story 1.11 D5: the index queries DevTools' --room= uses. They never push_error (the runner is
+## the check for that), even for an invalid file.
+func _test_index_queries() -> void:
+	RoomLoader.add_root("res://tests/rooms")  # once: it walks swap/, input/ and dev_tools/ too
+	# StringNames sort by address, so whether a plain sort() of these three happens to come out
+	# alphabetical depends on when each was interned, not on the engine or this code: a warning,
+	# never a FAIL (review of 1.11). The pair check below holds either way.
+	var plain: Array[StringName] = [&"t_swap_b", &"m1_shaft", &"t_swap_a"]
+	plain.sort()
+	if plain == ([&"m1_shaft", &"t_swap_a", &"t_swap_b"] as Array[StringName]):
+		push_warning("test_room_loader: a plain sort() of three StringNames came out alphabetical this run, so the pair check can't tell it from room_ids()' String sort")
+	var ids := RoomLoader.room_ids()
+	check(ids.has(&"m1_shaft") and ids.has(&"t_swap_a") and ids.has(&"t_swap_b") and ids.has(&"t_dev_room"), "room_ids() holds rooms/ and the added test rooms (got %s)" % [ids])
+	var pairs_ok := true
+	for i in ids.size() - 1:
+		if not String(ids[i]) < String(ids[i + 1]):
+			pairs_ok = false
+	check(ids.size() >= 4 and pairs_ok, "...alphabetically, each id before the next as Strings (got %s)" % [ids])
+	var m1 := RoomLoader.inspect(&"m1_shaft")
+	check(m1.known and m1.entries == ([&"down", &"spawn", &"up"] as Array[StringName]) and m1.errors.is_empty(),
+			"inspect(m1_shaft): known, entries exactly down, spawn, up, no errors (got %s)" % [m1])
+	check(RoomLoader.inspect(&"t_swap_b").entries == ([&"up"] as Array[StringName]), "inspect(t_swap_b): only up (no P) (got %s)" % [RoomLoader.inspect(&"t_swap_b")])
+	check(RoomLoader.inspect(&"t_swap_a").entries == ([&"down", &"spawn"] as Array[StringName]), "inspect(t_swap_a): down and spawn (got %s)" % [RoomLoader.inspect(&"t_swap_a")])
+	var nope := RoomLoader.inspect(&"nope")
+	check(not nope.known and nope.entries.is_empty() and nope.errors.is_empty(), "inspect(nope): not known (got %s)" % [nope])
+	var bad := RoomLoader.inspect(&"bad_edge_hole")
+	check(bad.known and bad.entries.is_empty() and not bad.errors.is_empty() and bad.errors == _errors_of(DIR + "bad_edge_hole.txt"),
+			"inspect(bad_edge_hole): known, no entries, validate()'s errors, and no push_error (got %s)" % [bad])

@@ -31,6 +31,15 @@ func is_active(id: StringName) -> bool:
 	return _requests.has(id)
 
 
+## A copy, {id: scale}, of the requests active now: DevTools' overlay lists them (Story 1.11 D11).
+## Read-only: it never touches the time scale, and changing the copy changes nothing here.
+func active() -> Dictionary:
+	var out := {}
+	for id: StringName in _requests:
+		out[id] = _requests[id].scale
+	return out
+
+
 ## Death and leaving the tree must never strand the world in slow motion.
 func clear() -> void:
 	_requests.clear()

@@ -70,6 +70,7 @@ func run() -> void:
 	_test_settings_reset()
 	_test_settings_round_trips()
 	_test_settings_fallbacks()
+	_test_settings_is_valid()
 	_test_slot_defaults()
 	_test_slot_flags()
 	_test_slot_records()
@@ -190,6 +191,21 @@ func _test_settings_fallbacks() -> void:
 
 
 # --- SlotState ---
+
+## Story 1.11 D8: the one validity rule, public so DevTools' --set validator can share it; a passed
+## schema is only ever a test's or DevTools' (a fake bool key until 1.16 adds real ones).
+func _test_settings_is_valid() -> void:
+	check(Settings.is_valid(&"brightness", 1) and Settings.is_valid(&"light_tap_window", 0.12), "is_valid: the defaults are valid")
+	check(not Settings.is_valid(&"brightness", 1.0) and not Settings.is_valid(&"brightness", true) and not Settings.is_valid(&"light_tap_window", 0),
+			"is_valid: a type mismatch is false (1.0 and true for an int, 0 for a float)")
+	check(not Settings.is_valid(&"brightness", 4) and not Settings.is_valid(&"light_tap_window", 0.25), "is_valid: a value outside the choices is false")
+	check(not Settings.is_valid(&"nope", 1), "is_valid: an unknown key is false")
+	var fake := Settings.SCHEMA.duplicate(true)
+	fake[&"fake_bool"] = {default = false, choices = [false, true]}
+	check(Settings.is_valid(&"fake_bool", true, fake) and Settings.is_valid(&"fake_bool", false, fake), "is_valid: with a passed schema, a key the real SCHEMA lacks is valid for its values")
+	check(not Settings.is_valid(&"fake_bool", 1, fake), "is_valid: ...and false for the wrong type")
+	check(not Settings.is_valid(&"fake_bool", true), "is_valid: ...and the same key without the schema argument is unknown")
+
 
 func _test_slot_defaults() -> void:
 	var s := SlotState.new()
@@ -673,6 +689,59 @@ func _test_settings_file() -> void:
 	Game.settings.set_value(&"brightness", 3)
 	await get_tree().process_frame
 	check(not FileAccess.file_exists(_tmp_file()), "unarmed (after reset_for_tests): a change writes nothing")
+
+	# Story 1.11 D8 (sonlm, 2026-11-19): a DevTools --set override lasts this session only, and a
+	# session with one writes no settings.json at all. The store is pointed at TMP again after every
+	# reset, so a broken guard writes into the temp folder, never the real file (check (e) below).
+	var o_writes := WriteCounter.new()
+	OS.add_logger(o_writes)
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	DirAccess.remove_absolute(_tmp_file())
+	Game.override_setting(&"brightness", 3)
+	Game.load_settings()
+	check(Game.settings.brightness == 3, "(a) an override, then a load with no file: the override is kept (brightness %d)" % Game.settings.brightness)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(not FileAccess.file_exists(_tmp_file()) and o_writes.total() == 0, "(a) ...and the missing file is not written (%d writes)" % o_writes.total())
+
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	check(Game._overrides.is_empty() and Game.settings.brightness == 1, "reset_for_tests() drops the overrides")
+	Game.store.write_settings(Settings.new().to_dict())
+	Game.load_settings()
+	check(Game._settings_armed and _tmp_holds(1), "(b, premise) a clean file loaded: writes are armed")
+	var clean := _read_tmp()
+	var w0 := o_writes.total()
+	Game.override_setting(&"brightness", 3)
+	Game.settings.set_value(&"light_tap_window", 0.2)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(o_writes.total() == w0 and _read_tmp() == clean, "(b) armed, then an override and a change to another key: no write, the file unchanged (%d writes)" % (o_writes.total() - w0))
+
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	var zero := Settings.new().to_dict()  # every key, so the load is clean and queues no rewrite
+	zero["brightness"] = 0
+	Game.store.write_settings(zero)
+	Game.override_setting(&"brightness", 3)
+	Game.load_settings()
+	check(Game.settings.brightness == 3, "(c) a file holding 0, an override of 3, then the load: brightness is 3 (got %d)" % Game.settings.brightness)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(_tmp_holds(0), "(c) ...and the file still holds 0 (got %s)" % _read_tmp().c_escape())
+
+	Game.reset_for_tests()
+	Game.store.dir = TMP
+	Game.store.write_settings(Settings.new().to_dict())
+	Game.load_settings()
+	var w1 := o_writes.total()
+	Game.settings.set_value(&"brightness", 2)
+	await get_tree().process_frame
+	check(o_writes.total() == w1 + 1 and _tmp_holds(2), "(d) control: with no override the same kind of change writes once, in TMP (%d writes)" % (o_writes.total() - w1))
+	OS.remove_logger(o_writes)
+	Game.reset_for_tests()
+	Game.store.dir = TMP
 
 	# Each test runs in its own Godot process, and the folder is redirected first, so this boot
 	# reads only the temp file. Keep it the last case: reset_for_tests() leaves the process

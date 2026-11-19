@@ -29,7 +29,7 @@ var light_tap_window := 0.12
 
 func set_value(key: StringName, v: Variant) -> void:
 	assert(SCHEMA.has(key), "Settings: unknown key '%s'" % key)
-	assert(_valid(key, v), "Settings: %s is not a valid value for '%s'" % [v, key])
+	assert(is_valid(key, v), "Settings: %s is not a valid value for '%s'" % [v, key])
 	if get(key) == v:
 		return
 	set(key, v)
@@ -57,7 +57,7 @@ func from_dict(d: Dictionary) -> bool:
 		# JSON numbers come back as floats: a whole one is the int it was written as.
 		if typeof(v) == TYPE_FLOAT and typeof(default) == TYPE_INT and v == floorf(v):
 			v = int(v)
-		if v == null or not _valid(key, v):
+		if v == null or not is_valid(key, v):
 			clean = false
 			v = default
 		set(key, v)
@@ -73,7 +73,12 @@ func reset() -> void:
 		changed.emit(key)
 
 
-## The type check comes first, so `true` never passes for 1.
-func _valid(key: StringName, v: Variant) -> bool:
-	var spec: Dictionary = SCHEMA[key]
+## True when `key` is in `schema` and `v` is one of its choices. The type check comes first, so
+## `true` never passes for 1, and 2.0 never passes for 2. `schema` is only ever passed by DevTools'
+## `--set` validator and its tests (a fake bool key, Story 1.11 D8); every other caller checks the
+## real SCHEMA.
+static func is_valid(key: StringName, v: Variant, schema: Dictionary = SCHEMA) -> bool:
+	if not schema.has(key):
+		return false
+	var spec: Dictionary = schema[key]
 	return typeof(v) == typeof(spec.default) and v in spec.choices

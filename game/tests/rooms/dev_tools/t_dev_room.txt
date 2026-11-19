@@ -1,0 +1,16 @@
+; Story 1.11 DevTools test room: P on a ledge with a short drop to a clean floor, no enemies,
+; one persistent object, exits to itself. Not a level.
+id=t_dev_room
+zone=dusk
+exits=up:t_dev_room@x8, down:t_dev_room@x8
+obj=lamp_t_dev_room_1@5,7
+---
+########.#
+#........#
+#.P......#
+####.....#
+#........#
+#........#
+#........#
+#........#
+########.#

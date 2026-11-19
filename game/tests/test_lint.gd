@@ -25,6 +25,8 @@ const SENTINELS := ["actors/player_input.gd", "core/clock.gd", "rules/tuning.gd"
 ## lists the files or folders where the pattern is the rule's purpose (all prefix matches).
 ## `rules_purity` and `core_layer` also get a bare pattern of class names built at run time
 ## (`layer_names()`). Ids are stable: FAIL lines and later stories (1.11's dev_ref line) name them.
+## `once` (only dev_ref has it; read with `rule.get("once", {})`) maps a path to [guard, line]: that
+## one line is let through once per file, and only right under that guard (Story 1.11 D12).
 ## (Story D3 sketched rows as {id, re, on, only, allow}; the two pattern lists and `skip` replaced
 ## `re`/`on` so one rule can check identifiers and path strings together.)
 const RULES: Array[Dictionary] = [
@@ -35,9 +37,11 @@ const RULES: Array[Dictionary] = [
 	# AR34/AR35: gameplay reads PlayerInput intents; raw input only in the sampler, device tracking
 	# (1.14) and the UI kit (1.31). Wider than `Input.` (code review of 1.8): InputMap, InputEvent*,
 	# the _input callbacks (and Control's gui_input), and `Input` passed around as a value.
+	# dev/ too (Story 1.11 D12): DevTools reads only its own dev_* action, ships in no release build
+	# and must work while the player is dead, locked or absent; the architecture lets dev/ touch anything.
 	{id = &"raw_input", bare = [r"\b(Input|InputMap)\b", r"\bInputEvent\w*",
 			r"\bfunc\s+_(input|unhandled_input|unhandled_key_input|shortcut_input|gui_input)\s*\(", r"\bgui_input\b"], code = [],
-		only = [], skip = [], allow = ["actors/player_input.gd", "core/devices.gd", "ui/kit/"]},
+		only = [], skip = [], allow = ["actors/player_input.gd", "core/devices.gd", "ui/kit/", "dev/"]},
 	# AR55: one logger, silent in release builds.
 	{id = &"print", bare = [r"(?<![\w.])(@GlobalScope\s*\.\s*)?(print|print_rich|printerr|printraw|prints|printt|print_debug|print_verbose|print_stack)\s*\(",
 			r"\bprint_(tree|tree_pretty|orphan_nodes)\s*\("], code = [],
@@ -71,10 +75,13 @@ const RULES: Array[Dictionary] = [
 	# is built at run time: `layer_names()`) or their paths.
 	{id = &"core_layer", bare = [], code = [r"res://(scripts|scenes)/(world|actors|objects|moments|ui|audio|dev)/"],
 		only = ["core/"], skip = [], allow = []},
-	# AR54: nothing outside dev/ (and tests/, which the lint doesn't scan) references DevTools.
-	# Story 1.11 allows world.gd's one path-string load() line, with a test.
+	# AR54: nothing outside dev/ (and tests/, which the lint doesn't scan) references dev/: its
+	# paths, DevTools, or any class_name declared under dev/ (`layer_names()`). The one exception
+	# is world.gd's guarded path-string load(), exactly that line, once, right under its guard
+	# (Story 1.11 D12); _test_tree checks the real world.gd holds it, so a stale entry fails.
 	{id = &"dev_ref", bare = [r"\bDevTools\b"], code = [r"res://(scripts|scenes)/dev/"],
-		only = [], skip = ["dev/"], allow = []},
+		only = [], skip = ["dev/"], allow = [],
+		once = {"world/world.gd": ["if OS.is_debug_build():", "add_child(load(\"res://scripts/dev/dev_tools.gd\").new())"]}},
 	# Release exports exclude tests/* (Platform & Build), so game code that loads a test file
 	# (Spec included) breaks only in the shipped build (code review of 1.9).
 	{id = &"tests_ref", bare = [], code = [r"res://tests/"],
@@ -162,14 +169,32 @@ static func lint_text(rel_path: String, text: String, names: Dictionary) -> Arra
 	var rules := _rules_for(rel_path, names)
 	var hits: Array[Dictionary] = []
 	var open := ""
+	var prev := ""  # the previous non-blank line's code, stripped: the guard a `once` line needs
+	var used := {}  # rule id -> true once its `once` line has been let through in this text
 	var lines := text.replace("\r", "").split("\n")
 	for i in lines.size():
 		var s := strip(lines[i], open)
 		open = s.open
+		var code: String = s.code.strip_edges()
 		for rule in rules:
 			if _matches(rule.bare, s.bare) or _matches(rule.code, s.code):
+				if not used.has(rule.id) and _exempt(rule, rel_path, code, prev):
+					used[rule.id] = true
+					continue
 				hits.append({line = i + 1, rule = rule.id})
+		if code != "":
+			prev = code
 	return hits
+
+
+## Story 1.11 D12: true when this is the rule's one `once` line for this path, right under its
+## guard. Both compare stripped code, so indentation and a trailing comment don't matter.
+static func _exempt(rule: Dictionary, rel_path: String, code: String, prev: String) -> bool:
+	var once: Dictionary = rule.get("once", {})
+	if not once.has(rel_path):
+		return false
+	var pair: Array = once[rel_path]
+	return prev == pair[0] and code == pair[1]
 
 
 ## The rules that apply to this path, each with a bare pattern for its run-time class names.
@@ -252,6 +277,7 @@ const SAMPLES: Array = [
 	[&"raw_input", "actors/player_input.gd", "\tjump_held = Input.is_action_pressed(\"jump\")", false],
 	[&"raw_input", "core/devices.gd", "\tvar e: InputEvent", false],
 	[&"raw_input", "ui/kit/menu_list.gd", "func _unhandled_input(event: InputEvent) -> void:", false],
+	[&"raw_input", "dev/dev_tools.gd", "\tif Input.is_action_just_pressed(&\"dev_overlay\"):", false],
 	[&"raw_input", "actors/player.gd", "@onready var input: PlayerInput = $PlayerInput", false],
 	[&"raw_input", "actors/player.gd", "\tvar w := PlayerInput.BUFFER_TIME", false],
 	[&"raw_input", "actors/player.gd", "\t# Input.is_action_pressed(\"jump\")", false],
@@ -341,6 +367,18 @@ const SAMPLES: Array = [
 	[&"dev_ref", "world/world.gd", "## DevTools sets it from 1.11", false],
 	[&"dev_ref", "core/log.gd", "\tLog.warn(Log.CORE, \"DevTools missing\")", false],
 	[&"dev_ref", "world/world.gd", "# see res://scripts/dev/dev_tools.gd", false],
+	# Story 1.11 D12: world.gd's one guarded line, and every near-miss of it.
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())  # path string", false],
+	[&"dev_ref", "ui/gutters.gd", "\tif OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())\n\tif OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tadd_child(preload(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/overlays.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\n\t\t# DevTools, debug only\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", false],
+	[&"dev_ref", "world/world.gd", "\tif not OS.is_debug_build():\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tpass\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
+	[&"dev_ref", "world/world.gd", "\tvar t: DevThing", true],
+	[&"dev_ref", "world/world.gd", "\tvar s := \"DevThing\"", false],
 	[&"tests_ref", "world/world.gd", "const S := preload(\"res://tests/spec.gd\")", true],
 	[&"tests_ref", "core/game.gd", "\tvar p := \"res://tests/fixtures/slot_v1.json\"", true],
 	[&"tests_ref", "world/world.gd", "## the spec lives in res://tests/spec.gd", false],
@@ -372,6 +410,7 @@ func _test_rules() -> void:
 	var names := {
 		core_layer = PackedStringArray(["Audio", "Lurker", "Player", "PlayerInput", "Room", "World"]),
 		rules_purity = PackedStringArray(["Log", "Player", "Timer", "World"]),
+		dev_ref = PackedStringArray(["DevThing", "DevTools"]),
 	}
 	var covered := {}
 	for row: Array in SAMPLES:
@@ -413,6 +452,8 @@ func _test_tree() -> void:
 	check(names.core_layer.size() >= 5, "lint: upper-layer class names collected for core_layer (%s)" % [names.core_layer])
 	check(names.rules_purity.has("Timer") and names.rules_purity.has("Log") and names.rules_purity.has("Player") and names.rules_purity.has("Game"),
 			"lint: rules_purity knows the Node classes, core/ and the layers above (%d names)" % names.rules_purity.size())
+	check(names.dev_ref.has("DevTools"), "lint: dev_ref knows the class names declared under dev/, so dev/ was walked (%s)" % [names.dev_ref])
+	_test_world_hook(sources.get("world/world.gd", ""), names)
 	var total := 0
 	for rel: String in sources:
 		for h in lint_text(rel, sources[rel], names):
@@ -425,13 +466,15 @@ func _test_tree() -> void:
 
 ## Class names a layer must not use, by rule id, so a new class or autoload is covered with no
 ## edit here. core_layer gets the class_name lines and autoloads of the layers above core/;
-## rules_purity gets those, core/'s, and every engine Node class (`node_classes`, from ClassDB).
+## rules_purity gets those, core/'s, and every engine Node class (`node_classes`, from ClassDB);
+## dev_ref gets dev/'s (Story 1.11 D12: code outside dev/ never names them).
 ## `sources` maps a path under scripts/ to its text; `autoloads` maps a name to its project.godot
 ## value ("*res://scripts/core/game.gd"). `class_name` may follow annotations (`@abstract`, `@icon(…)`).
 static func layer_names(sources: Dictionary, autoloads: Dictionary, node_classes: PackedStringArray) -> Dictionary:
 	var re := RegEx.create_from_string(r"(?m)^(?:@\w+(?:\([^)\n]*\))?\s+)*class_name\s+(\w+)")
 	var upper := PackedStringArray()
 	var core := PackedStringArray()
+	var dev := PackedStringArray()
 	for rel: String in sources:
 		var dir := rel.get_slice("/", 0)
 		for m in re.search_all(sources[rel]):
@@ -439,28 +482,65 @@ static func layer_names(sources: Dictionary, autoloads: Dictionary, node_classes
 				upper.append(m.get_string(1))
 			elif dir == "core":
 				core.append(m.get_string(1))
+			if dir == "dev":
+				dev.append(m.get_string(1))
 	for name: String in autoloads:
 		var dir := String(autoloads[name]).trim_prefix("*").trim_prefix(ROOT + "/").get_slice("/", 0)
 		if dir in UPPER_DIRS:
 			upper.append(name)
 		elif dir == "core":
 			core.append(name)
+		if dir == "dev":
+			dev.append(name)
 	var below := upper + core + node_classes
 	upper.sort()
 	below.sort()
-	return {core_layer = upper, rules_purity = below}
+	dev.sort()
+	return {core_layer = upper, rules_purity = below, dev_ref = dev}
 
 
 func _test_layer_names() -> void:
 	var n := layer_names({
 			"world/enemy.gd": "@abstract class_name EnemyBase\nextends Node",
 			"ui/thing.gd": "@icon(\"res://i.svg\") class_name IconThing",
+			"dev/tool.gd": "class_name DevThing",
 			"core/log.gd": "class_name Log",
 			"rules/gear.gd": "class_name Gear"},
-		{"Game": "*res://scripts/core/game.gd", "Audio": "*res://scripts/audio/audio.gd"},
+		{"Game": "*res://scripts/core/game.gd", "Audio": "*res://scripts/audio/audio.gd", "DevAuto": "*res://scripts/dev/dev_auto.gd"},
 		PackedStringArray(["Timer"]))
-	check(Array(n.core_layer) == ["Audio", "EnemyBase", "IconThing"], "layer_names: core_layer gets upper classes (annotated too) and upper autoloads (%s)" % [n.core_layer])
-	check(Array(n.rules_purity) == ["Audio", "EnemyBase", "Game", "IconThing", "Log", "Timer"], "layer_names: rules_purity also gets core/, its autoload and the Node classes, never rules/ (%s)" % [n.rules_purity])
+	check(Array(n.core_layer) == ["Audio", "DevAuto", "DevThing", "EnemyBase", "IconThing"], "layer_names: core_layer gets upper classes (annotated too, dev/ included) and upper autoloads (%s)" % [n.core_layer])
+	check(Array(n.rules_purity) == ["Audio", "DevAuto", "DevThing", "EnemyBase", "Game", "IconThing", "Log", "Timer"], "layer_names: rules_purity also gets core/, its autoload and the Node classes, never rules/ (%s)" % [n.rules_purity])
+	check(Array(n.dev_ref) == ["DevAuto", "DevThing"], "layer_names: dev_ref gets only dev/'s classes and autoloads (%s)" % [n.dev_ref])
+
+
+## Story 1.11 D12: the real world.gd holds dev_ref's `once` line exactly once, as the first
+## statement of _ready() (AC1), and the lint lets it through, so an exemption whose text no longer
+## matches the code fails here, not silently.
+func _test_world_hook(src: String, names: Dictionary) -> void:
+	var pair: Array = (_rule(&"dev_ref").once as Dictionary)["world/world.gd"]
+	var line: String = pair[1]
+	var codes: Array[String] = []  # every non-blank line's code, stripped
+	var open := ""
+	for text in src.replace("\r", "").split("\n"):
+		var s := strip(text, open)
+		open = s.open
+		var code: String = s.code.strip_edges()
+		if code != "":
+			codes.append(code)
+	var count := codes.count(line)
+	check(count == 1, "lint: world.gd holds the DevTools line exactly once (got %d)" % count)
+	var at := codes.find(line)
+	check(at >= 2 and codes[at - 1] == pair[0] and codes[at - 2] == "func _ready() -> void:",
+			"lint: ...under its guard, as the first statement of World._ready() (got %s)" % [codes.slice(maxi(at - 2, 0), at + 1)])
+	var hits := lint_text("world/world.gd", src, names).filter(func(h: Dictionary) -> bool: return h.rule == &"dev_ref")
+	check(count == 1 and hits.is_empty(), "lint: ...and dev_ref lets it through (hits %s)" % [hits])
+
+
+static func _rule(id: StringName) -> Dictionary:
+	for rule in RULES:
+		if rule.id == id:
+			return rule
+	return {}
 
 
 func _gd_files(dir: String) -> Array[String]:

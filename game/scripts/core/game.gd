@@ -34,6 +34,7 @@ var store := SaveStore.new()
 var _booted := false
 var _settings_armed := false  # false until load_settings(): until then a change writes nothing
 var _settings_write_queued := false
+var _overrides := {}  # StringName -> value: session-only values (DevTools' --set); none are ever saved
 
 
 func _init() -> void:
@@ -65,6 +66,12 @@ func load_settings() -> void:
 	var read := store.read_settings()
 	var stored: Dictionary = read.settings
 	var clean := settings.from_dict(stored)
+	# Story 1.11 D8: an override outlives the load (DevTools applies --set before boot() runs), and
+	# a session with any override writes no settings.json at all, not even a rewrite of a bad file.
+	for key: StringName in _overrides:
+		settings.set_value(key, _overrides[key])
+	if not _overrides.is_empty():
+		return
 	if read.found == SaveStore.Found.UNREADABLE or read.found == SaveStore.Found.NEWER:
 		return
 	_settings_armed = true
@@ -72,12 +79,27 @@ func load_settings() -> void:
 		_queue_settings_write()
 
 
+## A settings value for this session only (DevTools' `--set`, Story 1.11 D8, sonlm 2026-11-19).
+## While any override exists the session writes no settings.json at all: not the override, not a
+## load's rewrite, not a later change to another key. A dev value must never reach the file the
+## release builds read (`user://` is shared by editor runs and exports). Like an unreadable or
+## newer file, the cost is that nothing changed this session is saved.
+func override_setting(key: StringName, v: Variant) -> void:
+	assert(Settings.is_valid(key, v), "Game.override_setting: %s is not valid for '%s'" % [v, key])
+	if _overrides.is_empty():
+		Log.info(Log.SAVE, "settings: overridden for this session; settings.json is not written")
+	_overrides[key] = v
+	_settings_armed = false  # a write already queued checks this and does nothing
+	settings.set_value(key, v)
+
+
 ## Every test that touches `Game` ends with this: defaults back on the same instances, settings
-## writes disarmed and the store pointed home, so nothing reaches the player's files. Leaves
-## `_booted` alone: only `test_state` boots, on a temp folder, as its last case, and each test
-## file runs in its own process.
+## writes disarmed, overrides dropped and the store pointed home, so nothing reaches the player's
+## files. Leaves `_booted` alone: only `test_state` boots, on a temp folder, as its last case, and
+## each test file runs in its own process.
 func reset_for_tests() -> void:
 	_settings_armed = false
+	_overrides.clear()
 	settings.reset()
 	slot.reset()
 	dive.reset()
