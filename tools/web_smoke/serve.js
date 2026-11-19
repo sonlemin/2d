@@ -1,6 +1,7 @@
 // A dependency-free static server for a build folder (Story 1.13 D8): the web smoke starts it as
 // Playwright's webServer, and the laptop views a server build through an SSH tunnel to it
-// (docs/build.md). Serves BUILD_DIR on 127.0.0.1 only, so /web/… and /web_debug/… are reachable.
+// (docs/build.md). Serves BUILD_DIR on 127.0.0.1 only, so /web/… and /web_debug/… are reachable,
+// plus one exact path outside it: /embed.html, the itch-style host page (Story 1.14 D7).
 //   BUILD_DIR=builds/<version> PORT=8060 node tools/web_smoke/serve.js
 // No COOP/COEP headers: a single-threaded build needs none (Godot's shell checks only WebGL2,
 // Fetch and a secure context, and 127.0.0.1 / a tunnelled localhost is secure).
@@ -45,6 +46,7 @@ if (!root || !stat(root)?.isDirectory()) {
   process.exit(1);
 }
 const realRoot = realpath(root);
+const EMBED = path.join(__dirname, 'embed.html');
 
 const server = http.createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -52,11 +54,18 @@ const server = http.createServer((req, res) => {
     return;
   }
   // The query string goes first: /web_debug/index.html?room=perf_worst is index.html.
+  let pathname;
   let rel;
   try {
-    rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    pathname = new URL(req.url, 'http://x').pathname;
+    rel = decodeURIComponent(pathname);
   } catch {
     res.writeHead(400).end();
+    return;
+  }
+  // The exact, undecoded path only: nothing else beside serve.js becomes reachable.
+  if (pathname === '/embed.html') {
+    send(req, res, EMBED, stat(EMBED));
     return;
   }
   let file = path.join(root, rel);
@@ -86,6 +95,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(404).end();
     return;
   }
+  send(req, res, file, st);
+});
+
+function send(req, res, file, st) {
+  if (!st?.isFile()) {
+    res.writeHead(404).end();
+    return;
+  }
   res.writeHead(200, {
     'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
     'Content-Length': st.size,
@@ -98,12 +115,12 @@ const server = http.createServer((req, res) => {
   // pipeline, not pipe: a client that aborts mid-download (a reload during the .wasm) must close
   // the file too, or the long-running tunnel server leaks a descriptor each time.
   pipeline(fs.createReadStream(file), res, () => {});
-});
+}
 
 server.on('error', (e) => {
   console.error(`serve.js: ${e.message}`);
   process.exit(1);
 });
 server.listen(port, '127.0.0.1', () => {
-  console.log(`serve.js: ${root} on http://127.0.0.1:${port}/ (web/index.html, web_debug/index.html)`);
+  console.log(`serve.js: ${root} on http://127.0.0.1:${port}/ (web/index.html, web_debug/index.html, embed.html)`);
 });

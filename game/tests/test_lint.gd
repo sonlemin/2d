@@ -95,7 +95,7 @@ const RULES: Array[Dictionary] = [
 	# (deferred from 1.4: `Game.settings.brightness = 2` compiled, emitted nothing, never saved).
 	# Covers nested fields and indexes, container mutators and reflective `set()` (code review of 1.9).
 	{id = &"state_write", bare = [
-			r"\bGame\s*\.\s*(settings|slot|dive|tuning|clock|store)\s*=(?!=)",
+			r"\bGame\s*\.\s*(settings|slot|dive|tuning|clock|store|display)\s*=(?!=)",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])+\s*([-+*/%]|\*\*|<<|>>|&|\||\^)?=(?!=)",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])+\s*\.\s*(append|append_array|push_back|push_front|insert|erase|remove_at|clear|merge|assign|fill|resize|sort|sort_custom|shuffle|reverse|pop_back|pop_front|pop_at)\s*\(",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\s*\.\s*set(_indexed|_deferred)?\s*\("],
@@ -402,6 +402,7 @@ const SAMPLES: Array = [
 	[&"state_write", "world/world.gd", "\tGame.dive.carried += 3", true],
 	[&"state_write", "ui/gutters.gd", "\tGame.slot.flags[\"met_oda\"] = true", true],
 	[&"state_write", "world/world.gd", "\tGame.slot = SlotState.new()", true],
+	[&"state_write", "ui/gutters.gd", "\tGame.display = x", true],
 	[&"state_write", "world/world.gd", "\tGame.slot.cache.embers = 3", true],
 	[&"state_write", "ui/gutters.gd", "\tGame.slot.flags[ids[0]] = true", true],
 	[&"state_write", "world/world.gd", "\tGame.slot.flags.erase(&\"met_oda\")", true],

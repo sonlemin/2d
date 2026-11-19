@@ -1,8 +1,8 @@
 // The web boot smoke (Story 1.13 AC6, AR53). Both web builds boot in headless Chromium; the debug
 // build is the runtime check, because a release web build prints parse and load errors but never
-// runtime script errors (D5). Later stories add their checks here as test.describe blocks: the
-// DPR scale and keys that must not scroll (1.14), the click-to-play gate (1.33), SMOKE save ok
-// (1.39), the pogo pitch (3.3).
+// runtime script errors (D5). Later stories add their checks here as test.describe blocks. Done:
+// the DPR scale and keys that must not scroll (1.14: `Display scale`, `Web input`). To come: the
+// click-to-play gate (1.33), SMOKE save ok (1.39), the pogo pitch (3.3).
 // @ts-check
 'use strict';
 
@@ -120,5 +120,167 @@ test.describe('Web (release)', () => {
     // AC7: DevTools is absent and Log is silent in release. Log's own prefixes only: Chromium's GPU
     // messages also start with "[" ("[.WebGL-0x…]GL Driver Message …").
     expect(texts(seen).filter((t) => LOG_LINE.test(t)), 'no Log line: DevTools and Log are debug-only').toEqual([]);
+  });
+});
+
+// --- Story 1.14 ------------------------------------------------------------------------------
+
+// scripts/core/display.gd's line (D6). The newest one names the scale now: a step that keeps the
+// whole scale (960×540 → 1000×600 at DPR 1) prints nothing new.
+const DISPLAY_LINE = /^\[ui\] display: scale (\S+)/;
+const newestScale = (seen) => {
+  const lines = texts(seen).filter((t) => DISPLAY_LINE.test(t));
+  return lines.length ? DISPLAY_LINE.exec(lines[lines.length - 1])[1] : null;
+};
+
+// What the engine really drew, from a device-pixel screenshot (D7): the box of non-black pixels
+// (the letterbox is exactly 0,0,0, F4) and the colour of its outermost columns at mid-height. The
+// browser decodes the PNG, so there is no npm dependency.
+async function measure(page) {
+  const png = await page.screenshot(); // scale: 'device' by default, so physical pixels
+  return page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const W = bmp.width;
+    const H = bmp.height;
+    const ctx = new OffscreenCanvas(W, H).getContext('2d');
+    ctx.drawImage(bmp, 0, 0);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (d[i] || d[i + 1] || d[i + 2]) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0) return { image: [W, H], box: null };
+    const mid = Math.floor((y0 + y1) / 2);
+    const rgb = (x) => { const i = (mid * W + x) * 4; return [d[i], d[i + 1], d[i + 2]].join(','); };
+    return { image: [W, H], box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], left: rgb(x0), right: rgb(x1) };
+  }, png.toString('base64'));
+}
+
+// One step's verdict: a 480·s × 270·s box (±1 px for the fit), centred to within 1 px, with both
+// outermost gutter columns showing the same non-black colour, so nothing is cropped (F3 cut off
+// the right gutter). Note for 1.25: if its HUD puts different pixels there, move the sample row.
+function judge(m, scale) {
+  const tol = scale < 1 ? 1 : 0;
+  const want = [480 * scale, 270 * scale];
+  if (!m.box) return { ok: false, why: 'no non-black pixel', ...m };
+  const [x, y, w, h] = m.box;
+  const [W, H] = m.image;
+  const size = Math.abs(w - want[0]) <= tol && Math.abs(h - want[1]) <= tol;
+  const centred = Math.abs(x - (W - w) / 2) <= 1 && Math.abs(y - (H - h) / 2) <= 1;
+  const edges = m.left === m.right;
+  return { ok: size && centred && edges, want: want.map((v) => +v.toFixed(1)), size, centred, edges, ...m };
+}
+
+// D7: expected values come from this table, never a JavaScript copy of the rule (one home:
+// display.gd). `css` is the viewport; the physical size is css × dpr, which the engine sees (F1).
+const DPR_ROWS = [
+  { dpr: 1, steps: [{ css: [960, 540], scale: 2, token: '2' }, { css: [1000, 600], scale: 2, token: '2' },
+    { css: [400, 225], scale: 400 / 480, token: '0.833' }, { css: [1000, 600], scale: 2, token: '2' }] },
+  { dpr: 1.5, steps: [{ css: [960, 540], scale: 3, token: '3' }, { css: [1000, 600], scale: 3, token: '3' }] },
+  // Integer: physical pixels decide, not CSS. 320×180 CSS is 640×360 physical, so ×1, not the fit.
+  { dpr: 2, steps: [{ css: [960, 540], scale: 4, token: '4' }, { css: [320, 180], scale: 1, token: '1' }] },
+];
+
+test.describe('Display scale', () => {
+  for (const row of DPR_ROWS) {
+    test.describe(`DPR ${row.dpr}`, () => {
+      const [w, h] = row.steps[0].css;
+      test.use({ viewport: { width: w, height: h }, deviceScaleFactor: row.dpr });
+
+      test(`${row.steps.map((s) => s.css.join('x')).join(' -> ')} at DPR ${row.dpr}`, async ({ page, seen }) => {
+        const left = await boot(page, seen, '/web_debug/index.html');
+        await expect.poll(() => newestScale(seen), { message: 'the first "[ui] display:" line', timeout: left() }).not.toBeNull();
+        for (const step of row.steps) {
+          const label = `${step.css.join('x')} CSS at DPR ${row.dpr}`;
+          await page.setViewportSize({ width: step.css[0], height: step.css[1] });
+          // A resize lands a frame or two later. Polled as text so a failure prints the whole
+          // measurement (the box, the image size, both edge colours), not just `ok: false`.
+          await expect.poll(async () => JSON.stringify(judge(await measure(page), step.scale)),
+            { message: `${label}: the engine draws x${step.token}, centred, both gutters showing`, timeout: 10_000 })
+            .toMatch(/^\{"ok":true,/);
+          await expect.poll(() => newestScale(seen),
+            { message: `${label}: the newest "[ui] display:" line names scale ${step.token}`, timeout: 10_000 }).toBe(step.token);
+        }
+        await expectClean(page, seen);
+      });
+    });
+  }
+});
+
+// Story 1.14 D7: the release build in an itch-style host page, because the build that ships is
+// the one that must not scroll the page. F11 and F12 are never pressed: browsers reserve them,
+// and the headless shell isn't the real browser for them (the laptop look checks F11).
+const KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'PageUp', 'PageDown', 'Home', 'End',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10'];
+// Keyboard scrolling animates; long enough that an unguarded key has visibly moved the host.
+const SCROLL_MS = 500;
+
+// boot() for a game inside embed.html: the host page, then the game's frame by its path, then
+// the same #status race in that frame. The page's console event carries the frame's messages
+// (F11), so `seen` works unchanged. Returns the frame and the time left on the one deadline.
+async function bootFrame(page, seen, url, gamePath) {
+  const deadline = Date.now() + BOOT_MS;
+  const left = () => Math.max(1, deadline - Date.now());
+  const response = await page.goto(url, { timeout: left() });
+  expect(response && response.status(), `${url} is served`).toBe(200);
+  const find = () => page.frames().find((f) => { try { return new URL(f.url()).pathname === gamePath; } catch { return false; } });
+  await expect.poll(() => !!find(), { message: `the host page holds a frame at ${gamePath}`, timeout: left() }).toBe(true);
+  const frame = find();
+  const handle = await frame.waitForFunction(() => {
+    if (!document.getElementById('status')) return 'booted';
+    const notice = document.getElementById('status-notice');
+    const text = notice ? notice.innerText.trim() : '';
+    return text !== '' ? `notice: ${text}` : false;
+  }, null, { timeout: left(), polling: 100 });
+  expect(await handle.jsonValue(), 'the frame removes #status (the engine started) instead of showing a failure notice').toBe('booted');
+  await expect.poll(() => texts(seen).some((t) => t.startsWith(BANNER)), { message: `the console shows "${BANNER}…"`, timeout: left() }).toBe(true);
+  return { frame, left };
+}
+
+test.describe('Web input', () => {
+  test('keys never scroll the host page, focused or blurred (embed.html?build=web)', async ({ page, seen }) => {
+    const { frame } = await bootFrame(page, seen, '/embed.html?build=web', '/web/index.html');
+    const scrollY = () => page.evaluate(() => window.scrollY);
+    const canvasActive = () => frame.evaluate(() => document.activeElement === document.getElementById('canvas'));
+    // Bubble phase on the frame's window: it sees each key after Godot's and the guard's listeners.
+    await frame.evaluate(() => {
+      window.__keys = [];
+      addEventListener('keydown', (e) => window.__keys.push(`${e.code}:${e.defaultPrevented}`));
+    });
+    const takeKeys = () => frame.evaluate(() => window.__keys.splice(0));
+    const prevented = (keys) => keys.map((k) => `${k}:true`);
+
+    // Focused: focusCanvas (F6) gave the canvas focus at boot.
+    expect(await canvasActive(), 'the canvas has focus after boot').toBe(true);
+    for (const k of KEYS) await page.keyboard.press(k);
+    await page.waitForTimeout(SCROLL_MS);
+    expect(await takeKeys(), 'canvas focused: every key reaches the frame prevented').toEqual(prevented(KEYS));
+    expect(await scrollY(), 'canvas focused: the host page has not scrolled').toBe(0);
+
+    // Blurred inside the frame: without the guard this scrolled the host by 619 px (F7).
+    await frame.evaluate(() => document.activeElement.blur());
+    expect(await frame.evaluate(() => document.activeElement === document.body), 'blur() moved focus to the frame\'s body').toBe(true);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(SCROLL_MS);
+    expect(await scrollY(), 'blurred: ArrowDown leaves the host page at scrollY 0').toBe(0);
+    expect(await canvasActive(), 'blurred: the guard gave the canvas focus back on the first key').toBe(true);
+    const rest = KEYS.filter((k) => k !== 'ArrowDown');
+    for (const k of rest) await page.keyboard.press(k);
+    await page.waitForTimeout(SCROLL_MS);
+    expect(await takeKeys(), 'blurred: every key reaches the frame prevented').toEqual(prevented(['ArrowDown', ...rest]));
+    expect(await scrollY(), 'blurred: the host page has still not scrolled').toBe(0);
+
+    const notice = await frame.evaluate(() => document.getElementById('status-notice')?.innerText.trim() ?? '');
+    expect(notice, 'the frame\'s #status-notice is empty or gone').toBe('');
+    await expectClean(page, seen);
   });
 });

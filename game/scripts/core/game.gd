@@ -3,6 +3,8 @@ extends Node
 ## it, never rules. It keeps the same instances all session and resets them in place, because
 ## subscribers hold on to them: gear changes call `tuning.apply_gear()`, never a new Tuning, and
 ## replacing a ref is an assert (Story 1.4 D7). `devices` arrives with Story 1.37.
+## Two refs are child nodes because they need the tree: `clock` (timers) and `display` (the
+## window, Story 1.14). Neither holds rule state.
 ## Starting up touches no file (D6): the entry scene calls `boot()` once, which loads
 ## `settings.json` and arms its writes. A test never boots against the real folder: one that
 ## checks the file points `store.dir` at a temp folder first and ends with `reset_for_tests()`.
@@ -27,6 +29,10 @@ var clock := Clock.new():  ## ADR-4: the only writer of the time scale
 	set(_value):
 		@warning_ignore("assert_always_false")
 		assert(false, "Game.clock is session-long: never replace it")
+var display := Display.new():  ## AR8: the scale rule; the only code that touches the stretch or the window
+	set(_value):
+		@warning_ignore("assert_always_false")
+		assert(false, "Game.display is session-long: never replace it")
 ## Reads and writes the player's files (AR37). Plumbing, not state, so no guard: tests change its
 ## `dir`, never the instance.
 var store := SaveStore.new()
@@ -40,18 +46,23 @@ var _overrides := {}  # StringName -> value: session-only values (DevTools' --se
 func _init() -> void:
 	clock.name = "Clock"
 	add_child(clock)
+	display.name = "Display"
+	add_child(display)
 	settings.changed.connect(_on_settings_changed)
 
 
 ## Once per session, first thing in the entry scene's `_ready()` (D6). Not in this autoload's own
 ## `_ready()`: autoloads are ready before the test runner exists, so a test could not redirect
 ## the folder in time, and a missing file would be rewritten into the real user:// on every run.
+## Then starts `display` (Story 1.14), after the settings so 7.2's display settings are loaded
+## when it reads them; it stays inert under the headless display server (1.14 D2).
 ## Story 1.21 adds: load slot 1 if present.
 func boot() -> void:
 	if _booted:
 		return
 	_booted = true
 	load_settings()
+	display.start()
 
 
 ## Loads `settings.json` into `settings` and arms its writes. A missing, corrupt or partly bad file

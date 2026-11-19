@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- An itch-style host page (Story 1.14 D7): a header, the game in a borderless 960×540 iframe,
+     then a tall page that keys could scroll. The web smoke's `Web input` test boots the release
+     build in it; on the laptop, http://localhost:8060/embed.html?build=web (or web_debug).
+     serve.js serves it at /embed.html, its one path outside BUILD_DIR. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Embed test (itch-style)</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; background: #222; color: #ddd; }
+  header { height: 100px; box-sizing: border-box; padding: 16px; }
+  #page { height: 3000px; padding: 16px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<header>Host page header. Click here to move focus off the game: arrows then scroll this page, which is correct.</header>
+<iframe id="game" width="960" height="540" style="border:0;display:block" title="game"></iframe>
+<div id="page">The rest of the host page. Keys pressed while the game has focus must never scroll it.</div>
+<script>
+  // Only the two web builds; anything else falls back to the release one, the build that ships.
+  var build = new URLSearchParams(location.search).get('build');
+  if (build !== 'web' && build !== 'web_debug') build = 'web';
+  document.getElementById('game').src = '/' + build + '/index.html';
+</script>
+</body>
+</html>

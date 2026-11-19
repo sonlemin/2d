@@ -26,6 +26,14 @@ const DEBUG_EXCLUDES := ["tests/*"]
 ## Single-threaded web (no SharedArrayBuffer, so no COOP/COEP and no itch.io origin change):
 ## these pick the web_nothreads_* templates. Written explicitly, never left to a default.
 const WEB_FALSE := ["variant/extensions_support", "variant/thread_support", "progressive_web_app/enabled"]
+## Story 1.14 D1: the canvas backing is CSS size × devicePixelRatio only under the Adaptive resize
+## policy (2), and the canvas must hold focus from the start for keys to reach the game. Both are
+## the defaults; written explicitly so a laptop re-save that changes them fails here.
+const WEB_EXPLICIT := {"html/canvas_resize_policy": 2, "html/focus_canvas_on_start": true}
+## Story 1.14 D5: the key guard in html/head_include, the same text in both web presets. The smoke
+## (`Web input`) is the real test; this pins that it is there and whole.
+const GUARD_PARTS := ["<script>", "addEventListener('keydown'", "preventDefault()", ".focus()",
+		"Arrow(Up|Down|Left|Right)", "Space", "Page(Up|Down)", "Home", "End", "F([1-9]|1[0-2])", ", true);", "</script>"]
 const WALK_ROOTS := ["res://rooms", "res://tests", "res://scripts/dev"]
 ## Files the walk must find, so an empty or wrong walk can't pass every filter check vacuously.
 const SENTINELS := ["rooms/l1/m1_shaft.txt", "rooms/dev/perf_worst.txt", "scripts/dev/dev_tools.gd", "tests/runner.gd"]
@@ -47,6 +55,7 @@ func run() -> void:
 	_test_numbering(cfg)
 	for i in PRESETS.size():
 		_test_preset(cfg, i)
+	_test_web_guard_same(cfg)
 	_test_model()
 	_test_filters(cfg)
 	if _fail == 0:
@@ -133,12 +142,31 @@ func _test_preset(cfg: ConfigFile, i: int) -> void:
 		for key: String in WEB_FALSE:
 			var v: Variant = cfg.get_value(opt, key, null) if has_opts else null
 			check(v is bool and v == false, "%s: %s=false, written explicitly (got %s)" % [label, key, v])
+		for key: String in WEB_EXPLICIT:
+			# has_section_key first: get_value() with a null default prints an engine ERROR.
+			var v: Variant = cfg.get_value(opt, key) if cfg.has_section_key(opt, key) else null
+			var want_v: Variant = WEB_EXPLICIT[key]
+			check(typeof(v) == typeof(want_v) and v == want_v, "%s: %s=%s, written explicitly (got %s)" % [label, key, want_v, v])
+		var guard: Variant = cfg.get_value(opt, "html/head_include") if cfg.has_section_key(opt, "html/head_include") else null
+		var text := str(guard) if guard is String else ""
+		var missing := GUARD_PARTS.filter(func(p: String) -> bool: return not p in text)
+		check(text != "" and missing.is_empty(), "%s: html/head_include holds the key guard (missing %s)" % [label, missing if text != "" else ["the key"]])
 	else:
 		var v: Variant = cfg.get_value(opt, "binary_format/embed_pck", null) if has_opts else null
 		check(v is bool and v == false, "%s: embed_pck=false, so the PCK sits beside the binary for the release check (got %s)" % [label, v])
 		var arch: Variant = cfg.get_value(opt, "binary_format/architecture", "") if has_opts else ""
 		check(str(arch) == "x86_64", "%s: binary_format/architecture is x86_64, the one template installed (got '%s')" % [label, arch])
 	_test_no_machine_paths(cfg, label, sec, opt)
+
+
+## Story 1.14 D5: one guard, so the release build and the debug build the smoke boots never drift.
+func _test_web_guard_same(cfg: ConfigFile) -> void:
+	var texts := []
+	for i in PRESETS.size():
+		if PRESETS[i].platform == "Web":
+			texts.append(str(cfg.get_value("preset.%d.options" % i, "html/head_include", "")))
+	check(texts.size() == 2 and texts[0] != "" and texts[0] == texts[1],
+			"Web and Web debug carry the same html/head_include (got %d presets, same %s)" % [texts.size(), texts.size() == 2 and texts[0] == texts[1]])
 
 
 ## AC1: builds come from the server's pinned templates and its builds/ folder, never a path
