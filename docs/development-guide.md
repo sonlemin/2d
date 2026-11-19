@@ -45,15 +45,17 @@ In the editor, use Debug → Customize Run Instances and its per-instance argume
 | `--chain=<n>` | 0–20 (`ChainState.MAX_CHAIN`), armed on every spawn (every life). Paid on the first physics tick that ends with the player off the floor, as n `ChainState.add_hit()` calls (count n, held n(n+1)/2, best chain n); then it breaks and banks like any chain |
 | `--log=<cat>,<cat>` | Turns on those `Log` categories (names from `Log.CATEGORIES`, any case). An unknown name warns and is skipped. `Log.set_enabled()` is called once, with every `--log` value merged, and only if they name at least one valid category (none, or `--log=` alone, warns and leaves `Log` as it was) |
 | `--set=<key>:<value>` | Any `Settings` key, typed by its default (int, float, bool `true`/`false`); repeatable. Goes through `Game.override_setting()`: the value survives `Game.boot()`'s load, and a session with any override writes no `settings.json` at all (not even a rewrite or another key's change). `--set=brightness:0`…`3` is how brightness changes until Options (Story 1.36) |
+| `--glow=on\|off` | Story 1.12: `on` adds a `WorldEnvironment` named `Glow` under DevTools, with a code-built `Environment` (`BG_CANVAS`, glow on, intensity 1.0, strength 1.0, bloom 0, threshold 0.5, additive). `off`, or no arg, adds none; anything else (`ON`, `yes`) warns. Engine glow is for the perf check only until Story 1.15's verdict |
+| `--perf[=<s>]` | Story 1.12: a timed perf run, 60 s by default, `<s>` 1–600. On every spawn it locks the player's input, masks its `Hurtbox` off (no kill or knock can break the chain), holds `--chain`'s n (or 20 without one) paid through `--chain`'s take-off arming, and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s, from a tick counter. A flare stand-in (ALWAYS, at the player's light radius) and an Ember Cache stand-in (CACHE, 80 px) ride along. It measures wall-clock frame times from the frame after the chain reaches n, then logs one summary line, `[room] dev: perf …`, and shows it in overlay 4; the autopilot keeps going after it. Built for `perf_worst`; the procedure is [perf.md](./perf.md) |
 
-Args apply in the order `log`, `set`, `room`, `chain`, and only when World is the current scene (a real run). A bad arg is a `push_warning` and the game still starts; never an error. A test that instances `world.tscn` gets an inert DevTools; to test an arg, set its `tokens` from World's `child_entered_tree`, connected before `add_child` (see `smoke_dev_tools.gd`).
+Args apply in the order `log`, `set`, `room`, `chain`, `glow`, `perf`, and only when World is the current scene (a real run). A bad arg is a `push_warning` and the game still starts; never an error. A test that instances `world.tscn` gets an inert DevTools; to test an arg, set its `tokens` from World's `child_entered_tree`, connected before `add_child` (see `smoke_dev_tools.gd`).
 
 **Overlays:** the backquote key (`` ` ``, action `dev_overlay`, physical keycode 96; no project action is bound to a function key) cycles, from off:
 
 1. the play rect (`World.play_rect()`), the notice rect (the play rect shrunk by `Lurker.SCREEN_MARGIN`, 8 px), and both 60 px gutters with their 58 px usable bands;
 2. the player's light radius and its notice reach (× 1.6), the reach dashed and dim with "below notice" while the light is under 80 px, plus each predator's state and a line to the player while it senses them;
 3. each exit (`side -> target`), the `spawn` / `up` / `down` entries, and each `obj=` id at its cell;
-4. FPS, the on-screen `PointLight2D` count (on screen = `World.play_rect()`) and the active `Clock` requests (each stays listed, greyed, 0.5 s after it ends);
+4. the readout, rebuilt at 4 Hz: `FPS`; `lights n/6, sprites m` (plus `, over k` when the always-lights alone exceed the budget), from `BudgetLight.counts()` on `World.light_rect()`, so it shows exactly what the light budget counts; `frame x.x ms, worst y.y ms` in wall time since mode 4 opened; with `--perf`, the run's progress, then its summary over up to three rows; then the active `Clock` requests (each stays listed, greyed, 0.5 s after it ends);
 
 then off. It works while paused (DevTools is `PROCESS_MODE_ALWAYS`). World marks use one cached unshaded `CanvasItemMaterial`, so they read under the darkness; screen marks sit on DevTools' own CanvasLayer 11, above the UI (10). A mark at an actor can sit up to one physics tick off the interpolated sprite (accepted for a dev overlay). Nothing blinks.
 
@@ -75,13 +77,16 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/test_state.g
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_loader.gd      # room validator, build, Room API and m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sweep.gd       # the pure room sweeps on inline grids
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
-godot --headless --path game res://tests/runner.tscn -- res://tests/test_dev_args.gd         # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, mode 2's light marks
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_dev_args.gd         # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, mode 2's light marks, --glow/--perf, the perf run's path, stats and summary
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_fx.gd               # Fx's shared materials, built once; effects free themselves
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_light_budget.gd     # BudgetLight: the rule, apply() on nodes, the sprite fallback, the scene audit
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_rooms.gd           # every room file: validation, cross-file links, sweeps, lurker guarantees
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd             # the descent bot in every spine room
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.gd           # the M1 move checks on m1_shaft
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_world.gd           # World: tree, framing, state wiring, respawn without a reload, R16 loop
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_room_swap.gd       # room swaps on the test rooms in tests/rooms/swap/
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd       # DevTools in World: inert without args, the real command line, each arg and bad arg, the overlay modes, light count, Clock rows, no function key
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_perf.gd            # the perf kit in World: --perf=3 in perf_worst holds the chain and the budget every tick, the summary; --glow, bad --perf, the view rect, m1_shaft unchanged
 ```
 
 Screenshots (needs a renderer):
@@ -123,6 +128,7 @@ A text scan of every `.gd` under `game/scripts/` (comments dropped, string conte
 | `rules_purity` | in `rules/`: `Node*` and every other Node class (ClassDB), `Input*`, `Engine*`, `OS`, `Time`, `SceneTree`, `get_tree(`, file access (`FileAccess`, `DirAccess`, `ResourceLoader`, `ResourceSaver`, `ConfigFile`), `ProjectSettings`, `DisplayServer`, `Game`, `Audio`, any class or autoload from `core/` or above, `load(`, a `preload` other than `scripts/rules/` or a sibling `name.gd` | — |
 | `core_layer` | in `core/`: a `class_name` or autoload from `world/ actors/ objects/ moments/ ui/ audio/ dev/` (collected at run time), or a path into them | — |
 | `dev_ref` | outside `dev/`: `DevTools`, any `class_name` declared under `dev/` (collected at run time), or a `res://scripts/dev/` / `res://scenes/dev/` path | `world/world.gd`'s one guarded line, `add_child(load("res://scripts/dev/dev_tools.gd").new())` right under `if OS.is_debug_build():`, once per file (the row's `once` field); a tree check proves the real `world.gd` holds it exactly once |
+| `raw_light` | `PointLight2D.new(` or `extends PointLight2D` (AR46, Story 1.12: every 2D light is a `BudgetLight`, or the ≤ 6 budget can't see it); a `PointLight2D` type annotation is fine. `.tscn` files are covered by `test_light_budget`'s scene audit instead | `core/budget_light.gd` |
 | `tests_ref` | any `res://tests/` path (release exports exclude `tests/*`, Spec included) | — |
 | `state_write` | outside `rules/`: `Game.settings/slot/dive/tuning.<field>…` assigned (any assignment operator, nested fields and indexes), a container mutator on one (`.append`, `.erase`, `.clear`, …), reflective `.set(`, or replacing a `Game.*` instance | — |
 
@@ -150,9 +156,11 @@ The level is `game/rooms/l1/m1_shaft.txt`: a header, `---`, then the grid (`#` w
 | Tune a lurker | the `LURKER_*` consts in `scripts/rules/tuning.gd`; change the matching GDD table too, and keep `LURKER_TELEGRAPH_TIME ≥ 0.75`. The sensing consts stay in `lurker.gd` until 1.20 |
 | Add an enemy that can be pogoed | A body on layer 3 (value 4) with a `take_hit()` method; add it to group `enemy` if contact should knock back |
 | Add a predator | An `Area2D` on layer 4 (value 8) in group `predator`; `monitorable` only while it may kill |
-| New effect | A static function in `fx.gd`; unshaded so it reads in the dark |
+| New effect | A static function in `fx.gd`, drawn with the shared `Fx.unshaded()` (or `Fx.additive()` for a glow) so it reads in the dark; never a new `Material` per effect |
+| Add a light | Build a `BudgetLight` (`scripts/core/budget_light.gd`), never a raw `PointLight2D` (lint `raw_light`; scenes are checked by `test_light_budget`'s audit), on the shared `art/light.png`, sized by `texture_scale`. Set its `rank`: ALWAYS only for the player and flares, CACHE for the Ember Cache, GLOW (the default) for everything else. Owners set `energy`, `color`, `texture_scale` and `visible`; only the budget writes `enabled` |
 | Add an input action | `project.godot` `[input]` (Project Settings → Input Map) and `game/README.md` |
 | Add a DevTools arg | one `ARGS` row in `scripts/dev/dev_tools.gd` (`{help, apply, repeat}`) + its apply method + a pure static validator + `test_dev_args` cases (+ a `smoke_dev_tools` case when it touches the scene) |
+| Measure performance | [perf.md](./perf.md): `godot --path game -- --room=perf_worst --perf`, then with `--glow=on` |
 
 After any rule change, update the matching GDD table. Note playtest-driven changes in `_bmad-output/implementation-artifacts/`.
 

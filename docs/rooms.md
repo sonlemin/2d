@@ -118,7 +118,7 @@ Plus, once per run: the tuned max fall can't stretch `Spec.LEDGE_FALL_MAX` past 
 
 **`smoke_bot.gd`** plays every `spine=true` room outside `rooms/dev/`, sorted by path, from its `up` entry (else `P`) down to its `down` exit: plain movement, Attack, a hop only when blocked, never Dash, all lurkers paused. It aims for the nearest crawler in a row below the last one it swung at, pogoes it, walks off a ledge at the edge nearest its next target, and slashes a walker on its floor within 24 px. Per room it must reach a chain of `Spec.BOT_MIN_CHAIN` (5; `m1_shaft`: 8), have chain 0 whenever its body crosses an exit (the World backstop never fires on its line), reach the `down` exit (or, with none, the bottom ledge), and be alive. A spine room with neither an `up` exit nor `P` is a named `FAIL` (nowhere to start). It prints a `bot <id>: frame …, best …` trace line.
 
-**`rooms/dev/`** (the perf scene, Story 1.12) is validated and counts for unique ids and links, but is never swept or botted. Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
+**`rooms/dev/`** holds `perf_worst.txt` (Story 1.12): the Old Mine at its worst for the `--perf` run ([perf.md](./perf.md)), 30 × 68 cells with 10 lurkers in wall stubs inside the play rect, 44 hoverers and 4 walkers, its centre columns 13–16 open top to bottom for the run's path. It is validated and counts for unique ids and links, but is never swept or botted, and it is not a level: the fairness rules don't apply. Release presets exclude `rooms/dev/*` (Story 1.13). Test-only rooms live in `game/tests/rooms/` and are never swept or exported.
 
 ```bash
 cd game && ./run_tests.sh       # everything

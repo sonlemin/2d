@@ -17,7 +17,8 @@ pixel_art_game/
 │   ├── README.md                 # Controls, loop rules and how to run tests (player-facing)
 │   ├── run_tests.sh              # ★ Test entry point: imports, then runs every tests/test_*.gd and tests/smoke_*.gd (glob)
 │   ├── rooms/
-│   │   └── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
+│   │   ├── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
+│   │   └── dev/perf_worst.txt    # The worst-case perf scene (Story 1.12): 30 × 68, validated only, never a level (docs/perf.md)
 │   ├── scenes/
 │   │   ├── world/
 │   │   │   └── world.tscn        # ★ ENTRY: main scene (run/main_scene). Darkness, RoomHolder, Camera, UI (gutters, router)
@@ -34,8 +35,9 @@ pixel_art_game/
 │   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags
 │   │   │   └── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
 │   │   ├── world/
-│   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect()
-│   │   │   ├── camera_rig.gd     # CameraRig: follow, downward lead, shake, limits, play_rect()
+│   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect(), light_rect()
+│   │   │   ├── light_budget.gd   # LightBudget: World's child that applies the ≤ 6 light budget each physics tick (priority 50); no class_name
+│   │   │   ├── camera_rig.gd     # CameraRig: follow, downward lead, shake, limits, play_rect(), view_rect()
 │   │   │   ├── room_legend.gd    # RoomLegend: the one definition of every grid char
 │   │   │   ├── room_loader.gd    # ★ RoomLoader: parse, pure validate (file:row:col errors), load, build
 │   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position()
@@ -52,10 +54,12 @@ pixel_art_game/
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
-│   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text
+│   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
+│   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
 │   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; release presets (1.13) exclude it
-│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --log, --set; ?… on web), the overlay key
-│   │   │   └── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/lights/Clock); no class_name
+│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --log, --set, --glow, --perf; ?… on web), the overlay key
+│   │   │   ├── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/light budget/frames/perf/Clock); no class_name
+│   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, stand-in lights, frame stats and summary (docs/perf.md); no class_name
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
 │   │   ├── runner.gd / runner.tscn # Runs one test as a scene; fails on no PASS, a timeout or any engine error
@@ -68,7 +72,9 @@ pixel_art_game/
 │   │   ├── test_room_sweep.gd    # The pure room sweeps on inline grids (fires + near-miss per rule)
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
-│   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows
+│   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, --glow/--perf, perf stats
+│   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves
+│   │   ├── test_light_budget.gd  # BudgetLight: the rule, jitter, apply() on nodes, sprite fallback, scene audit
 │   │   ├── spec.gd               # Helper: the GDD's guarantees as constants, preloaded by tests
 │   │   ├── room_sweep.gd         # Helper: the pure room sweeps (falls, stretches, hazards, ids, links, arrival)
 │   │   ├── smoke_rooms.gd        # Every room file: validation, cross-file checks, sweeps, lurker guarantees
@@ -78,6 +84,7 @@ pixel_art_game/
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
 │   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, each arg, the overlay cycle, no F-key
+│   │   ├── smoke_perf.gd         # The perf kit in world.tscn: --perf=3 in perf_worst, budget held every tick, the summary
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
 │   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, dev_tools/t_dev_room.txt); never exported
@@ -145,6 +152,7 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 |---|---|
 | Game | `game/scenes/world/world.tscn` (`run/main_scene`) → `scripts/world/world.gd::_ready()` |
 | Dev args (debug builds) | `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0` → `scripts/dev/dev_tools.gd` |
+| Perf run (debug builds) | `godot --path game -- --room=perf_worst --perf` (add `--glow=on`) → `scripts/dev/perf_run.gd`; procedure in [perf.md](./perf.md) |
 | Tests | `game/run_tests.sh` → `tests/runner.tscn` → every `tests/test_*.gd`, then `tests/smoke_*.gd` |
 | Screenshots | `tests/screenshot.gd` (manual, needs a display or xvfb) |
 | Sprites | `python3 tools/build_sprites.py` (from the repo root) |

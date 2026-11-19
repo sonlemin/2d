@@ -3,7 +3,7 @@
 **Type:** monolith (one Godot game + an asset tool)
 **Primary Language:** GDScript
 **Architecture:** scene-tree composition with a pure-logic core
-**Last Updated:** 2026-11-19 (DevTools, Story 1.11; initial scan 2026-11-11, exhaustive)
+**Last Updated:** 2026-11-19 (the light budget and the perf scene, Story 1.12; initial scan 2026-11-11, exhaustive)
 
 ## Project Overview
 
@@ -26,6 +26,7 @@ A 2D pixel-art descent Metroidvania built in Godot 4.7. You pogo off enemies to 
 - [Source Tree Analysis](./source-tree-analysis.md) — annotated directory tree
 - [Development Guide](./development-guide.md) — run, test, edit art and levels, common tasks
 - [Rooms](./rooms.md) — the room file format, legend, validator errors and `Room` API
+- [Performance Measurement](./perf.md) — the CP1 perf procedure: `perf_worst`, `--perf`, `--glow`, what to record (Story 1.15 fills the results)
 
 Not generated (nothing to document): API contracts, data models, deployment guide, contribution guide, integration architecture.
 

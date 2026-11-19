@@ -1,5 +1,5 @@
 # generated: 2026-11-12T12:16:27+07:00
-# last_updated: 2026-11-19T11:43:00+07:00
+# last_updated: 2026-11-19T12:51:00+07:00
 # project: pixel_art_game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   dependencies live there, not here). Re-run gds-sprint-planning after adding stories.
 
 generated: "2026-11-12T12:16:27+07:00"
-last_updated: "2026-11-19T11:43:00+07:00"
+last_updated: "2026-11-19T12:51:00+07:00"
 project: pixel_art_game
 project_key: NOKEY
 tracking_system: file-system
@@ -57,7 +57,7 @@ development_status:
   1-9-glob-test-runner-spec-and-the-architecture-lint: done
   1-10-room-smoke-tests-and-the-reachability-bot: done
   1-11-devtools-entry-args-and-overlays: done
-  1-12-worst-case-performance-scene: ready-for-dev
+  1-12-worst-case-performance-scene: review
   1-13-export-pipeline-and-web-boot-smoke: backlog
   1-14-display-scaling-and-web-input: backlog
   1-15-cp1-gate-feel-check-and-performance-verdict: backlog

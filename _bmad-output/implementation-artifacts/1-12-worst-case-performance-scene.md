@@ -1,6 +1,10 @@
+---
+baseline_commit: cc53560efa6177a3401b60433ebd9c3ab4451cea
+---
+
 # Story 1.12: Worst-case performance scene
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -123,26 +127,26 @@ so that the light budget and bloom are decided on data before any art depends on
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 11).** `cd game && ./run_tests.sh` gives `== ALL GREEN (17 tests)`, 1086 `ok`. The per-test counts are under "Previous story intelligence". The engine facts this story relies on are already probed (see "Verified facts").
-- [ ] **Task 2: `Fx` materials (AC: 5).** `Fx.unshaded()` and `Fx.additive()` (D6), plus the new `tests/test_fx.gd`.
-- [ ] **Task 3: `BudgetLight` (AC: 2, 3).**
+- [x] **Task 1: Baseline (AC: 11).** `cd game && ./run_tests.sh` gives `== ALL GREEN (17 tests)`, 1086 `ok`. The per-test counts are under "Previous story intelligence". The engine facts this story relies on are already probed (see "Verified facts").
+- [x] **Task 2: `Fx` materials (AC: 5).** `Fx.unshaded()` and `Fx.additive()` (D6), plus the new `tests/test_fx.gd`.
+- [x] **Task 3: `BudgetLight` (AC: 2, 3).**
   - Write `scripts/core/budget_light.gd` (D3, D4) and add `Spec.LIGHTS_ON_SCREEN_MAX` (D11).
   - In `player.tscn`, `Light` gets the script with `rank = 0` (ALWAYS). In `lurker.tscn`, `Glow` gets the script with GLOW, the default.
   - Write the new `tests/test_light_budget.gd` (D12).
-- [ ] **Task 4: World runs the budget (AC: 3, 4).**
+- [x] **Task 4: World runs the budget (AC: 3, 4).**
   - Add `CameraRig.view_rect()`, and `World.light_rect()` returning it.
   - Write `scripts/world/light_budget.gd` (no `class_name`). `World._ready()` adds it as a child named `LightBudget`, with physics priority 50 (D2, D5).
-- [ ] **Task 5: The lint (AC: 2).** Add the `raw_light` row, its samples, and the docs table row (D11).
-- [ ] **Task 6: `rooms/dev/perf_worst.txt` (AC: 1).** Start from the validated D9 grid, and keep its properties if you change it.
-- [ ] **Task 7: DevTools (AC: 6–8).**
+- [x] **Task 5: The lint (AC: 2).** Add the `raw_light` row, its samples, and the docs table row (D11).
+- [x] **Task 6: `rooms/dev/perf_worst.txt` (AC: 1).** Start from the validated D9 grid, and keep its properties if you change it.
+- [x] **Task 7: DevTools (AC: 6–8).**
   - Add the `glow` and `perf` rows with their pure validators (D7, D1).
   - Write `scripts/dev/perf_run.gd`, with no `class_name` (D1, D8).
   - Point overlay 4 at the budget and add its new rows (D8).
-- [ ] **Task 8: Tests (AC: 1–8, 10).**
+- [x] **Task 8: Tests (AC: 1–8, 10).**
   - Write the new `tests/smoke_perf.gd`.
   - Edit `test_dev_args`, `smoke_dev_tools` and `test_lint` as D12 says.
-- [ ] **Task 9: Docs and ledger (AC: 9, 11).** Write `docs/perf.md` (D10) and every doc D13 lists. Close ledger items 1 and 2, and add the four new items, each with its owner line.
-- [ ] **Task 10: Verify (AC: 11).**
+- [x] **Task 9: Docs and ledger (AC: 9, 11).** Write `docs/perf.md` (D10) and every doc D13 lists. Close ledger items 1 and 2, and add the four new items, each with its owner line.
+- [x] **Task 10: Verify (AC: 11).**
   - `./run_tests.sh` gives `== ALL GREEN (20 tests)`, with no `ERROR:` lines. Also grep the raw output for any `ERROR:` printed after the runner exits.
   - Run the D14 red checks, each in a scratch copy of `game/` with its own `config/name`, as 1.11 did. Record each one with its failing line.
   - Do the D15 desktop debug export check and record its summary line.
@@ -998,7 +1002,65 @@ static func additive() -> CanvasItemMaterial:  # once: BLEND_MODE_ADD + LIGHT_MO
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-19.
+
 ### Debug Log References
+
+- **Baseline (Task 1):** `cc53560`, `== ALL GREEN (17 tests)`, 1086 `ok`, 1 m 48 s; per-test counts as in "Previous story intelligence".
+- **Final (Task 10):** `== ALL GREEN (20 tests)`, 1244 `ok`, 1 m 54 s; no `ERROR:` line anywhere in the raw output, including after each runner exit. Bot best chain 8 on `m1_shaft` (unchanged; `perf_worst` is not a spine room and is never botted).
+
+  | Test | before | after | why |
+  |---|---|---|---|
+  | test_chain_state | 0 (69 checks) | 0 (69 checks) | — |
+  | test_clock | 21 | 21 | — |
+  | test_deferred_owners | 25 | 25 | ledger edited, still every item owned |
+  | test_dev_args | 75 | 115 | `--glow` / `--perf` values, `glow_environment()`, `path_point()`, stats (+ the 50/70 fps case after red check 19), `summary_text()`, `summary_rows()` |
+  | test_fx | — | 8 | new |
+  | test_light_budget | — | 56 | new |
+  | test_lint | 179 | 188 | 8 `raw_light` samples + its "has a firing sample" check |
+  | test_log | 7 | 7 | — |
+  | test_room_loader | 79 | 79 | — |
+  | test_room_sweep | 74 | 74 | — |
+  | test_state | 180 | 180 | — |
+  | test_tuning | 87 | 87 | — |
+  | smoke_bot | 6 | 6 | — |
+  | smoke_dev_tools | 88 | 87 | 7 per-light stand-in cases moved to `test_light_budget`; +6 (raw light premise and verdict, `lights 3/6` and `frame` rows, worst-frame premise, `cycle()` reset) |
+  | smoke_moves | 17 | 17 | — |
+  | smoke_perf | — | 44 | new (+1 priority-window check after red check 20a) |
+  | smoke_player_input | 59 | 59 | — |
+  | smoke_room_swap | 39 | 39 | — |
+  | smoke_rooms | 90 | 92 | `perf_worst`: "validates clean" and its `_check_record` line |
+  | smoke_world | 60 | 60 | — |
+
+- **Red checks (D14),** each in a scratch copy of `game/` with `config/name="red_1_12_scratch"` (its own `user://`, deleted afterwards), by a driver that mutates one file, runs the named tests and restores it. The failing lines:
+  1. `choose()` by distance only → `FAIL ALWAYS + CACHE (farthest) + 6 GLOWs: the CACHE and the nearest 4 GLOWs kept (got [true, false, true, true, true, true, true, false])`, `FAIL a GLOW nearer than the CACHE, and lit, still ranks below it (got [true, false, true])`.
+  2. No ALWAYS special case → `FAIL ALWAYS x7 + GLOW: all 7 ALWAYS kept over the budget, the GLOW dropped, nearest of all (got [true, true, true, true, true, true, false, false])` (then `set_demoted()`'s assert fires in the node cases: an extra engine error).
+  3. No stickiness → `FAIL sticky: a lit far GLOW keeps its slot against an unlit near one (got [false, true])`, `FAIL jitter: … no entry changes state more than once (got [0, 0, 0, 0, 0, 119, 120])`.
+  4. Off-screen counted as on screen → `FAIL a slot frees when a lit GLOW leaves the screen …`, `FAIL off-screen entries keep lit as given, true and false, even at budget 0 (got [false, false, true])`, `FAIL a lit GLOW leaves the view: the nearest demoted GLOW is relit …`.
+  5. Budget call removed → `FAIL ...at most 6 lights are lit in the view (162 ticks over; worst 7)`, `FAIL (premise) the budget was exercised: some tick showed a sprite glow …`, `FAIL (premise for D5) … (got 7)`.
+  6. `MAX_ON_SCREEN = 8` → `FAIL BudgetLight.MAX_ON_SCREEN (8) is at or under Spec.LIGHTS_ON_SCREEN_MAX (6) …`, `FAIL 8 light sources on screen: 6 stay lit, 2 show sprites, over 0 (got { lit: 8, sprites: 0, over: 0 })`.
+  7. `Fx.unshaded()` builds a new material → `FAIL Fx.unshaded() returns the same instance twice` (+ the `pop()` / `popup()` material checks).
+  8. `player.tscn`'s `Light` without the script → `FAIL player.tscn ./Light is a BudgetLight (script <null>)`, `FAIL player.tscn's Light is a BudgetLight` (named, no SCRIPT ERROR); `smoke_dev_tools`: `FAIL m1_shaft at spawn: 1 light on screen, the player's (got 0)`.
+  9. `PointLight2D.new()` in `actors/crawler.gd` → `FAIL lint actors/crawler.gd:58 raw_light`.
+  10. No hurtbox mask → `FAIL (premise) the run took the player: input locked, Hurtbox mask 0 (got locked true, mask 12)`.
+  11. Path from wall time: not red-checkable headless; the tick counter is a reviewed rule (`path_point(_tick, …)`).
+  12. No `BG_CANVAS` → `FAIL glow_environment(): background BG_CANVAS`; `smoke_perf`: `FAIL --glow=on: DevTools has a WorldEnvironment named Glow, glow on, BG_CANVAS`.
+  13. D2 swapped (`light_rect()` returns the play rect) → `smoke_dev_tools`: `FAIL ...plus a code-built light by the player and one under a gutter count, one outside the view doesn't: 3 (got 2)`; `smoke_perf`: `FAIL light_rect() is the whole 480 × 270 view … (got [P: (-4.0, 0.0), S: (360.0, 270.0)] …)`.
+  14. Overlay counting through `find_children` again → `FAIL ...plus a code-built light … 3 (got 4)`, `FAIL ...and the raw PointLight2D beside the player isn't counted …`.
+  15. Sprite alpha fixed at 1.0 → `FAIL a demoted GLOW at energy 1.0 shows its sprite in its own colour, alpha 0.35 (got (1.0, 0.25, 0.2, 1.0))`, `FAIL ...energy 0.5 gives alpha 0.175 (got 1.000)`.
+  16. `set_demoted()` without `enabled` → `FAIL 8 light sources on screen: 6 stay lit … (got { lit: 8, sprites: 2, over: 0 })`, `FAIL ...the 2 GLOWs farthest from the centre are demoted, their PointLight2D disabled`.
+  17. Flare stand-in of rank CACHE → `FAIL two stand-ins ride along: a flare of rank ALWAYS, then a cache of rank CACHE`.
+  18. `perf_seconds("")` returns 0 → `test_dev_args`: `FAIL --perf alone is 60 s (got [0, ""])`; `smoke_perf` still `SMOKE PASS` (it never runs a bare `--perf`), as D14 expected.
+  19. Stats bucketed by frame count → first run: caught only by `FAIL a frame starting past the run's last second lands in no bucket (got [1])`; D14's predicted case ("a second with only 30 frames gives min 30") **passes** under the mutation, because at exactly 60 fps frame-count buckets coincide with time buckets. Added a 50 fps + 70 fps case; re-run: `FAIL a 50 fps second then a 70 fps one: min 50 fps, buckets [50, 70] (… got 60, [60, 60])`.
+  20. Budget before the actors: (a) `LightBudget.PRIORITY = 0` alone **was not caught** at first (`SMOKE PASS`): at priority 0 tree order still runs it after `RoomHolder`, since World adds it after the scene's children. Added a priority-window check to `smoke_perf`; re-run: `FAIL World's LightBudget ticks after the actors and before DevTools by priority (got 0), pausable with World`. (b) The call moved to the start of `World._physics_process()` → `FAIL ...at most 6 lights are lit in the view (2 ticks over; worst 7)`, `FAIL (premise for D5) at the tick screen 1's glows first wake, the sample already shows ≤ 6 lit (got 7) …`.
+  21. `_chain_given` ignored → `FAIL --chain=99 --perf=1 holds chain 20 (got hold 0, chain 0)` (and the 3 s run's chain checks).
+  22. No `snap()` after the teleport: not red-checkable headless (the camera slide), recorded beside 11.
+- **D15, desktop debug export:** scratch copy with `config/name="export_1_12_scratch"` and a throwaway one-preset `export_presets.cfg` (Linux, `include_filter="rooms/*"`), never committed; `godot --headless --path <copy> --export-debug "Linux debug scratch" <out>/perf.x86_64`, then `timeout 20 <out>/perf.x86_64 --headless -- --room=perf_worst --perf=3`: exit 124 (the `timeout`, expected), 0 `ERROR` lines, and `[room] dev: perf 3 s: 437 frames, avg 145.5 fps, min 145 fps, worst 13.8 ms at 2.1 s, 0 over 20 ms; lights max 6/6, sprites max 1, over 0; chain 20, breaks 0, deaths 0; glow off; window 64x64; Linux, ` (headless: window 64x64, no adapter name). `rooms/dev/perf_worst.txt` is in the pack. The copy, its `user://` dir and the preset were deleted.
+- **Screenshots (xvfb, Mesa llvmpipe),** a scratch script outside the repo run by absolute path through the runner, in the export scratch copy: `perf_worst` with `--perf=20`, shot once at least one sprite glow showed (`lit 6, sprites 1`), then overlay 4, with glow off and on. Seen:
+  - The four screen-1 lurkers: three lit glows light the bricks beside them red; the demoted one (top right, farthest from the view centre) shows a soft red halo that lights nothing (mean red 42 in its box vs 78–93 for the lit ones). It reads as the same kind of glow, dimmer.
+  - Overlay 4 reads `FPS 20` / `lights 6/6, sprites 1` / `frame 17.6 ms, worst 59.9 ms` / `perf 0 / 20 s` in white over the left gutter, legible at size 8.
+  - Glow on: the lit glows' halos are a little larger and softer; the dark floor went from RGB (6, 5, 16) to (0, 0, 11): the same darkening the D7 probe saw. The look check in `docs/perf.md` asks sonlm to judge this on the laptop's GPU.
+  - The gutters stay opaque black in every shot.
 
 ### Completion Notes List
 
@@ -1018,5 +1080,57 @@ static func additive() -> CanvasItemMaterial:  # once: BLEND_MODE_ADD + LIGHT_MO
     - the CACHE placed farthest;
     - the plain `--room=perf_worst`;
     - the first-second hitch.
+- **Implemented (gds-dev-story, 2026-11-19), all 10 tasks.** What exists now:
+  - `BudgetLight` (`core/budget_light.gd`): ranks, group, `wants_light()`, `set_demoted()` (the only writer of `enabled`), the `Fallback` sprite (CACHE and GLOW only), and the pure statics `texture_rect()`, `lit_on_screen()`, `choose()`, `apply()`, `counts()`, as D3/D4. The player's `Light` is ALWAYS (`rank = 0` stored), the lurker's `Glow` GLOW (the default, not stored, so an editor re-save can't drift it).
+  - World's `LightBudget` child (`world/light_budget.gd`, priority 50, built right after `add_to_group("world")`), `World.light_rect()` → `CameraRig.view_rect()`.
+  - `Fx.unshaded()` / `additive()`; `_unshaded()` gone. `Spec.LIGHTS_ON_SCREEN_MAX` 6. Lint `raw_light`.
+  - `rooms/dev/perf_worst.txt`, the D9 grid verbatim (re-validated: `inspect()` gives no errors, 10 lurkers at the D9 positions, spawn (3, 4), bounds 480 × 1088).
+  - DevTools `glow` and `perf` rows, `glow_value()`, `perf_seconds()`, `glow_environment()`, `_chain_given`; `dev/perf_run.gd`; overlay 4's new rows.
+  - Docs, `project-context.md`, the architecture and the ledger per D13 (ledger: 1.11 items 1 and 2 closed; four new items owned by 1.20, 1.22, 1.23 and 1.15).
+- **Deviations from the Dev Notes** (none changes an AC):
+  - `BudgetLight` processes only while demoted (`set_process(on and sprite)` in `set_demoted()`), not every frame for every light; `set_demoted()` syncs the sprite at once, so the light and its sprite always swap in the same call.
+  - `PerfRun`'s held chain is `hold_chain` (D1 sketched `chain`); it adds `elapsed_s()` for overlay 4's progress row; the stand-ins are named `PerfFlare` / `PerfCache`. A paused frame is skipped and left out of the run's time (D1 didn't say). The path check reads the player's `Body` shape (10 × 20 at +2 px) for the columns and rows it tests.
+  - Overlay 4 splits the summary with a pure `summary_rows()`: parts at `; `, joined greedily up to `SUMMARY_ROW_CHARS` (90), at most 3 rows, the last taking the rest. The D1 example gives 3 rows, each ≤ 90 characters.
+  - Tests beyond D12: `test_light_budget` also checks `counts()` skips a raw `PointLight2D`, the scene audit's premise uses named sentinels (player, lurker, world) instead of a count; `smoke_perf` adds `--chain=5 --perf=1` holds 5, the summary logged exactly once (a `Logger` captures it), and the `LightBudget` priority window (after red check 20a); `test_dev_args` adds the 50/70 fps stats case (after red check 19), "a frame of exactly 20 ms is not over", "a frame starting past the run lands in no bucket", the summary rows and "glow on".
+  - `game-architecture.md`'s "Other Cross-cutting Rules → Play rect" bullet got a pointer to the light-rect exception (not in D13's list; without it that bullet contradicts D2). No `project-context.md` rule beyond D13's list.
+- **Ledger** (`deferred-work.md`): closed 1.11's "`--chain` starts at take-off and ends on its first break" (by `--perf`, D1) and "The on-screen light count lives only in `dev/`" (by `BudgetLight` + `World.light_rect()` + overlay 4 on `counts()`, D2–D5, D8). Added under "Deferred from: dev of 1-12-…": `LightSource` drives the owner's `BudgetLight` → **Owner: Story 1.20**; the Ember Cache's glow is a CACHE `BudgetLight` and the stand-in reads its radius from `Tuning` → **Owner: Story 1.22**; a flare is an ALWAYS `BudgetLight`, compared with the stand-in → **Owner: Story 1.23**; engine glow lives only in DevTools until the verdict → **Owner: Story 1.15**.
+- **No measurement is recorded** (AC9): `docs/perf.md`'s results table is empty for Story 1.15. Headless numbers above (145 fps, 64 × 64 window) are the server's dummy display, not data.
+- Tests green; needs a 5-minute look on the laptop: `godot --path game -- --room=perf_worst --perf=20`, then with `--glow=on`; backquote to overlay 4; watch lurker glows turn into sprites past 6 lights and read the summary.
 
 ### File List
+
+- `_bmad-output/game-architecture.md` (modified)
+- `_bmad-output/implementation-artifacts/1-12-worst-case-performance-scene.md` (modified)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/project-context.md` (modified)
+- `docs/architecture.md` (modified)
+- `docs/component-inventory.md` (modified)
+- `docs/development-guide.md` (modified)
+- `docs/index.md` (modified)
+- `docs/perf.md` (new)
+- `docs/rooms.md` (modified)
+- `docs/source-tree-analysis.md` (modified)
+- `game/README.md` (modified)
+- `game/rooms/dev/perf_worst.txt` (new)
+- `game/scenes/actors/lurker.tscn` (modified)
+- `game/scenes/actors/player.tscn` (modified)
+- `game/scripts/core/budget_light.gd` (new) + `budget_light.gd.uid` (new)
+- `game/scripts/core/fx.gd` (modified)
+- `game/scripts/dev/dev_tools.gd` (modified)
+- `game/scripts/dev/overlays.gd` (modified)
+- `game/scripts/dev/perf_run.gd` (new) + `perf_run.gd.uid` (new)
+- `game/scripts/world/camera_rig.gd` (modified)
+- `game/scripts/world/light_budget.gd` (new) + `light_budget.gd.uid` (new)
+- `game/scripts/world/world.gd` (modified)
+- `game/tests/smoke_dev_tools.gd` (modified)
+- `game/tests/smoke_perf.gd` (new) + `smoke_perf.gd.uid` (new)
+- `game/tests/spec.gd` (modified)
+- `game/tests/test_dev_args.gd` (modified)
+- `game/tests/test_fx.gd` (new) + `test_fx.gd.uid` (new)
+- `game/tests/test_light_budget.gd` (new) + `test_light_budget.gd.uid` (new)
+- `game/tests/test_lint.gd` (modified)
+
+## Change Log
+
+- 2026-11-19: Story 1.12 implemented (gds-dev-story): `BudgetLight` and World's `LightBudget` (≤ 6 lights lit in the whole view, sprite fallback, ALWAYS never demoted), `Fx` shared materials, lint `raw_light`, `rooms/dev/perf_worst.txt`, DevTools `--glow` and `--perf` (the autopilot perf run) with overlay 4's budget, frame and summary rows, `docs/perf.md`; three new tests (`test_fx`, `test_light_budget`, `smoke_perf`), 22 red checks run (two tests strengthened after red checks 19 and 20a), the desktop debug export checked. Status → review.

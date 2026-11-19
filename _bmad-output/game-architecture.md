@@ -136,6 +136,7 @@ Dev-only debug entry points and hotkeys are a pattern rule (see Implementation P
 - **Visible play rect:** one shared definition of the visible play area (inside the gutters). Lurker
   notice ("on screen"), off-screen stirring distance, edge cues, glyph-prompt clamps and the guarantee
   tests all use it — never the raw viewport. (M1's viewport check would let a lurker wake unseen behind a gutter: a Pillar 2 break.)
+  (The light budget, a cost rule, counts the whole view instead: `World.light_rect()`, Story 1.12 D2; see Lighting.)
 - **Standalone rooms:** every room loads and runs headless on its own (no world, save or hub needed), so
   the reachability bot and smoke tests can exercise each room in isolation.
 - **Web:** single-threaded export, click-to-play gate before audio, auto-pause on focus loss,
@@ -441,6 +442,8 @@ user://
 - **Priority over budget:** the player and flares always keep a `PointLight2D`; lurker wall glow falls back to a sprite glow first. [GDD question: cap on simultaneous flares?]
 - Small glows (lurker eye cores, cache core, embers, ledge rims) are unshaded sprites.
 - Engine glow/bloom stays **off** until the E1 worst-case perf scene (Old Mine density + flare + cache + player) holds 60 FPS on web and on the HD 620 target. If it fails, bloom is faked with unshaded additive sprites.
+- **`BudgetLight`** (`scripts/core/budget_light.gd`, Story 1.12): every `PointLight2D` is one (lint `raw_light`; the scenes are audited by `test_light_budget`), with a `rank`: ALWAYS (the player, flares), CACHE (the Ember Cache), GLOW (lurker glows and anything else; the default, so a light that forgets its rank is demoted first). World's `LightBudget` child applies the budget once per physics tick at priority 50, after every actor has moved and set its light and before DevTools (100), so a glow that wakes on a tick is never drawn past the budget. The rule: a light *wants* light when it is shown, has energy and a texture; on-screen lights that want light keep their `PointLight2D` up to `MAX_ON_SCREEN` (6, ≤ `Spec.LIGHTS_ON_SCREEN_MAX`): ALWAYS first, never demoted even past the budget (that excess is reported as `over`), then CACHE, then GLOW; within a rank an already-lit light keeps its slot (sticky, so nothing flickers: ≤ 3 flashes/s), then the light nearest the centre. Off-screen lights are left as they are (the engine culls them, and a light at the edge can't toggle as it crosses). A demoted light's `PointLight2D` is disabled and its additive, unshaded `Fallback` sprite (`Fx.additive()`, same texture, colour and size, alpha following energy) shows instead. Only the budget writes `enabled`.
+- **The budget's "on screen" is the whole view** (`World.light_rect()` = `CameraRig.view_rect()`, 480 × 270, gutters included; decided by sonlm, 2026-11-19): the budget is a cost rule, and the engine draws and culls lights against the whole viewport, so a light under an opaque gutter still costs a lit pass. AR20's "on screen" (notice, stir, edge cues, the guarantees) stays `play_rect()`. The two differ only in rooms wider than 360 px (`perf_worst`, the Weaver arena, the hub).
 
 ### Scripted Moments
 
@@ -611,9 +614,9 @@ func _on_exit_reached(target: StringName) -> void:
 
 | Tool | What it does |
 |---|---|
-| **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; `--glow` (1.12), `--hp` (1.19) and `--difficulty` (1.22) each add one row to DevTools' `ARGS` registry |
+| **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; Story 1.12 added `--glow=on\|off` (a code-built `WorldEnvironment` under DevTools, for the perf check only) and `--perf[=<s>]` (the perf run, below); `--hp` (1.19) and `--difficulty` (1.22) each add one row to DevTools' `ARGS` registry |
 | **Session settings** | `-- --set=brightness:0` sets any `Settings` key for this session only (typed by its default: int, float, bool `true`/`false`; repeatable) through `Game.override_setting()`; a session with any override writes no settings.json at all. Until Options (1.36) it is how brightness changes |
-| **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20) · 3: room exits, entries + persistent object ids · 4: FPS, `PointLight2D` count on screen (the play rect), active Clock requests |
+| **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20) · 3: room exits, entries + persistent object ids · 4: FPS, `lights n/6, sprites m` (+ `over k`) from `BudgetLight.counts()` on `World.light_rect()` (what the budget counts, Story 1.12), wall-clock frame and worst-frame times, the perf run's progress and summary, active Clock requests |
 | **Log categories** | `-- --log=lurker,clock` (names from `Log.CATEGORIES`, any case) |
 | **Smoke markers** | debug web exports print console markers (`SMOKE boot ok`, `SMOKE save ok`) that the Playwright smoke check reads; the release web export gets a boot-only check |
 | **Tests and bot** | `./run_tests.sh`, the reachability bot, `screenshot.gd` (unchanged) |
@@ -621,6 +624,8 @@ func _on_exit_reached(target: StringName) -> void:
 **Args source:** `OS.get_cmdline_user_args()` on desktop; in web debug builds the URL query (`?room=s3_gate&chain=4`) through `JavaScriptBridge.eval("window.location.search")`, which returns null off the web, so there is no `OS.has_feature("web")` branch. Args apply only when World is the current scene (a real run); a test injects tokens through World's `child_entered_tree`, so every other test gets an inert DevTools. A bad arg is a `push_warning`, never an error: the game still starts (an unknown or invalid `--room` loads the default start room).
 
 **Arg phases:** the hook is the first statement of `World._ready()`, so DevTools applies `--log`, then `--set`, then `--room` at once, before `Game.boot()` and the first room (which is why `--set` must survive `boot()`'s load). `--chain` arms on every `player_spawned` and is paid as n `ChainState.add_hit()` calls on the first physics tick that ends with that player off the floor; it then breaks and banks like any chain, never pinned. `--room` sets `World.start_room` / `start_entry` (the `P`, else the up entry, else down) and never writes `Game.dive`'s respawn point.
+
+**Perf run** (Story 1.12, decided by sonlm 2026-11-19: the autopilot): `--perf[=<s>]` (60 s by default, 1–600; `?perf` on web) adds `dev/perf_run.gd` under DevTools. On every spawn it locks the player's input, masks its `Hurtbox` off, holds `--chain`'s n (else 20) paid through `--chain`'s take-off arming (never pinned), and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s from a tick counter (repeatable across machines and browsers). Two stand-in `BudgetLight`s ride along under the room: a flare (ALWAYS, at the player's light radius) and an Ember Cache (CACHE, 80 px). It measures wall-clock frame times (`Time.get_ticks_usec()`, never `delta`) and samples `BudgetLight.counts()` every tick, then freezes one summary (frames, avg/min FPS, the worst frame and when, frames over 20 ms, max lights/sprites/over, breaks and deaths, glow, window, adapter), logs it once and shows it in overlay 4. The scene is `rooms/dev/perf_worst.txt`; the procedure, `docs/perf.md`, is run in Story 1.15.
 
 **Activation:** `World` adds a `DevTools` node only when `OS.is_debug_build()` is true (editor runs and debug exports). Release exports never contain it. The overlay toggle is a dev-only input action, `dev_overlay`, on the backquote key (`` ` ``, physical keycode 96); DevTools is `PROCESS_MODE_ALWAYS`, so it cycles while paused. **No function keys.**
 
@@ -638,7 +643,7 @@ These come from earlier decisions; listed here so every agent sees them together
 - **Time:** only `Game.clock` writes `Engine.time_scale`; real-time visuals use `delta / Engine.time_scale`; UI runs with `PROCESS_MODE_ALWAYS`.
 - **Accessibility:** all flashing, shaking, pulsing and easing read `Settings.reduce_flashing`, `shake`, `reduced_motion` through `Fx`, camera shake, the invulnerability blink and UI easing. No per-effect toggles. Every effect respects ≤ 3 flashes/s.
 - **Strings:** all player-facing text through `tr()`; copy names shapes, never colours (UX O16).
-- **Play rect:** "on screen" always means `World.play_rect()`, never the viewport.
+- **Play rect:** "on screen" always means `World.play_rect()`, never the viewport (the light budget's cost rule counts the whole view, `World.light_rect()`; see Lighting).
 - **Determinism:** no randomness in level behaviour (camera shake only).
 - **Input:** gameplay reads `PlayerInput` intents; menus read menu actions; nothing reads raw keycodes.
 
@@ -656,7 +661,9 @@ Rules nobody checks get broken quietly. These checks run in `./run_tests.sh`:
   purity and `core/` layer rules below; `DevTools`, any `class_name` declared under `dev/`, or a
   `res://scripts/dev/` / `res://scenes/dev/` path outside `dev/` (`dev_ref`), except `world.gd`'s one guarded
   `load()` line: exactly that line, once, right under its `if OS.is_debug_build():` (a tree check
-  proves the real `world.gd` holds it exactly once, so a stale exemption fails); any `res://tests/`
+  proves the real `world.gd` holds it exactly once, so a stale exemption fails); `PointLight2D.new(`
+  or `extends PointLight2D` outside `core/budget_light.gd` (`raw_light`, Story 1.12: every light is a
+  `BudgetLight`; `.tscn` files are audited by `test_light_budget` instead); any `res://tests/`
   path in game code (release exports drop `tests/*`); writes to `Game.settings` / `slot` / `dive` /
   `tuning` state that skip a rule method (assignments, nested fields, container mutators, `.set(`) or
   replace a `Game` instance, outside `rules/`. Each hit prints `FAIL lint <file>:<line> <rule>`; every
@@ -694,7 +701,8 @@ pixel_art_game/
 │   │   │   ├── save_store.gd          # JSON slots, atomic write, .bak, migrations
 │   │   │   ├── log.gd                 # static Log, category consts
 │   │   │   ├── palettes.gd            # zone palettes + UI role colours (data from DESIGN.md tokens)
-│   │   │   └── fx.gd                  # code-built effects, reads the accessibility gate
+│   │   │   ├── budget_light.gd        # BudgetLight: every PointLight2D, its rank, the ≤ 6 budget rule, sprite fallback (1.12)
+│   │   │   └── fx.gd                  # code-built effects, cached materials (unshaded(), additive()), reads the accessibility gate
 │   │   ├── rules/                     # pure RefCounted / static, unit-tested
 │   │   │   ├── chain_state.gd
 │   │   │   ├── health.gd
@@ -708,7 +716,8 @@ pixel_art_game/
 │   │   │   ├── dialogue.gd            # per-NPC ordered {key, requires_flag} line lists (linear, flag-gated)
 │   │   │   └── migrations.gd          # migrate_vN_to_vN1 functions
 │   │   ├── world/
-│   │   │   ├── world.gd               # room swap, respawn, play_rect(), exit backstop
+│   │   │   ├── world.gd               # room swap, respawn, play_rect(), light_rect(), exit backstop
+│   │   │   ├── light_budget.gd        # World's LightBudget child: applies the light budget each tick, priority 50 (1.12)
 │   │   │   ├── room.gd                # built room node; owns transient entities
 │   │   │   ├── room_loader.gd         # parse + pure validate + build (TileSet in code, rims)
 │   │   │   ├── room_legend.gd         # char → tile/entity table (single source)
@@ -753,7 +762,8 @@ pixel_art_game/
 │   │   │   └── music_stems.gd         # stem sync, chain layers, ducking (volume tweens)
 │   │   └── dev/                       # debug builds only; nothing depends on dev/
 │   │       ├── dev_tools.gd           # entry args (CLI / URL query), smoke markers
-│   │       └── overlays.gd            # play rect, light rings, exits/ids, perf
+│   │       ├── overlays.gd            # play rect, light rings, exits/ids, perf
+│   │       └── perf_run.gd            # --perf: the autopilot perf run, stand-in lights, frame stats, summary (1.12)
 │   ├── scenes/                        # mirrors scripts/ domains; thin prefabs
 │   │   ├── world/world.tscn
 │   │   ├── actors/                    # player.tscn, crawler.tscn, lurker.tscn, flare.tscn, weaver/
@@ -807,6 +817,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 | Saves | `scripts/core/save_store.gd`, `scripts/rules/migrations.gd` | slot files, atomic write, `.bak`, versioning |
 | Logging | `scripts/core/log.gd` | static `Log` |
 | Effects | `scripts/core/fx.gd` | code-built FX, cached materials, accessibility gate |
+| Light budget | `scripts/core/budget_light.gd`, `scripts/world/light_budget.gd` | every `PointLight2D` as a ranked `BudgetLight`; ≤ 6 lit in `World.light_rect()` each physics tick, sprite fallback (Story 1.12) |
 | Palette zones | `scripts/core/palettes.gd` | Layer 1 zone palettes and UI role colours (DESIGN.md tokens), zone cross-fade data; read by world tint and gutters |
 | Chain, health, embers, gear rules | `scripts/rules/` | pure rules + `Tuning`, unit-tested |
 | Light sensing maths | `scripts/rules/sensing.gd` | notice / stir / sense / target choice |
@@ -822,7 +833,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 | HUD and menus | `scripts/ui/` | gutters, screen router, UI kit, screens, theme |
 | Audio | `scripts/audio/` + `audio/` | autoload `Audio`, stems, SFX |
 | Strings | `text/strings.csv` | every player-facing string, including NPC lines (`NPC_SMITH_GREET_1`) and journal text (`JOURNAL_A_1_BODY`) written by the narrative pass |
-| Dev tools | `scripts/dev/` | debug-build-only entry args, overlays, smoke markers |
+| Dev tools | `scripts/dev/` | debug-build-only entry args, overlays, the perf run (`perf_run.gd`), smoke markers |
 | Sprites / SFX pipelines | `tools/` → `game/art/`, `game/audio/sfx/` | text sources → build output |
 | Builds | `tools/export.sh`, `tools/web_smoke/` → `builds/` | validate, export, licences, size, smoke |
 | Tests | `game/tests/` | unit, smoke, bot, lint, fixtures |

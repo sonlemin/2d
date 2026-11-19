@@ -107,8 +107,10 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **`--chain` starts at take-off and ends on its first break** — `game/scripts/dev/dev_tools.gd` pays n `ChainState.add_hit()` calls on each life's first airborne tick, and the chain then breaks and banks like any chain (a landing, Snuff, cling grace, a knock or an exit). `perf_worst`'s 60 s run needs the light held at chain 20 for the whole run.
   → **Owner: Story 1.12** — the worst-case performance scene (`rooms/dev/perf_worst.txt`, "the player at chain 20") and its 60 s run are 1.12's; it decides how the light stays at chain 20 there.
+  → **Closed (Story 1.12): `--perf[=<s>]` (`game/scripts/dev/perf_run.gd`, D1, sonlm's choice: the autopilot) holds the chain for the whole run by never letting it break: the player's input is locked, its `Hurtbox` masked off, and it rides a fixed vertical path down the room's centre that never touches a floor or an exit. The chain (`--chain`'s n, else 20) is still paid through `--chain`'s take-off arming and never pinned; the summary counts `breaks` (expected 0), and `smoke_perf` checks chain 20 on every tick of a 3 s run.**
 - **The on-screen light count lives only in `dev/`** — overlay 4's count (`counts_on_screen()` in `game/scripts/dev/overlays.gd`: shown, enabled, energy > 0, a texture, and its texture rect meets `World.play_rect()`) is the only code that knows which `PointLight2D`s are on screen. The ≤ 6 budget (AR46) needs the same rule in game code, and the engine itself culls lights against the whole 480×270 viewport, gutters included.
   → **Owner: Story 1.12** — it keeps at most 6 `PointLight2D` lit on screen (lurker glows fall back to sprites first); decide there whether the budget counts the play rect or the viewport, move the rule into game code and point overlay 4 at it.
+  → **Closed (Story 1.12): the rule moved into game code as `BudgetLight` (`game/scripts/core/budget_light.gd`: `lit_on_screen()`, `texture_rect()`, `choose()`, `apply()`, `counts()`), applied every physics tick by World's `LightBudget` child after the actors (D3–D5). It counts the whole view, `World.light_rect()` = `CameraRig.view_rect()` (D2, sonlm's choice: a cost rule; AR20's fairness rules keep `play_rect()`). Overlay 4 now calls `BudgetLight.counts()` with that rect, so it shows exactly what the budget counts (D8); `counts_on_screen()` is gone.**
 - **Overlay 2 reads the sensing constants from `Lurker`** — `game/scripts/dev/overlays.gd` reads `Lurker.NOTICE_MIN_RADIUS`, `NOTICE_FACTOR` and `SCREEN_MARGIN`. When they move into `rules/sensing.gd`, `overlays.gd` must move in the same change, or every debug run fails to compile. Overlay 2 also gains sense/stir rings, plus a radius ring for every `light_source` (player, flare, cache), not only the player.
   → **Owner: Story 1.20** — it adds `rules/sensing.gd` (`can_notice`, `can_sense`, `can_stir`), where those constants move.
 - **A dev session meets the save** — `World._respawn_point()` reads `Game.dive`'s respawn point before `--room`'s start, and DevTools never writes it. From 1.21 a loaded respawn point beats `--room`, and a dev session (`--room`, `--chain`) records dev room visits (`SlotState.visit()`) and `best_chain` into the slot.
@@ -121,6 +123,17 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Owner: Story 1.24** — it extends `entry_position()`.
 - **Boot screens must not swallow `--room`** — when the title and web gate land as boot screens, a run with `--room` / `?room=` must still start straight in that room (1.12's perf run, 1.13's Playwright `?room=perf_worst`, 2.12's `?room=weaver_test`). World must stay the main scene, so the `current_scene == World` gate in `DevTools._ready()` (`game/scripts/dev/dev_tools.gd`) still fires. 1.33 decides whether the web gate still shows (it unlocks audio).
   → **Owner: Story 1.33** — it adds the screens shown at boot.
+
+## Deferred from: dev of 1-12-worst-case-performance-scene.md (2026-11-19)
+
+- **`LightSource` drives its light through the owner's `BudgetLight`** — the budget, not `LightSource`, decides light or sprite, and `LightSource` never writes `enabled` (`game/scripts/core/budget_light.gd`: only `set_demoted()` writes it). Until then the perf run's stand-ins are lights only and wake no lurker.
+  → **Owner: Story 1.20** — it adds `LightSource` (architecture: "drives its `PointLight2D` (or sprite glow)").
+- **The Ember Cache's glow is a `BudgetLight` of rank CACHE** — and the perf run's cache stand-in (`game/scripts/dev/perf_run.gd` `CACHE_RADIUS`, 80 px) then reads its radius from the cache's `Tuning` value instead of its own const.
+  → **Owner: Story 1.22** — it builds the Ember Cache and its light radius.
+- **A flare's light is a `BudgetLight` of rank ALWAYS** — and the perf run's flare stand-in (`game/scripts/dev/perf_run.gd`, at the player's light radius, riding along) is then compared with a real thrown flare, which sticks where it lands.
+  → **Owner: Story 1.23** — it builds Flare Toss and the flare.
+- **Engine glow lives only in DevTools (`--glow`)** — if 1.15 says go, a follow-up moves it into game code and re-checks the brightness levels and contrast floors: the 2026-11-19 probe saw glow darken the dark ambient (0.039 → 0.016 on a software renderer). If it says no-go, bloom is faked with unshaded additive sprites (architecture → Lighting).
+  → **Owner: Story 1.15** — the CP1 verdict decides glow go/no-go and creates the follow-up story.
 
 ## Deferred from: code review of 1-11-devtools-entry-args-and-overlays.md (2026-11-19)
 

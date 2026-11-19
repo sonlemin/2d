@@ -2,7 +2,7 @@
 
 Open this folder in Godot 4.7 and press F5.
 
-A debug build (an editor run or a debug export) can start in any room and state, e.g. from the repo root: `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0` (the args and overlays are in [the development guide](../docs/development-guide.md#devtools-debug-builds-only)).
+A debug build (an editor run or a debug export) can start in any room and state, e.g. from the repo root: `godot --path game -- --room=m1_shaft --chain=8 --set=brightness:0` (the args and overlays are in [the development guide](../docs/development-guide.md#devtools-debug-builds-only)). For a performance run, `godot --path game -- --room=perf_worst --perf` plays the worst-case scene on autopilot for 60 s and prints one summary line (add `--glow=on` to compare engine glow; the procedure is [docs/perf.md](../docs/perf.md)).
 
 ## Controls
 
@@ -48,4 +48,7 @@ Run `./run_tests.sh` from this folder. If `godot` isn't on your PATH, use `GODOT
 - **World smoke test** (`tests/smoke_world.gd`): the game scene with its gutters and framing; banked embers, the best chain, deaths and brightness live in `Game`; a death respawns a fresh player at the top without a reload; the floor hole loops you to the top; a lurker hidden behind a gutter never notices you.
 - **Room swap smoke test** (`tests/smoke_room_swap.gd`): two small test rooms; going through an exit banks the chain, you arrive still falling from above or standing beside the hole from below, and killed crawlers stay gone across swaps and deaths.
 - **DevTools args** (`tests/test_dev_args.gd`): the debug launch options read the same from the command line and a web address, and every bad value is caught with a warning that names the valid ones.
-- **DevTools smoke test** (`tests/smoke_dev_tools.gd`): with no options the debug tools change nothing; each option starts the right room, chain, log or setting (a session-only setting is never saved); the backquote key cycles the four overlays, even while paused; no function key is bound.
+- **DevTools smoke test** (`tests/smoke_dev_tools.gd`): with no options the debug tools change nothing; each option starts the right room, chain, log or setting (a session-only setting is never saved); the backquote key cycles the four overlays, even while paused; the light count shows what the light budget counts; no function key is bound.
+- **Effects** (`tests/test_fx.gd`): the hit effects share one material each instead of building a new one per effect, and they clean themselves up.
+- **Light budget** (`tests/test_light_budget.gd`): at most 6 lights stay lit on screen; lurker glows past that become sprite glows, the player's light and flares never do, and nothing flickers between the two; every light in the scenes is part of the budget.
+- **Perf smoke test** (`tests/smoke_perf.gd`): a 3-second perf run in the worst-case scene holds chain 20 and the light budget on every tick and reports one summary; engine glow and bad options; the shaft never needs the budget.
