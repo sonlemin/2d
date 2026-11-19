@@ -69,6 +69,9 @@ func run() -> void:
 	OS.add_logger(_warnings)
 	await test_perf_run()
 	await test_held_chain()
+	await test_death_mid_run()
+	await test_breaks()
+	await test_blocked_path()
 	await test_room_alone()
 	await test_glow()
 	await test_bad_perf()
@@ -252,6 +255,68 @@ func test_held_chain() -> void:
 		await _teardown()
 
 
+## Review 2026-11-19: a death mid-run (none happens in perf_worst today: the Hurtbox is masked).
+## The run takes the new player, rebuilds the stand-ins in the rebuilt room and counts the death.
+## The last life's stand-ins are moved once more before that, in a room World already took out of
+## the tree; probed on 4.7.2, that prints no engine error (the runner would fail on one).
+func test_death_mid_run() -> void:
+	_build(["--room=perf_worst", "--perf=3"])
+	var perf: Node = _dev().perf if _dev() != null else null
+	var p: Player = _spawned[0] if _spawned.size() == 1 else null
+	if perf == null or p == null:
+		check(false, "(premise) --room=perf_worst --perf=3 builds a PerfRun and a player")
+		await _teardown()
+		return
+	for i in 5:
+		await get_tree().physics_frame
+	p.die()
+	var start_ms := Time.get_ticks_msec()
+	while _spawned.size() < 2 and Time.get_ticks_msec() - start_ms < 3000:
+		await get_tree().physics_frame
+	var q: Player = _spawned[1] if _spawned.size() == 2 else null
+	check(q != null and perf.deaths == 1, "a death mid-run: a fresh player, and the run counts 1 death (got %d)" % perf.deaths)
+	if q != null:
+		var room := _world.current_room()
+		check(q.input.is_locked() and (q.get_node(^"Hurtbox") as Area2D).collision_mask == 0, "...the run takes the new player: locked, Hurtbox mask 0")
+		check(perf.stand_ins.size() == 2 and perf.stand_ins.all(func(l: BudgetLight) -> bool: return l.is_inside_tree() and l.get_parent() == room),
+				"...and rides two new stand-ins in the rebuilt room")
+	_warnings.take()
+	await _teardown()
+
+
+## Review 2026-11-19: a chain break while measuring counts in `breaks` and the summary.
+func test_breaks() -> void:
+	_build(["--room=perf_worst", "--perf=1"])
+	var perf: Node = _dev().perf if _dev() != null else null
+	var p: Player = _spawned[0] if _spawned.size() == 1 else null
+	if perf == null or p == null:
+		check(false, "(premise) --room=perf_worst --perf=1 builds a PerfRun and a player")
+		await _teardown()
+		return
+	for i in 10:
+		await get_tree().physics_frame
+	check(p.chain.count == ChainState.MAX_CHAIN and p.chain.held > 0 and perf.breaks == 0, "(premise) measuring at chain 20 with embers held, 0 breaks")
+	p.chain.break_chain()  # banks the held embers, as a landing would
+	check(perf.breaks == 1, "a break while measuring counts 1 (got %d)" % perf.breaks)
+	var start_ms := Time.get_ticks_msec()
+	while not perf.done and Time.get_ticks_msec() - start_ms < PERF_CAP_MS:
+		await get_tree().physics_frame
+	check(perf.done and perf.result.get("breaks", -1) == 1, "...and the summary says breaks 1 (got %s)" % [perf.result.get("breaks")])
+	_warnings.take()
+	await _teardown()
+
+
+## D1: --perf on a room whose centre line meets a solid cell (m1_shaft, the default room: its
+## middle ledge) warns once at the first spawn, and the run still starts.
+func test_blocked_path() -> void:
+	_build(["--perf=1"])
+	var w := _warnings.take()
+	check(_world.current_room().id == &"m1_shaft" and w.size() == 1 and w[0].begins_with("DevTools: --perf: room 'm1_shaft' blocks the path at row "),
+			"--perf on m1_shaft: one path warning (got %s)" % [w])
+	check(_dev().perf != null and _dev().get_node_or_null(^"PerfRun") != null, "...and the run still starts")
+	await _teardown()
+
+
 ## AC1: --room=perf_worst alone is the plain room: no run, no stand-ins, no glow.
 func test_room_alone() -> void:
 	_build(["--room=perf_worst"])
@@ -262,6 +327,8 @@ func test_room_alone() -> void:
 	if p != null:
 		var hurtbox := p.get_node(^"Hurtbox") as Area2D
 		check(not p.input.is_locked() and hurtbox.collision_mask == 12, "...the player is not locked and its Hurtbox mask is 12 (got %d)" % hurtbox.collision_mask)
+		var at := _world.current_room().entry_position(&"spawn")
+		check(p.global_position == at and p.chain.count == 0, "...at its P %s with chain 0 (got %s, chain %d)" % [at, p.global_position, p.chain.count])
 	await get_tree().physics_frame
 	var others := _lights().filter(func(n: Node) -> bool: return not (n.get_parent() is Lurker or n.get_parent() is Player))
 	check(others.is_empty(), "...no stand-ins: every BudgetLight is a lurker glow or the player's light (got %s)" % [others])

@@ -14,7 +14,12 @@ const GROUP := &"budget_light"
 const MAX_ON_SCREEN := 6  ## AR46 budget, until the CP1 perf verdict (1.15) confirms or tightens it; the guarantee is Spec.LIGHTS_ON_SCREEN_MAX
 const SPRITE_ALPHA := 0.35  ## additive sprite alpha per unit of energy: about a dark wall's share of the light it replaces; presentation, judged by eye in 1.15
 
-@export var rank := Rank.GLOW  ## a light that forgets its rank is demoted first, never kept over budget
+## A light that forgets its rank is demoted first, never kept over budget. Set before add_child
+## (AR23): _ready() builds the fallback sprite from it.
+@export var rank := Rank.GLOW:
+	set(value):
+		assert(not is_node_ready(), "BudgetLight: rank is set before add_child; _ready() built the fallback from the old one")
+		rank = value
 var demoted := false  ## read-only outside; set through set_demoted()
 
 var _sprite: Sprite2D  # the fallback glow; ALWAYS lights have none
@@ -130,14 +135,18 @@ static func _before(x: Dictionary, y: Dictionary, xi: int, yi: int) -> bool:
 
 ## Applies the budget to `lights` (group budget_light) against `rect` (World.light_rect()): each
 ## BudgetLight that wants light is an entry; those whose state changes are demoted or relit.
-## Returns counts().
-static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN) -> Dictionary:
+## Returns nothing: it runs every tick, and only the overlay and the perf run need counts().
+static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN) -> void:
 	var wanting: Array[BudgetLight] = []
 	var entries: Array[Dictionary] = []
 	var centre := rect.get_center()
 	for n: Variant in lights:
 		var l := n as BudgetLight
-		if l == null or not l.wants_light():
+		if l == null:
+			continue
+		# A relit demoted light would draw light and sprite, uncounted (AR46).
+		assert(l.enabled != l.demoted, "BudgetLight: only the budget writes `enabled` (set_demoted())")
+		if not l.wants_light():
 			continue
 		var r := texture_rect(l)
 		wanting.append(l)
@@ -146,7 +155,6 @@ static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN) -> Dictio
 	for i in wanting.size():
 		if wanting[i].demoted == keep[i]:  # kept but demoted, or dropped but lit
 			wanting[i].set_demoted(not keep[i])
-	return counts(lights, rect, budget)
 
 
 ## {lit, sprites, over} for `rect`: the BudgetLights lit on screen; the demoted ones that want light

@@ -20,7 +20,7 @@ const LAYER := 11  ## above World's UI layer (10), so screen marks draw over the
 const FONT_SIZE := 8
 const USABLE_INSET := 1.0  ## px: a gutter's usable band is 58 of its 60 px (UX DESIGN.md gutter-usable)
 const SUMMARY_ROW_CHARS := 90  ## the perf summary's rows: about 400 px of the size-8 fallback font, inside the 480 px screen (1.12 D8)
-const SUMMARY_ROWS := 3  ## at most; the last row takes the rest
+const SUMMARY_ROWS := 3  ## at most, split at `; `; the last row takes the rest, and an overlong row then wraps at a space
 # Never #ffd27a (Light) or #d9473f (danger), NFR9.
 const WHITE := Color(1, 1, 1, 0.9)
 const GREY := Color(0.75, 0.75, 0.78, 0.9)
@@ -171,8 +171,10 @@ static func clock_rows(seen: Dictionary, live: Dictionary, now_ms: int) -> Array
 	return rows
 
 
-## The perf summary over at most SUMMARY_ROWS rows, split only at its `; ` boundaries, each part
-## joined onto the row while it fits SUMMARY_ROW_CHARS; the last row takes the rest.
+## The perf summary in rows of at most SUMMARY_ROW_CHARS. First split at its `; ` boundaries into at
+## most SUMMARY_ROWS rows, each part joined onto the row while it fits, the last row taking the
+## rest; then any row still too long wraps at its last space that fits. Chrome's WebGL adapter name
+## ("ANGLE (Intel, … Direct3D11 vs_5_0 ps_5_0, D3D11)") alone is about 90 characters.
 static func summary_rows(text: String) -> PackedStringArray:
 	var rows := PackedStringArray()
 	for part in text.split("; "):
@@ -182,7 +184,17 @@ static func summary_rows(text: String) -> PackedStringArray:
 			rows.append(part)
 		else:
 			rows[-1] += "; " + part
-	return rows
+	var out := PackedStringArray()
+	for row in rows:
+		var rest := row
+		while rest.length() > SUMMARY_ROW_CHARS:
+			var cut := rest.rfind(" ", SUMMARY_ROW_CHARS)
+			if cut <= 0:
+				cut = SUMMARY_ROW_CHARS  # one word wider than a row: cut inside it
+			out.append(rest.substr(0, cut))
+			rest = rest.substr(cut).lstrip(" ")
+		out.append(rest)
+	return out
 
 
 # --- Mode 3: room items -----------------------------------------------------------------------------

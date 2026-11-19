@@ -308,3 +308,14 @@ func _test_summary_rows() -> void:
 			"...the first row starts 'perf 60 s', and each fits %d characters (got %s)" % [Overlays.SUMMARY_ROW_CHARS, Array(rows).map(func(r: String) -> int: return r.length())])
 	result.glow = true
 	check(PerfRun.summary_text(result).contains("; glow on;"), "...and glow on reads 'glow on'")
+	# Review 2026-11-19: Chrome's WebGL adapter name and a 600 s run make parts too long for any
+	# `; ` split; overlong rows wrap at a space, and no character is lost.
+	result.merge({seconds = 600, frames = 215998, worst_at_s = 512.3, slow_frames = 22, os = "Web",
+			adapter = "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)"}, true)
+	text = PerfRun.summary_text(result)
+	rows = Overlays.summary_rows(text)
+	var squash := func(s: String) -> String: return s.replace(";", "").replace(" ", "")
+	check(Array(rows).all(func(r: String) -> bool: return r.length() <= Overlays.SUMMARY_ROW_CHARS) and squash.call("".join(rows)) == squash.call(text),
+			"summary_rows: a web adapter name and a 600 s run wrap at a space, each row ≤ %d characters, nothing lost (got %s)" % [Overlays.SUMMARY_ROW_CHARS, Array(rows).map(func(r: String) -> int: return r.length())])
+	check(Overlays.summary_rows("x".repeat(Overlays.SUMMARY_ROW_CHARS + 5)) == PackedStringArray(["x".repeat(Overlays.SUMMARY_ROW_CHARS), "xxxxx"]),
+			"...and a single word wider than a row is cut at %d characters" % Overlays.SUMMARY_ROW_CHARS)

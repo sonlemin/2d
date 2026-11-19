@@ -42,10 +42,11 @@ func _test_effects() -> void:
 	Fx.popup(parent, Vector2(10, 10), "x5", Color.WHITE)
 	var labels: Array[Node] = parent.get_children().filter(func(n: Node) -> bool: return n is Label)
 	check(labels.size() == 1 and labels[0].material == Fx.unshaded(), "popup() adds one Label with Fx.unshaded() (got %s)" % [parent.get_children()])
-	# Lifetime 0.35 s (probed: freed after about 0.36 s); real time, so a time scale left by another
-	# test can't stretch it. A freed object compares equal to null, so the premise is checked first.
+	# Lifetime 0.35 s of game time (probed: freed after about 0.36 s). The timer runs on game time
+	# too, so a time scale left by another test stretches both alike. A freed object compares equal
+	# to null, so the premise is checked first.
 	var found := sparks.size() == 1
 	var p: Node = sparks[0] if found else null
-	await get_tree().create_timer(0.6, true, false, true).timeout
+	await get_tree().create_timer(0.6, true, false, false).timeout
 	check(found and not is_instance_valid(p), "...and the sparks free themselves after their lifetime (AR46: code-built FX free themselves)")
 	parent.queue_free()

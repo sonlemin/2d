@@ -128,6 +128,13 @@ func _light(parent: Node, rank: int, pos: Vector2, energy := 1.0, scale := 0.2) 
 	return l
 
 
+## apply() returns nothing (it runs every tick); the cases read counts() right after it, as the
+## overlay and the perf run do.
+func _apply(lights: Array) -> Dictionary:
+	BudgetLight.apply(lights, VIEW)
+	return BudgetLight.counts(lights, VIEW)
+
+
 func _holder() -> Node2D:
 	var h := Node2D.new()
 	add_child(h)
@@ -148,7 +155,7 @@ func _test_nodes() -> void:
 		var s := l.get_node_or_null(^"Fallback") as Sprite2D
 		return (s == null) if l.rank == A else (s != null and s.material == Fx.additive() and not s.visible))
 	check(fallbacks_ok, "(premise) each CACHE and GLOW has a hidden Fallback sprite drawn with Fx.additive(); ALWAYS lights have none")
-	var r := BudgetLight.apply(all, VIEW)
+	var r := _apply(all)
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 2 and r.over == 0,
 			"8 light sources on screen: %d stay lit, 2 show sprites, over 0 (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, r])
 	check(glows[2].demoted and glows[3].demoted and not glows[2].enabled and not glows[3].enabled,
@@ -160,11 +167,11 @@ func _test_nodes() -> void:
 	var fb := func(l: BudgetLight) -> Sprite2D: return l.get_node(^"Fallback") as Sprite2D
 	check(fb.call(glows[2]).visible and fb.call(glows[3]).visible and not fb.call(glows[0]).visible and not fb.call(cache).visible,
 			"...and after a frame the demoted GLOWs show their sprites, the lit ones don't")
-	r = BudgetLight.apply(all, VIEW)
+	r = _apply(all)
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 2 and glows[2].demoted and glows[3].demoted, "a second apply with nothing changed changes nothing (got %s)" % [r])
 	# Recovery: the 60 px GLOW leaves the view; the nearest demoted one (100 px) is relit.
 	glows[0].position = Vector2(2000, 2000)
-	r = BudgetLight.apply(all, VIEW)
+	r = _apply(all)
 	check(not glows[2].demoted and glows[2].enabled and glows[3].demoted, "a lit GLOW leaves the view: the nearest demoted GLOW is relit, the farthest stays a sprite")
 	check(not glows[0].demoted and glows[0].enabled, "...and the one that left keeps its state (off screen: left as it is)")
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 1, "...lit %d, sprites 1 (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, r])
@@ -175,7 +182,7 @@ func _test_nodes() -> void:
 	for i in 7:
 		always.append(_light(h, A, Vector2(100 + 40 * i, 135)))
 	var glow := _light(h, G, Vector2(240, 140))
-	r = BudgetLight.apply(always + [glow], VIEW)
+	r = _apply(always + [glow])
 	check(r.lit == 7 and r.over == 1 and r.sprites == 1, "the player and 6 flares plus a glow: all 7 always-lights stay lit, over 1 (got %s)" % [r])
 	check(glow.demoted and always.all(func(l: BudgetLight) -> bool: return l.enabled and not l.demoted), "...the glow still drops, and no ALWAYS light is disabled")
 	h.queue_free()
@@ -226,7 +233,7 @@ func _test_no_slot() -> void:
 	var hidden := _light(h, G, Vector2(240, 130))
 	hidden.visible = false
 	var dark := _light(h, G, Vector2(240, 131), 0.0)
-	var r := BudgetLight.apply(lights + [hidden, dark], VIEW)
+	var r := _apply(lights + [hidden, dark])
 	var demoted := (lights + [hidden, dark]).filter(func(l: BudgetLight) -> bool: return l.demoted)
 	check(demoted.is_empty() and r.lit == 6, "6 wanting plus 1 hidden and 1 at energy 0: none demoted, 6 lit (got %s, %d demoted)" % [r, demoted.size()])
 	check(not hidden.wants_light() and not dark.wants_light() and lights[1].wants_light(), "wants_light(): shown, energy > 0 and textured")
