@@ -6,8 +6,8 @@ extends Node
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_display.gd
 ## The runner is headless, so `start()` must stay inert here: that is the real case, not a stub.
 ## The real window is the web smoke's (`Display scale`) and Task 7's desktop check.
-## Not tested, because a failed assert aborts the test: a window with no area, and replacing
-## `Game.display` (test_lint's `state_write` covers the second).
+## Not tested, because a failed assert aborts the test: `scale_for()` on a window with no area
+## (`apply()` ignores one, tested), and replacing `Game.display` (test_lint's `state_write`).
 
 const EPS := 0.0001
 const INT := Window.CONTENT_SCALE_STRETCH_INTEGER
@@ -32,6 +32,17 @@ const SCALES := [
 	[Vector2i(400, 225), 0.83333, FRAC],
 	[Vector2i(320, 180), 0.66667, FRAC],
 ]
+## D6 (code review of 1.14): was, now → logs. A step logs; a pixel inside the fit doesn't.
+const LOG_STEPS := [
+	[0.0, 3.0, true],  # the first apply
+	[0.0, 0.83333, true],  # the first apply, already in the fit
+	[2.0, 3.0, true],  # a whole step up
+	[3.0, 2.0, true],  # a whole step down
+	[2.0, 0.83333, true],  # into the fit
+	[0.83333, 1.0, true],  # out of the fit
+	[0.83333, 0.81667, false],  # a drag inside the fit
+	[0.66667, 0.83333, false],
+]
 ## D4: usable screen, decorations → window scale.
 const WINDOW_SCALES := [
 	[Vector2i(1920, 1040), Vector2i(0, 30), 3],
@@ -49,6 +60,7 @@ var _emits: Array[float] = []
 
 func run() -> void:
 	_test_scale_for()
+	_test_logs_step()
 	_test_window_scale_for()
 	_test_project_settings()
 	_test_inert_before_start()
@@ -71,6 +83,12 @@ func _test_scale_for() -> void:
 		var stretch := Display.stretch_for(w)
 		check(absf(got - row[1]) < EPS and stretch == row[2],
 				"scale_for %dx%d = %.5f, %s (got %.5f, %s)" % [w.x, w.y, row[1], _name(row[2]), got, _name(stretch)])
+
+
+func _test_logs_step() -> void:
+	for row: Array in LOG_STEPS:
+		var got := Display.logs_step(row[0], row[1])
+		check(got == row[2], "logs_step %.5f -> %.5f is %s (got %s)" % [row[0], row[1], row[2], got])
 
 
 func _test_window_scale_for() -> void:
@@ -121,6 +139,12 @@ func _test_apply() -> void:
 	_step(d, Vector2i(960, 540), 2.0, INT, 1, "back to whole scales switches to integer")
 	_step(d, Vector2i(1000, 600), 2.0, INT, 0, "a new size at the same whole scale emits nothing")
 	_step(d, Vector2i(1440, 810), 3.0, INT, 1, "the next whole scale emits once")
+	# Code review of 1.14: a window with no area (a hidden embed) is ignored, never a 0.0 fit.
+	_step(d, Vector2i(0, 0), 3.0, INT, 0, "a window with no area changes nothing")
+	_step(d, Vector2i(1440, 0), 3.0, INT, 0, "a window with no height changes nothing")
+	_step(d, Vector2i(0, 810), 3.0, INT, 0, "a window with no width changes nothing")
+	_step(d, Vector2i(400, 225), 0.83333, FRAC, 1, "after it, a real size applies as usual")
+	_step(d, Vector2i(320, 180), 0.66667, FRAC, 1, "each new size inside the fit still emits")
 	d.scale_changed.disconnect(_on_scale_changed)
 	get_window().content_scale_stretch = INT
 

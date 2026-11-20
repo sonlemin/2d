@@ -81,9 +81,14 @@ func start() -> void:
 	set_process(true)
 
 
-## The stretch and `scale` for a window of `window` physical pixels. Emits and logs only when the
-## scale changes, so a drag-resize logs once per whole-scale step, not once per pixel (D6).
+## The stretch and `scale` for a window of `window` physical pixels. Emits on every change of
+## scale, so readers always see the true value, but logs only on a step (D6, `logs_step()`).
 func apply(window: Vector2i) -> void:
+	# Code review of 1.14: the per-frame check sends whatever the engine reports, and a hidden or
+	# collapsed embed can report no area. That is no window to scale, not a 0.0 fit: keep the last
+	# real scale, and keep `_last_window` so the next real size is still compared against it.
+	if window.x <= 0 or window.y <= 0:
+		return
 	if window == _last_window:
 		return
 	_last_window = window
@@ -91,12 +96,21 @@ func apply(window: Vector2i) -> void:
 	get_window().content_scale_stretch = stretch_for(window)
 	if is_equal_approx(s, scale):
 		return
+	var was := scale
 	scale = s
-	if s >= 1.0:
-		Log.info(Log.UI, "display: scale %d in %dx%d" % [int(s), window.x, window.y])
-	else:
-		Log.info(Log.UI, "display: scale %.3f (fit) in %dx%d" % [s, window.x, window.y])
+	if logs_step(was, s):
+		if s >= 1.0:
+			Log.info(Log.UI, "display: scale %d in %dx%d" % [int(s), window.x, window.y])
+		else:
+			Log.info(Log.UI, "display: scale %.3f (fit) in %dx%d" % [s, window.x, window.y])
 	scale_changed.emit(s)
+
+
+## D6: a drag-resize logs once per step, not once per pixel. Above ×1 every change is a whole
+## step; inside the fit the scale moves with each pixel, so only entering it (from a whole scale
+## or from "no window", 0.0) is a step. Leaving it lands on a whole scale, which logs.
+static func logs_step(was: float, now: float) -> bool:
+	return now >= 1.0 or was >= 1.0 or was == 0.0
 
 
 ## D4, PC only. F8: Godot doesn't clamp the window to the screen, so ×3 on a 1366×768 screen opens

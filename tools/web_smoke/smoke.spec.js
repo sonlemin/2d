@@ -176,7 +176,8 @@ function judge(m, scale) {
   const [W, H] = m.image;
   const size = Math.abs(w - want[0]) <= tol && Math.abs(h - want[1]) <= tol;
   const centred = Math.abs(x - (W - w) / 2) <= 1 && Math.abs(y - (H - h) / 2) <= 1;
-  const edges = m.left === m.right;
+  // AC5: the same non-black colour; two black samples would pass a crop (code review of 1.14).
+  const edges = m.left === m.right && m.left !== '0,0,0';
   return { ok: size && centred && edges, want: want.map((v) => +v.toFixed(1)), size, centred, edges, ...m };
 }
 
@@ -278,6 +279,13 @@ test.describe('Web input', () => {
     await page.waitForTimeout(SCROLL_MS);
     expect(await takeKeys(), 'blurred: every key reaches the frame prevented').toEqual(prevented(['ArrowDown', ...rest]));
     expect(await scrollY(), 'blurred: the host page has still not scrolled').toBe(0);
+
+    // Blurred, then a game key (code review of 1.14): any key gives the canvas focus back, so Jump
+    // and Attack recover without an arrow. The guard leaves an unguarded key alone (not prevented).
+    await frame.evaluate(() => document.activeElement.blur());
+    await page.keyboard.press('KeyZ');
+    expect(await canvasActive(), 'blurred: a game key (KeyZ) also gives the canvas focus back').toBe(true);
+    expect(await takeKeys(), 'blurred: the guard does not prevent a game key').toEqual(['KeyZ:false']);
 
     const notice = await frame.evaluate(() => document.getElementById('status-notice')?.innerText.trim() ?? '');
     expect(notice, 'the frame\'s #status-notice is empty or gone').toBe('');

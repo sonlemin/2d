@@ -31,9 +31,11 @@ const WEB_FALSE := ["variant/extensions_support", "variant/thread_support", "pro
 ## the defaults; written explicitly so a laptop re-save that changes them fails here.
 const WEB_EXPLICIT := {"html/canvas_resize_policy": 2, "html/focus_canvas_on_start": true}
 ## Story 1.14 D5: the key guard in html/head_include, the same text in both web presets. The smoke
-## (`Web input`) is the real test; this pins that it is there and whole.
+## (`Web input`) is the real test; this pins that it is there and whole. The key names are pinned
+## with their regex neighbours, because the guard's comment names some of them too (code review).
 const GUARD_PARTS := ["<script>", "addEventListener('keydown'", "preventDefault()", ".focus()",
-		"Arrow(Up|Down|Left|Right)", "Space", "Page(Up|Down)", "Home", "End", "F([1-9]|1[0-2])", ", true);", "</script>"]
+		"/^(Arrow(Up|Down|Left|Right)|", "|Space|", "|Page(Up|Down)|", "|Home|", "|End|", "|F([1-9]|1[0-2]))$/",
+		"g.test(e.code) || g.test(e.key)", "a === document.body", ", true);", "</script>"]
 const WALK_ROOTS := ["res://rooms", "res://tests", "res://scripts/dev"]
 ## Files the walk must find, so an empty or wrong walk can't pass every filter check vacuously.
 const SENTINELS := ["rooms/l1/m1_shaft.txt", "rooms/dev/perf_worst.txt", "scripts/dev/dev_tools.gd", "tests/runner.gd"]

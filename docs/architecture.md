@@ -223,7 +223,7 @@ The lint is stricter than AR48's list on purpose (Story 1.9 D3, widened again by
 
 **Variance from `game-architecture.md` → Enforcement** (Story 1.11 D12): two rules are shaped by DevTools. `raw_input` also allows `dev/`: the rule keeps gameplay on `PlayerInput` intents, and DevTools reads only its own `dev_overlay` action, ships in no release build and must work while the player is dead, locked or absent. `dev_ref` is a line rule, not a file rule: outside `dev/` it fails on `DevTools`, any `class_name` declared under `dev/` (collected at run time) and any `res://scripts/dev/` or `res://scenes/dev/` path, except `world.gd`'s one line, `add_child(load("res://scripts/dev/dev_tools.gd").new())`, let through once per file and only right under `if OS.is_debug_build():`. A tree check proves the real `world.gd` holds that line exactly once, so an exemption that no longer matches the code fails.
 
-Last run: 2026-11-19, **ALL GREEN** (21 tests, bot best chain 8 over the full `m1_shaft` descent).
+Last run: 2026-11-20, **ALL GREEN** (22 tests, bot best chain 8 over the full `m1_shaft` descent).
 
 ## Deployment
 
