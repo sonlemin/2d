@@ -4,7 +4,7 @@ baseline_commit: 1afcc65
 
 # Story 1.14: Display scaling and web input
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -182,6 +182,20 @@ so that pixels stay sharp and the page never scrolls under me.
   - **`embed.html?build=web`:**
     - arrows, Space, PageDown and F5 never scroll or reload the host page, also after clicking the game, then the header text, then the game again;
     - with the header clicked, arrows scroll the host. That is correct: the game doesn't have focus.
+
+### Review Findings
+
+Code review 2026-11-20 (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 2 decision (resolved to patches by sonlm), 6 patch, 1 defer, 21 dismissed. All 8 patches applied 2026-11-20: 22 tests ALL GREEN (test_display 60 ok, test_export_presets 67, test_lint 192); export BUILD OK `builds/20261120-317fd60-dirty`, web smoke 7 passed. Not red-checked: the numpad branch (Playwright can't turn NumLock off) and the new `KeyZ` refocus step against the old guard.
+
+- [x] [Review][Patch] (decided: log on step only — sonlm 2026-11-20: (a)) Below 480×270 a drag-resize logs and emits on every pixel — in the fit range `scale_for()` is continuous, so `apply()`'s `is_equal_approx` never returns early: each frame of a web drag-resize below 480×270 prints `[ui] display: scale 0.8xx (fit)` and emits `scale_changed`. D6 says "a drag-resize logs once per step, not once per pixel". Options: (a) log only on entering/leaving the fit and on whole-scale changes, still emit and update `scale` per change; (b) log and emit only on entering/leaving the fit (subscribers 1.33/1.34 get a stale fit value); (c) accept it and amend D6.
+- [x] [Review][Patch] (decided: refocus on any key — sonlm 2026-11-20: (a)) A blurred canvas gets focus back only from a guarded key — the guard refocuses the canvas only for arrows/Space/page/F-keys. With focus on the frame's body, the game's own keys (Z/X/C/V) do nothing until the player presses an arrow, and that arrow press is itself lost (the event's target was fixed at dispatch, so Godot's canvas listener never sees it). Options: (a) also refocus (without `preventDefault`) on any keydown while `document.activeElement` is `body`/null; (b) keep the AC4 scope as built.
+- [x] [Review][Patch] A window with no area reaches the `scale_for()` assert every frame [game/scripts/core/display.gd:86] — the per-frame poll sends whatever `get_window().size` reports; a 0-sized canvas (hidden/collapsed iframe) asserts in debug and in release sets `scale` 0.0 ("no window") and emits `scale_changed(0.0)`. Fix: return early in `apply()` on `window.x <= 0 or window.y <= 0`, before `_last_window`; test it.
+- [x] [Review][Patch] The guard misses numpad navigation keys with NumLock off [game/export_presets.cfg:45,63] — those keys have `e.code` `Numpad8`… but `e.key` `ArrowUp`/`PageUp`/`Home` and the browser scrolls on them. Fix: test the regex against `e.key` as well as `e.code` in both presets; update `GUARD_PARTS`.
+- [x] [Review][Patch] `GUARD_PARTS` can't detect `Space` dropped from the regex [game/tests/test_export_presets.gd:36] — the guard's comment already contains "Space". Pin `|Space|` (or the regex literal).
+- [x] [Review][Patch] The smoke's edge check passes on two black samples [tools/web_smoke/smoke.spec.js judge()] — AC5 says "the same non-black colour"; `edges = m.left === m.right` accepts `0,0,0` twice. Add `m.left !== '0,0,0'`.
+- [x] [Review][Patch] `state_write` lint misses `Game.display.scale = …` [game/tests/test_lint.gd:99] — only the bare replacement covers `display`; add it to the field-write pattern with a firing sample.
+- [x] [Review][Patch] Two doc slips [docs/architecture.md:226, docs/component-inventory.md:164] — "21 tests" → 22; "then calls `display.start()`, at most one per frame" reads as if the per-frame cap applied to `display.start()`; move the clause.
+- [x] [Review][Defer] The first window fit may read X11 frame extents as 0 [game/scripts/core/display.gd:110] — deferred, unverified on a real WM; check on a borderline screen.
 
 ## Dev Notes
 
@@ -773,3 +787,4 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-19.
 
 - 2026-11-19: Story created (create-story). Engine and browser behaviour probed on the server (F1–F11). Status ready-for-dev.
 - 2026-11-19: Implemented (dev-story). `Game.display`, the web presets' keys and key guard, `embed.html`, the `Display scale` and `Web input` smoke blocks, `test_display`, docs. New probe F12: the web root window never emits `size_changed` on a browser resize, so `Display` also checks the size each frame. 22 tests green (1381 ok); export BUILD OK, 7 passed; D10 red checks recorded. Status review.
+- 2026-11-20: Code review (Blind Hunter, Edge Case Hunter, Acceptance Auditor). sonlm decided: log only on a step (`Display.logs_step()`), and the guard refocuses the canvas on any key while nothing in the page has focus. Applied 8 patches: `apply()` ignores a window with no area; the guard matches `e.key` too (numpad); `GUARD_PARTS` pins the regex groups; the smoke's edge columns must be non-black and a blurred `KeyZ` refocuses; `state_write` covers `Game.display.<field>`; doc slips. 1 deferred to 1.15 (X11 decorations at the first fit). 22 tests green; export BUILD OK, 7 passed. Status done; the laptop look (Task 10) is still to do.

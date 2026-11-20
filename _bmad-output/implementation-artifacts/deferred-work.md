@@ -161,3 +161,8 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **The Windows build is never booted on the server** — `tools/export.sh` exports it and checks its PCK (AC3), but the server has no Windows or wine to run it, so nothing proves the `.exe` starts. Its PCK comes from the same filters as Linux's: the Windows, Linux and web release PCKs of the 2026-11-19 build are byte-identical (99,492 bytes), and the Linux build boots and the web build passes its smoke.
   → **Owner: Story 7.15** — it ships the final Windows build; boot it there on Windows (or under wine on the server) before the tester round.
+
+## Deferred from: code review of 1-14-display-scaling-and-web-input.md (2026-11-20)
+
+- **The first PC window fit may read the window decorations as 0** — `game/scripts/core/display.gd` `_fit_window()` reads `win.get_size_with_decorations() - win.size` once, from `Game.boot()` during World's first `_ready()`. On X11 the window manager may not have published `_NET_FRAME_EXTENTS` yet, so the decorations read (0, 0) and a borderline screen (usable 1440×830 with a 30 px title bar) picks ×3 and opens partly off it, the F8 case D4 fixes. Unverifiable under Xvfb (no window manager). A possible fix: re-fit once on the first `size_changed` or a frame later if the decorations were zero.
+  → **Owner: Story 1.15** — the CP1 laptop checks run the PC build under a real window manager; log the `display: window` line there and re-fit only if the decorations read zero.
