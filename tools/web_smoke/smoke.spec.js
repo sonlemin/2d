@@ -252,12 +252,14 @@ test.describe('Web input', () => {
     const { frame } = await bootFrame(page, seen, '/embed.html?build=web', '/web/index.html');
     const scrollY = () => page.evaluate(() => window.scrollY);
     const canvasActive = () => frame.evaluate(() => document.activeElement === document.getElementById('canvas'));
-    // Bubble phase on the frame's window: it sees each key after Godot's and the guard's listeners.
+    // Capture phase on the frame's window, registered after the guard, so it also sees the keys the
+    // guard stops before Godot (F11, browser zoom). It keeps the event and reads defaultPrevented
+    // when taken, after the whole dispatch, so Godot's and the guard's listeners have both run.
     await frame.evaluate(() => {
       window.__keys = [];
-      addEventListener('keydown', (e) => window.__keys.push(`${e.code}:${e.defaultPrevented}`));
+      addEventListener('keydown', (e) => window.__keys.push(e), true);
     });
-    const takeKeys = () => frame.evaluate(() => window.__keys.splice(0));
+    const takeKeys = () => frame.evaluate(() => window.__keys.splice(0).map((e) => `${e.code}:${e.defaultPrevented}`));
     const prevented = (keys) => keys.map((k) => `${k}:true`);
 
     // Focused: focusCanvas (F6) gave the canvas focus at boot.
@@ -286,6 +288,21 @@ test.describe('Web input', () => {
     await page.keyboard.press('KeyZ');
     expect(await canvasActive(), 'blurred: a game key (KeyZ) also gives the canvas focus back').toBe(true);
     expect(await takeKeys(), 'blurred: the guard does not prevent a game key').toEqual(['KeyZ:false']);
+
+    // Laptop look of 1.14: Godot prevents every key on the focused canvas, so F11 and the browser's
+    // zoom keys did nothing. The guard stops them before Godot and leaves them to the browser: with
+    // the canvas focused, each arrives not prevented (F11 is pressed but its fullscreen isn't
+    // judged here: the headless shell isn't the real browser for it, the laptop look is).
+    expect(await canvasActive(), 'the canvas has focus before the browser keys').toBe(true);
+    const BROWSER_KEYS = ['F11', 'Control+Equal', 'Control+Minus', 'Control+Digit0'];
+    for (const k of BROWSER_KEYS) await page.keyboard.press(k);
+    const browser = (await takeKeys()).filter((k) => !k.startsWith('Control'));
+    expect(browser, 'canvas focused: F11 and Ctrl + - 0 reach the browser, not prevented')
+      .toEqual(['F11:false', 'Equal:false', 'Minus:false', 'Digit0:false']);
+    // F5 (reload) and F10 stay guarded: a reload loses the run.
+    for (const k of ['F5', 'F10']) await page.keyboard.press(k);
+    expect(await takeKeys(), 'canvas focused: F5 and F10 are still prevented').toEqual(prevented(['F5', 'F10']));
+    expect(await scrollY(), 'the host page has still not scrolled').toBe(0);
 
     const notice = await frame.evaluate(() => document.getElementById('status-notice')?.innerText.trim() ?? '');
     expect(notice, 'the frame\'s #status-notice is empty or gone').toBe('');

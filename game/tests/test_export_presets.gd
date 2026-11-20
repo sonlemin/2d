@@ -35,7 +35,8 @@ const WEB_EXPLICIT := {"html/canvas_resize_policy": 2, "html/focus_canvas_on_sta
 ## with their regex neighbours, because the guard's comment names some of them too (code review).
 const GUARD_PARTS := ["<script>", "addEventListener('keydown'", "preventDefault()", ".focus()",
 		"/^(Arrow(Up|Down|Left|Right)|", "|Space|", "|Page(Up|Down)|", "|Home|", "|End|", "|F([1-9]|1[0-2]))$/",
-		"g.test(e.code) || g.test(e.key)", "a === document.body", ", true);", "</script>"]
+		"g.test(e.code) || g.test(e.key)", "a === document.body",
+		"e.code === 'F11' || ((e.ctrlKey || e.metaKey) && (/^(Equal|Minus|Digit0|NumpadAdd|NumpadSubtract|Numpad0)$/.test(e.code) || /^[-+=_0]$/.test(e.key)))) { e.stopPropagation(); return; }", ", true);", "</script>"]
 const WALK_ROOTS := ["res://rooms", "res://tests", "res://scripts/dev"]
 ## Files the walk must find, so an empty or wrong walk can't pass every filter check vacuously.
 const SENTINELS := ["rooms/l1/m1_shaft.txt", "rooms/dev/perf_worst.txt", "scripts/dev/dev_tools.gd", "tests/runner.gd"]
