@@ -132,7 +132,7 @@ Code review 2026-11-21 over `c9143ca..HEAD` (Blind Hunter, Edge Case Hunter, Acc
 
 **Result:** `cd game && ./run_tests.sh` → `== ALL GREEN (23 tests)`, 1565 `ok`, 0 `FAIL`, 0 error lines.
 
-**Still open with sonlm:** the `?room=perf_worst&perf` run in Firefox on the Intel iGPU, on the build made after this review. The 1.16 row in `docs/perf.md` is provisional until then.
+**The perf re-run (sonlm, 2026-11-21, build `20261121-af07203`, Firefox on the Intel iGPU), pasted:** `[room] dev: perf 60 s: 357 frames, avg 2.5 fps, min 0 fps, worst 95438.0 ms at 48.3 s, 15 over 20 ms; lights max 6/6, sprites max 5, over 0; chain 20, breaks 0, deaths 0; glow off; window 3330x1087; Web, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar` → **void**: a 95 s frame is a hidden or covered tab, and the summary reports only the worst frame, so the first-frame figure can't be read from it. sonlm: the story is done. The 1.16 row in `docs/perf.md` stays provisional and the first-frame stall is Story 7.13's (ledgered).
 
 ## Dev Notes
 

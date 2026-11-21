@@ -103,6 +103,7 @@ Copied from the summary lines sonlm ran and pasted (2026-11-21). The Firefox lin
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-11-21 | 20261121-22fa2af `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1870 | 60 Hz | off | 59.5 | 29 | 548.0 (0.0 s) | 2 | 6/6 / 7 / 0 | 0 / 0 | with `Fx.warm_up()`: no change from 1.15's 562 ms. The stall is the first frame itself (load time, before any input), which a warm-up in that same frame can't take out. Not chased further (→ 7.13) |
 | 2026-11-21 | 20261121-22fa2af `web_debug` | sonlm's laptop, Chrome, WebKit WebGL | 4358x6762 | — | off | (4.1) | (0) | (159886.3 at 46.8 s) | (160) | 6/6 / 5 / 0 | 0 / 0 | **void:** a 160 s frame is a hidden tab (see below), not the GPU |
+| 2026-11-21 | 20261121-af07203 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | — | off | (2.5) | (0) | (95438.0 at 48.3 s) | (15) | 6/6 / 5 / 0 | 0 / 0 | **void:** the re-run on the patched warm-up (code review); a 95 s frame is a hidden or covered tab, so the first-frame figure can't be read from it. The row above stays provisional; Story 7.13 re-measures |
 
 **Runs not made at CP1 (sonlm's choice, 2026-11-21):** glow on everywhere (glow was a no-go, so its cost no longer decides anything), the laptop desktop on the Intel iGPU, and Chrome. No separate HD 620 machine was available; the laptop's Intel iGPU, through Firefox, stood in for the low-end target. The full pass is Story 7.13.
 
