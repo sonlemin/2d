@@ -17,6 +17,8 @@ pixel_art_game/
 │   ├── export_presets.cfg        # The four export presets (Windows, Linux, Web, Web debug; Story 1.13), pinned by test_export_presets
 │   ├── README.md                 # Controls, loop rules and how to run tests (player-facing)
 │   ├── run_tests.sh              # ★ Test entry point: imports, then runs every tests/test_*.gd and tests/smoke_*.gd (glob)
+│   ├── fonts/                    # Fusion Pixel Font 8px proportional latin .otf (+ .import: AA, hinting, subpixel off, no system fallback), OFL.txt, LICENSES/ (Story 1.17; docs/build.md)
+│   ├── text/                     # strings.csv (keys,en) + its .import and the generated strings.en.translation (committed; Story 1.17)
 │   ├── rooms/
 │   │   ├── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
 │   │   └── dev/perf_worst.txt    # The worst-case perf scene (Story 1.12): 30 × 68, validated only, never a level (docs/perf.md)
@@ -44,7 +46,8 @@ pixel_art_game/
 │   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position()
 │   │   ├── ui/
 │   │   │   ├── gutters.gd        # Gutters: the two flat 60 px HUD strips
-│   │   │   └── screen_router.gd  # ScreenRouter: one full-screen UI screen at a time
+│   │   │   ├── screen_router.gd  # ScreenRouter: one full-screen UI screen at a time
+│   │   │   └── theme_builder.gd  # ThemeBuilder: the one Theme in code (font, size 8, Label variations), play_text for UI over the play area
 │   │   ├── actors/
 │   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, contact and death
 │   │   │   ├── player_input.gd   # PlayerInput: the only Input reader; intents, Light tap/hold, real-time buffers, lock()
@@ -57,6 +60,7 @@ pixel_art_game/
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
 │   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
+│   │   │   ├── text_style.gd     # TextStyle: font, sizes, line metrics, CAP_TOP, the play-area outline (play_text LabelSettings, cached)
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
 │   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; the release presets exclude it (export.sh checks)
 │   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --log, --set, --glow, --perf; ?… on web), the overlay key
@@ -79,7 +83,10 @@ pixel_art_game/
 │   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, --glow/--perf, perf stats
 │   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves; the gate, the EFFECTS table, the sampled rates
 │   │   ├── test_light_budget.gd  # BudgetLight: the rule, jitter, apply() on nodes, sprite fallback, scene audit
+│   │   ├── test_strings.gd       # The string table: shape, registered and current, en fallback, key scan, dead keys, copy rules, scene text
+│   │   ├── test_theme.gd         # Font import pins, coverage, widths, Theme variations and pitches, CAP_TOP, play_text, popups at 8 px
 │   │   ├── spec.gd               # Helper: the GDD's guarantees as constants, preloaded by tests
+│   │   ├── strings_check.gd      # Helper: the pure string-table checks (table, glyphs, registered, copy, key refs, scene text)
 │   │   ├── room_sweep.gd         # Helper: the pure room sweeps (falls, stretches, hazards, ids, links, arrival)
 │   │   ├── rate.gd               # Helper: a rate in Hz from values sampled once per tick (turns, the span between events)
 │   │   ├── smoke_rooms.gd        # Every room file: validation, cross-file checks, sweeps, lurker guarantees
@@ -106,6 +113,7 @@ pixel_art_game/
 │   │   └── player.txt crawler.txt lurker.txt lurker_eyes.txt slash.txt tile.txt
 │   │                             # One char = one pixel; '.' = transparent
 │   ├── export.sh                 # ★ Builds every target into builds/<version>/ and checks each one (Story 1.13; docs/build.md)
+│   ├── godot_licenses.gd         # Writes GODOT_LICENSES.txt (Godot's licence, third-party components, licence texts) for export.sh (Story 1.17)
 │   ├── pck_list.gd               # Lists a PCK's files through the engine's own reader (export.sh's release check)
 │   └── web_smoke/                # The web boot smoke: Playwright 1.65.1 (exact pin), Chromium headless
 │       ├── embed.html            # An itch-style host page with the game in a 960×540 iframe (Story 1.14's Web input test)
@@ -185,11 +193,13 @@ Source of truth for art is `tools/sprites/*.txt`; `game/art/*.png` is build outp
 
 | File | Purpose |
 |---|---|
-| `game/project.godot` | Main scene, window/stretch, input actions, physics layer names, renderer, pixel snap |
+| `game/project.godot` | Main scene, window/stretch, input actions, physics layer names, renderer, pixel snap, the project font (`gui/theme/custom_font`) and the registered string table (`internationalization/locale/translations`) |
 | `game/art/*.png.import` | Per-texture import settings |
+| `game/fonts/*.otf.import` | The font's import settings: antialiasing, hinting and subpixel positioning off, no system fallback (pinned; `test_theme` reads them) |
+| `game/text/strings.csv.import` | The string table's import settings (`compress=1`, `unescape_keys=false`, `unescape_translations=true`) |
 | `tools/sprites/palette_edge.txt` | The colour palette for the sprite pipeline |
 | `game/export_presets.cfg` | The four export presets `tools/export.sh` calls by name (Story 1.13); `test_export_presets` pins them |
 | `tools/web_smoke/package.json` + `package-lock.json` | The web smoke's one dependency, `@playwright/test` pinned exactly; Node ≥ 24 |
 | `.gitignore` | Ignores `game/.godot/`, `game/export/`, `/builds/`, the web smoke's `node_modules/` and Playwright output, BMAD loop caches, `__pycache__/` |
 
-There is no CI configuration, `.env` or localisation folder.
+There is no CI configuration or `.env`. The string table is `game/text/` (Story 1.17); M2 ships English only.

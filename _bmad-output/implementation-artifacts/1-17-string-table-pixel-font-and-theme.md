@@ -4,7 +4,7 @@ baseline_commit: 08eb89917617f047e7593856c3d1dcd0d0b8c592
 
 # Story 1.17: String table, pixel font and theme
 
-Status: ready-for-dev
+Status: in-progress
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -131,13 +131,13 @@ so that everything I read is sharp at every integer scale.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` → `== ALL GREEN (23 tests)`, 1565 `ok`, 0 `FAIL` (measured at story creation on `08eb899`, 2026-11-21). Re-run it and record the result in the Dev Agent Record.
-- [ ] **Task 2: Font files and import (AC: 1).**
-  - [ ] Download the release zip into an empty scratch folder and check its SHA-512 (Verified facts). Copy `fusion-pixel-8px-proportional-latin.otf`, `OFL.txt` and `LICENSES/` (four sub-folders) into `game/fonts/` unmodified. Leave out the other locale builds (`ja`, `ko`, `zh_*`).
-  - [ ] Run `godot --headless --path game --import`, then edit `game/fonts/fusion-pixel-8px-proportional-latin.otf.import` to set the four pinned params, then import again. Commit the `.otf`, the `.otf.import`, `OFL.txt` and `LICENSES/`. The `.txt` files are not imported (no `.import` beside them; check).
-  - [ ] `project.godot`: add `[gui] theme/custom_font="res://fonts/fusion-pixel-8px-proportional-latin.otf"`. Don't touch the `gui/theme/default_font_*` settings: they apply only to the engine's built-in font.
-- [ ] **Task 3: `core/text_style.gd` (AC: 2, 3).**
-  - [ ] Consts:
+- [x] **Task 1: Baseline (AC: 10).** `cd game && ./run_tests.sh` → `== ALL GREEN (23 tests)`, 1565 `ok`, 0 `FAIL` (measured at story creation on `08eb899`, 2026-11-21). Re-run it and record the result in the Dev Agent Record.
+- [x] **Task 2: Font files and import (AC: 1).**
+  - [x] Download the release zip into an empty scratch folder and check its SHA-512 (Verified facts). Copy `fusion-pixel-8px-proportional-latin.otf`, `OFL.txt` and `LICENSES/` (four sub-folders) into `game/fonts/` unmodified. Leave out the other locale builds (`ja`, `ko`, `zh_*`).
+  - [x] Run `godot --headless --path game --import`, then edit `game/fonts/fusion-pixel-8px-proportional-latin.otf.import` to set the four pinned params, then import again. Commit the `.otf`, the `.otf.import`, `OFL.txt` and `LICENSES/`. The `.txt` files are not imported (no `.import` beside them; check).
+  - [x] `project.godot`: add `[gui] theme/custom_font="res://fonts/fusion-pixel-8px-proportional-latin.otf"`. Don't touch the `gui/theme/default_font_*` settings: they apply only to the engine's built-in font.
+- [x] **Task 3: `core/text_style.gd` (AC: 2, 3).**
+  - [x] Consts:
     - `FONT_PATH`;
     - `SIZE := 8`, `SIZE_LARGE := 16`;
     - `LINE_SPACING_SINGLE := -4`, `LINE_SPACING_BODY := 0`, `LINE_SPACING_LARGE := -8` (D4);
@@ -145,54 +145,54 @@ so that everything I read is sharp at every integer scale.
     - `CAP_TOP := 3` and `CAP_TOP_LARGE := 6` (D4);
     - `OUTLINE_PX := 1`;
     - `PLACEHOLDER_SURFACE := Color("#0d0b14")`.
-  - [ ] Each const gets a `##` comment citing the DESIGN token and the probe.
-  - [ ] `font() -> FontFile`: one `preload`, so no file lists the path twice.
-  - [ ] `play_text(color: Color, outline_color: Color) -> LabelSettings`: cached in a static Dictionary keyed by the two colours (never a new resource per popup, project rule). The `LabelSettings` has `font_size = SIZE`, `font_color = color` and 4 stacked shadows at the offsets above with `outline_size` 0 and `outline_color`. `outline_size` stays 0 and `shadow_size` stays at its default; the probe drew exactly glyph, outline and background.
-- [ ] **Task 4: `ui/theme_builder.gd` and the UI roots (AR40) (AC: 2, 3).**
-  - [ ] `static func theme() -> Theme`: cached. It sets `default_font = TextStyle.font()` and `default_font_size = TextStyle.SIZE`, plus base Label `line_spacing = LINE_SPACING_BODY`. It adds type variations of `Label`: `HudValue`, `HudValueLarge`, `MenuItem` and `BodyLine`, using `set_type_variation()` + `set_font_size()` + `set_constant(&"line_spacing", …)`.
-  - [ ] `static func play_text(color, outline) -> LabelSettings`: delegates to `TextStyle`.
-  - [ ] `gutters.gd` and `screen_router.gd` set `theme = ThemeBuilder.theme()` in `_ready()`, with one `##` line each.
-- [ ] **Task 5: Fx popups (AC: 4).**
-  - [ ] Edit `Fx.popup()` and `chain_popup()` as AC4 says. `fx.gd` header line: popups draw `TextStyle.play_text`.
-  - [ ] `warm_up()`'s label gets `label_settings = TextStyle.play_text(SPARK, TextStyle.PLACEHOLDER_SURFACE)` and keeps `WARM_ALPHA`.
-  - [ ] `player.gd`: the two popups use `tr()` keys (AC5) and drop the `10`.
-  - [ ] The `EFFECTS` rows are unchanged: same functions, same motion.
-- [ ] **Task 6: String table (AC: 5).**
-  - [ ] Create `game/text/strings.csv` with the two rows. Import it, then set the three `.import` params (they are the defaults today; commit them explicitly).
-  - [ ] Add the `[internationalization]` setting. Commit the `.csv`, `.csv.import` and `strings.en.translation`.
-  - [ ] Check: `git status` after a second `--import` shows no change.
-- [ ] **Task 7: `tests/test_strings.gd` (AC: 6, 9).**
-  - [ ] Read the CSV with `FileAccess.get_csv_line()`, which handles quoted commas and newlines. Never use `ConfigFile` or `JSON.parse_string()` (they print `ERROR:` lines).
-  - [ ] Write each validator as a pure static function on a helper `tests/strings_check.gd` (not run by the glob, like `room_sweep.gd`). Each returns `Array[String]` errors and has a firing sample and a near-miss in the test.
-  - [ ] Unescape the CSV's `en` with `String.c_unescape()` before comparing to `translate()`. This reproduces the importer's `unescape_translations=true` (probed: `\n`, `\t`, `\\` rows all equal). Don't hand-list the escapes.
-  - [ ] The scan covers `res://scripts/**/*.gd` and `res://scenes/**/*.tscn`, not `tests/`. For `.gd` files, drop comments with `test_lint.gd`'s `static func strip(line, open) -> {code, bare, open}`. Preload the script and call the static; use `code` (strings kept), carrying `open` from line to line. Don't write a second stripper. For `.tscn` files, read whole lines.
-  - [ ] The prefix list is a const in `strings_check.gd`: `MENU`, `DEATH`, `TIER`, `NPC`, `JOURNAL`, `DEV`, `POPUP`. A story that adds a domain adds its prefix there and in the docs section.
-- [ ] **Task 8: `tests/test_theme.gd` (AC: 1–4).**
-  - [ ] Font import pins on the loaded `FontFile` (4 asserts).
-  - [ ] `ProjectSettings.get_setting("gui/theme/custom_font") == TextStyle.FONT_PATH`.
-  - [ ] `ThemeDB.fallback_font` is that font.
-  - [ ] Coverage loop (AC1).
-  - [ ] Widths against DESIGN's measured table: `0123456789` 50 px, `+1240` 24 px, `x12 +24` 33 px, and digit widths all equal (5 px) at size 8. Size 16 is exactly ×2 of size 8 for each string.
-  - [ ] Each variation's size and pitch (two-line minus one-line Label height, headless) against 8 / 16 / 8 / 12.
-  - [ ] `CAP_TOP`: `font.get_ascent(8) - 6 == TextStyle.CAP_TOP`. The cap height of 6 is DESIGN's metric, so the expected value comes from the design, not from the const.
-  - [ ] `ThemeBuilder.theme()` returns the same instance twice.
-  - [ ] `play_text()` caches: same colours give the same instance, other colours a new one. It has 4 stacked shadows at the 4 offsets, outline 0, size 8.
-  - [ ] The `Fx.popup` Label carries `play_text` settings, and `chain_popup` at 12 links is size 8.
-  - [ ] **Pixel check (D5):** there is no renderer test, because the suite runs `--headless`. After Task 5, re-run the render probe (Verified facts, last bullet) once against the real project. Use a throwaway script in the scratchpad that loads `m1_shaft` standalone and calls `Fx.popup` / `chain_popup(…, 12, …)`; don't commit it. Record in the Dev Agent Record: three colours, 4-neighbour outline, popup 8 px at 12 links. `tests/screenshot.gd` is unchanged.
-  - [ ] Update `test_fx`: drop any assertion on the removed overrides; the popup tests keep their rise/fade checks.
-  - [ ] `smoke_world`: `Gutters.theme` and `ScreenRouter.theme` are `ThemeBuilder.theme()` after World's `_ready`.
-  - [ ] Extend `smoke_world`'s `test_popups_in_room` (`:170`, the bank that adds a popup Label): the Label's text is `+1 banked`, not `POPUP_BANKED`. This proves `tr()` resolves through the registered table in a real node, not only in `test_strings`.
-- [ ] **Task 9: Lint, export and docs (AC: 7, 8, 9).**
-  - [ ] Add `raw_text` to `RULES` with its samples (AC7), and make the M1 popups pass.
-  - [ ] Write `tools/godot_licenses.gd` in `pck_list.gd`'s style: lives outside `game/`, may print. It writes to the path after `--`, quits 0, and pushes an error and quits 1 on a write failure. Run it with the project (`--headless --path "$ROOT/game" -s "$ROOT/tools/godot_licenses.gd" -- <abs out>`) or with `--main-pack` like `pck_list`. Probe which one exits cleanly with no error line, and record the result.
-  - [ ] `export.sh`:
-    - [ ] a `licences` step after `export`;
-    - [ ] `test_strings` in the `content` step;
-    - [ ] required PCK entries;
-    - [ ] the header's "later stories add steps (string keys and licences 1.17 …)" line becomes past tense for 1.17.
-  - [ ] Run `tools/export.sh` once to `== BUILD OK`. `ls` each folder for the three items.
-  - [ ] Docs (D14).
-  - [ ] Ledger entries (D15).
+  - [x] Each const gets a `##` comment citing the DESIGN token and the probe.
+  - [x] `font() -> FontFile`: one `preload`, so no file lists the path twice.
+  - [x] `play_text(color: Color, outline_color: Color) -> LabelSettings`: cached in a static Dictionary keyed by the two colours (never a new resource per popup, project rule). The `LabelSettings` has `font_size = SIZE`, `font_color = color` and 4 stacked shadows at the offsets above with `outline_size` 0 and `outline_color`. `outline_size` stays 0 and `shadow_size` stays at its default; the probe drew exactly glyph, outline and background.
+- [x] **Task 4: `ui/theme_builder.gd` and the UI roots (AR40) (AC: 2, 3).**
+  - [x] `static func theme() -> Theme`: cached. It sets `default_font = TextStyle.font()` and `default_font_size = TextStyle.SIZE`, plus base Label `line_spacing = LINE_SPACING_BODY`. It adds type variations of `Label`: `HudValue`, `HudValueLarge`, `MenuItem` and `BodyLine`, using `set_type_variation()` + `set_font_size()` + `set_constant(&"line_spacing", …)`.
+  - [x] `static func play_text(color, outline) -> LabelSettings`: delegates to `TextStyle`.
+  - [x] `gutters.gd` and `screen_router.gd` set `theme = ThemeBuilder.theme()` in `_ready()`, with one `##` line each.
+- [x] **Task 5: Fx popups (AC: 4).**
+  - [x] Edit `Fx.popup()` and `chain_popup()` as AC4 says. `fx.gd` header line: popups draw `TextStyle.play_text`.
+  - [x] `warm_up()`'s label gets `label_settings = TextStyle.play_text(SPARK, TextStyle.PLACEHOLDER_SURFACE)` and keeps `WARM_ALPHA`.
+  - [x] `player.gd`: the two popups use `tr()` keys (AC5) and drop the `10`.
+  - [x] The `EFFECTS` rows are unchanged: same functions, same motion.
+- [x] **Task 6: String table (AC: 5).**
+  - [x] Create `game/text/strings.csv` with the two rows. Import it, then set the three `.import` params (they are the defaults today; commit them explicitly).
+  - [x] Add the `[internationalization]` setting. Commit the `.csv`, `.csv.import` and `strings.en.translation`.
+  - [x] Check: `git status` after a second `--import` shows no change.
+- [x] **Task 7: `tests/test_strings.gd` (AC: 6, 9).**
+  - [x] Read the CSV with `FileAccess.get_csv_line()`, which handles quoted commas and newlines. Never use `ConfigFile` or `JSON.parse_string()` (they print `ERROR:` lines).
+  - [x] Write each validator as a pure static function on a helper `tests/strings_check.gd` (not run by the glob, like `room_sweep.gd`). Each returns `Array[String]` errors and has a firing sample and a near-miss in the test.
+  - [x] Unescape the CSV's `en` with `String.c_unescape()` before comparing to `translate()`. This reproduces the importer's `unescape_translations=true` (probed: `\n`, `\t`, `\\` rows all equal). Don't hand-list the escapes.
+  - [x] The scan covers `res://scripts/**/*.gd` and `res://scenes/**/*.tscn`, not `tests/`. For `.gd` files, drop comments with `test_lint.gd`'s `static func strip(line, open) -> {code, bare, open}`. Preload the script and call the static; use `code` (strings kept), carrying `open` from line to line. Don't write a second stripper. For `.tscn` files, read whole lines.
+  - [x] The prefix list is a const in `strings_check.gd`: `MENU`, `DEATH`, `TIER`, `NPC`, `JOURNAL`, `DEV`, `POPUP`. A story that adds a domain adds its prefix there and in the docs section.
+- [x] **Task 8: `tests/test_theme.gd` (AC: 1–4).**
+  - [x] Font import pins on the loaded `FontFile` (4 asserts).
+  - [x] `ProjectSettings.get_setting("gui/theme/custom_font") == TextStyle.FONT_PATH`.
+  - [x] `ThemeDB.fallback_font` is that font.
+  - [x] Coverage loop (AC1).
+  - [x] Widths against DESIGN's measured table: `0123456789` 50 px, `+1240` 24 px, `x12 +24` 33 px, and digit widths all equal (5 px) at size 8. Size 16 is exactly ×2 of size 8 for each string.
+  - [x] Each variation's size and pitch (two-line minus one-line Label height, headless) against 8 / 16 / 8 / 12.
+  - [x] `CAP_TOP`: `font.get_ascent(8) - 6 == TextStyle.CAP_TOP`. The cap height of 6 is DESIGN's metric, so the expected value comes from the design, not from the const.
+  - [x] `ThemeBuilder.theme()` returns the same instance twice.
+  - [x] `play_text()` caches: same colours give the same instance, other colours a new one. It has 4 stacked shadows at the 4 offsets, outline 0, size 8.
+  - [x] The `Fx.popup` Label carries `play_text` settings, and `chain_popup` at 12 links is size 8.
+  - [x] **Pixel check (D5):** there is no renderer test, because the suite runs `--headless`. After Task 5, re-run the render probe (Verified facts, last bullet) once against the real project. Use a throwaway script in the scratchpad that loads `m1_shaft` standalone and calls `Fx.popup` / `chain_popup(…, 12, …)`; don't commit it. Record in the Dev Agent Record: three colours, 4-neighbour outline, popup 8 px at 12 links. `tests/screenshot.gd` is unchanged.
+  - [x] Update `test_fx`: drop any assertion on the removed overrides; the popup tests keep their rise/fade checks.
+  - [x] `smoke_world`: `Gutters.theme` and `ScreenRouter.theme` are `ThemeBuilder.theme()` after World's `_ready`.
+  - [x] Extend `smoke_world`'s `test_popups_in_room` (`:170`, the bank that adds a popup Label): the Label's text is `+1 banked`, not `POPUP_BANKED`. This proves `tr()` resolves through the registered table in a real node, not only in `test_strings`.
+- [x] **Task 9: Lint, export and docs (AC: 7, 8, 9).**
+  - [x] Add `raw_text` to `RULES` with its samples (AC7), and make the M1 popups pass.
+  - [x] Write `tools/godot_licenses.gd` in `pck_list.gd`'s style: lives outside `game/`, may print. It writes to the path after `--`, quits 0, and pushes an error and quits 1 on a write failure. Run it with the project (`--headless --path "$ROOT/game" -s "$ROOT/tools/godot_licenses.gd" -- <abs out>`) or with `--main-pack` like `pck_list`. Probe which one exits cleanly with no error line, and record the result.
+  - [x] `export.sh`:
+    - [x] a `licences` step after `export`;
+    - [x] `test_strings` in the `content` step;
+    - [x] required PCK entries;
+    - [x] the header's "later stories add steps (string keys and licences 1.17 …)" line becomes past tense for 1.17.
+  - [x] Run `tools/export.sh` once to `== BUILD OK`. `ls` each folder for the three items.
+  - [x] Docs (D14).
+  - [x] Ledger entries (D15).
 - [ ] **Task 10: Laptop look (human gate, AC: 10).** HALT for sonlm. Look at the desktop build (×3 window) and the debug web build in `m1_shaft`:
   - pogo a chain past 5 and past 10: the chain popup stays 8 px, crisp, with a thin 1 px dark outline;
   - bank it with a landing: the "+N banked" popup;
@@ -387,10 +387,81 @@ so that everything I read is sharp at every integer scale.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-21/22.
+
 ### Debug Log References
+
+- **Task 1 baseline** (`b8f93a3`): `== ALL GREEN (23 tests)`, 1565 `ok`, 0 `FAIL`. Re-run with only `custom_font` added: still 23 green, 1565 `ok` (the dev overlays and the perf smoke don't move).
+- **Font download** (scratchpad, empty folder): zip 17,520,997 bytes, SHA-512 `3b332a10…bc8d9`, `.otf` SHA-256 `82f1df2f…71be2`, `OFL.txt` SHA-256 `bc518cf6…76a63`: all three match Verified facts. First import wrote `antialiasing=1`, `hinting=3`, `subpixel_positioning=4`, `allow_system_fallback=true`; pinned to `0/0/0/false` and re-imported. No `.import` appeared beside `OFL.txt` or `LICENSES/*`.
+- **String table import:** `strings.csv.import` already carries `compress=1`, `delimiter=0`, `unescape_keys=false`, `unescape_translations=true` (committed as written). A second `--import` left `strings.en.translation` byte-identical (MD5 `6630d049…1d10c` before and after).
+- **Render probe (D5, Task 8 pixel check)**, throwaway `popup_probe.gd` in the scratchpad (not committed), run through `tests/runner.tscn` under `xvfb-run` + `opengl3` in the real `world.tscn` with `m1_shaft`: `chain_popup(…, 3, 6)`, `chain_popup(…, 12, 24)` and `popup("+3 banked")`, read with Pillow. For each popup: glyph pixels exactly the glyph colour (`#ffd17a` / `#ffedb2`), outline pixels exactly `#0d0b14`, 0 outline pixels without a 4-neighbour glyph, 0 glyph sides without outline, 0 diagonal-only outline pixels; caps 6 rows tall. `x12  +24` at 12 links: 57 glyph pixels and 6-row caps, the size-8 count from the story's probe (size 10 drew 115), so 8 px. Background pixels around the two left popups vary because the real room is lit behind them; around `+3 banked` the background was one colour, so that crop held exactly three colours.
+- **`godot_licenses.gd` probe:** `--headless --path game -s … -- <out>` and `--headless --main-pack <linux pck> -s … -- <out>` both exit 0 with no `ERROR` / `WARN` / `SCRIPT` line and write identical files (96,747 bytes; 106 component parts, 19 licence texts). A bad path prints `ERROR: godot_licenses: cannot write … (File not found)` and exits 1. `export.sh` uses `--path game` (no built PCK needed), under `XDG_DATA_HOME=$RUN_DATA` like the listings.
+- **Real PCK paths** (`pck_linux.txt` of the first build): `res://fonts/fusion-pixel-8px-proportional-latin.otf.import`, `res://.godot/imported/fusion-pixel-8px-proportional-latin.otf-f58d28e3e6e45f174646544d86e33822.fontdata`, `res://text/strings.en.translation` (plus `strings.csv.import`); the three required regexes match them.
+- **Red-checks (D16)**, each broken, `FAIL` seen, restored:
+  - import `antialiasing=1` (re-imported) → `FAIL font: antialiasing off (got 1)`;
+  - `custom_font` removed → `FAIL project.godot gui/theme/custom_font …` and `FAIL ThemeDB.fallback_font …`;
+  - `BodyLine` given `LINE_SPACING_SINGLE` → `FAIL BodyLine: size 8, line pitch 12 px (got 8, 8.0)`;
+  - `CAP_TOP` 4 → `FAIL CAP_TOP is ascent - DESIGN's cap 6 (ascent 9.0, CAP_TOP 4)`;
+  - `play_text` uncached → `FAIL play_text() caches…` and `FAIL Fx.popup's Label carries play_text…`;
+  - 3-sided outline → `FAIL play_text: four shadows… (count 3…)`;
+  - `tr("POPUP_BANKD")` → `FAIL code scan: …player.gd:256: key POPUP_BANKD is not in text/strings.csv` (and POPUP_BANKED dead);
+  - CSV edited without re-import → `FAIL registered and current: row 2: POPUP_BANKED translates to '+%d banked', not the CSV's '+%d saved'`;
+  - dead key `MENU_RESUME` added → `FAIL code scan: … key MENU_RESUME is referenced nowhere`;
+  - `SHOP_BUY` → `FAIL table: row 4: key SHOP_BUY has an unlisted prefix`;
+  - "roguelike" in an `en` → `FAIL copy rules: row 3: POPUP_LOST says 'roguelike'` (a first try with a comma tripped the cell-count check instead, also a FAIL);
+  - `"+%d banked"` back as a literal → `FAIL lint actors/player.gd:256 raw_text`;
+  - `export.sh` with `web` left out of the licence copy (a full run) → `== BUILD FAILED: licences: web/OFL.txt is missing or empty`.
+- **Builds:** `20261121-b8f93a3-dirty` (before the commit): `== BUILD OK …, web download 11.0 MB (gzip; raw 40.8 MB), licences in 4 folders, PCK files windows 84 / linux 84 / web 84 / web_debug 91, 120 s`; `OFL.txt`, `LICENSES/` (4 files) and `GODOT_LICENSES.txt` listed in each of the four folders. The clean build after the commit is recorded in the Completion Notes.
 
 ### Completion Notes List
 
 - Story created 2026-11-21: ultimate context engine analysis completed - comprehensive developer guide created.
+- **Implemented (Tasks 1–9), 2026-11-22.** Font pinned and imported pixel-exact, and made the project font (`gui/theme/custom_font`). `core/text_style.gd` (`TextStyle`) and `ui/theme_builder.gd` (`ThemeBuilder`), with the theme set on `Gutters` and `ScreenRouter`. `Fx.popup()` draws `TextStyle.play_text` at 8 px with the 1 px four-side outline (the `size` parameter and M1's overrides are gone; `chain_popup` is 8 px at every count, per D7). `warm_up()`'s label carries a real popup's `LabelSettings`. The string table has `POPUP_BANKED` / `POPUP_LOST` (M1's copy verbatim) and `player.gd` shows them through `tr()`. `tests/test_strings.gd` + `tests/strings_check.gd`, `tests/test_theme.gd`, lint `raw_text`, `tools/godot_licenses.gd`, and the `export.sh` content and licences steps plus PCK entries. Docs per D14; ledger per D15.
+- **Suite:** `== ALL GREEN (25 tests)`, 1665 `ok` (baseline 23 / 1565: +2 tests, +100 checks), 0 `FAIL`.
+- **Choices inside the story's room:**
+  - `raw_text` uses D12's literal-consuming pattern as one `code` regex (both quote kinds). Its `.text` sink also takes `+=` and refuses `==`; `tooltip_text` / `placeholder_text` likewise. 7 firing samples and 11 near-misses, D12's two near-misses included.
+  - `check_copy` applies the colour-word rule to both the `en` text (whole words) and the key's segments, outside `NPC_` / `JOURNAL_`. AC6 says "in a key" and UX-DR55 is about the copy, so it checks both.
+  - `TextStyle.play_text()` also sets `font = TextStyle.font()` on the `LabelSettings`, so the popup doesn't depend on the project fallback.
+  - `test_fx` had no assertion on the removed overrides. It gained one check: the warm-up label shares a real chain popup's `LabelSettings` (AC4).
+  - The size step still counts only top-level `web/` files. The three new top-level text files are in, `LICENSES/` (a subfolder, a few KB) is not, as AC8 states.
+- **Deferred (D15), owners set:** the placeholder outline colour → **Story 1.18**; the bank popup stays 8 px → **Story 1.26**; the window title isn't a string key → **Story 1.33**. The 7.13 first-frame entry lost its warm-up-font clause (owner stays 7.13).
+- **Status stays in-progress:** Task 10 is sonlm's laptop look (human gate). Tests green; needs a look on the laptop.
 
 ### File List
+
+- `game/fonts/fusion-pixel-8px-proportional-latin.otf` (new)
+- `game/fonts/fusion-pixel-8px-proportional-latin.otf.import` (new)
+- `game/fonts/OFL.txt` (new)
+- `game/fonts/LICENSES/boutique-bitmap-7x7/OFL.txt`, `galmuri/LICENSE.txt`, `misaki/misaki.txt`, `miseki-bitmap/LICENSE.txt` (new)
+- `game/text/strings.csv`, `strings.csv.import`, `strings.en.translation` (new)
+- `game/project.godot` (`[gui]`, `[internationalization]`)
+- `game/scripts/core/text_style.gd` + `.gd.uid` (new)
+- `game/scripts/ui/theme_builder.gd` + `.gd.uid` (new)
+- `game/scripts/core/fx.gd`
+- `game/scripts/actors/player.gd`
+- `game/scripts/ui/gutters.gd`
+- `game/scripts/ui/screen_router.gd`
+- `game/scripts/dev/overlays.gd` (comment only)
+- `game/tests/strings_check.gd` + `.gd.uid` (new)
+- `game/tests/test_strings.gd` + `.gd.uid` (new)
+- `game/tests/test_theme.gd` + `.gd.uid` (new)
+- `game/tests/test_lint.gd`
+- `game/tests/test_fx.gd`
+- `game/tests/smoke_world.gd`
+- `game/README.md`
+- `tools/godot_licenses.gd` (new)
+- `tools/export.sh`
+- `docs/build.md`
+- `docs/development-guide.md`
+- `docs/component-inventory.md`
+- `docs/source-tree-analysis.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-17-string-table-pixel-font-and-theme.md`
+
+## Change Log
+
+- 2026-11-22: Tasks 1–9 implemented (font, theme, text style, popups, string table, `test_strings`, `test_theme`, lint `raw_text`, export content and licences steps, docs, ledger). 25 tests green, 1665 `ok`; build OK with the licences in all four folders. Task 10 (laptop look) pending.

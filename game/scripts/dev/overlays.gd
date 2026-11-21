@@ -23,7 +23,7 @@ const CLOCK_LINGER_MS := 500  ## an ended Clock request stays listed (greyed) th
 const LAYER := 11  ## above World's UI layer (10), so screen marks draw over the opaque gutters
 const FONT_SIZE := 8
 const USABLE_INSET := 1.0  ## px: a gutter's usable band is 58 of its 60 px (UX DESIGN.md gutter-usable)
-const SUMMARY_ROW_CHARS := 90  ## the perf summary's rows: about 400 px of the size-8 fallback font, inside the 480 px screen (1.12 D8)
+const SUMMARY_ROW_CHARS := 90  ## the perf summary's rows: the project font, Fusion 8 (Story 1.17): an 88-character row is 403 px, inside the 480 px screen (1.12 D8)
 const SUMMARY_ROWS := 3  ## at most, split at `; `; the last row takes the rest, and an overlong row then wraps at a space
 # Never #ffd27a (Light) or #d9473f (danger), NFR9.
 const WHITE := Color(1, 1, 1, 0.9)

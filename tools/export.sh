@@ -2,14 +2,15 @@
 # Builds every target with one command and proves each build boots (AR52, AR53; Story 1.13).
 # Usage, from anywhere: tools/export.sh   (set GODOT=/path/to/godot if it isn't on PATH)
 # Steps, in order; the first failure stops the build: preflight (Godot 4.7.2, its templates,
-# Node, Playwright, the browser), version, import, content (every room file, before any export),
-# the four exports, the PCK checks (no dev or test content in a release), the web download size,
-# the Linux release boot, the web smoke (both web builds in headless Chromium), summary.
+# Node, Playwright, the browser), version, import, content (every room file and every string key,
+# before any export), the four exports, the licences (the font's and Godot's, beside every build),
+# the PCK checks (no dev or test content in a release), the web download size, the Linux release
+# boot, the web smoke (both web builds in headless Chromium), summary.
 # Output: builds/<yyyymmdd>-<sha7>[-dirty]/{windows,linux,web,web_debug,logs}; a rebuild of the
 # same version replaces the folder. Last line: `== BUILD OK builds/<version> …` or
 # `== BUILD FAILED: <step>: <reason>`, with the matching exit code. docs/build.md has the setup.
-# No flags and no partial modes: later stories add steps (string keys and licences 1.17,
-# flags and lengths 5.7).
+# No flags and no partial modes. Story 1.17 added the string keys and the licences; later stories
+# add steps (flags and lengths 5.7).
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -181,15 +182,19 @@ step import
 godot_run "$LOGS/import.log" 600 --headless --path "$ROOT/game" --import
 check_run "import" "$LOGS/import.log"
 
-# --- 4. content: every room file, before any export (AR52, D12) --------------------------------
+# --- 4. content: every room file and every string key, before any export (AR52, D12) ----------
 # smoke_rooms validates every rooms/**/*.txt (legend, unique ids, exit links) and runs the
-# per-room guarantees, in ~12 s; the whole suite (~2 min) is run_tests.sh's job. The runner's
-# exit code is the verdict; the scan is a second net. 1.17 adds string keys here, 5.7 flags and
-# lengths.
+# per-room guarantees, in ~12 s; test_strings (Story 1.17) checks the string table, that the
+# committed .translation is current, and every key reference in scripts/ and scenes/. The whole
+# suite (~2 min) is run_tests.sh's job. The runner's exit code is the verdict; the scan is a
+# second net. 5.7 adds flags and lengths here.
 step content
 godot_run "$LOGS/content.log" 150 --headless --path "$ROOT/game" res://tests/runner.tscn -- res://tests/smoke_rooms.gd
 check_run "content" "$LOGS/content.log"
 grep -qx 'SMOKE PASS' "$LOGS/content.log" || fail "content: smoke_rooms printed no SMOKE PASS line" "$LOGS/content.log"
+godot_run "$LOGS/content_strings.log" 150 --headless --path "$ROOT/game" res://tests/runner.tscn -- res://tests/test_strings.gd
+check_run "content: string keys" "$LOGS/content_strings.log"
+grep -qx 'PASS' "$LOGS/content_strings.log" || fail "content: test_strings printed no PASS line" "$LOGS/content_strings.log"
 
 # --- 5. exports: absolute paths only (a relative one resolves against game/, not here) ---------
 step export
@@ -206,7 +211,34 @@ export_one "Linux" --export-release linux unbroken_chain.x86_64
 export_one "Web" --export-release web index.html
 export_one "Web debug" --export-debug web_debug index.html
 
-# --- 6. PCK checks: no release PCK carries dev or test content (AR53, D4) -----------------------
+# --- 6. licences: the font's and Godot's, beside every build (NFR18, UX-DR16; Story 1.17 D13) ---
+# OFL.txt and LICENSES/ are not resources, so no PCK carries them: they are copied to each build
+# folder's top level (the itch.io web zip is web/). GODOT_LICENSES.txt (Godot's MIT licence, every
+# third-party component and every licence text) is written once per build by
+# tools/godot_licenses.gd on the pinned 4.7.2 editor binary, then copied the same way.
+step licences
+FONT_LICENCES="$ROOT/game/fonts"
+XDG_DATA_HOME="$RUN_DATA" godot_run "$LOGS/licences.log" 60 --headless --path "$ROOT/game" -s "$ROOT/tools/godot_licenses.gd" -- "$LOGS/GODOT_LICENSES.txt"
+check_run "licences: GODOT_LICENSES.txt" "$LOGS/licences.log"
+[ -s "$LOGS/GODOT_LICENSES.txt" ] || fail "licences: tools/godot_licenses.gd wrote no GODOT_LICENSES.txt" "$LOGS/licences.log"
+LICENCE_DIRS=(windows linux web web_debug)
+for key in "${LICENCE_DIRS[@]}"; do
+	cp -- "$FONT_LICENCES/OFL.txt" "$LOGS/GODOT_LICENSES.txt" "$OUT/$key/"
+	cp -R -- "$FONT_LICENCES/LICENSES" "$OUT/$key/"
+done
+# Checked in every folder, apart from the copy, so a folder the copy skipped fails here.
+lic_src="$(find "$FONT_LICENCES/LICENSES" -type f -size +0c | wc -l)"
+[ "$lic_src" -ge 1 ] || fail "licences: game/fonts/LICENSES/ holds no licence file"
+for key in windows linux web web_debug; do
+	for f in OFL.txt GODOT_LICENSES.txt; do
+		[ -s "$OUT/$key/$f" ] || fail "licences: $key/$f is missing or empty"
+	done
+	lic_n="$(find "$OUT/$key/LICENSES" -type f -size +0c 2> /dev/null | wc -l)" || true
+	[ "$lic_n" -eq "$lic_src" ] || fail "licences: $key/LICENSES/ holds $lic_n non-empty files, not $lic_src"
+done
+echo "   OFL.txt, LICENSES/ ($lic_src files), GODOT_LICENSES.txt ($(stat -c %s -- "$LOGS/GODOT_LICENSES.txt") bytes) in each of windows, linux, web, web_debug"
+
+# --- 7. PCK checks: no release PCK carries dev or test content (AR53, D4) -----------------------
 step pck
 declare -A PCK=([windows]=windows/unbroken_chain.pck [linux]=linux/unbroken_chain.pck [web]=web/index.pck [web_debug]=web_debug/index.pck)
 declare -A PCK_FILES=()
@@ -246,6 +278,11 @@ for key in windows linux web web_debug; do
 		fail "pck: the $key PCK carries $what: $(grep -c . <<<"$hits") paths" "$list"
 	fi
 	# So the check can't pass on an empty or wrong listing: each PCK must hold what it must.
+	# Every preset ships the font (its import remap and the imported data) and the string table
+	# (Story 1.17); the font's licence files are not resources and come from the licences step.
+	required+=('^res://fonts/fusion-pixel-8px-proportional-latin\.otf\.import$'
+		'^res://\.godot/imported/fusion-pixel-8px-proportional-latin\.otf-[0-9a-f]{32}\.fontdata$'
+		'^res://text/strings\.en\.translation$')
 	for re in "${required[@]}"; do
 		grep -Eq "$re" "$list" || fail "pck: the $key PCK has no ${re//\\/} ($n files listed)" "$list"
 	done
@@ -257,7 +294,7 @@ for key in windows linux web web_debug; do
 	echo "   $key: $n files"
 done
 
-# --- 7. size: the web download, compressed (NFR5, D6) -----------------------------------------
+# --- 8. size: the web download, compressed (NFR5, D6) -----------------------------------------
 step size
 gz=0
 raw=0
@@ -272,7 +309,7 @@ SIZE="web download $(mb "$gz") MB (gzip; raw $(mb "$raw") MB)"
 echo "   $SIZE"
 [ "$gz" -lt "$WEB_DOWNLOAD_MAX_BYTES" ] || fail "size: web download $gz bytes gzip (raw $raw) is not under $WEB_DOWNLOAD_MAX_BYTES (NFR5)"
 
-# --- 8. Linux release boot: world.gd loads without scripts/dev/ (AR53, D5) --------------------
+# --- 9. Linux release boot: world.gd loads without scripts/dev/ (AR53, D5) --------------------
 # A release build prints parse and load errors, never runtime script errors, and prints nothing
 # when all is well. Booted = still running when timeout ends it (124), with no error line. Its
 # user:// is the build's own RUN_DATA, where Game.boot() writes a default settings.json.
@@ -290,7 +327,7 @@ fi
 BOOT_RC=$RC
 echo "   linux: still running after $BOOT_S s, no error"
 
-# --- 9. web smoke: both web builds boot in headless Chromium (AR53, D7) -----------------------
+# --- 10. web smoke: both web builds boot in headless Chromium (AR53, D7) -----------------------
 step web_smoke
 log="$LOGS/web_smoke.log"
 RC=0
@@ -317,9 +354,9 @@ PASSED="$(grep -E '^ +[0-9]+ passed' "$log" | tail -n 1 | sed -r 's/^ +//' || tr
 [ -n "$PASSED" ] || fail "web_smoke: no 'N passed' line" "$log"
 echo "   $PASSED"
 
-# --- 10. summary ------------------------------------------------------------------------------
+# --- 11. summary ------------------------------------------------------------------------------
 step summary
-END="== BUILD OK builds/$V, $SIZE, PCK files windows ${PCK_FILES[windows]} / linux ${PCK_FILES[linux]} / web ${PCK_FILES[web]} / web_debug ${PCK_FILES[web_debug]}, $((SECONDS - START_S)) s"
+END="== BUILD OK builds/$V, $SIZE, licences in 4 folders, PCK files windows ${PCK_FILES[windows]} / linux ${PCK_FILES[linux]} / web ${PCK_FILES[web]} / web_debug ${PCK_FILES[web_debug]}, $((SECONDS - START_S)) s"
 {
 	echo "$END"
 	echo "version: $V"
@@ -329,6 +366,7 @@ END="== BUILD OK builds/$V, $SIZE, PCK files windows ${PCK_FILES[windows]} / lin
 	for key in windows linux web web_debug; do
 		echo "pck $key: ${PCK_FILES[$key]} files"
 	done
+	echo "licences: OFL.txt, LICENSES/ ($lic_src files), GODOT_LICENSES.txt in windows, linux, web, web_debug"
 	echo "linux boot: exit $BOOT_RC (still running) after $BOOT_S s, no error line"
 	echo "web smoke: $PASSED"
 } > "$LOGS/summary.txt"

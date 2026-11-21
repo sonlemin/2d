@@ -9,6 +9,7 @@ const PLACEHOLDER := Color("#07060b")
 
 
 func _ready() -> void:
+	theme = ThemeBuilder.theme()  ## every HUD element added under the gutters inherits the game font (AR40)
 	# A 352 px room leaves 4 px of clear colour either side of it inside the play area; matching
 	# the gutter makes them one band. CanvasModulate never tints the clear colour. Set here so
 	# the colour has one home: when the fill turns per-zone (1.18), set it with the fill.

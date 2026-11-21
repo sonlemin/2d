@@ -253,7 +253,7 @@ func _set_swing_visible(on: bool) -> void:
 
 func _on_banked(amount: int) -> void:
 	if not is_dead:
-		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), "+%d banked" % amount, Color(1, 0.93, 0.7), 10)
+		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_BANKED") % amount, Color(1, 0.93, 0.7))
 
 
 ## Runtime spawns belong to the room, never to World (AR23, D8): the room frees them with itself.
@@ -325,7 +325,7 @@ func die() -> void:
 	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen
 	var lost := chain.lose()  # unbanked embers die with you
 	if lost > 0:
-		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), "-%d lost" % lost, Color(1, 0.35, 0.3), 10)
+		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_LOST") % lost, Color(1, 0.35, 0.3))
 	velocity = Vector2.ZERO
 	_set_swing_visible(false)
 	died.emit()

@@ -125,6 +125,8 @@ func test_tree(scene_before: Node) -> void:
 	check(ui is CanvasLayer and ui.process_mode == Node.PROCESS_MODE_ALWAYS, "UI is a CanvasLayer that always processes")
 	var names := ui.get_children().map(func(c): return String(c.name))
 	check(names == ["Gutters", "ScreenRouter"], "UI holds Gutters then ScreenRouter, so screens draw over the gutters (got %s)" % [names])
+	check(ui.get_node("Gutters").theme == ThemeBuilder.theme() and ui.get_node("ScreenRouter").theme == ThemeBuilder.theme(),
+			"Gutters and ScreenRouter carry ThemeBuilder.theme(), so every HUD element and screen inherits the game font (AR40)")
 	check(_player() != null and _player().get_parent() == _world and _player().get_index() == holder.get_index() + 1, "the player is spawned right after RoomHolder, so it draws on top of the room")
 	check(get_tree().current_scene == scene_before, "the current scene is still the runner's")
 
@@ -176,6 +178,7 @@ func test_popups_in_room() -> void:
 	var added := _room().get_child(_room().get_child_count() - 1)
 	check(_room().get_child_count() == in_room + 1 and added is Label, "a bank's popup (a Label) goes under the room (room children %d -> %d, last is %s)" % [in_room, _room().get_child_count(), added.get_class()])
 	check(_world.get_child_count() == in_world, "...and nothing goes under World")
+	check(added is Label and (added as Label).text == "+1 banked", "...and reads '+1 banked': tr() resolves POPUP_BANKED through the registered table (got '%s')" % added.get(&"text"))
 
 
 func test_death_and_respawn() -> void:

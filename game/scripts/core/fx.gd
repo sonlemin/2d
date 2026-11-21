@@ -1,5 +1,6 @@
 class_name Fx
-## One-shot hit effects built in code (no art needed). Unshaded so they read in the dark.
+## One-shot hit effects built in code (no art needed). Unshaded so they read in the dark. Popups
+## draw TextStyle.play_text (Story 1.17).
 ## Also the accessibility gate (AR57, Story 1.16 D1): the only script that reads reduce flashing,
 ## screen shake and reduced motion (lint a11y_gate). Camera shake, the invulnerability blink and the
 ## UI kit's easing ask the readers below; there are no per-effect toggles. EFFECTS declares each
@@ -138,20 +139,20 @@ static func pop(parent: Node, pos: Vector2, amount := SPARK_COUNT) -> void:
 	p.finished.connect(p.queue_free)
 
 
-## A floating "x5" over the hit, so the chain count is felt where the eyes are.
+## A floating "x5" over the hit, so the chain count is felt where the eyes are. 8 px at every
+## count (Story 1.17 D7, sonlm): M1's 10 px scaled the 8 px face by a fraction; the gutter's chain
+## number carries the long-chain read. Numbers only, so no string key (UX-DR150).
 static func chain_popup(parent: Node, pos: Vector2, count: int, embers: int) -> void:
-	popup(parent, pos, "x%d  +%d" % [count, embers], SPARK, 8 if count < 5 else 10)
+	popup(parent, pos, "x%d  +%d" % [count, embers], SPARK)
 
 
-## Floating text that rises and fades; under reduced motion it fades in place (UX-DR127).
-static func popup(parent: Node, pos: Vector2, text: String, color: Color, size := 8) -> void:
+## Floating text that rises and fades; under reduced motion it fades in place (UX-DR127). Drawn in
+## TextStyle.play_text: the game font at size 8 with the 1 px four-side outline (UX-DR15).
+static func popup(parent: Node, pos: Vector2, text: String, color: Color) -> void:
 	var l := Label.new()
 	l.material = unshaded()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-	l.add_theme_constant_override("outline_size", 3)
+	l.label_settings = TextStyle.play_text(color, TextStyle.PLACEHOLDER_SURFACE)
 	l.z_index = 5
 	parent.add_child(l)
 	l.global_position = pos + Vector2(-10, -30)
@@ -182,6 +183,7 @@ static func warm_up(room: Node, pos: Vector2) -> void:
 	var l := Label.new()
 	l.material = unshaded()
 	l.text = "x"
+	l.label_settings = TextStyle.play_text(SPARK, TextStyle.PLACEHOLDER_SURFACE)  # a real popup's font, size and outline
 	l.modulate.a = WARM_ALPHA
 	l.position = pos
 	room.add_child(l)

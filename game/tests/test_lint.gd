@@ -108,6 +108,16 @@ const RULES: Array[Dictionary] = [
 	{id = &"a11y_gate", bare = [r"(?<!Fx\.)\b(reduce_flashing|reduced_motion)\b", r"settings\s*\.\s*shake\b"],
 		code = [r"[\x22\x27](reduce_flashing|reduced_motion|shake)[\x22\x27]"],
 		only = [], skip = ["dev/"], allow = ["core/fx.gd", "rules/settings.gd"]},
+	# AR41 (Story 1.17 D12): player text goes through tr(), so the string table and its scan see it.
+	# Fires on a text sink followed, on the same line, by a string literal holding two lowercase
+	# letters in a row. The pattern consumes whole literals after the sink, so a closing quote is
+	# never read as an opening one (`tr("POPUP_BANKED") % amount` stays quiet); keys are upper case
+	# and numeric formats ("x%d  +%d") have no two lowercase letters together. What a text scan
+	# can't see (review covers it): text built in a variable on an earlier line, and a sink reached
+	# by name (`call("set_text", …)`). dev/ is skipped: the overlays are debug text, never shipped.
+	{id = &"raw_text", bare = [], code = [
+			r"(?:\.\s*text\s*\+?=(?!=)|\b(?:tooltip_text|placeholder_text)\s*\+?=(?!=)|\b(?:set_text|popup|draw_string|draw_multiline_string|add_item|append_text|add_text)\s*\()(?:[^\x22\x27]|\x22(?:\\.|[^\x22\\])*\x22|\x27(?:\\.|[^\x27\\])*\x27)*?(?:\x22(?:\\.|[^\x22\\])*?[a-z]{2}|\x27(?:\\.|[^\x27\\])*?[a-z]{2})"],
+		only = [], skip = ["dev/"], allow = []},
 ]
 
 var _fail := 0
@@ -448,6 +458,25 @@ const SAMPLES: Array = [
 	[&"a11y_gate", "world/world.gd", "\t_player.pogo_hit.connect(_camera.kick.bind(CameraRig.POGO_SHAKE))", false],
 	[&"a11y_gate", "actors/player.gd", "\t# steady under reduce_flashing (Fx decides)", false],
 	[&"a11y_gate", "actors/player.gd", "\tvar s := \"shake it\"", false],
+	# Story 1.17 D12: raw player text after a sink, and the near-misses that must stay quiet.
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"Resume\"", true],
+	[&"raw_text", "actors/player.gd", "\tFx.popup(p, pos, \"+%d banked\" % n, c)", true],
+	[&"raw_text", "ui/gutters.gd", "\tdraw_string(f, v, \"Paused\")", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.set_text('Resume')", true],
+	[&"raw_text", "ui/gutters.gd", "\tb.tooltip_text = \"Hold to snuff\"", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.text += \" more\"", true],
+	[&"raw_text", "ui/gutters.gd", "\tlist.add_item(tr(\"MENU_RESUME\"), \"icon\")", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = tr(\"MENU_RESUME\")", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"x\"", false],
+	[&"raw_text", "actors/player.gd", "\tFx.popup(p, pos, \"x%d  +%d\" % [a, b], SPARK)", false],
+	[&"raw_text", "actors/player.gd", "\tFx.popup(_fx_parent(), pos, tr(\"POPUP_BANKED\") % amount, c)", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = tr(\"MENU_RESUME\") + suffix", false],
+	[&"raw_text", "ui/gutters.gd", "\tif l.text == \"Resume\":", false],
+	[&"raw_text", "ui/gutters.gd", "\t# l.text = \"Resume\"", false],
+	[&"raw_text", "ui/gutters.gd", "\tvar s := \"Resume\"", false],
+	[&"raw_text", "actors/player.gd", "\tFx.chain_popup(p, pos, n, e)", false],
+	[&"raw_text", "ui/gutters.gd", "\ts.texture = load(\"res://art/light.png\")", false],
+	[&"raw_text", "dev/overlays.gd", "\titem.draw_string(font, p, \"perf summary\")", false],
 ]
 
 

@@ -27,22 +27,23 @@ Run `cd game && ./run_tests.sh` first for any build you will share: `export.sh` 
 
 ## What `tools/export.sh` does
 
-Steps run in order and the first failure stops the build. The last line is `== BUILD OK builds/<version>, web download … MB (gzip; raw … MB), PCK files …` (exit 0) or `== BUILD FAILED: <step>: <reason>` with the log to read (exit 1). There are no flags or partial modes.
+Steps run in order and the first failure stops the build. The last line is `== BUILD OK builds/<version>, web download … MB (gzip; raw … MB), licences in 4 folders, PCK files …` (exit 0) or `== BUILD FAILED: <step>: <reason>` with the log to read (exit 1). There are no flags or partial modes.
 
 | Step | Checks |
 |---|---|
 | **preflight** | Godot is 4.7.2; each of the four templates is installed with `version.txt` = `4.7.2.stable`; Node ≥ 24 and `npx`; Playwright `1.65.1` in `tools/web_smoke/node_modules` (read from its `package.json`, without Node); its headless shell is installed (by Playwright's own registry: `chromium.executablePath()` names the full Chromium, which an `--only-shell` install lacks; without Node or Playwright it is named as not checked); port 8061 is free. Every missing item is named in one run, and nothing is built |
 | **version** | `<yyyymmdd>-<sha7>`, plus `-dirty` when `git status --porcelain` shows anything. Computed before the export, which can create `.godot/` and `.uid` files |
 | **import** | `godot --headless --path game --import` |
-| **content** | `tests/smoke_rooms.gd` through the runner: every `rooms/**/*.txt` file (validation, unique ids and exit links, the per-room guarantees), in about 12 s. Passes on the runner's exit 0, no error line and its `SMOKE PASS` line. Runs before any export. Story 1.17 adds the string keys here, Story 5.7 the flags and lengths |
+| **content** | `tests/smoke_rooms.gd` through the runner: every `rooms/**/*.txt` file (validation, unique ids and exit links, the per-room guarantees), in about 12 s. Passes on the runner's exit 0, no error line and its `SMOKE PASS` line. Then `tests/test_strings.gd` (Story 1.17): the string table's shape, that the committed `.translation` is current, the English fallback under other locales, every key reference in `scripts/` and `scenes/`, no dead key, the copy rules and raw text in scenes. Passes the same way, on its `PASS` line. Runs before any export. Story 5.7 adds the flags and lengths |
 | **export** | `Windows`, `Linux`, `Web` (release) and `Web debug`, headless, to absolute paths |
-| **pck** | Lists each PCK with `tools/pck_list.gd` (below). No PCK may hold a path under `res://tests/`, and a release PCK (Windows, Linux, Web) none under `res://rooms/dev/`, `res://scenes/dev/` or `res://scripts/dev/` (`scenes/dev/` has no files yet; the first one fails here until its exclusion is in the presets and `test_export_presets`). So an empty or wrong listing can't pass, a release PCK must hold `res://scripts/world/world.gd…` and every room file outside `rooms/dev/`, and the `Web debug` PCK `res://scripts/dev/dev_tools.gd…` and every room file, `rooms/dev/perf_worst.txt` included |
-| **size** | The web download, NFR5: the sum of each `web/` file's `gzip -9` size must be under 30,000,000 bytes (`WEB_DOWNLOAD_MAX_BYTES`). It is what itch.io's CDN sends, since it gzips `html`, `js`, `wasm` and `pck`. The raw size is printed beside it (4.7.2's `index.wasm` alone is 39.5 MB raw, about 10 MB compressed) |
+| **licences** | Story 1.17 (NFR18, UX-DR16): `tools/godot_licenses.gd` writes `logs/GODOT_LICENSES.txt` once per build (below), then `game/fonts/OFL.txt`, `game/fonts/LICENSES/` and `GODOT_LICENSES.txt` are copied to the top level of each of `windows/`, `linux/`, `web/` and `web_debug/`. It fails if any of the three is missing or empty in any folder (`LICENSES/` must hold as many non-empty files as the source). They are not resources, so no PCK carries them; the itch.io zip is `web/`, so they ship there too |
+| **pck** | Lists each PCK with `tools/pck_list.gd` (below). No PCK may hold a path under `res://tests/`, and a release PCK (Windows, Linux, Web) none under `res://rooms/dev/`, `res://scenes/dev/` or `res://scripts/dev/` (`scenes/dev/` has no files yet; the first one fails here until its exclusion is in the presets and `test_export_presets`). So an empty or wrong listing can't pass, a release PCK must hold `res://scripts/world/world.gd…` and every room file outside `rooms/dev/`, and the `Web debug` PCK `res://scripts/dev/dev_tools.gd…` and every room file, `rooms/dev/perf_worst.txt` included. Every PCK must also hold the font's import remap `res://fonts/fusion-pixel-8px-proportional-latin.otf.import`, its imported data `res://.godot/imported/fusion-pixel-8px-proportional-latin.otf-<md5>.fontdata` and the string table `res://text/strings.en.translation` (Story 1.17) |
+| **size** | The web download, NFR5: the sum of each top-level `web/` file's `gzip -9` size (the licence files included; `LICENSES/` is a few KB) must be under 30,000,000 bytes (`WEB_DOWNLOAD_MAX_BYTES`). It is what itch.io's CDN sends, since it gzips `html`, `js`, `wasm` and `pck`. The raw size is printed beside it (4.7.2's `index.wasm` alone is 39.5 MB raw, about 10 MB compressed) |
 | **boot** | The Linux release build runs headless for 5 s. It passes only if `timeout` ends it (exit 124: still running) and it printed no `ERROR` / `SCRIPT ERROR` line |
 | **web_smoke** | `tools/web_smoke/`: both web builds in headless Chromium (below), under a 600 s `timeout`. Passes on exit 0 with an `N passed` line and no skipped, flaky, unrun or interrupted test (`forbidOnly` in the config stops a stray `test.only`) |
 | **summary** | Writes `logs/summary.txt` and prints the end line |
 
-Every Godot step runs under `timeout` (600 s for exports, 150 s for content, 60 s for listings) and fails on a non-zero exit **or** any `ERROR:` / `SCRIPT ERROR` / `FAIL` line in its log, scanned with the colours stripped: Godot exits 0 on some errors (a missing preset options section, a parse error in a release build). A Ctrl-C or a TERM still ends with `== BUILD FAILED: <step>: interrupted` and `logs/summary.txt`.
+Every Godot step runs under `timeout` (600 s for exports, 150 s for each content run, 60 s for listings and the licence notice) and fails on a non-zero exit **or** any `ERROR:` / `SCRIPT ERROR` / `FAIL` line in its log, scanned with the colours stripped: Godot exits 0 on some errors (a missing preset options section, a parse error in a release build). A Ctrl-C or a TERM still ends with `== BUILD FAILED: <step>: interrupted` and `logs/summary.txt`.
 
 The PCK listings and the Linux boot run with `XDG_DATA_HOME` set to the build's own `logs/xdg_data/`, so the game's `user://` is fresh for every build: a boot never reads what an earlier build left (an older or newer settings or save schema) and never writes the server's own. Exports keep the real `XDG_DATA_HOME`, where the templates live.
 
@@ -57,14 +58,15 @@ The PCK listings and the Linux boot run with `XDG_DATA_HOME` set to the build's 
 
 ```
 builds/<version>/
-  windows/unbroken_chain.exe, unbroken_chain.pck
-  linux/unbroken_chain.x86_64, unbroken_chain.pck
+  windows/unbroken_chain.exe, unbroken_chain.pck, OFL.txt, LICENSES/, GODOT_LICENSES.txt
+  linux/unbroken_chain.x86_64, unbroken_chain.pck, OFL.txt, LICENSES/, GODOT_LICENSES.txt
   web/index.html, index.js, index.wasm, index.pck, index.audio.worklet.js,
-      index.audio.position.worklet.js, index.png, index.icon.png, index.apple-touch-icon.png
+      index.audio.position.worklet.js, index.png, index.icon.png, index.apple-touch-icon.png,
+      OFL.txt, LICENSES/, GODOT_LICENSES.txt
   web_debug/(the same names)
-  logs/import.log, content.log, export_{windows,linux,web,web_debug}.log,
-       pck_{windows,linux,web,web_debug}.txt, boot_linux.log, web_smoke.log, summary.txt,
-       xdg_data/ (the user:// of the listings and the boot)
+  logs/import.log, content.log, content_strings.log, export_{windows,linux,web,web_debug}.log,
+       licences.log, GODOT_LICENSES.txt, pck_{windows,linux,web,web_debug}.txt, boot_linux.log,
+       web_smoke.log, summary.txt, xdg_data/ (the user:// of the listings and the boot)
 ```
 
 - `builds/` is gitignored. A rebuild of the same version replaces its folder; nothing outside it is deleted.
@@ -92,6 +94,23 @@ godot --headless --main-pack /abs/path/game.pck -s /abs/path/tools/pck_list.gd
 ```
 
 It prints every file in the pack, one `res://…` path per line, after the engine banner (keep only `^res://` lines). A folder it can't open prints an `ERROR:` line and makes it exit 1, so a partial listing fails the step. The engine reads its own pack, so a PCK format change (v4 in 4.7) needs nothing here. Both paths must be absolute: a relative `-s` path resolves inside the pack. Caveat: `--main-pack` still instances the pack's autoloads. `Game._init()` only builds the Clock and the Display (disk access and the window wait for `boot()`, which only World calls), so a listing touches nothing; **a future autoload must keep disk and network out of `_init()` and `_ready()`**.
+
+## `tools/godot_licenses.gd`
+
+```bash
+godot --headless --path /abs/path/game -s /abs/path/tools/godot_licenses.gd -- /abs/out/GODOT_LICENSES.txt
+```
+
+It writes Godot's MIT licence (`Engine.get_license_text()`), every third-party component the engine was built with (`Engine.get_copyright_info()`: name, files, copyright lines, licence) and every licence's full text (`Engine.get_license_info()`), about 97 KB on 4.7.2. It runs on the editor binary, which preflight pins to 4.7.2 like the templates; the editor's component list is a superset of the templates' (it adds editor-only components), and a superset notice is compliant. A write failure prints an `ERROR:` line and exits 1. Probed on 4.7.2 (Story 1.17): with `--path game` and with `--main-pack <pck>` it exits 0 with no error line and writes the same bytes; `export.sh` uses `--path game`, so it needs no built PCK.
+
+## Third-party files
+
+**Fusion Pixel Font** (Story 1.17 D1; AR42, UX-DR16), OFL 1.1, by TakWolf: `game/fonts/`, taken unmodified from release **`2026.11.10`** (published 2026-11-09), the latest on 2026-11-21.
+
+- Asset: `https://github.com/TakWolf/fusion-pixel-font/releases/download/2026.11.10/fusion-pixel-font-8px-proportional-otf-v2026.11.10.zip` (17,520,997 bytes), SHA-512 `3b332a100518738d1acbc2beb7cefef19f1dec8e01f363f258264099d9071b2e78d1e120e49b188da83646dbaa273507bb49423b239f1d96be258b86ab9bc8d9`.
+- Kept from it: `fusion-pixel-8px-proportional-latin.otf` (2,501,068 bytes, SHA-256 `82f1df2f423d8a4880f3dd6f1839a34855648c69e2a3652a3e8f09d665971be2`), `OFL.txt` (SHA-256 `bc518cf64b8032c07690f33cc270c35c179255a6ac8efa7c165ebae7e8f76a63`) and `LICENSES/` (the licences of the fonts Fusion draws on: `boutique-bitmap-7x7/`, `galmuri/`, `misaki/`, `miseki-bitmap/`). The six other locale builds (`ja`, `ko`, `zh_*`) are left out. The `.otf` is not subset (that would be a modification under the OFL; the web budget has room). `OFL.txt` declares no Reserved Font Name.
+- The committed `fusion-pixel-8px-proportional-latin.otf.import` pins `antialiasing=0`, `hinting=0`, `subpixel_positioning=0` and `allow_system_fallback=false` (the importer's defaults are 1 / 3 / 4 / true, and antialiasing survives Godot's pixel-font auto-detect). `tests/test_theme.gd` reads all four on the loaded font, so an editor re-import with defaults fails the suite.
+- To move to a newer release: download into an empty folder, check the hashes, copy the same three items, re-import (the `.import` keeps the four pins), run the suite, and update this section.
 
 ## The web smoke
 

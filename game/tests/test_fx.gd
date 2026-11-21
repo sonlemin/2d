@@ -291,6 +291,12 @@ func _test_warm_up() -> void:
 		return
 	check(parts[0].material == Fx.unshaded() and labels[0].material == Fx.unshaded() and sprites[0].material == Fx.additive(), "...drawn with the cached unshaded(), unshaded() and additive()")
 	check(sprites[0].texture == preload("res://art/light.png"), "...the sprite with art/light.png, as BudgetLight's fallback")
+	var real := Node2D.new()
+	add_child(real)
+	Fx.chain_popup(real, Vector2.ZERO, 1, 1)
+	check(labels[0].label_settings != null and labels[0].label_settings == (real.get_child(0) as Label).label_settings,
+			"...the label with a real chain popup's LabelSettings: the same font, size and outline (Story 1.17 AC4)")
+	real.queue_free()
 	check(kids.all(func(n: CanvasItem) -> bool: return n.modulate.a >= CANVAS_CULL_ALPHA and n.modulate.a <= 0.02),
 			"...each at an alpha no one sees but the renderer still draws (>= %s, probed; got %s)" % [CANVAS_CULL_ALPHA, kids.map(func(n: CanvasItem) -> float: return n.modulate.a)])
 	check(kids.all(func(n: CanvasItem) -> bool: return n.get(&"position") == Vector2(40, 50)), "...at the position given (the entry, inside the first view)")

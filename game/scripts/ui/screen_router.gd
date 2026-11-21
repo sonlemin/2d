@@ -8,6 +8,7 @@ var _current: Control
 
 
 func _ready() -> void:
+	theme = ThemeBuilder.theme()  ## every screen opened here inherits the game font (AR40)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # an empty router must not eat clicks
 
