@@ -90,7 +90,7 @@ Tasks marked **(sonlm)** are human gates: the dev agent HALTs, asks and waits. I
   - [ ] 5.4 Flare cap recommendation (a number, or "none needed", with the reason).
   - [ ] 5.5 Air dash: keep ≈ 39 px, or fix to 31 px.
   - [ ] 5.6 Feel check verdict: yes, no or mixed. Any "no" names what to fix.
-  - [ ] 5.7 Devlog or private build: where it was posted (link or note).
+  - [ ] 5.7 Devlog: approve the agent's draft of `docs/devlog/cp1.md` (D8).
 - [ ] **Task 6: Record and apply (AC: 2–6)** (agent, after Task 5)
   - [ ] 6.1 Fill in the playtest record: the answers, the evidence and the follow-ups. Copy sonlm's summary lines into `docs/perf.md` → Results, one row per run, numbers verbatim (D3).
   - [ ] 6.2 Interpolation:
@@ -186,6 +186,12 @@ These are the story author's calls. sonlm can veto any of them before dev.
   - Sprint keys must match `number-number-name`, so a "1.15a" can't be added by hand.
   - Correct-course places the story before 1.16 and updates `epics.md` and `sprint-status.yaml` with sonlm.
 
+### sonlm's answers (2026-11-21, while creating the story)
+
+- **Available to test on:** a high-refresh display, Firefox on the laptop and an HD 620-class machine. Task 3.2's high-refresh pass and Task 4.4 both run.
+- **No Linux desktop.** Skip Task 3.5. In 6.7, change the X11 ledger item's owner to Story 7.14 (D5).
+- **D8: the devlog is a note in the repo.** At close-out the agent drafts `docs/devlog/cp1.md` from the record, a short post about what CP1 built and what was decided. sonlm approves it before the commit, and can publish it later. It uses no outside service.
+
 ### Commands for sonlm (fill in `<v>` in Task 2.1)
 
 Windows PowerShell, from the folder that holds the `.pem`.
@@ -235,6 +241,7 @@ Read the summary line from DevTools → Console (`[room] dev: perf …`).
 ### Project Structure Notes
 
 - New: `_bmad-output/implementation-artifacts/playtests/1-15-cp1-gate-feel-check-and-performance-verdict.md`.
+- New: `docs/devlog/cp1.md` (D8).
 - Changed: `docs/perf.md` (Results), `_bmad-output/project-context.md`, `_bmad-output/game-architecture.md`, the GDD (`planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md`, Open Questions and maybe Movement), `planning-artifacts/epics.md` (AR6, maybe FR2), `deferred-work.md`, `sprint-status.yaml`.
 - Code only if a decision calls for it: `scripts/actors/player.gd` and `rules/tuning.gd` with `tests/smoke_player_input.gd` (dash); `core/budget_light.gd` with `tests/spec.gd` (budget); `project.godot` with `tests/smoke_room_swap.gd` (interpolation, after a HALT).
 - Never `game/override.cfg` in the repo. It would override the project for everyone (the editor reads it from the project root). It lives only beside sonlm's exe.
@@ -309,4 +316,4 @@ The tree is clean on `feat/m2-e1`.
 
 ## Change Log
 
-- 2026-11-21: Story created (gds-create-story). Ultimate context engine analysis completed - comprehensive developer guide created. D1–D7 are the story author's calls. Probes: `override.cfg` beside an exported binary is read, and it turns physics interpolation off; the `test_chain_state` diff against M1 shows harness lines only.
+- 2026-11-21: Story created (gds-create-story). Ultimate context engine analysis completed - comprehensive developer guide created. D1–D7 are the story author's calls. sonlm's answers: high refresh, Firefox and HD 620 are available, there is no Linux desktop, and the devlog is a note in the repo (D8). Probes: `override.cfg` beside an exported binary is read, and it turns physics interpolation off; the `test_chain_state` diff against M1 shows harness lines only.
