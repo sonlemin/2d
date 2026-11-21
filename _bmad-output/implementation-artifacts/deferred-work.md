@@ -95,7 +95,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 ## Deferred from: code review of 1-8-playerinput-intents.md (2026-11-18)
 
 - **The air dash runs longer than FR2 says** — `game/scripts/actors/player.gd` checks the dash timer before it counts it down, so a 0.12 s `DASH_TIME` dashes for 8–9 ticks (≈ 0.15 s, ≈ 39 px at 260 px/s), not FR2's 0.12 s / 31 px. That is M1's behaviour and `smoke_player_input` pins it (dx 31–40, 8–9 dashing ticks); the laptop feel checks have all been on the longer dash.
-  → **Owner: Story 1.15** — the CP1 feel gate decides: fix the off-by-one (the dash becomes 31 px) or change the GDD to the felt 39 px, then tighten the pin.
+  → **Closed (Story 1.15): sonlm kept the felt dash (CP1 gate, 2026-11-21). GDD Movement and FR2 now read 260 px/s for 0.15 s (9 ticks, ≈ 39 px); the code is unchanged so the dash plays identically, the `Tuning.DASH_TIME` comment says why, and `smoke_player_input` pins exactly 8 gravity-free ticks, 9 dashing ticks and 38.5–39.5 px (measured 8 / 9 / 39.0, before and after).**
 - **The raw-`Input` source check is a substring regex** — `game/tests/smoke_player_input.gd` `test_sources` greps `Input\.` outside `player_input.gd`, so it misses event reads (`_input(event)`, `event.is_action_pressed(...)`) and aliasing (`var i := Input`), and flags `Input.` in comments.
   → **Owner: Story 1.9** — `test_lint.gd` takes over the "no raw Input outside PlayerInput / the UI kit" rule and should cover event-based reads; `test_sources` can then drop its regex.
   → **Closed (Story 1.9): `test_lint.gd` rule `raw_input` (`Input` / `InputMap` as identifiers, `InputEvent*`, the `_input` / `_gui_input` callbacks and the `gui_input` signal; comments and strings ignored); `test_sources` dropped its regex.**
@@ -133,7 +133,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 - **A flare's light is a `BudgetLight` of rank ALWAYS** — and the perf run's flare stand-in (`game/scripts/dev/perf_run.gd`, at the player's light radius, riding along) is then compared with a real thrown flare, which sticks where it lands.
   → **Owner: Story 1.23** — it builds Flare Toss and the flare.
 - **Engine glow lives only in DevTools (`--glow`)** — if 1.15 says go, a follow-up moves it into game code and re-checks the brightness levels and contrast floors: the 2026-11-19 probe saw glow darken the dark ambient (0.039 → 0.016 on a software renderer). If it says no-go, bloom is faked with unshaded additive sprites (architecture → Lighting).
-  → **Owner: Story 1.15** — the CP1 verdict decides glow go/no-go and creates the follow-up story.
+  → **Closed (Story 1.15): no-go (sonlm, CP1 gate, 2026-11-21). Bloom is faked with unshaded additive sprites; `--glow` stays DevTools-only; architecture Lighting, decision row 14 and the GDD bloom row record it. No follow-up story.**
 
 ## Deferred from: code review of 1-11-devtools-entry-args-and-overlays.md (2026-11-19)
 
@@ -165,4 +165,15 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 ## Deferred from: code review of 1-14-display-scaling-and-web-input.md (2026-11-20)
 
 - **The first PC window fit may read the window decorations as 0** — `game/scripts/core/display.gd` `_fit_window()` reads `win.get_size_with_decorations() - win.size` once, from `Game.boot()` during World's first `_ready()`. On X11 the window manager may not have published `_NET_FRAME_EXTENTS` yet, so the decorations read (0, 0) and a borderline screen (usable 1440×830 with a 30 px title bar) picks ×3 and opens partly off it, the F8 case D4 fixes. Unverifiable under Xvfb (no window manager). A possible fix: re-fit once on the first `size_changed` or a frame later if the decorations were zero.
-  → **Owner: Story 1.15** — the CP1 laptop checks run the PC build under a real window manager; log the `display: window` line there and re-fit only if the decorations read zero.
+  → **Owner: Story 7.14** — no Linux desktop was available at CP1 (sonlm's laptop is Windows); the Steam Deck pass runs the Linux build under KDE (a real window manager): log the `display: window` line there and re-fit only if the decorations read zero.
+
+## Deferred from: CP1 gate, Story 1.15 playtest (2026-11-21)
+
+- **Physics interpolation was never compared at high refresh** — sonlm's laptop panel is 60 Hz only, where on and off look the same (one tick per frame). The case interpolation exists for (120/144 Hz, `CameraRig` on the physics tick) is still unseen.
+  → **Owner: Story 7.14** — the Steam Deck OLED runs at 90 Hz: play on and off (`override.cfg`) there, and on any high-refresh monitor available by then; turning it off needs the `CameraRig` rework (story 1.15 D2).
+- **The perf run counts a hidden browser tab as one long frame** — `game/scripts/dev/perf_run.gd` measures wall time and skips only tree pauses, so when a browser stops drawing a hidden tab the whole gap lands in one frame (1.15's discarded Chrome and Firefox runs: 132.8 s and 146.5 s). The run should flag it (or exclude it and say so) so a disturbed run can't pass as a slow GPU.
+  → **Owner: Story 7.13** — the performance pass leans on long web runs; flag hidden time in the summary line before it starts.
+- **The web key guard swallows the browser's DevTools keys** — F12 is in the guard's F-key list (`game/export_presets.cfg` `html/head_include`, both web presets), and Godot's canvas listener prevents every other key, so Ctrl+Shift+I/J/C never reach the browser. The 1.15 workaround is the browser menu. A fix lets them through the way F11 and zoom are (`9f9d6e1`), pinned in `test_export_presets`.
+  → **Owner: Story 7.13** — its web runs read the console; fix it before them (or earlier, if a story needs the web console first).
+- **CP1 measured only two perf runs** — by sonlm's choice, the laptop desktop (RTX 3050) and Firefox on the Intel iGPU, both glow off; not made: glow on (no-go), Chrome, the laptop desktop on the Intel iGPU, a separate HD 620 machine (none available).
+  → **Owner: Story 7.13** — the 10-minute pass runs Chrome and the Intel iGPU desktop (Windows Graphics settings → Power saving) as part of NFR1.

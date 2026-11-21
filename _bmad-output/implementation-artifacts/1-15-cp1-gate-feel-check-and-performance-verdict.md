@@ -4,7 +4,7 @@ baseline_commit: ccc8ac4
 
 # Story 1.15: CP1 gate: feel check and performance verdict
 
-Status: in-progress
+Status: done
 
 **Type:** playtest · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** closes CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
@@ -71,46 +71,46 @@ Tasks marked **(sonlm)** are human gates: the dev agent HALTs, asks and waits. I
     - the commands, with the real version in each path (**Commands for sonlm** below).
   - [x] 2.2 Commit the record. Builds are gitignored, so they stay on the server.
   - [x] 2.3 Report to sonlm. Give him the commands, the play checklist and the decisions to make (Task 5), then **HALT**.
-- [ ] **Task 3: Feel check (AC: 2, 5)** (sonlm)
-  - [ ] 3.1 Play the release Windows exe at ×3, at 60 Hz: the shaft top to bottom, a few deaths and respawns, and room exits.
-  - [ ] 3.2 Run the same build with `override.cfg` (interpolation off, D2) and compare. If a high-refresh display is available, play both again on it.
-  - [ ] 3.3 Air dash: does it feel right as it is (≈ 39 px)? (D4)
-  - [ ] 3.4 Play the shaft in the browser at the ×2 embed (`embed.html?build=web`): one descent; note anything that feels different from desktop.
-  - [ ] 3.5 Linux desktop with a window manager, if one is available: launch the Linux build and paste the `[ui] display: window …` line, if it prints (D5).
-- [ ] **Task 4: Performance runs (AC: 3, 4)** (sonlm)
-  - [ ] 4.1 Laptop desktop, glow off, then glow on: 60 s runs from the clone through the Godot console exe (D1). Paste both summary lines.
-  - [ ] 4.2 Chrome, glow off and on, at `web_debug` through the tunnel. Paste the console summary lines.
-  - [ ] 4.3 Firefox: the same two runs.
-  - [ ] 4.4 HD 620-class machine: the same runs, or "not available".
-  - [ ] 4.5 Glow look check at brightness 0–3 (`docs/perf.md` → The look check): is the darkness readable, the halo right, and does a sprite glow read the same as a lit glow?
-- [ ] **Task 5: Decisions (AC: 2, 4, 5, 6)** (sonlm)
-  - [ ] 5.1 Physics interpolation: keep or turn off, with the reason.
-  - [ ] 5.2 Engine glow: go or no-go.
-  - [ ] 5.3 Light budget: confirm 6, or tighten (then re-run Task 4 at the new budget).
-  - [ ] 5.4 Flare cap recommendation (a number, or "none needed", with the reason).
-  - [ ] 5.5 Air dash: keep ≈ 39 px, or fix to 31 px.
-  - [ ] 5.6 Feel check verdict: yes, no or mixed. Any "no" names what to fix.
-  - [ ] 5.7 Devlog: approve the agent's draft of `docs/devlog/cp1.md` (D8).
-- [ ] **Task 6: Record and apply (AC: 2–6)** (agent, after Task 5)
-  - [ ] 6.1 Fill in the playtest record: the answers, the evidence and the follow-ups. Copy sonlm's summary lines into `docs/perf.md` → Results, one row per run, numbers verbatim (D3).
-  - [ ] 6.2 Interpolation:
+- [x] **Task 3: Feel check (AC: 2, 5)** (sonlm)
+  - [x] 3.1 Play the release Windows exe at ×3, at 60 Hz: the shaft top to bottom, a few deaths and respawns, and room exits.
+  - [x] 3.2 Run the same build with `override.cfg` (interpolation off, D2) and compare. If a high-refresh display is available, play both again on it. — done at 60 Hz; no high-refresh display (60 Hz panel only), so that pass → Story 7.14.
+  - [x] 3.3 Air dash: does it feel right as it is (≈ 39 px)? (D4)
+  - [x] 3.4 Play the shaft in the browser at the ×2 embed (`embed.html?build=web`): one descent; note anything that feels different from desktop.
+  - [x] 3.5 Linux desktop with a window manager, if one is available: launch the Linux build and paste the `[ui] display: window …` line, if it prints (D5). — skipped: no Linux desktop (X11 item → Story 7.14).
+- [x] **Task 4: Performance runs (AC: 3, 4)** (sonlm)
+  - [x] 4.1 Laptop desktop, glow off, then glow on: 60 s runs from the clone through the Godot console exe (D1). Paste both summary lines. — glow off only (RTX 3050, editor run); glow on not run (no-go).
+  - [x] 4.2 Chrome, glow off and on, at `web_debug` through the tunnel. Paste the console summary lines. — not made, by sonlm's choice (two runs discarded: tab hidden); → Story 7.13.
+  - [x] 4.3 Firefox: the same two runs. — glow off only, on the laptop's Intel iGPU.
+  - [x] 4.4 HD 620-class machine: the same runs, or "not available". — not available; the laptop's Intel iGPU through Firefox stood in.
+  - [x] 4.5 Glow look check at brightness 0–3 (`docs/perf.md` → The look check): is the darkness readable, the halo right, and does a sprite glow read the same as a lit glow? — not run: glow decided no-go.
+- [x] **Task 5: Decisions (AC: 2, 4, 5, 6)** (sonlm)
+  - [x] 5.1 Physics interpolation: keep or turn off, with the reason.
+  - [x] 5.2 Engine glow: go or no-go.
+  - [x] 5.3 Light budget: confirm 6, or tighten (then re-run Task 4 at the new budget).
+  - [x] 5.4 Flare cap recommendation (a number, or "none needed", with the reason).
+  - [x] 5.5 Air dash: keep ≈ 39 px, or fix to 31 px.
+  - [x] 5.6 Feel check verdict: yes, no or mixed. Any "no" names what to fix.
+  - [x] 5.7 Devlog: approve the agent's draft of `docs/devlog/cp1.md` (D8).
+- [x] **Task 6: Record and apply (AC: 2–6)** (agent, after Task 5)
+  - [x] 6.1 Fill in the playtest record: the answers, the evidence and the follow-ups. Copy sonlm's summary lines into `docs/perf.md` → Results, one row per run, numbers verbatim (D3).
+  - [x] 6.2 Interpolation:
     - **Kept:** `project-context.md` (Technology Stack "Display" line: "kept since 1.15", the reason, and the Physics interpolation rule); architecture Frame Pacing and decision row 8 (decided, dated); AR6 in `epics.md`.
     - **Turned off:** HALT. Show sonlm the change before making it: `project.godot`, `smoke_room_swap.gd:245`, and `CameraRig`, which runs on the physics tick only because interpolation forces it (D2). If the rig needs more than a flag, it goes in a fix story (D7).
-  - [ ] 6.3 Light budget:
+  - [x] 6.3 Light budget:
     - **Confirmed:** update the comments on `BudgetLight.MAX_ON_SCREEN` and `Spec.LIGHTS_ON_SCREEN_MAX` (drop "until 1.15").
     - **Tightened:** change the GDD first, then `Spec.LIGHTS_ON_SCREEN_MAX`, `BudgetLight.MAX_ON_SCREEN`, architecture Lighting and the `docs/perf.md` numbers; `test_light_budget` must stay green; sonlm re-runs Task 4.
-  - [ ] 6.4 Glow:
+  - [x] 6.4 Glow:
     - **Go:** draft the follow-up story through `gds-correct-course` with sonlm. It moves glow into game code and re-checks the brightness levels and contrast floors.
     - **No-go:** architecture Lighting reads "engine glow: no-go (CP1, <date>); bloom = unshaded additive sprites"; `--glow` stays a DevTools-only option.
 
     Either way, update the GDD Open Questions bloom row (decided, dated).
-  - [ ] 6.5 Flare cap: the GDD Open Questions flare row and architecture Lighting line 452 get the recommendation. Story 1.23 makes it a `Tuning` value (epics 1.23).
-  - [ ] 6.6 Air dash (D4):
+  - [x] 6.5 Flare cap: the GDD Open Questions flare row and architecture Lighting line 452 get the recommendation. Story 1.23 makes it a `Tuning` value (epics 1.23).
+  - [x] 6.6 Air dash (D4):
     - **Keep:** the GDD Movement row (line 125) becomes "260 px/s for 0.15 s (≈ 39 px; 8–9 ticks)"; FR2 in `epics.md` changes to match; the `Tuning.DASH_TIME` comment is updated. Then either set `DASH_TIME` to the true length and make the timer honest (count down before the check), with `smoke_player_input` pinning the exact ticks and distance, or keep the code and pin it as it is. Pick the change that leaves the dash identical in play; prove it with the before/after tick count.
     - **Fix to 31 px:** count down before the check in `player.gd` `_physics_process` (lines 160–162), and pin `smoke_player_input` to 7–8 ticks and ≈ 31 px. Re-run `smoke_bot` (the bot uses no dash, but check its best chain). sonlm does a short re-feel (a human gate).
-  - [ ] 6.7 Ledger: close the three 1.15 items with their outcomes. For X11, if no Linux desktop was available, change its owner to **Story 7.14** (D5).
-  - [ ] 6.8 A feel "no", or a fix story from 6.2 or 6.4: run `gds-correct-course` to add each before 1.16 (D7). HALT for sonlm's approval.
-  - [ ] 6.9 `cd game && ./run_tests.sh` → `== ALL GREEN`. Then commit: code, docs, the record, `sprint-status.yaml` (`done`), and this story (Change Log, status `done`).
+  - [x] 6.7 Ledger: close the three 1.15 items with their outcomes. For X11, if no Linux desktop was available, change its owner to **Story 7.14** (D5).
+  - [x] 6.8 A feel "no", or a fix story from 6.2 or 6.4: run `gds-correct-course` to add each before 1.16 (D7). HALT for sonlm's approval.
+  - [x] 6.9 `cd game && ./run_tests.sh` → `== ALL GREEN`. Then commit: code, docs, the record, `sprint-status.yaml` (`done`), and this story (Change Log, status `done`).
 
 ## Dev Notes
 
@@ -318,14 +318,30 @@ Claude Opus 5.5 (claude-opus-5-5)
 ### Completion Notes List
 
 - Tasks 1–2 (agent): the automated gate passes (AC1); the playtest record is created with the evidence and the real build paths. HALTed at Task 3 for sonlm's play sessions (human gates, Tasks 3–5).
+- Tasks 3–5 (sonlm, 2026-11-21): feel yes; interpolation kept ("I don't see the difference", 60 Hz only); glow no-go; budget 6 confirmed; flare cap none needed; dash kept ≈ 39 px; devlog approved. Perf: sonlm chose two runs, the laptop desktop (RTX 3050) and Firefox on the Intel iGPU, both glow off; both held 6/6 lights, over 0. No high-refresh display, HD 620 machine or Linux desktop was available.
+- Task 6 (agent): decisions applied to project-context, architecture (rows 8 and 14, Frame Pacing, Lighting), epics (FR2, AR6), the GDD (Movement air dash, Open Questions bloom and flare rows), `docs/perf.md` Results (copied verbatim), the `BudgetLight`/`Spec` comments and the `Tuning.DASH_TIME` comment. Dash: code unchanged (identical in play); `smoke_player_input` pinned exactly to 8 gravity-free ticks, 9 dashing ticks and 38.5–39.5 px (measured 8 / 9 / 39.0 before and after). No fix stories (feel yes, glow no-go, interpolation kept), so no `gds-correct-course`.
+- Ledger: dash and glow closed; X11 → Story 7.14. New, with owners: high-refresh interpolation → 7.14; perf run counts a hidden tab as one frame → 7.13; web key guard swallows F12 / Ctrl+Shift+J → 7.13; perf runs not made at CP1 → 7.13.
+- Final run: `run_tests.sh` → 22 tests, 1397 ok, `== ALL GREEN`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/playtests/1-15-cp1-gate-feel-check-and-performance-verdict.md` (new)
 - `_bmad-output/implementation-artifacts/1-15-cp1-gate-feel-check-and-performance-verdict.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/planning-artifacts/epics.md`
+- `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md`
+- `docs/perf.md`
+- `docs/devlog/cp1.md` (new)
+- `game/scripts/rules/tuning.gd` (comment only)
+- `game/scripts/core/budget_light.gd` (comment only)
+- `game/tests/spec.gd` (comment only)
+- `game/tests/smoke_player_input.gd` (dash pin tightened)
 
 ## Change Log
 
 - 2026-11-21: Story created (gds-create-story). Ultimate context engine analysis completed - comprehensive developer guide created. D1–D7 are the story author's calls. sonlm's answers: high refresh, Firefox and HD 620 are available, there is no Linux desktop, and the devlog is a note in the repo (D8). Probes: `override.cfg` beside an exported binary is read, and it turns physics interpolation off; the `test_chain_state` diff against M1 shows harness lines only.
 - 2026-11-21: Dev started (in-progress). Task 1 automated gate green on `e304d31` (build `20261121-e304d31`); Task 2 playtest record created. Waiting on sonlm for Tasks 3–5.
+- 2026-11-21: sonlm's play sessions and decisions (Tasks 3–5) recorded and applied (Task 6): interpolation kept, glow no-go, budget 6, no flare cap, dash kept ≈ 39 px (docs follow the game; pin exact), feel yes. Devlog `docs/devlog/cp1.md` approved. Status done.

@@ -1,6 +1,6 @@
 # Playtest: CP1 gate (Story 1.15)
 
-**Build:** 20261121-e304d31 · **Date:** · **Played by:** sonlm (not blind) · **Machines:** laptop (Windows, <GPU>, <refresh> Hz); high-refresh display: <Hz>; HD 620: <yes/not available>; Linux desktop: not available (sonlm, 2026-11-21)
+**Build:** 20261121-e304d31 · **Date:** 2026-11-21 · **Played by:** sonlm (not blind) · **Machines:** laptop (Windows, NVIDIA GeForce RTX 3050 Laptop GPU + Intel HD Graphics iGPU, 60 Hz panel); high-refresh display: not available (the panel offers 60 Hz only); HD 620 machine: not available (the laptop's Intel iGPU, through Firefox, stood in); Linux desktop: not available
 
 ## Questions
 
@@ -58,17 +58,45 @@ ssh -i .\sonlm2026-private.pem -t -L 8060:127.0.0.1:8060 sonlm@123.31.11.131 "cd
 
 | Question | Answer (yes / no / mixed) | Notes |
 |---|---|---|
-| 1. Feel, desktop ×3 and browser ×2 | | |
-| 2. Physics interpolation | | |
-| 3. Perf, glow, budget, flare cap | | |
-| 4. Air dash | | |
+| 1. Feel, desktop ×3 and browser ×2 | yes | sonlm's verdict: yes; no fix named |
+| 2. Physics interpolation | keep | sonlm: "I don't see the difference. It seem like normal gameplay like before this story" (on vs off at 60 Hz); no high-refresh display |
+| 3. Perf, glow, budget, flare cap | yes (2 runs) | both runs hold the budget (6/6, over 0); glow no-go; budget 6 confirmed; flare cap: none needed. Only 2 of AC3's runs were made, by sonlm's choice |
+| 4. Air dash | keep ≈ 39 px | sonlm kept the felt dash |
 
 ## Evidence
 
-(feel notes, deaths and attempts, perf summary lines verbatim)
+- **Feel:** sonlm played the release Windows exe at ×3 (60 Hz), with interpolation on and with `override.cfg` (off), and saw no difference between them. The laptop panel offers 60 Hz only (Windows "Dynamic refresh rate" not supported; "Choose a refresh rate" lists 60 Hz), so the high-refresh pass could not run.
+- **Glow look check (4.5):** not run; glow was decided no-go without the glow-on runs.
+- **Finding:** in the browser, F12 and Ctrl+Shift+J don't open DevTools: the 1.14 key guard prevents F1–F12 and Godot's canvas listener prevents every other key. Workaround: the browser menu (⋮ / ☰ → More tools).
+
+### Perf summary lines (verbatim, pasted by sonlm 2026-11-21)
+
+- Laptop desktop, glow off (editor run, debug, D1):
+  `[room] dev: perf 60 s: 6924 frames, avg 115.4 fps, min 56 fps, worst 116.1 ms at 0.4 s, 16 over 20 ms; lights max 6/6, sprites max 7, over 0; chain 20, breaks 0, deaths 0; glow off; window 3456x1984; Windows, NVIDIA GeForce RTX 3050 Laptop GPU`
+- Firefox, `web_debug`, glow off (laptop's Intel iGPU; tab kept in front):
+  `[room] dev: perf 60 s: 3569 frames, avg 59.5 fps, min 28 fps, worst 562.0 ms at 0.0 s, 5 over 20 ms; lights max 6/6, sprites max 7, over 0; chain 20, breaks 0, deaths 0; glow off; window 3330x1087; Web, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar`
+- In both, the worst frame is in the first second: the known first-second hitch (shader warm-up, Story 1.16).
+
+### Discarded runs (tab hidden mid-run; not results)
+
+- Chrome, glow off: `[room] dev: perf 60 s: 1343 frames, avg 7.5 fps, min 0 fps, worst 132798.6 ms at 47.2 s, 62 over 20 ms; lights max 6/6, sprites max 7, over 0; chain 20, breaks 0, deaths 0; glow off; window 3457x1822; Web, WebKit WebGL`
+- Firefox, glow off: `[room] dev: perf 60 s: 1062 frames, avg 6.4 fps, min 0 fps, worst 146454.0 ms at 18.3 s, 7 over 20 ms; lights max 6/6, sprites max 5, over 0; chain 20, breaks 0, deaths 0; glow off; window 3330x1087; Web, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar (firefox)`
+- Why: one frame of 132.8 s / 146.5 s means the browser stopped rendering a hidden tab; `perf_run.gd` measures wall time and skips only tree pauses, so the hidden stretch counted as one frame. Finding: the perf run should flag or exclude hidden-page time.
 
 ## Decisions and follow-ups
 
-(each decision with its date; follow-up stories with keys; ledger items closed)
+All by sonlm, 2026-11-21:
+
+- **Physics interpolation: kept.** project-context (Display line, Engine rule), architecture Frame Pacing and decision row 8, AR6.
+- **Engine glow: no-go.** Bloom = unshaded additive sprites; `--glow` stays DevTools-only. Architecture Lighting and row 14, the GDD bloom row, project-context Performance. No follow-up story.
+- **Light budget: 6 confirmed.** Comments on `BudgetLight.MAX_ON_SCREEN` and `Spec.LIGHTS_ON_SCREEN_MAX`; architecture row 14.
+- **Flare cap: none needed.** The GDD flare row and architecture Lighting; Story 1.23 makes it a `Tuning` value and re-checks it with real flares.
+- **Air dash: keep ≈ 39 px.** GDD Movement and FR2 read 0.15 s (9 ticks, ≈ 39 px); code unchanged; `smoke_player_input` pinned exactly (8 gravity-free ticks, 9 dashing, 39.0 px; the same before and after).
+- **Feel verdict: yes.** No fix stories, so no `gds-correct-course` run (D7).
+- **Perf scope:** sonlm chose to make only the Firefox run after the laptop one (glow no-go makes the glow-on runs moot).
+
+**Ledger** (`deferred-work.md`): closed the dash and engine glow items; the X11 decorations item → Story 7.14. New: interpolation at high refresh → 7.14; the perf run counting a hidden tab as one frame → 7.13; the web key guard swallowing the DevTools keys → 7.13; the runs not made at CP1 → 7.13.
 
 ## Devlog / private build
+
+Devlog: `docs/devlog/cp1.md` (a note in the repo, D8), drafted by the agent, approved by sonlm.

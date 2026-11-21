@@ -44,7 +44,7 @@ Tags: `[E#]` is the epic that owns the requirement in the GDD's high-level `epic
 **Movement and core kit (M1, carried into M2)**
 
 FR1: Movement uses the M1 tuning: run 110 px/s (ground accel 900 px/s², air accel 1500 px/s²); jump −330 px/s (apex ≈ 60 px), early release = velocity ×0.45; gravity 900 px/s² rising, ×0.6 falling, max fall 210 px/s; coyote time 0.08 s; jump buffer 0.10 s. [M1]
-FR2: Air dash: 260 px/s for 0.12 s, horizontal, ignores gravity; once per airtime, refreshed by landing or a pogo hit. [M1]
+FR2: Air dash: 260 px/s for 0.15 s (9 ticks, ≈ 39 px), horizontal, ignores gravity; once per airtime, refreshed by landing or a pogo hit. [M1; length kept at the CP1 gate, 2026-11-21]
 FR3: The camera leads 70 px downward while falling. [M1]
 FR4: Slash (Attack on the ground): active 0.12 s, cooldown 0.22 s, hitbox 22×16 px in front. Attack in the air always pogoes: armed 0.22 s, hitbox 26×24 px below the feet; a hit bounces the player at −300 px/s, adds 1 link and freezes 75 ms (hitstop); a pogo on the same frame as touching the ground adds nothing. Player body 10×20 px, hurtbox 8×18 px. [M1]
 FR5: Chain: +1 link per pogo hit without touching the ground, capped at 20. Chain-Light radius = 40 + 22·√links px. Blade Bloom scales slash and pogo hitboxes ×(1 + 0.18·√links), max ×1.8, never the hurtbox. [M1]
@@ -200,7 +200,7 @@ AR2: Retire `shaft.gd`: its LAYOUT becomes `rooms/l1/m1_shaft.txt` (22 columns i
 AR3: Retire the other M1 patterns: `player.gd`'s four `Engine.time_scale` writes (→ `Clock`), raw `Input.*` reads (→ `PlayerInput`), `randf_range` camera shake (→ `camera_rig.gd`), 44 `@export` tuning vars on player/crawler/lurker (28 / 5 / 11; → `Tuning`); `lurker.gd`'s `get_viewport_rect()` and `get_first_node_in_group("player")` (→ `World.play_rect()` + `Sensing`); `Fx._unshaded()` building a material per effect (→ cached static). [E1]
 AR4: Foundations in the architecture's order: `Log` → `Clock` → state objects (`Settings`, `SlotState`, `DiveState`, `Tuning`) → `Game` → `RoomLoader` + `World` → `PlayerInput` → `run_tests.sh` glob runner + `test_lint.gd`. The lint can only go green once Clock, PlayerInput, the F-key removal and the camera-shake move have landed. [E1]
 AR5: Build the worst-case perf scene `rooms/dev/perf_worst.txt` **early in E1** (Old Mine density + flare + cache + player, placeholder art; debug presets only) and check it on the laptop and in a web debug build. It decides: engine glow/bloom go/no-go (fallback: unshaded additive sprites), whether ≤ 6 `PointLight2D` holds 60 FPS, Compatibility glow web parity, and informs the flare cap question. [E1]
-AR6: Enable 2D physics interpolation (`physics/common/physics_interpolation = true`, 60 ticks, keep `snap_2d_transforms_to_pixel`); teleports (respawn, room entry) call `reset_physics_interpolation()`. Keep it only if the laptop feel check (60 Hz and high-refresh) passes; otherwise turn it off and record why. [E1]
+AR6: Enable 2D physics interpolation (`physics/common/physics_interpolation = true`, 60 ticks, keep `snap_2d_transforms_to_pixel`); teleports (respawn, room entry) call `reset_physics_interpolation()`. Keep it only if the laptop feel check (60 Hz and high-refresh) passes; otherwise turn it off and record why. **Kept at the CP1 gate (1.15, 2026-11-21): no visible difference at 60 Hz; no high-refresh display (that check → Story 7.14).** [E1]
 
 **Engine, display, platform**
 

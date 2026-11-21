@@ -11,7 +11,7 @@ extends PointLight2D
 
 enum Rank { ALWAYS, CACHE, GLOW }  ## slots go in this order; GLOW (lurker wall glow) is demoted first
 const GROUP := &"budget_light"
-const MAX_ON_SCREEN := 6  ## AR46 budget, until the CP1 perf verdict (1.15) confirms or tightens it; the guarantee is Spec.LIGHTS_ON_SCREEN_MAX
+const MAX_ON_SCREEN := 6  ## AR46 budget, confirmed at the CP1 gate (1.15, sonlm, 2026-11-21: perf_worst held on desktop and in Firefox on the Intel iGPU); the guarantee is Spec.LIGHTS_ON_SCREEN_MAX
 const SPRITE_ALPHA := 0.35  ## additive sprite alpha per unit of energy: about a dark wall's share of the light it replaces; presentation, judged by eye in 1.15
 
 ## A light that forgets its rank is demoted first, never kept over budget. Set before add_child

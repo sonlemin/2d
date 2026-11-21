@@ -287,13 +287,13 @@ Taken in dependency order in step 4:
 | 5 | Anchor quit | Save anchor id + carried embers + Ember Cache; killed enemies reset | — | Smallest snapshot that keeps the GDD rule "carried stays at risk until a station" |
 | 6 | Time | One `Clock` (in `Game`) is the only writer of `Engine.time_scale`; scale = product of active requests; pause = `SceneTree.paused` | — | Hitstop × slow-mo × assist compose instead of fighting |
 | 7 | Input | `PlayerInput` node turns actions into per-tick intents (Light tap/hold, toggles, real-time buffers) | — | Keeps the player script lean; tests can inject exact timings |
-| 8 | Frame pacing | 2D physics interpolation **on**, with pixel snapping; feel-checked on the laptop in E1 (fallback: off) | Godot 4.7.2 | Smooth on 120/144 Hz displays without changing 60-tick tuning |
+| 8 | Frame pacing | 2D physics interpolation **on**, with pixel snapping; **kept at the CP1 gate (1.15, 2026-11-21)**: no visible difference at 60 Hz, no high-refresh display to test on, and on is already built and tested | Godot 4.7.2 | Smooth on 120/144 Hz displays without changing 60-tick tuning |
 | 9 | Light sensing | `LightSource` node on player / flare / cache; pure sensing helper; all checks use the shared play rect | — | One model for lurkers (seek) and the Weaver (flee); fixes the gutter blind spot |
 | 10 | Rules layer | Pure rules classes (chain, health, embers) + `Tuning` object (base values + gear modifiers) | — | Gear bends numbers in one place; rules stay unit-tested |
 | 11 | Communication | Typed signals on state objects; groups + duck typing between actors; **no global event bus** | — | Every connection traceable to its owner |
 | 12 | UI | Persistent UI `CanvasLayer` in `World`: gutter HUD + one `ScreenRouter` (replace, never stack); E1 UI kit; CSV string table; one accessibility gate | — | Matches UX rules; menus stay consistent across 7 epics |
 | 13 | Audio | `Audio` autoload; all mixing by per-player volume tweens on Master; no bus effects | Godot 4.7.2 (web Sample playback) | Behaves the same on web and desktop |
-| 14 | Lighting | ≤ 6 `PointLight2D` on screen; small glows are unshaded sprites; engine glow off until the E1 perf scene passes on web | — | Lights × lit items is the cost driver at 480×270 |
+| 14 | Lighting | ≤ 6 `PointLight2D` on screen (confirmed at the CP1 gate, 2026-11-21); small glows are unshaded sprites; **engine glow: no-go (CP1, 2026-11-21)**, bloom = unshaded additive sprites | — | Lights × lit items is the cost driver at 480×270 |
 | 15 | Scripted moments | One-off scripts on shared primitives (Clock, input lock, camera hooks, audio cues); no sequence runner in M2 | — | Cheap now; consistent behaviour; revisit at Layer 2 |
 | 16 | Asset loading | Per-room load on transition (behind the cut); small assets preloaded; no threaded loading | — | Content is tiny; web export is single-threaded |
 | 17 | Build pipeline | Server builds all targets headless via `tools/export.sh`; laptop plays | Godot 4.7.2 templates; `@playwright/test` 1.65.1, exact pin (Story 1.13); Node 24 on server | One reproducible build machine; runs the web smoke check |
@@ -409,7 +409,7 @@ user://
 ### Frame Pacing
 
 - `physics/common/physics_interpolation = true`, physics at 60 ticks/s, `snap_2d_transforms_to_pixel` kept.
-- E1 feel check on the laptop (60 Hz and high-refresh if available). If the player or camera feels soft or late, turn it off and record why.
+- **Kept (CP1 gate, Story 1.15, 2026-11-21, sonlm):** on the laptop at 60 Hz, on and off (`override.cfg`) showed no visible difference, and no high-refresh display was available; on is already built and tested, so it stays. The high-refresh check is deferred to Story 7.14 (Steam Deck OLED, 90 Hz).
 - Teleports (respawn, room entry) call `reset_physics_interpolation()`.
 
 ### Light Sensing
@@ -449,9 +449,9 @@ user://
 ### Lighting
 
 - Budget: **≤ 6 `PointLight2D` on screen** (player, flare, lurker glows), all sharing `light.png` via `texture_scale`.
-- **Priority over budget:** the player and flares always keep a `PointLight2D`; lurker wall glow falls back to a sprite glow first. [GDD question: cap on simultaneous flares?]
+- **Priority over budget:** the player and flares always keep a `PointLight2D`; lurker wall glow falls back to a sprite glow first. Flare cap: none needed (CP1 gate, 2026-11-21, sonlm); Story 1.23 makes it a `Tuning` value and re-checks it with real flares.
 - Small glows (lurker eye cores, cache core, embers, ledge rims) are unshaded sprites.
-- Engine glow/bloom stays **off** until the E1 worst-case perf scene (Old Mine density + flare + cache + player) holds 60 FPS on web and on the HD 620 target. If it fails, bloom is faked with unshaded additive sprites.
+- **Engine glow: no-go (CP1, 2026-11-21); bloom = unshaded additive sprites.** `--glow` stays a DevTools-only option. The budget of 6 is confirmed: `perf_worst` held on the laptop desktop and in Firefox on the laptop's Intel iGPU (`docs/perf.md` → Results).
 - **`BudgetLight`** (`scripts/core/budget_light.gd`, Story 1.12): every `PointLight2D` is one (lint `raw_light`; the scenes are audited by `test_light_budget`), with a `rank`: ALWAYS (the player, flares), CACHE (the Ember Cache), GLOW (lurker glows and anything else; the default, so a light that forgets its rank is demoted first). World's `LightBudget` child applies the budget once per physics tick at priority 50, after every actor has moved and set its light and before DevTools (100), so a glow that wakes on a tick is never drawn past the budget. The rule: a light *wants* light when it is shown, has energy and a texture; on-screen lights that want light keep their `PointLight2D` up to `MAX_ON_SCREEN` (6, ≤ `Spec.LIGHTS_ON_SCREEN_MAX`): ALWAYS first, never demoted even past the budget (that excess is reported as `over`), then CACHE, then GLOW; within a rank an already-lit light keeps its slot (sticky, so nothing flickers: ≤ 3 flashes/s), then the light nearest the centre. Off-screen lights are left as they are (the engine culls them, and a light at the edge can't toggle as it crosses). A demoted light's `PointLight2D` is disabled and its additive, unshaded `Fallback` sprite (`Fx.additive()`, same texture, colour and size, alpha following energy) shows instead. Only the budget writes `enabled`.
 - **The budget's "on screen" is the whole view** (`World.light_rect()` = `CameraRig.view_rect()`, 480 × 270, gutters included; decided by sonlm, 2026-11-19): the budget is a cost rule, and the engine draws and culls lights against the whole viewport, so a light under an opaque gutter still costs a lit pass. AR20's "on screen" (notice, stir, edge cues, the guarantees) stays `play_rect()`. The two differ only in rooms wider than 360 px (`perf_worst`, the Weaver arena, the hub).
 

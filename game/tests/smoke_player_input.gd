@@ -193,8 +193,8 @@ func test_jump_buffer() -> void:
 	check(vy_out > -1.0, "Jump pressed 9 ticks before landing is lost (vy %.1f)" % vy_out)
 
 
-## FR2: air dash 260 px/s, horizontal, no gravity, once per airtime, refreshed by landing. FR2 says
-## 0.12 s (31 px); M1's dash runs 8-9 ticks (≈ 39 px), pinned here as is (deferred to 1.15).
+## FR2: air dash 260 px/s for 0.15 s (9 ticks, ≈ 39 px), horizontal, no gravity, once per airtime,
+## refreshed by landing. CP1 gate (1.15, sonlm): the felt dash is kept, so the ticks are pinned exactly.
 func test_air_dash() -> void:
 	_release_all()
 	place(_room.cell_centre(AIR_CELL))
@@ -218,11 +218,11 @@ func test_air_dash() -> void:
 				straight += 1
 				dy += absf(pos.y - prev.y)
 		prev = pos
-	# 0.12 s is 7.2 ticks; M1 checks the timer before counting it down, so the dash runs on the
-	# start tick plus 8 more, the last of them already falling.
-	check(straight >= 7 and straight <= 8, "air dash holds (260 × facing, 0) for 7-8 ticks, 0.12 s with no gravity (got %d)" % straight)
-	check(dashing >= 8 and dashing <= 9, "...at 260 px/s sideways for 8-9 ticks (got %d)" % dashing)
-	check(dx >= 31.0 and dx <= 40.0, "...covering at least 260 × 0.12 = 31 px (got %.1f)" % dx)
+	# DASH_TIME 0.12 s is 7.2 ticks; player.gd checks the timer before counting it down, so the dash
+	# runs on the start tick plus 8 more, the last of them already falling (FR2: 9 ticks, 0.15 s).
+	check(straight == 8, "air dash holds (260 × facing, 0) for exactly 8 ticks with no gravity (got %d)" % straight)
+	check(dashing == 9, "...at 260 px/s sideways for exactly 9 ticks, 0.15 s (got %d)" % dashing)
+	check(dx >= 38.5 and dx <= 39.5, "...covering 9 × 260 / 60 = 39 px (got %.1f)" % dx)
 	check(dy < 0.01, "...with no vertical drift while it ignores gravity (got %.2f px)" % dy)
 	Input.action_press("dash")
 	await frames(1)

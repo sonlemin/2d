@@ -88,8 +88,13 @@ A guide, not a rule; sonlm decides.
 
 ## Results (Story 1.15)
 
-No numbers are recorded by the agent; sonlm fills this in Story 1.15.
+No numbers are recorded by the agent: each row is copied from a summary line sonlm ran and pasted (Story 1.15, D3). The lines are kept verbatim in the playtest record (`_bmad-output/implementation-artifacts/playtests/1-15-cp1-gate-feel-check-and-performance-verdict.md`).
 
 | Date | Build / commit | Machine and adapter | Window and scale | Refresh | Glow | Avg FPS | Min FPS | Worst ms (at s) | Over 20 ms | Lights / sprites / over max | Breaks / deaths | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | | | | | |
+| 2026-11-21 | `feat/m2-e1` clone (1.15) | sonlm's laptop, Windows, NVIDIA GeForce RTX 3050 Laptop GPU | 3456x1984 | 60 Hz | off | 115.4 | 56 | 116.1 (0.4 s) | 16 | 6/6 / 7 / 0 | 0 / 0 | debug (editor exe), D1; worst frame is the first-second hitch (1.16) |
+| 2026-11-21 | 20261121-e304d31 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | 60 Hz | off | 59.5 | 28 | 562.0 (0.0 s) | 5 | 6/6 / 7 / 0 | 0 / 0 | the weakest target run (browser on the Intel iGPU); min 28 is the first second (hitch, 1.16) |
+
+**Runs not made at CP1 (sonlm's choice, 2026-11-21):** glow on everywhere (glow was a no-go, so its cost no longer decides anything), the laptop desktop on the Intel iGPU, and Chrome. No separate HD 620 machine was available; the laptop's Intel iGPU, through Firefox, stood in for the low-end target. The full pass is Story 7.13.
+
+**Hidden tabs ruin a web run.** A browser stops drawing a hidden tab, and the run measures wall time, so the whole hidden stretch counts as one frame (two discarded 1.15 runs had a single 132 s and 146 s frame). Keep the game tab in front for the whole run, with DevTools docked in the same window and opened from the browser menu (the web key guard swallows F12 and Ctrl+Shift+J).

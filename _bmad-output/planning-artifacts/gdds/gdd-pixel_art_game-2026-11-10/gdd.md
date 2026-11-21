@@ -122,7 +122,7 @@ The HUD sits in two side gutters of about 60 px each, so the visible play area i
 | Jump | −330 px/s, apex ≈ 60 px (3.75 tiles); release early = velocity ×0.45 |
 | Gravity | 900 px/s² rising; ×0.6 falling; max fall 210 px/s |
 | Coyote time / jump buffer | 0.08 s / 0.10 s |
-| Air dash | 260 px/s for 0.12 s (≈31 px), horizontal, ignores gravity. Once per airtime; refreshed by landing or a pogo hit |
+| Air dash | 260 px/s for 0.15 s (9 ticks, ≈ 39 px; the last tick already falls), horizontal, ignores gravity. Once per airtime; refreshed by landing or a pogo hit. *CP1 gate, 2026-11-21:* the felt dash is kept (was written as 0.12 s / ≈ 31 px; M1 always ran 9 ticks) |
 | Camera | leads 70 px downward while falling |
 
 #### Attack, pogo and chain (M1)
@@ -783,8 +783,8 @@ Not blocking M2 architecture; each is decided by the epic or pass named.
 | How each side area exits back to the spine | E4 |
 | Respawn point for a phase-2 death (the landing station is broken until victory) | E6 |
 | Hub and Layer 2 landing palettes | E5 / E6 |
-| Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits). *Architecture, 2026-11-11:* bloom stays off until the E1 worst-case perf scene holds 60 FPS on web and the HD 620 target; otherwise it is faked with unshaded sprites | E1 perf scene |
-| A cap on simultaneous flares. The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs, so repeated tosses could crowd it (architecture, 2026-11-11) | E1 perf scene + playtest |
+| Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits). *Architecture, 2026-11-11:* bloom stays off until the E1 worst-case perf scene holds 60 FPS on web and the HD 620 target; otherwise it is faked with unshaded sprites. **Decided (CP1 gate, 2026-11-21, sonlm): engine glow no-go; bloom = unshaded additive sprites** | E1 perf scene (decided) |
+| A cap on simultaneous flares. The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs, so repeated tosses could crowd it (architecture, 2026-11-11). **CP1 gate, 2026-11-21, sonlm: no cap needed** (perf_worst held at 6/6 lights with a flare on screen, desktop and Firefox on the Intel iGPU); Story 1.23 makes the cap a `Tuning` value and re-checks it with real flares | Story 1.23 |
 | Ways to fail: Hard Landing and Grip Gives Out are dropped by M1 tuning (slow max fall, cling without stamina); Running Dry needs crafting (parked); Prey (a capture becomes an escape) | a later layer |
 | Peak moments: The Speck, Riding the Giant, Felling the Canopy, The Curious Companion | their layers |
 
