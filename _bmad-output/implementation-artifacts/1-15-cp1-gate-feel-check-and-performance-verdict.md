@@ -4,7 +4,7 @@ baseline_commit: ccc8ac4
 
 # Story 1.15: CP1 gate: feel check and performance verdict
 
-Status: ready-for-dev
+Status: in-progress
 
 **Type:** playtest · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** closes CP1 Foundations (1.1–1.15) · **Branch:** `feat/m2-e1`
 
