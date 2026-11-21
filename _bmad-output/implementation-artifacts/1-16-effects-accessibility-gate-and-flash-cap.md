@@ -4,7 +4,7 @@ baseline_commit: c9143ca44cffd9ad5066806dac1a006838f7d661
 
 # Story 1.16: Effects accessibility gate and flash cap
 
-Status: in-progress
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30), first story · **Branch:** `feat/m2-e1`
 
@@ -78,7 +78,7 @@ so that the game is safe to play from the first kit build.
   - [x] `smoke_world` (or a new `smoke_a11y.gd`, D11): in `m1_shaft`, with `shake` false, a pogo hit leaves `offset == ZERO` for 30 ticks while a hitstop request is active and the crawler's sparks appear under the room; with `shake` true the same hit moves `offset` (existing check). Turning `shake` off mid-shake zeroes `offset` the next tick. A crawler knock with `reduce_flashing` on keeps the player sprite at `STEADY_ALPHA` and visible for the whole invulnerability.
   - [x] Red-check every new check (D13).
 - [x] **Task 8: Docs (AC: 9; D12).**
-- [ ] **Task 9: Laptop check (human gate, AC: 6).** HALT for sonlm: the debug web build (`tools/export.sh`), `?room=perf_worst&perf`, Firefox on the Intel iGPU and the laptop's Chrome, recording `worst … at … s` in `docs/perf.md` next to the 1.15 rows; plus a look with `?set=reduce_flashing:true`, `?set=shake:false` and `?set=reduced_motion:true` in `m1_shaft` (sparks smaller, steady transparency after a crawler hit, no shake, popups stay put). The agent records no numbers and claims no feel; report "tests green; needs a feel check on the laptop".
+- [x] **Task 9: Laptop check (human gate, AC: 6).** HALT for sonlm: the debug web build (`tools/export.sh`), `?room=perf_worst&perf`, Firefox on the Intel iGPU and the laptop's Chrome, recording `worst … at … s` in `docs/perf.md` next to the 1.15 rows; plus a look with `?set=reduce_flashing:true`, `?set=shake:false` and `?set=reduced_motion:true` in `m1_shaft` (sparks smaller, steady transparency after a crawler hit, no shake, popups stay put). The agent records no numbers and claims no feel; report "tests green; needs a feel check on the laptop".
 
 ## Dev Notes
 
@@ -211,6 +211,12 @@ Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
   - the pogo shake at the defaults, new to anyone who played since 1.7
   - the fall lead on a pogo: it used to snap up to 46 px back in one tick on every pogo hit mid-fall, and now eases at 140 px/s (the same rig fix). The 1.15 "feel yes" was given with the snap.
 
+- **Task 9 result (sonlm, laptop, 2026-11-21), build `20261121-22fa2af`:**
+  - Firefox / Intel iGPU, pasted: `[room] dev: perf 60 s: 3570 frames, avg 59.5 fps, min 29 fps, worst 548.0 ms at 0.0 s, 2 over 20 ms; lights max 6/6, sprites max 7, over 0; chain 20, breaks 0, deaths 0; glow off; window 3330x1870; Web, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar` → warm-up made **no change** (562 → 548 ms, noise). At 0.0 s the stall is the first frame itself, which a warm-up in the same frame can't remove; it is load time, before any input, and will sit behind the click-to-play gate (1.33). Not chased further; the performance pass is 7.13 (already owns the web runs). `Fx.warm_up()` stays: it is cheap and covers later first draws (a later room's first demotion).
+  - Chrome, pasted: `[room] dev: perf 60 s: 844 frames, avg 4.1 fps, min 0 fps, worst 159886.3 ms at 46.8 s, 160 over 20 ms; …; window 4358x6762; Web, WebKit WebGL` → **void** (a 160 s frame is a hidden tab, the known 7.13 item).
+  - Settings looks: sonlm "settings look right" (reduce flashing, shake off, reduced motion in `m1_shaft`).
+  - Pogo feel with the shake back and the eased lead: "pogo yes but just a bit, barely visible" → the 2.5 px shake strength is deferred to the 1.30 feel review (ledger, owner 1.30).
+
 ### File List
 
 - `game/scripts/rules/settings.gd`
@@ -238,3 +244,4 @@ Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
 ### Change Log
 
 - 2026-11-21: Tasks 1–8 implemented: the accessibility gate in `Fx`, `EFFECTS` with the flash-cap tests, the reduced variants, the shake gate, warm-up, lint `a11y_gate`, `smoke_a11y` and the docs. Also fixed the pre-existing hitstop/real-time bug in `CameraRig` (sonlm's call). Status stays in-progress until Task 9's laptop check.
+- 2026-11-21: Task 9 done (sonlm on the laptop): warm-up no change to the first-frame stall (recorded in `docs/perf.md`), Chrome run void, settings looks right, pogo feel yes (shake barely visible → 1.30). Status → review.
