@@ -3,10 +3,15 @@ extends Node
 ## shakes while the pogo's freeze frame and sparks stay (FR38, UX-DR128, D7), and reduce flashing
 ## turns the invulnerability blink into steady transparency (UX-DR126, D4). Each case runs at the
 ## default too, so a check can't pass on an effect that never plays.
-## The harness has no World, so the pogo → kick wire is made here, as world.gd makes it.
+## Code review 1.16: the real knock's blink is timed against Spec, and the camera's look-ahead is
+## read across a real pogo (the rig's real-time fix changed it, and nothing tested it).
+## The harness has no World, so the pogo → kick wire is made here; smoke_world checks World's own.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_a11y.gd
 
 const RoomHarness := preload("res://tests/room_harness.gd")
+const Spec := preload("res://tests/spec.gd")
+const M1_BLINK_LIT_S := 0.25  ## AC8: M1 drew the player for 0.25 s of each 0.4 s blink period; unchanged.
+const STEADY_ALPHA_AC3 := 0.5  ## AC3: the steady transparency under reduce flashing.
 
 var _fail := 0
 var _parts: Dictionary
@@ -70,7 +75,8 @@ func _sparks() -> int:
 
 
 ## A real pogo on the highest hoverer (as smoke_moves does). Returns true on the hit frame, with
-## the sparks counted and the hitstop seen on that frame.
+## the sparks counted and the hitstop seen on that frame, and the camera's look-ahead before and
+## after the hit tick.
 func _pogo() -> Dictionary:
 	var hovers := _crawlers(true)
 	if hovers.is_empty():
@@ -84,15 +90,19 @@ func _pogo() -> Dictionary:
 	_player.pogo_hit.connect(on_hit)
 	var pressed := false
 	var out := {hit = false}
+	var lead_before := 0.0  # the rig's look-ahead before the tick that has just run
 	for i in 60:
 		if not pressed and is_instance_valid(target) and target.global_position.y - _player.global_position.y < 26:
 			Input.action_press("attack")
+			lead_before = _camera.get("_lead")
 			await frames(1)
 			Input.action_release("attack")
 			pressed = true
 		if hits[0] > 0:
-			out = {hit = true, sparks = _sparks() - sparks_before, hitstop = Game.clock.is_active(&"hitstop"), offset = _camera.offset}
+			out = {hit = true, sparks = _sparks() - sparks_before, hitstop = Game.clock.is_active(&"hitstop"), offset = _camera.offset,
+					lead_before = lead_before, lead_after = _camera.get("_lead")}
 			break
+		lead_before = _camera.get("_lead")
 		await frames(1)
 	_player.pogo_hit.disconnect(on_hit)
 	return out
@@ -102,7 +112,16 @@ func test_pogo_shake_on() -> void:
 	Game.reset_for_tests()
 	var got := await _pogo()
 	check(got.hit, "setup: a pogo hit on the highest hoverer (shake on)")
+	if not got.hit:
+		return
 	check(got.hitstop, "...with its freeze frame (Clock hitstop active on the hit)")
+	# The look-ahead shares the rig's real time: before the fix the hit tick read 0.33 s and dropped
+	# the lead by up to 46.7 px at once; now it eases at LEAD_SPEED like any other tick. A second
+	# deliberate change at the defaults (code review 1.16; feel-checked on the laptop).
+	var step := CameraRig.LEAD_SPEED / Engine.physics_ticks_per_second
+	var drop: float = got.lead_before - got.lead_after
+	check(got.lead_before > 2.0 * step, "setup: the camera was looking ahead on the fall (lead %.2f px before the hit)" % got.lead_before)
+	check(drop <= step + 0.01, "the hit tick eases the look-ahead by one tick's worth, never a jump (dropped %.2f px, one tick is %.2f)" % [drop, step])
 	# The real pogo, hitstop included: the rig used to read delta / time_scale on the hit tick, after
 	# the hitstop request, and killed the shake at once (Story 1.16, probed on 4.7.2).
 	var moved := 0
@@ -167,14 +186,16 @@ func _knock() -> Dictionary:
 	if not knocked:
 		return {knocked = false}
 	var alphas := {}
+	var seq: Array[float] = []
 	var always_visible := true
 	var ticks := 0
 	while _player.get("_invuln") > 0.0 and ticks < 120:
 		alphas[sprite.modulate.a] = true
+		seq.append(sprite.modulate.a)
 		always_visible = always_visible and sprite.visible
 		ticks += 1
 		await frames(1)
-	return {knocked = true, alphas = alphas.keys(), visible = always_visible, ticks = ticks, after = sprite.modulate.a}
+	return {knocked = true, alphas = alphas.keys(), visible = always_visible, ticks = ticks, after = sprite.modulate.a, seq = seq}
 
 
 func test_blink_default() -> void:
@@ -183,6 +204,21 @@ func test_blink_default() -> void:
 	check(got.knocked, "setup: a crawler contact knocks the player (default)")
 	if got.knocked:
 		check(0.0 in got.alphas and 1.0 in got.alphas, "default: the invulnerability blinks between 0 and 1 (AC8; got %s over %d ticks)" % [got.alphas, got.ticks])
+		# The rate the game runs, on the real player. One 0.6 s invulnerability shows a single dark
+		# run, so a period can't be read from it (the walker may knock again as it ends, which starts
+		# a new one); the dark run's length can: 0.15 s at Spec.BLINK_HZ with M1's 0.25 s lit.
+		var dark: Array[int] = []
+		var run := 0
+		for a: float in got.seq:
+			if a == 0.0:
+				run += 1
+			elif run > 0:
+				dark.append(run)
+				run = 0
+		var tps: float = Engine.physics_ticks_per_second
+		var want := roundi((1.0 / Spec.BLINK_HZ - M1_BLINK_LIT_S) * tps)
+		check(not dark.is_empty() and dark.all(func(n: int) -> bool: return absi(n - want) <= 1), "...each dark run lasts %d ticks, within a tick: Spec.BLINK_HZ with M1's 0.25 s lit (AC8; got %s)" % [want, dark])
+		check(dark.size() / (got.ticks / tps) <= Spec.FLASH_HZ_MAX, "...under the flash cap (%d dark runs in %d ticks)" % [dark.size(), got.ticks])
 
 
 func test_blink_reduced() -> void:
@@ -192,7 +228,8 @@ func test_blink_reduced() -> void:
 	var got := await _knock()
 	check(got.knocked, "setup: a crawler contact knocks the player (reduce flashing)")
 	if got.knocked:
-		check(got.alphas == [Fx.STEADY_ALPHA] and got.ticks >= 30, "reduce flashing: steady transparency (%s) for the whole invulnerability (got %s over %d ticks)" % [Fx.STEADY_ALPHA, got.alphas, got.ticks])
+		# The alpha is read back from a Color (32-bit channels), so compared approximately.
+		check(got.alphas.size() == 1 and is_equal_approx(got.alphas[0], STEADY_ALPHA_AC3) and got.ticks >= 30, "reduce flashing: steady transparency (%s, AC3) for the whole invulnerability (got %s over %d ticks)" % [STEADY_ALPHA_AC3, got.alphas, got.ticks])
 		check(got.visible, "...and the player stays visible throughout (UX-DR126)")
 		check(got.after == 1.0, "...and fully drawn once it ends (got %s)" % got.after)
 	Game.reset_for_tests()

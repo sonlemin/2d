@@ -82,7 +82,7 @@ func _physics_process(delta: float) -> void:
 			_timer -= delta
 			# The rate is declared in Fx.EFFECTS and held to the 2 Hz pulse cap there (NFR8).
 			_eyes.modulate.a = 0.1 + 0.9 * Fx.pulse(_t, Fx.EYE_PULSE_HZ)
-			_body_sprite.position.x = sin(_t * 40.0) * 0.5  # a small shiver
+			_body_sprite.position.x = sin(_t * Fx.SHIVER_RATE) * 0.5  # a small shiver, declared in Fx.EFFECTS
 			if not sensed:
 				_enter(State.IDLE if global_position.distance_to(_home) < 1.0 else State.RETURN)
 			elif _timer <= 0.0:

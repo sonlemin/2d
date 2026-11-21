@@ -77,10 +77,11 @@ pixel_art_game/
 │   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
 │   │   ├── test_export_presets.gd # The export presets and their filters, through the exporter's own matcher (Story 1.13)
 │   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, --glow/--perf, perf stats
-│   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves
+│   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves; the gate, the EFFECTS table, the sampled rates
 │   │   ├── test_light_budget.gd  # BudgetLight: the rule, jitter, apply() on nodes, sprite fallback, scene audit
 │   │   ├── spec.gd               # Helper: the GDD's guarantees as constants, preloaded by tests
 │   │   ├── room_sweep.gd         # Helper: the pure room sweeps (falls, stretches, hazards, ids, links, arrival)
+│   │   ├── rate.gd               # Helper: a rate in Hz from values sampled once per tick (turns, the span between events)
 │   │   ├── smoke_rooms.gd        # Every room file: validation, cross-file checks, sweeps, lurker guarantees
 │   │   ├── smoke_bot.gd          # The descent bot in every spine room: chain ≥ 5, no live chain at an exit
 │   │   ├── smoke_moves.gd        # The M1 move checks on m1_shaft: pogo, landing, jump, cling, Snuff release
@@ -88,6 +89,7 @@ pixel_art_game/
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
 │   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, the SMOKE boot marker, each arg, the overlay cycle, no F-key
+│   │   ├── smoke_a11y.gd         # The accessibility gate on m1_shaft: shake off, blink and steady variant, look-ahead on a pogo
 │   │   ├── smoke_perf.gd         # The perf kit in world.tscn: --perf=3 in perf_worst, budget held every tick, the summary
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots (needs a real renderer: xvfb-run)
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World

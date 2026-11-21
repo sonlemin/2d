@@ -145,7 +145,7 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_room.queue_free()
 	_room_holder.add_child(room)
 	_room = room
-	Fx.warm_up(room, room.entry_position(entry))  # AR46, Story 1.16 D10: the first-second hitch
+	Fx.warm_up(room, room.entry_position(entry))  # AR46, Story 1.16 D10: each shared material's first draw is paid at the load
 	if respawn:
 		_spawn_player(entry)
 	else:

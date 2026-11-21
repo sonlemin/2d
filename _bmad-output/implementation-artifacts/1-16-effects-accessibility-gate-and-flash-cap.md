@@ -4,7 +4,7 @@ baseline_commit: c9143ca44cffd9ad5066806dac1a006838f7d661
 
 # Story 1.16: Effects accessibility gate and flash cap
 
-Status: review
+Status: done
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30), first story · **Branch:** `feat/m2-e1`
 
@@ -79,6 +79,60 @@ so that the game is safe to play from the first kit build.
   - [x] Red-check every new check (D13).
 - [x] **Task 8: Docs (AC: 9; D12).**
 - [x] **Task 9: Laptop check (human gate, AC: 6).** HALT for sonlm: the debug web build (`tools/export.sh`), `?room=perf_worst&perf`, Firefox on the Intel iGPU and the laptop's Chrome, recording `worst … at … s` in `docs/perf.md` next to the 1.15 rows; plus a look with `?set=reduce_flashing:true`, `?set=shake:false` and `?set=reduced_motion:true` in `m1_shaft` (sparks smaller, steady transparency after a crawler hit, no shake, popups stay put). The agent records no numbers and claims no feel; report "tests green; needs a feel check on the laptop".
+
+### Review Findings
+
+Code review 2026-11-21 over `c9143ca..HEAD` (Blind Hunter, Edge Case Hunter, Acceptance Auditor). No acceptance criterion or threshold changed after ready-for-dev. 2 decisions, 13 patches, 1 deferred, 8 dismissed. All decisions resolved and all patches applied the same day (see Review resolution below).
+
+- [x] [Review][Decision] One-shot effects are never held to the 3 flashes/s cap — every `ONCE` row declares `hz = 0.0` and `test_fx` asserts exactly that, so nothing bounds how often the sparks, the light kick, the chain popup or the shake fire. The `light_kick` comment argues from the 0.22 s attack cooldown, which is 4.5 per second (about 3.4 per real second with the 75 ms freeze), above `Spec.FLASH_HZ_MAX`. The real bound for pogo effects is the bounce between hits, which no test measures. The ground slash arc (`player.gd:249-251`, unshaded, 0.12 s on in each 0.22 s cooldown) has no bounce bound and no row. Wording that waits on this decision: `fx.gd:5-6` and `:32-33`, `project-context.md:101`. [`game/scripts/core/fx.gd:28-34`, `game/tests/test_fx.gd:94-101`] (blind+edge+auditor; NFR8, AC2)
+- [x] [Review][Decision] `Fx.EFFECTS` is not "everything that flashes, blinks, pulses, shakes or eases" — no row for the lurker's telegraph shiver (`lurker.gd:85`, `sin(_t * 40.0) * 0.5`, about 6.4 Hz), the pogo squash and its ease back (`player.gd:235`, `:87-89`), the eye-open ease (`lurker.gd:120`) or the slash and pogo arcs (`player.gd:249-251`). The Dev Notes scoped the shiver out ("not flashing") while AC2, the table's heading and `project-context.md` say everything; none of these reads a setting. `test_fx`'s reflection check sees only public static functions on `Fx`, so its "no effect ships undeclared" comment claims more than it checks. [`game/scripts/core/fx.gd:22-39`, `game/tests/test_fx.gd:108-122`] (blind+edge+auditor; AC2)
+- [x] [Review][Patch] Warm-up nodes are freed on a 0.05 s tween, not on drawn frames: a first tween step of 0.05 s or more frees the label and sprite undrawn, and the comment says "Two frames". Free after two drawn frames; probe on 4.7.2 first that the signal counted fires under `--headless`. The `docs/perf.md` "no change" row stays provisional until a laptop `--perf` re-run after this patch. [`game/scripts/core/fx.gd:175-179`] (edge+auditor)
+- [x] [Review][Patch] `test_pogo_shake_on` reads `got.hitstop` with no guard when the setup pogo misses; add `if not got.hit: return`, as `test_pogo_shake_off` has. [`game/tests/smoke_a11y.gd:104-105`] (blind+edge)
+- [x] [Review][Patch] The rates the game runs are not held by a test: `test_fx.gd:104-105` compares the rows with the consts they are built from, and `Fx.pulse(t, hz)` takes any rate. Drop the tautology; in `smoke_a11y` measure a real lurker's eye-pulse interval and a real knock's blink rate against `Spec` (state the ±1 tick allowance); measure the sampled rates by mean interval, not a count over 2 s (which reads 2.1 Hz as 2.0). [`game/tests/test_fx.gd:104-105`, `:146-175`, `game/tests/smoke_a11y.gd:185`] (blind+auditor; AC2)
+- [x] [Review][Patch] AC values are checked loosely or against themselves: the popup rise passes anywhere from 10 to 14 px, `STEADY_ALPHA` is compared with itself and a 0.3–1.0 window (AC3 says 0.5), `INVULN_LIT` (0.25 s of 0.4 s, AC8) is pinned by nothing, and the alpha read back from a `Color` is compared exactly. Pin 14 px at the end of the rise, 0.5 and 0.25 s with their AC citations (14 px is M1's value by AC8, not in the design docs), use `is_equal_approx`, await `tree_exited` for "frees itself", call `Game.reset_for_tests()` at the top of `run()`, and correct the header's "thresholds come from Spec" line. [`game/tests/test_fx.gd:13`, `:19-21`, `:153-154`, `:210-218`, `game/tests/smoke_a11y.gd:195`] (blind+edge+auditor; AC3, AC8)
+- [x] [Review][Patch] World's own wiring is untested: deleting `world.gd:148` (the warm-up call) or `world.gd:193` (the `pogo_hit` → `kick` wire) fails nothing, since `smoke_a11y` connects the wire itself and `smoke_world` calls `kick(6.0)` directly. Add both checks to `smoke_world`. [`game/scripts/world/world.gd:148`, `:193`] (blind+edge+auditor; AC6)
+- [x] [Review][Patch] The camera look-ahead changed with the real-time fix and no test reads `_lead`: on a pogo hit it used to drop by up to 46.7 px in one tick and now eases at 140 px/s. This is a second deliberate change at the defaults beside the shake (AC8's text is left as written). Add a `_lead` check across a real pogo with its hitstop; needs a laptop feel look. [`game/scripts/world/camera_rig.gd:108-111`] (edge+auditor; AC8)
+- [x] [Review][Patch] Lint `a11y_gate` misses `_settings.shake`: `\bsettings` needs a word boundary and `_` is a word character. Widen the pattern and add firing samples. [`game/tests/test_lint.gd:108`] (blind; AC1)
+- [x] [Review][Patch] The pre-1.16 settings check asserts only "unclean", not that brightness and the tap window survive and the three new keys take their defaults. [`game/tests/test_state.gd:178`] (blind; AC1)
+- [x] [Review][Patch] `Fx.pop()` floors the particle count at 1 only under reduce flashing; `amount <= 0` at the defaults reaches `CPUParticles2D.amount` (no caller passes one today). [`game/scripts/core/fx.gd:107`] (edge)
+- [x] [Review][Patch] The warm-up is still described as the hitch fix after the laptop measured no change (562 → 548 ms, one run): reword the comments and the `docs/perf.md` paragraph, and say that the Chrome row's elided figures are not in the story record. [`game/scripts/core/fx.gd:147-151`, `game/scripts/world/world.gd:148`, `docs/perf.md:26`, `:104-105`] (blind+auditor; AC6, D10)
+- [x] [Review][Patch] Two hand-ons have no ledger entry: the first-frame stall ("→ 7.13" in the story record and `docs/perf.md`; note there that the warm-up label does not match the popup's font size and outline), and D6's obligation that a pogo target which survives a hit adds its own spark call. Add both to `deferred-work.md` with owner lines. [`_bmad-output/implementation-artifacts/deferred-work.md`] (blind+auditor)
+- [x] [Review][Patch] The standing rule "real-time visuals use `delta / Engine.time_scale` in `_process`" is unqualified, while this story's own ledger entry says it misreads on the frame a Clock request lands; Story 1.19's hit flash will read the rule as written. Add the caveat, and correct `docs/architecture.md:138`, which still says `CameraRig._process` uses the formula. [`_bmad-output/project-context.md:39`, `_bmad-output/game-architecture.md:398`, `:659`, `docs/architecture.md:138`] (blind+edge+auditor)
+- [x] [Review][Patch] Docs out of step: `EYE_PULSE_HZ` is still listed as a lurker const; the lint row says 13 rules (14 with `a11y_gate`); the `test_dev_args` check count (take it from the `ok` lines); the lint summary in `project-context.md` omits `a11y_gate`; `smoke_a11y` is missing from the test lists; the dated last-run line (update from the post-patch run). [`docs/component-inventory.md:115`, `:282`, `:284`, `_bmad-output/project-context.md:84`, `docs/development-guide.md`, `docs/source-tree-analysis.md`, `docs/architecture.md:226`, `game/README.md`] (blind+edge+auditor; D12)
+- [x] [Review][Defer] Shake turned off while the tree is paused leaves the last random offset on screen until the first unpaused tick [`game/scripts/world/camera_rig.gd:117-121`] — deferred, new in this diff but unreachable until Options opens from Pause (owner Story 1.36)
+
+### Review resolution (2026-11-21)
+
+**sonlm's laptop looks (build `20261121-22fa2af`, web debug):**
+- Slash arc mashed on the ground, and pogo effects on a fast chain: "Feels like norm. Doesn't flash. Seems like before."
+- Camera on a pogo chain (the eased look-ahead, shake off then on): "Shake feels better." Taken as no objection to the eased look-ahead.
+- Lurker shiver: not a valid look. `chain=20` is paid at take-off and banks on the first landing, so the lurker most likely never woke; sonlm: "I don't think it jitter". The decision below does not depend on it.
+
+**Decision 1 (sonlm: option 1): measure the pogo gap, declare the slash arc.**
+- `Spec.POGO_GAP_MIN` = 1 / `FLASH_HZ_MAX` (1/3 s, from NFR8's 3 flashes per second). `smoke_bot` times its pogo hits in every spine room: closest 1.017 s over 19 hits in `m1_shaft`. This is the bot's line, not every line a player can find; the attack cooldown alone allows about 0.29 s, so the bounce between targets (the layout) is what holds it.
+- `Fx.EFFECTS` gains `swing_arcs` (ONCE) with its written reason: a player-paced attack sprite, not a flash. The `light_kick` comment's wrong arithmetic is gone; both rows say why in a `why` field.
+- This amends AC2's design note (D3) that a one-shot's cap "is its trigger rate": the trigger rate is now measured.
+
+**Decision 2 (sonlm: option 1): declare the motion effects, no behaviour change.**
+- New kind `Fx.Kind.MOTION`: position or scale only, no brightness change; declared, not rate-capped. Rows `lurker_shiver` (6.37 Hz, from the new `Fx.SHIVER_RATE` that `lurker.gd` now reads; same value as before), `lurker_eye_open`, `pogo_squash`.
+- This amends AC2 bullet 4 ("nothing is above `Spec.FLASH_HZ_MAX`") for `MOTION` rows only, by sonlm's decision. `test_fx` requires every row to name a reduced variant or a `why`.
+
+**Patches applied:**
+- Warm-up frees after `Fx.WARM_FRAMES` (3) process frames, not a 0.05 s tween; the particle no longer finishes first. `test_fx` checks the items are still there two frames later.
+- `smoke_a11y`: the missing guard; the look-ahead read across a real pogo (25.67 px before the hit, dropped 2.33 px on the hit tick, one tick's worth); each dark run of a real knock's blink is 9 ticks; the steady alpha against AC3's 0.5 with `is_equal_approx`.
+- `test_fx`: the tautology removed; blink and pulse rates measured over 10 s by the span between events (`tests/rate.gd`), with a 2.1 Hz sample that fires; lit 15 and dark 9 ticks against M1's 0.25 s of 0.4 s; the popup's rise pinned at 14 px at the end of the rise; `pop()` with a count of 0; reset at the top of `run()`.
+- `smoke_world`: World's own pogo → shake wire on the respawned player; three warm-up items under the room at every `room_entered`; a real lurker's eye pulse timed through its telegraph (at least 1.96 Hz from 4 turns in 53 ticks, cap 2.0).
+- Lint `a11y_gate` catches `_settings.shake`; `test_state` asserts a pre-1.16 file keeps brightness and the tap window; `Fx.pop()` floors the count at 1 in both branches.
+- Ledger: the first-frame stall (owner Story 7.13) and D6's spark obligation (owner E4).
+- Docs: the warm-up wording (`fx.gd`, `world.gd`, `docs/perf.md`), the real-time caveat (`project-context.md`, `game-architecture.md`, `docs/architecture.md`), and the drift listed in the finding.
+
+**AC8, recorded:** the eased camera look-ahead on a pogo hit is a second deliberate change at the defaults, beside the shake now showing. Both come from the `CameraRig` real-time fix. AC8's text is left as written.
+
+**Red-checks (D13), each broken once and seen to FAIL, then restored:** `WARM_FRAMES` 1; the `pop()` floor removed; `EYE_PULSE_HZ` 2.2 (`test_fx` and `smoke_world`); `INVULN_LIT` 0.5 (`test_fx` and `smoke_a11y`); `POPUP_RISE` 12 and `STEADY_ALPHA` 0.6; a `why` removed; the rig reading `delta / Engine.time_scale` again (the look-ahead and the shake checks); World without its warm-up call; World without its pogo wire; the bot gap against 2 s. The lint's new samples are their own red-check.
+
+**Result:** `cd game && ./run_tests.sh` → `== ALL GREEN (23 tests)`, 1565 `ok`, 0 `FAIL`, 0 error lines.
+
+**Still open with sonlm:** the `?room=perf_worst&perf` run in Firefox on the Intel iGPU, on the build made after this review. The 1.16 row in `docs/perf.md` is provisional until then.
 
 ## Dev Notes
 
@@ -158,6 +212,8 @@ so that the game is safe to play from the first kit build.
 - `test_dev_args.gd:139` hard-codes the `schema_help` string (`keys: brightness (0, 1, 2, 3), light_tap_window (0.12, 0.2, 0.3)`); it changes with the new keys.
 - `test_tuning` keeps the M1 `lurker.eye_pulse_hz = 2.0` row as a `local` constant read through `get_script_constant_map()` of `home`; a `home` of `fx.gd` with `local = "EYE_PULSE_HZ"` works the same way.
 - **Alpha-cull probe (D10), 4.7.2-stable source:** `RendererCanvasCull::_cull_canvas_item` returns early when `(ci->modulate * p_modulate).a < 0.007`, so `1/255` (0.0039) is culled (line 329, re-checked with curl). `Fx.WARM_ALPHA` is 0.01; `test_fx` checks it against 0.007.
+- **Warm-up draw probe (code review, 4.7.2, `xvfb-run` with `opengl3`):** items created on a physics tick and counted at `RenderingServer.frame_post_draw`. The 0.05 s tween: drawn once after a normal frame, **0 times** when the frame before took 120 ms. `Fx.warm_up()` counting three process frames: drawn twice in both cases. Under `--headless`, `frame_post_draw` never fires (0 times over the same probe; 164 times under the renderer), which is why the warm-up counts `process_frame` and not drawn frames.
+- **Bot pogo gap (code review):** `m1_shaft`, closest two pogo hits 61 ticks apart (1.017 s) over 19 hits, counted in physics ticks (60 per real second under a hitstop, Story 1.8 D3).
 
 ### References
 
@@ -220,6 +276,7 @@ Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
 ### File List
 
 - `game/scripts/rules/settings.gd`
+- Code review: `game/scripts/actors/lurker.gd`, `game/tests/rate.gd` (+ `.uid`, new), `game/tests/smoke_bot.gd`, `game/tests/smoke_world.gd`, `game/tests/spec.gd`, `game/tests/test_state.gd`, `game/tests/test_lint.gd`, `docs/architecture.md`, `docs/source-tree-analysis.md`, `game/README.md`, `_bmad-output/game-architecture.md` (the other files below were touched again)
 - `game/scripts/core/fx.gd`
 - `game/scripts/world/camera_rig.gd`
 - `game/scripts/world/world.gd`
@@ -245,3 +302,4 @@ Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
 
 - 2026-11-21: Tasks 1–8 implemented: the accessibility gate in `Fx`, `EFFECTS` with the flash-cap tests, the reduced variants, the shake gate, warm-up, lint `a11y_gate`, `smoke_a11y` and the docs. Also fixed the pre-existing hitstop/real-time bug in `CameraRig` (sonlm's call). Status stays in-progress until Task 9's laptop check.
 - 2026-11-21: Task 9 done (sonlm on the laptop): warm-up no change to the first-frame stall (recorded in `docs/perf.md`), Chrome run void, settings looks right, pogo feel yes (shake barely visible → 1.30). Status → review.
+- 2026-11-21: Code review (3 layers): 2 decisions resolved by sonlm (measure the pogo gap and declare the slash arc; declare motion effects as `MOTION` rows), 13 patches applied, 1 item deferred to Story 1.36, 2 ledger entries added (7.13, E4), 8 findings dismissed. 23 tests, 1565 `ok`. Status → done; the laptop perf re-run on the patched build is still open.

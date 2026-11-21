@@ -175,7 +175,10 @@ func _test_settings_round_trips() -> void:
 	v.changed.connect(func(key: StringName) -> void: got.append(key))
 	v.from_dict(full)
 	check(got == Settings.SCHEMA.keys(), "from_dict() emits changed for every key, changed or not (D2; got %s)" % [got])
-	check(not Settings.new().from_dict({"brightness": 3, "light_tap_window": 0.12}), "a file from before Story 1.16 (no accessibility keys) is unclean, so Game rewrites it with the defaults (no version bump)")
+	var old := Settings.new()
+	check(not old.from_dict({"brightness": 3, "light_tap_window": 0.2}), "a file from before Story 1.16 (no accessibility keys) is unclean, so Game rewrites it with the defaults (no version bump)")
+	check(old.brightness == 3 and is_equal_approx(old.light_tap_window, 0.2) and not old.reduce_flashing and old.shake and not old.reduced_motion,
+			"...and it keeps what the player had set: brightness 3 and the 0.2 s tap window survive, the three new keys take their defaults (got %s)" % [old.to_dict()])
 	# Story 1.16: each bool key round-trips through JSON as a bool, both ways.
 	for key: StringName in [&"reduce_flashing", &"shake", &"reduced_motion"]:
 		for b: bool in [false, true]:

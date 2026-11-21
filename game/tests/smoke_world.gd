@@ -13,11 +13,14 @@ extends Node
 const WorldScene := preload("res://scenes/world/world.tscn")
 const LurkerScene := preload("res://scenes/actors/lurker.tscn")
 const TMP := "user://smoke_world_tmp"
+const Spec := preload("res://tests/spec.gd")
+const Rate := preload("res://tests/rate.gd")
 
 var _fail := 0
 var _world: World
 var _spawned: Array[Player] = []
 var _spawned_at: Array[Vector2] = []
+var _warm_counts: Array[int] = []  # warm-up items under the room at each room_entered
 
 
 func check(cond: bool, msg: String) -> void:
@@ -54,9 +57,11 @@ func run() -> void:
 	test_brightness()
 	test_popups_in_room()
 	await test_death_and_respawn()
+	await test_pogo_wire()
 	await test_behind_the_gutter()
 	await test_hunt_over_death()
 	await test_bottom_loop()
+	test_warm_up_at_room_load()
 	test_screen_router()
 	test_sources()
 	await get_tree().process_frame  # a queued settings write would land here
@@ -71,6 +76,9 @@ func run() -> void:
 
 func _on_room_entered(_id: StringName) -> void:
 	_set_room_lurkers_active(false)
+	# room_entered is emitted inside _swap_room(), after Fx.warm_up(): its items are still there.
+	_warm_counts.append(_room().get_children().filter(func(n: Node) -> bool:
+		return n is CanvasItem and is_equal_approx(n.modulate.a, Fx.WARM_ALPHA)).size())
 
 
 func _on_spawned(player: Player) -> void:
@@ -222,6 +230,31 @@ func _gutter_row() -> int:
 	return -1
 
 
+## Code review 1.16: World makes the pogo → shake wire on every spawn (_swap_room), and no test
+## failed without it (smoke_a11y wires its own harness). The signal a real pogo emits, on the
+## player World respawned, must reach the rig.
+func test_pogo_wire() -> void:
+	var p := _player()
+	_camera().snap()
+	await frames(1)
+	check(_camera().offset == Vector2.ZERO, "setup: the camera is still before the hit (offset %s)" % _camera().offset)
+	p.pogo_hit.emit()
+	var moved := false
+	for i in 3:
+		await frames(1)
+		moved = moved or _camera().offset != Vector2.ZERO
+	check(moved, "World wires pogo_hit to the camera's kick on the respawned player: the hit shakes the view")
+	_camera().snap()
+
+
+## Code review 1.16, AC6: World._swap_room() calls Fx.warm_up() after the room enters the tree, so
+## the three items are under the room when room_entered fires (death, respawn and the bottom loop
+## above each load a room).
+func test_warm_up_at_room_load() -> void:
+	check(not _warm_counts.is_empty() and _warm_counts.all(func(n: int) -> bool: return n == 3),
+			"every room load warms up: three items at Fx.WARM_ALPHA under the room at room_entered (got %s over %d loads)" % [_warm_counts, _warm_counts.size()])
+
+
 ## AC2: a lurker inside the viewport but behind a gutter never notices; a control lurker in the
 ## play area at the same distance does (so this test can fail).
 func test_behind_the_gutter() -> void:
@@ -248,9 +281,26 @@ func test_behind_the_gutter() -> void:
 	var canvas_x := a.get_global_transform_with_canvas().origin
 	check(get_viewport().get_visible_rect().has_point(canvas_x) and canvas_x.x < 60.0, "lurker A is inside the viewport, behind the left gutter (screen %s)" % canvas_x)
 	check(not _world.play_rect().has_point(a.global_position), "...and outside play_rect()")
-	await seconds(0.3)
+	# Lurker B's eyes are sampled every tick of its telegraph (code review 1.16: the rate the game
+	# runs, measured on a real lurker and not read back from Fx.EFFECTS).
+	var eyes := b.get_node("Eyes") as Sprite2D
+	var alphas: Array[float] = []
+	for i in int(ceil(0.3 * Engine.physics_ticks_per_second)):
+		await frames(1)
+		if b.state == Lurker.State.TELEGRAPH:
+			alphas.append(eyes.modulate.a)
 	check(b.state == Lurker.State.TELEGRAPH, "control: lurker B in the play area, 48 px away, telegraphs (state %d)" % b.state)
 	check(a.state == Lurker.State.IDLE, "lurker A behind the gutter, 48 px away, never notices (state %d)" % a.state)
+	for i in 120:
+		if b.state != Lurker.State.TELEGRAPH:
+			break  # it hunts from here: removed below, 48 px from the player
+		await frames(1)
+		alphas.append(eyes.modulate.a)
+	# Peak to trough is half a cycle. Each turn is read within half a tick, so a telegraph of under a
+	# second tells about 2.2 Hz from 2.0; the 10 s sample in test_fx is the fine check.
+	var turns := Rate.turns(alphas)
+	var band := Rate.hz_band(turns, Engine.physics_ticks_per_second, 2)
+	check(turns.size() >= 3 and band.x <= Spec.PULSE_HZ_MAX, "a real lurker's eyes pulse at no more than %s Hz through its telegraph (Spec.PULSE_HZ_MAX; at least %.2f Hz from %d turns in %d ticks)" % [Spec.PULSE_HZ_MAX, band.x, turns.size(), alphas.size()])
 	_room().remove_child(a)
 	_room().remove_child(b)
 	a.queue_free()

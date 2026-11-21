@@ -83,7 +83,7 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/test_room_sw
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_deferred_owners.gd  # every deferred-work.md item has an owner
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_export_presets.gd  # the four export presets and their filters, through the exporter's own matcher over the real files
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_dev_args.gd         # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, mode 2's light marks, --glow/--perf, the perf run's path, stats and summary
-godot --headless --path game res://tests/runner.tscn -- res://tests/test_fx.gd               # Fx's shared materials, built once; effects free themselves
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_fx.gd               # Fx's shared materials, built once; effects free themselves; the accessibility gate, the EFFECTS table and the sampled rates
 godot --headless --path game res://tests/runner.tscn -- res://tests/test_light_budget.gd     # BudgetLight: the rule, apply() on nodes, the sprite fallback, the scene audit
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_rooms.gd           # every room file: validation, cross-file links, sweeps, lurker guarantees
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd             # the descent bot in every spine room
@@ -91,6 +91,7 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_moves.
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_world.gd           # World: tree, framing, state wiring, respawn without a reload, R16 loop
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_room_swap.gd       # room swaps on the test rooms in tests/rooms/swap/
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd       # DevTools in World: inert without args, the real command line, the SMOKE boot marker, each arg and bad arg, the overlay modes, light count, Clock rows, no function key
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_a11y.gd            # the accessibility gate on m1_shaft: shake off, the blink and its steady variant, the look-ahead on a pogo
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_perf.gd            # the perf kit in World: --perf=3 in perf_worst holds the chain and the budget every tick, the summary; --glow, bad --perf, the view rect, m1_shaft unchanged
 ```
 
@@ -136,7 +137,7 @@ A text scan of every `.gd` under `game/scripts/` (comments dropped, string conte
 | `raw_light` | `PointLight2D.new(` or `extends PointLight2D` (AR46, Story 1.12: every 2D light is a `BudgetLight`, or the ≤ 6 budget can't see it); a `PointLight2D` type annotation is fine. `.tscn` files are covered by `test_light_budget`'s scene audit instead | `core/budget_light.gd` |
 | `tests_ref` | any `res://tests/` path (release exports exclude `tests/*`, Spec included) | — |
 | `state_write` | outside `rules/`: `Game.settings/slot/dive/tuning.<field>…` assigned (any assignment operator, nested fields and indexes), a container mutator on one (`.append`, `.erase`, `.clear`, …), reflective `.set(`, or replacing a `Game.*` instance | — |
-| `a11y_gate` | the accessibility keys anywhere: `reduce_flashing` / `reduced_motion` as an identifier (not after `Fx.`), `settings.shake`, or `"reduce_flashing"` / `"reduced_motion"` / `"shake"` as a string (AR57, Story 1.16: one gate; everything asks `Fx.reduce_flashing()` / `shake_on()` / `reduced_motion()`). `dev/` is skipped (DevTools sets keys generically through `SCHEMA`) | `core/fx.gd`, `rules/settings.gd` |
+| `a11y_gate` | the accessibility keys anywhere: `reduce_flashing` / `reduced_motion` as an identifier (not after `Fx.`), `settings.shake` on any name ending in `settings` (so `_settings.shake` too), or `"reduce_flashing"` / `"reduced_motion"` / `"shake"` as a string (AR57, Story 1.16: one gate; everything asks `Fx.reduce_flashing()` / `shake_on()` / `reduced_motion()`). `dev/` is skipped (DevTools sets keys generically through `SCHEMA`) | `core/fx.gd`, `rules/settings.gd` |
 
 **Fix the code, never the lint.** A rule that hits correct code is a broken rule: fix its pattern in `RULES` and add a sample that shows why. Every rule has sample lines in `SAMPLES` (fires; quiet on an allowed path, in a comment and, for identifier rules, in a string). It can't see aliasing through a local, a write through a call's result, a singleton or method reached by name, or script inside `.tscn` files; review covers those.
 

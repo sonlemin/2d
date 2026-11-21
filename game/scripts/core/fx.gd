@@ -2,8 +2,9 @@ class_name Fx
 ## One-shot hit effects built in code (no art needed). Unshaded so they read in the dark.
 ## Also the accessibility gate (AR57, Story 1.16 D1): the only script that reads reduce flashing,
 ## screen shake and reduced motion (lint a11y_gate). Camera shake, the invulnerability blink and the
-## UI kit's easing ask the readers below; there are no per-effect toggles. EFFECTS declares every
-## effect's flash rate, and test_fx holds it to the cap (NFR8, UX-DR125).
+## UI kit's easing ask the readers below; there are no per-effect toggles. EFFECTS declares each
+## effect with its rate: test_fx holds the periodic ones to the caps and smoke_bot holds the pogo-hit
+## one-shots apart (NFR8, UX-DR125).
 
 const SPARK := Color(1.0, 0.82, 0.48)   ## chain-light amber
 const SPARK_COUNT := 14  ## particles per pogo spark burst; presentation (M1 value, was pop()'s default).
@@ -12,30 +13,47 @@ const INVULN_LIT := 0.625  ## fraction of each blink period drawn lit (M1: 0.25 
 const EYE_PULSE_HZ := 2.0  ## Hz of the lurker's telegraph eye pulse, a smooth sine (GDD Predators "pulse at 2 Hz"; the pulse cap is 2 Hz, so nothing may raise it; was lurker.EYE_PULSE_HZ).
 const STEADY_ALPHA := 0.5  ## alpha a blink holds instead under reduce flashing (UX-DR126 "steady transparency"): still clearly visible.
 const POPUP_RISE := 14.0  ## px a popup rises over its life; presentation (M1 value, was inline).
+const SHIVER_RATE := 40.0  ## rad/s of the lurker's telegraph body shiver, about 6.4 Hz at ±0.5 px; presentation (M1 value, was inline in lurker.gd).
 ## Warm-up draws at this alpha: the lowest the canvas renderer still draws. Probed on 4.7.2:
 ## RendererCanvasCull::_cull_canvas_item skips an item whose combined modulate alpha is < 0.007, so
 ## 1/255 would be culled and warm up nothing (Story 1.16 D10).
 const WARM_ALPHA := 0.01
+## Process frames the warm-up items live. Counted in frames, not seconds: a slow frame right after a
+## load would end a timer before anything was drawn (code review 1.16). Three frame starts leave two
+## drawn frames, whether the room loads in _ready, on a physics tick or in _process.
+const WARM_FRAMES := 3
 
-enum Kind { ONCE, PULSE, BLINK }
+enum Kind { ONCE, PULSE, BLINK, MOTION }
 
 ## Everything in the game that flashes, blinks, pulses, shakes or eases (NFR8, UX-DR125, Story 1.16
-## D3). A new effect adds its row here, with its reduced variant in words, and draws through this
-## gate. hz is 0 for ONCE: a one-shot's rate is its trigger's (one per pogo hit, one per bank).
-## `fn` names the Fx function that draws it ("" when it lives elsewhere); test_fx checks that every
-## public effect function on Fx has a row.
+## D3). A new effect adds its row here and draws through this gate.
+## - hz is 0 for ONCE: a one-shot's rate is its trigger's. The cooldown alone does not hold the cap
+##   (0.22 s apart is 4.5 per second), so the pogo-hit ones (sparks, chain popup, shake, light kick,
+##   and the bank popup, at most one per chain) are held by smoke_bot, which measures the smallest
+##   real-time gap between two pogo hits in every spine room against Spec.POGO_GAP_MIN.
+## - MOTION moves or scales a sprite without changing its brightness: declared here, not rate-capped
+##   (the cap is on flashes). Its hz is the rate it runs at, for the record.
+## - `reduced` names the reduced variant in words; a row without one says why in `why`.
+## - `fn` names the Fx function that draws it ("" when it lives elsewhere). test_fx checks that every
+##   public effect function on Fx has a row; an effect drawn elsewhere is declared by hand.
 const EFFECTS := {
 	&"pogo_sparks": {kind = Kind.ONCE, hz = 0.0, fn = "pop", reduced = "reduce flashing: half the count, max size 2 -> 1 px (the 1 px floor, D5)"},
 	&"popup": {kind = Kind.ONCE, hz = 0.0, fn = "popup", reduced = "reduced motion: fades in place, no rise"},
 	&"chain_popup": {kind = Kind.ONCE, hz = 0.0, fn = "chain_popup", reduced = "reduced motion: as popup, which draws it"},
 	&"camera_shake": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "shake off: none (CameraRig asks shake_on())"},
-	# No reduced variant: one 18 px swell eased back per pogo hit, and pogo hits are at least the
-	# 0.22 s attack cooldown apart with a bounce between them, so it never nears the cap.
-	&"light_kick": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = ""},
+	&"light_kick": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
+			why = "one 18 px swell of the player's light, eased back, per pogo hit (player.gd): a change of radius, never an on/off flash"},
+	&"swing_arcs": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
+			why = "the slash and pogo arcs (player.gd) show for the 0.12 s or 0.22 s a swing can hit, once per Attack press: the player's own action at their own pace, not a flash the game plays at them (sonlm's laptop look, 2026-11-21: reads as a normal attack)"},
 	&"invuln_blink": {kind = Kind.BLINK, hz = INVULN_BLINK_HZ, fn = "blink_alpha", reduced = "reduce flashing: steady transparency (STEADY_ALPHA)"},
-	# No reduced variant: the telegraph must read by motion, not colour alone (UX-DR129), and 2 Hz is
-	# within the pulse cap.
-	&"lurker_eye_pulse": {kind = Kind.PULSE, hz = EYE_PULSE_HZ, fn = "pulse", reduced = ""},
+	&"lurker_eye_pulse": {kind = Kind.PULSE, hz = EYE_PULSE_HZ, fn = "pulse", reduced = "",
+			why = "the telegraph must read by motion, not colour alone (UX-DR129), and 2 Hz is within the pulse cap"},
+	&"lurker_eye_open": {kind = Kind.MOTION, hz = 0.0, fn = "", reduced = "",
+			why = "the eyes open from a slit over 0.2 s, once per telegraph (lurker.gd): part of the warning (UX-DR129)"},
+	&"lurker_shiver": {kind = Kind.MOTION, hz = SHIVER_RATE / TAU, fn = "", reduced = "",
+			why = "a ±0.5 px body shiver while a lurker telegraphs (lurker.gd): part of the warning, which must read by motion (UX-DR129); reduced motion covers UI easing and popups (UX-DR127)"},
+	&"pogo_squash": {kind = Kind.MOTION, hz = 0.0, fn = "", reduced = "",
+			why = "the sprite stretches to (0.75, 1.3) on a pogo hit and eases back (player.gd): hit feedback on the player's own action; reduced motion covers UI easing and popups (UX-DR127)"},
 }
 
 static var _unshaded_material: CanvasItemMaterial
@@ -104,7 +122,7 @@ static func pop(parent: Node, pos: Vector2, amount := SPARK_COUNT) -> void:
 	p.material = unshaded()
 	p.one_shot = true
 	p.explosiveness = 1.0
-	p.amount = maxi(int(amount * 0.5), 1) if reduced else amount
+	p.amount = maxi(int(amount * 0.5) if reduced else amount, 1)  # CPUParticles2D rejects an amount below 1
 	p.lifetime = 0.35
 	p.direction = Vector2.UP
 	p.spread = 180.0
@@ -144,22 +162,23 @@ static func popup(parent: Node, pos: Vector2, text: String, color: Color, size :
 	tw.chain().tween_callback(l.queue_free)
 
 
-## AR46, Story 1.16 D10: GL Compatibility compiles a shader variant on an item's first draw, which the
-## 1.15 web runs saw as a first-second hitch (docs/perf.md). So each cached material is drawn once
-## at room load: sparks and a label with unshaded(), a light sprite with additive(). Children of the
-## room (AR23), at `pos` (inside the first view: off-screen items are culled), at WARM_ALPHA (no one
-## sees it, and the renderer still draws it), and each frees itself within a few frames.
+## AR46, Story 1.16 D10: GL Compatibility compiles a shader variant on an item's first draw. So each
+## cached material is drawn once at room load: sparks and a label with unshaded(), a light sprite
+## with additive(). Children of the room (AR23), at `pos` (inside the first view: off-screen items
+## are culled), at WARM_ALPHA (no one sees it, and the renderer still draws it), freed after
+## WARM_FRAMES. The room must be in the tree.
+## Measured on the laptop (docs/perf.md): no change to the web first-frame stall, which is the load
+## itself. Kept for the first use of a material later in a session; the stall is Story 7.13's.
 static func warm_up(room: Node, pos: Vector2) -> void:
+	assert(room.is_inside_tree(), "Fx.warm_up(): the room must be in the tree, or nothing is drawn")
 	var p := CPUParticles2D.new()
 	p.material = unshaded()
-	p.one_shot = true
 	p.amount = 1
-	p.lifetime = 0.05
+	p.lifetime = 1.0  # outlives WARM_FRAMES: it is freed with the others, never by finishing first
 	p.modulate.a = WARM_ALPHA
 	p.position = pos
 	room.add_child(p)
 	p.emitting = true
-	p.finished.connect(p.queue_free)
 	var l := Label.new()
 	l.material = unshaded()
 	l.text = "x"
@@ -172,8 +191,16 @@ static func warm_up(room: Node, pos: Vector2) -> void:
 	s.modulate.a = WARM_ALPHA
 	s.position = pos
 	room.add_child(s)
-	# Two frames: one to be drawn, one to be sure the draw happened before the free.
-	var tw := room.create_tween()
-	tw.tween_interval(0.05)
-	tw.tween_callback(l.queue_free)
-	tw.tween_callback(s.queue_free)
+	_free_after_frames([p, l, s], room.get_tree(), WARM_FRAMES)
+
+
+## Frees `items` once `frames` process frames have started. process_frame fires before that frame's
+## _process and draw, and under --headless too (RenderingServer.frame_post_draw does not), so the
+## items are drawn on every frame before the last one counted. Items freed with their room first are
+## skipped.
+static func _free_after_frames(items: Array[Node], tree: SceneTree, frames: int) -> void:
+	for i in frames:
+		await tree.process_frame
+	for item in items:
+		if is_instance_valid(item):
+			item.queue_free()

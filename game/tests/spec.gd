@@ -15,5 +15,6 @@ const NARROW_MIN := 6  ## GDD Level Types: Narrow stretch "6–10 tiles wide; no
 const NARROW_MAX := 10  ## GDD Level Types: Narrow stretch "6–10 tiles wide": the widest open run in a cling= stretch row, so both walls stay in reach.
 const LIGHTS_ON_SCREEN_MAX := 6  ## GDD Open Questions: "The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs" (architecture AR46), confirmed at the CP1 gate (1.15); a ceiling: never loosen it without the GDD.
 const FLASH_HZ_MAX := 3.0  ## GDD Accessibility: "Flash safety: no more than 3 flashes per second anywhere" (NFR8, UX-DR125); a ceiling for every effect.
+const POGO_GAP_MIN := 1.0 / FLASH_HZ_MAX  ## GDD Accessibility: "Flash safety: no more than 3 flashes per second anywhere" (NFR8): s of real time between two pogo hits, since each hit plays its sparks, light swell, popup and shake once; a floor on the bot's line in every spine room.
 const PULSE_HZ_MAX := 2.0  ## GDD Predators: Lurker: eyes "pulse at 2 Hz", the gutter frame "pulsing … (≤ 2 Hz)" (UX-DR125: pulses ≤ 2 Hz).
 const BLINK_HZ := 2.5  ## GDD Combat damage table: crawler contact "0.6 s invulnerable (blinking at 2.5 Hz)" (UX-DR125: blinks 2.5 Hz).

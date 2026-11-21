@@ -23,7 +23,7 @@ Each pass wakes the lurkers as their screen comes into reach. Hunting lurkers (9
 
 **The light budget** (`BudgetLight`, `World`'s `LightBudget` node, every physics tick): at most 6 lights keep their `PointLight2D` in the whole 480 × 270 view; lurker glows beyond that show an additive sprite glow instead. The player's light and flares are never demoted. Overlay 4 shows `lights n/6, sprites m`.
 
-**Known first-second hitch:** the first demotion is the additive material's first use, which can compile a shader. A worst frame within the first second may be that compile, not steady-state cost. Since Story 1.16, `Fx.warm_up()` draws the shared materials (sparks, a label, an additive light sprite) once at every room load, at an alpha no one sees, to pay that compile up front; whether it removes the 1.15 hitch (562 ms at 0.0 s, Firefox on the Intel iGPU) is the 1.16 laptop run in the table below. Always record `worst … at … s` with the number.
+**Known first-second hitch:** the first demotion is the additive material's first use, which can compile a shader. A worst frame within the first second may be that compile, not steady-state cost. Since Story 1.16, `Fx.warm_up()` draws the shared materials (sparks, a label, an additive light sprite) once at every room load, at an alpha no one sees, so a material's first draw is paid at the load. It did not remove the 1.15 hitch: the 1.16 laptop run below measured 548 ms against 562 ms, one run each. That run is provisional: the code review found the warm-up items were freed on a 0.05 s timer and could go undrawn after a slow frame, so it can't tell a warm-up that does nothing from one that never drew. The patched warm-up counts frames (two drawn frames, probed on 4.7.2); a re-run on the patched build is pending. The stall at 0.0 s is the load itself and is Story 7.13's (ledgered). Always record `worst … at … s` with the number.
 
 ## How to run
 
@@ -97,7 +97,7 @@ No numbers are recorded by the agent: each row is copied from a summary line son
 
 ## Results (Story 1.16: warm-up)
 
-Copied from the summary lines sonlm ran and pasted (2026-11-21), verbatim in the 1.16 story's Dev Agent Record.
+Copied from the summary lines sonlm ran and pasted (2026-11-21). The Firefox line is verbatim in the 1.16 story's Dev Agent Record; the record shortens the Chrome line with "…", so that row's lights, sprites, breaks and deaths are here only (the row is void either way). Both rows predate the code review's warm-up patch (see the hitch paragraph above).
 
 | Date | Build / commit | Machine and adapter | Window and scale | Refresh | Glow | Avg FPS | Min FPS | Worst ms (at s) | Over 20 ms | Lights / sprites / over max | Breaks / deaths | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

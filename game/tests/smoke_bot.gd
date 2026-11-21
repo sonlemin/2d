@@ -4,6 +4,10 @@ extends Node
 ## reach a chain of Spec.BOT_MIN_CHAIN (GDD Level Progression: "an automated bot must reach a chain
 ## of ≥ 5 in every spine shaft"), never cross an exit with a live chain (the World backstop would
 ## fire on its line), and reach the down exit alive. This checks the layout, not survival or feel.
+## Code review 1.16: it also times its pogo hits. Each hit plays its sparks, light swell, popup and
+## shake once, so two hits closer than Spec.POGO_GAP_MIN would pass the flash cap (NFR8). The
+## attack cooldown alone allows about 0.29 s; the bounce between targets is what keeps hits apart,
+## and that is the layout's doing. This is the bot's line, not every line a player can find.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_bot.gd
 
 const RoomHarness := preload("res://tests/room_harness.gd")
@@ -100,6 +104,9 @@ func _play(rec: Dictionary) -> void:
 	var chain_at_cross := -1
 	var ending := "timeout"
 	var frame := 0
+	# Physics ticks stay at 60 per real second under a hitstop (Story 1.8 D3), so ticks are real time.
+	var hit_ticks: Array[int] = []
+	_player.pogo_hit.connect(func() -> void: hit_ticks.append(Engine.get_physics_frames()))
 	while frame < max_frames:
 		var pos := _player.global_position
 		if _player.is_dead:
@@ -173,6 +180,11 @@ func _play(rec: Dictionary) -> void:
 		Input.action_release(a)
 	print("     bot %s: frame %d, best %d, %s, y=%d" % [id, frame, best, ending if crossed == "" else "exit " + crossed, int(_player.global_position.y / Room.TILE)])
 	check(best >= Spec.BOT_MIN_CHAIN, "%s: the bot chains %d+ pogos with plain movement, no dash (Spec.BOT_MIN_CHAIN; best %d)" % [id, Spec.BOT_MIN_CHAIN, best])
+	var gap_ticks := max_frames
+	for i in range(1, hit_ticks.size()):
+		gap_ticks = mini(gap_ticks, hit_ticks[i] - hit_ticks[i - 1])
+	var gap: float = gap_ticks / float(Engine.physics_ticks_per_second)
+	check(hit_ticks.size() >= 2 and gap >= Spec.POGO_GAP_MIN, "%s: on the bot's line two pogo hits are never under %.3f s of real time apart (Spec.POGO_GAP_MIN, NFR8; closest %.3f s over %d hits)" % [id, Spec.POGO_GAP_MIN, gap, hit_ticks.size()])
 	check(crossed == "" or chain_at_cross == 0, "%s: the chain is 0 when the bot crosses an exit, so the backstop never fires on its line (chain %d)" % [id, maxi(chain_at_cross, 0)])
 	if not down.is_empty():
 		check(crossed == "down", "%s: the bot reaches the down exit (ended: %s, row %d)" % [id, ending, int(_player.global_position.y / Room.TILE)])

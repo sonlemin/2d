@@ -395,7 +395,7 @@ user://
 - `Engine.time_scale` = product of active requests × assist. Death and `_exit_tree` clear all requests.
 - Clock requests count down **only while the tree is not paused**: pause freezes slow-mo and hitstop where they are. (Supersedes M1's `process_always` hitstop timer.)
 - Pause is `SceneTree.paused`, never the time scale. UI, HUD and the death card run with `PROCESS_MODE_ALWAYS`; the Clock's timers pause (above).
-- Real-time visuals keep using `delta / Engine.time_scale` in `_process` (M1 rule).
+- Real-time visuals keep using `delta / Engine.time_scale` in `_process` (M1 rule). Story 1.16 found its limit, probed on 4.7.2: a frame's delta is scaled before a Clock request made in that frame, so the formula reads about 0.33 s on the frame a hitstop starts. A visual that starts on a hit tick must not use it; on the physics tick, real time is one tick (1 / 60 s), as `CameraRig` counts it.
 
 ### Input
 
@@ -656,7 +656,7 @@ func _ready() -> void:
 
 These come from earlier decisions; listed here so every agent sees them together.
 
-- **Time:** only `Game.clock` writes `Engine.time_scale`; real-time visuals use `delta / Engine.time_scale`; UI runs with `PROCESS_MODE_ALWAYS`.
+- **Time:** only `Game.clock` writes `Engine.time_scale`; real-time visuals use `delta / Engine.time_scale` (never for a visual that starts on a hit tick: see Time and pause); UI runs with `PROCESS_MODE_ALWAYS`.
 - **Accessibility:** all flashing, shaking, pulsing and easing read `Settings.reduce_flashing`, `shake`, `reduced_motion` through `Fx`, camera shake, the invulnerability blink and UI easing. No per-effect toggles. Every effect respects ≤ 3 flashes/s.
 - **Strings:** all player-facing text through `tr()`; copy names shapes, never colours (UX O16).
 - **Play rect:** "on screen" always means `World.play_rect()`, never the viewport (the light budget's cost rule counts the whole view, `World.light_rect()`; see Lighting).

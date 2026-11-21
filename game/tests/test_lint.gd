@@ -105,7 +105,7 @@ const RULES: Array[Dictionary] = [
 	# no effect grows its own toggle. `shake` alone is too common a word (`_shake`, `kick()`), so it
 	# is matched only as a settings field or a key string. dev/ is skipped: DevTools sets keys
 	# generically through SCHEMA and never names one.
-	{id = &"a11y_gate", bare = [r"(?<!Fx\.)\b(reduce_flashing|reduced_motion)\b", r"\bsettings\s*\.\s*shake\b"],
+	{id = &"a11y_gate", bare = [r"(?<!Fx\.)\b(reduce_flashing|reduced_motion)\b", r"settings\s*\.\s*shake\b"],
 		code = [r"[\x22\x27](reduce_flashing|reduced_motion|shake)[\x22\x27]"],
 		only = [], skip = ["dev/"], allow = ["core/fx.gd", "rules/settings.gd"]},
 ]
@@ -432,6 +432,9 @@ const SAMPLES: Array = [
 	[&"state_write", "rules/slot_state.gd", "\tGame.slot.best_chain = 3", false],
 	[&"a11y_gate", "actors/player.gd", "\tif Game.settings.reduce_flashing:", true],
 	[&"a11y_gate", "world/camera_rig.gd", "\tif not Game.settings.shake:", true],
+	[&"a11y_gate", "world/camera_rig.gd", "\tif not _settings.shake:", true],
+	[&"a11y_gate", "ui/gutters.gd", "\tvar on: bool = my_settings . shake", true],
+	[&"a11y_gate", "world/camera_rig.gd", "\t_settings.shake_time = 0.2", false],
 	[&"a11y_gate", "ui/gutters.gd", "\tif Game.settings.get(&\"reduced_motion\"):", true],
 	[&"a11y_gate", "ui/gutters.gd", "\tGame.settings.changed.connect(func(k): if k == &\"shake\": _redraw())", true],
 	[&"a11y_gate", "actors/lurker.gd", "\tvar reduced_motion := false", true],
