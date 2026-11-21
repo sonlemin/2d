@@ -146,13 +146,15 @@ func _blink_samples(seconds: float) -> Dictionary:
 	var lit: Array[int] = []
 	var dark: Array[int] = []
 	var values := {}
-	var prev := Fx.blink_alpha(seconds)
+	# Sampled half a tick off the tick boundaries, where the blink's edges fall (0.25 s and 0.4 s are
+	# whole ticks), so float rounding can't move an edge to the next tick.
+	var prev := Fx.blink_alpha(seconds - 0.5 * TICK)
 	var run := 1
 	var edges := 0
 	var i := 0
 	while true:
 		i += 1
-		var r := seconds - i * TICK
+		var r := seconds - (i + 0.5) * TICK
 		if r <= 0.0:
 			break  # the end of invulnerability (alpha back to 1.0) is not a flash
 		var a := Fx.blink_alpha(r)
