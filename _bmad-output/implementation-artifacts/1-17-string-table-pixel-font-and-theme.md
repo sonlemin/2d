@@ -4,7 +4,7 @@ baseline_commit: 08eb89917617f047e7593856c3d1dcd0d0b8c592
 
 # Story 1.17: String table, pixel font and theme
 
-Status: in-progress
+Status: review
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -193,7 +193,7 @@ so that everything I read is sharp at every integer scale.
   - [x] Run `tools/export.sh` once to `== BUILD OK`. `ls` each folder for the three items.
   - [x] Docs (D14).
   - [x] Ledger entries (D15).
-- [ ] **Task 10: Laptop look (human gate, AC: 10).** HALT for sonlm. Look at the desktop build (×3 window) and the debug web build in `m1_shaft`:
+- [x] **Task 10: Laptop look (human gate, AC: 10).** HALT for sonlm. Look at the desktop build (×3 window) and the debug web build in `m1_shaft`:
   - pogo a chain past 5 and past 10: the chain popup stays 8 px, crisp, with a thin 1 px dark outline;
   - bank it with a landing: the "+N banked" popup;
   - die with embers held: the "-N lost" popup;
@@ -430,7 +430,8 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-21/22.
   - The size step still counts only top-level `web/` files. The three new top-level text files are in, `LICENSES/` (a subfolder, a few KB) is not, as AC8 states.
 - **Deferred (D15), owners set:** the placeholder outline colour → **Story 1.18**; the bank popup stays 8 px → **Story 1.26**; the window title isn't a string key → **Story 1.33**. The 7.13 first-frame entry lost its warm-up-font clause (owner stays 7.13).
 - **Clean build for the laptop look:** `builds/20261122-52ae0cb` (from commit `52ae0cb`): `== BUILD OK …, web download 11.0 MB (gzip; raw 40.8 MB), licences in 4 folders, PCK files windows 84 / linux 84 / web 84 / web_debug 91, 125 s`, web smoke 7 passed.
-- **Status stays in-progress:** Task 10 is sonlm's laptop look (human gate). Tests green; needs a look on the laptop.
+- **Task 10 done:** sonlm's laptop look passed all four items (below). Status → review.
+- **Laptop look, desktop build (sonlm, 2026-11-22, Windows ×3, `20261122-52ae0cb`):** item 1 pass: the chain popup "is still the same" size past 9 and past 10; item 2 ("+N banked") and item 3 ("-N lost") "seem fine", and sonlm noted they look as in the previous story (expected: only their font and text source changed). Item 4 pass (web debug build, `?room=perf_worst&perf`): the overlays draw in the pixel font and the perf summary rows fit. On the web debug build, `?chain=8` looked like it failed on the first try: the arg was applied (`[room] dev: chain 8`, re-probed headless), but it is paid on a life's first take-off, so a hop that lands first banks it (1.11 D6, as designed).
 
 ### File List
 
@@ -470,3 +471,4 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-21/22.
 ## Change Log
 
 - 2026-11-22: Tasks 1–9 implemented (font, theme, text style, popups, string table, `test_strings`, `test_theme`, lint `raw_text`, export content and licences steps, docs, ledger). 25 tests green, 1665 `ok`; build OK with the licences in all four folders. Task 10 (laptop look) pending.
+- 2026-11-22: Task 10 laptop look passed (sonlm: desktop ×3 items 1–3, web debug item 4). Status → review.
