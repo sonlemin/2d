@@ -425,6 +425,7 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-21/22.
   - `test_fx` had no assertion on the removed overrides. It gained one check: the warm-up label shares a real chain popup's `LabelSettings` (AC4).
   - The size step still counts only top-level `web/` files. The three new top-level text files are in, `LICENSES/` (a subfolder, a few KB) is not, as AC8 states.
 - **Deferred (D15), owners set:** the placeholder outline colour → **Story 1.18**; the bank popup stays 8 px → **Story 1.26**; the window title isn't a string key → **Story 1.33**. The 7.13 first-frame entry lost its warm-up-font clause (owner stays 7.13).
+- **Clean build for the laptop look:** `builds/20261122-52ae0cb` (from commit `52ae0cb`): `== BUILD OK …, web download 11.0 MB (gzip; raw 40.8 MB), licences in 4 folders, PCK files windows 84 / linux 84 / web 84 / web_debug 91, 125 s`, web smoke 7 passed.
 - **Status stays in-progress:** Task 10 is sonlm's laptop look (human gate). Tests green; needs a look on the laptop.
 
 ### File List
