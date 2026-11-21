@@ -411,6 +411,10 @@ Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-21/22.
   - "roguelike" in an `en` → `FAIL copy rules: row 3: POPUP_LOST says 'roguelike'` (a first try with a comma tripped the cell-count check instead, also a FAIL);
   - `"+%d banked"` back as a literal → `FAIL lint actors/player.gd:256 raw_text`;
   - `export.sh` with `web` left out of the licence copy (a full run) → `== BUILD FAILED: licences: web/OFL.txt is missing or empty`.
+  - `test_strings` inside `export.sh` (after the commit, on `592f068`):
+    - `tr("POPUP_BANKD")` failed the content step earlier, at `smoke_rooms`: `tr()` returns the bare key, which has no `%d`, so `% amount` printed `ERROR: String formatting error` → `== BUILD FAILED: content: error lines in its log`.
+    - A dead key (`MENU_RESUME,Resume` appended to the CSV) survives `export.sh`'s own re-import and reaches `test_strings` → `FAIL code scan: … MENU_RESUME is referenced nowhere` → `== BUILD FAILED: content: string keys: error lines in its log (exit 1)`, before any export.
+    - Restored with `git checkout` and a re-import (`.translation` MD5 back to `6630d049…`, clean tree). The `builds/20261122-592f068-dirty` folder is this deliberately failed run.
 - **Builds:** `20261121-b8f93a3-dirty` (before the commit): `== BUILD OK …, web download 11.0 MB (gzip; raw 40.8 MB), licences in 4 folders, PCK files windows 84 / linux 84 / web 84 / web_debug 91, 120 s`; `OFL.txt`, `LICENSES/` (4 files) and `GODOT_LICENSES.txt` listed in each of the four folders. The clean build after the commit is recorded in the Completion Notes.
 
 ### Completion Notes List

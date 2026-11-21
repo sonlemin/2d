@@ -126,4 +126,4 @@ _Critical rules and patterns for implementing game code in this project. Focus o
 - Keep it lean: only rules agents would otherwise get wrong.
 - Update it when the architecture or the stack changes; remove rules that become obvious or obsolete.
 
-Last Updated: 2026-11-21 (Story 1.16 code review: EFFECTS kinds and `why`, the pogo gap, the real-time caveat)
+Last Updated: 2026-11-22 (Story 1.17: the text pipeline, `TextStyle` / `ThemeBuilder`, the string scan, lint `raw_text`, the licences step)

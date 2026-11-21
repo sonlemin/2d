@@ -154,7 +154,7 @@ rsync -a <server>:project/pixel_art_game/builds/<version>/linux/ ./uc-<version>/
 
 - Upload `web/` as a zip with `index.html` at its top level, as an HTML game; embed at **960 × 540** (×2).
 - Leave **SharedArrayBuffer support** off: a non-threaded build doesn't need it, and the option changes the game's origin, which loses saves.
-- itch.io's limits: 1,000 files, 500 MB extracted, 200 MB per file, 240-character paths. A build has 9 web files.
+- itch.io's limits: 1,000 files, 500 MB extracted, 200 MB per file, 240-character paths. A build has 15 web files: 9 from the export, plus `OFL.txt`, `GODOT_LICENSES.txt` and the 4 files under `LICENSES/` (Story 1.17).
 - Click-to-play is an itch.io frame option, on by default; the game's own gate is Story 1.33.
 
 ## Engine upgrade checklist (AR7)
