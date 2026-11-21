@@ -48,9 +48,9 @@ so that the kit is built on foundations I trust.
 
 Tasks marked **(sonlm)** are human gates: the dev agent HALTs, asks and waits. It never fills them in, assumes them or marks them done itself (epics "Human gates").
 
-- [ ] **Task 1: Automated gate (AC: 1)** (agent)
-  - [ ] 1.1 Start from a clean tree on `feat/m2-e1`. Run `cd game && ./run_tests.sh` and record the test count, the `ok` total and `== ALL GREEN`.
-  - [ ] 1.2 Prove that `test_chain_state` is unchanged from M1:
+- [x] **Task 1: Automated gate (AC: 1)** (agent)
+  - [x] 1.1 Start from a clean tree on `feat/m2-e1`. Run `cd game && ./run_tests.sh` and record the test count, the `ok` total and `== ALL GREEN`.
+  - [x] 1.2 Prove that `test_chain_state` is unchanged from M1:
     ```bash
     git diff feat/m1-prototype:game/tests/run_tests.gd HEAD:game/tests/test_chain_state.gd
     ```
@@ -62,15 +62,15 @@ Tasks marked **(sonlm)** are human gates: the dev agent HALTs, asks and waits. I
     - the two `quit()` lines removed.
 
     Paste the diff stat and that list into the record. If any `check(` line differs, stop: the gate fails.
-  - [ ] 1.3 From the same run, record `test_lint`'s `PASS` and `smoke_bot`'s best chain in `m1_shaft`. It was 8 at 1.10; 5 or more passes.
-  - [ ] 1.4 Run `tools/export.sh` on the clean tree. Record the version (`<yyyymmdd>-<sha7>`, never `-dirty`), `BUILD OK`, the web gzip size and the smoke result (`7 passed`).
-- [ ] **Task 2: Play kit and record (AC: 6)** (agent)
-  - [ ] 2.1 Create `implementation-artifacts/playtests/` and the record from **Record template** below. Fill in:
+  - [x] 1.3 From the same run, record `test_lint`'s `PASS` and `smoke_bot`'s best chain in `m1_shaft`. It was 8 at 1.10; 5 or more passes.
+  - [x] 1.4 Run `tools/export.sh` on the clean tree. Record the version (`<yyyymmdd>-<sha7>`, never `-dirty`), `BUILD OK`, the web gzip size and the smoke result (`7 passed`).
+- [x] **Task 2: Play kit and record (AC: 6)** (agent)
+  - [x] 2.1 Create `implementation-artifacts/playtests/` and the record from **Record template** below. Fill in:
     - the build version;
     - the Task 1 evidence;
     - the commands, with the real version in each path (**Commands for sonlm** below).
-  - [ ] 2.2 Commit the record. Builds are gitignored, so they stay on the server.
-  - [ ] 2.3 Report to sonlm. Give him the commands, the play checklist and the decisions to make (Task 5), then **HALT**.
+  - [x] 2.2 Commit the record. Builds are gitignored, so they stay on the server.
+  - [x] 2.3 Report to sonlm. Give him the commands, the play checklist and the decisions to make (Task 5), then **HALT**.
 - [ ] **Task 3: Feel check (AC: 2, 5)** (sonlm)
   - [ ] 3.1 Play the release Windows exe at ×3, at 60 Hz: the shaft top to bottom, a few deaths and respawns, and room exits.
   - [ ] 3.2 Run the same build with `override.cfg` (interpolation off, D2) and compare. If a high-refresh display is available, play both again on it.
@@ -308,12 +308,24 @@ The tree is clean on `feat/m2-e1`.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5)
+
 ### Debug Log References
+
+- 2026-11-21, `e304d31`: `run_tests.sh` → 22 tests, 1397 ok, 0 FAIL, `== ALL GREEN (22 tests)`; `test_chain_state` `ALL PASS (69 checks)`; `test_lint` PASS; `smoke_bot` best chain 8 in `m1_shaft`.
+- `tools/export.sh` → `== BUILD OK builds/20261121-e304d31, web download 10.3 MB (gzip; raw 40.0 MB)`, web smoke `7 passed (1.0m)`, 117 s.
 
 ### Completion Notes List
 
+- Tasks 1–2 (agent): the automated gate passes (AC1); the playtest record is created with the evidence and the real build paths. HALTed at Task 3 for sonlm's play sessions (human gates, Tasks 3–5).
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/playtests/1-15-cp1-gate-feel-check-and-performance-verdict.md` (new)
+- `_bmad-output/implementation-artifacts/1-15-cp1-gate-feel-check-and-performance-verdict.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
 - 2026-11-21: Story created (gds-create-story). Ultimate context engine analysis completed - comprehensive developer guide created. D1–D7 are the story author's calls. sonlm's answers: high refresh, Firefox and HD 620 are available, there is no Linux desktop, and the devlog is a note in the repo (D8). Probes: `override.cfg` beside an exported binary is read, and it turns physics interpolation off; the `test_chain_state` diff against M1 shows harness lines only.
+- 2026-11-21: Dev started (in-progress). Task 1 automated gate green on `e304d31` (build `20261121-e304d31`); Task 2 playtest record created. Waiting on sonlm for Tasks 3–5.
