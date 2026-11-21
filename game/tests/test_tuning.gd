@@ -26,7 +26,7 @@ const ACTORS := {
 ## A row is moved to Tuning (`keys`), kept as a local const (`local`), per instance (`instance`),
 ## or became a player setting (`setting`, Story 1.8: the Snuff hold is Settings.light_tap_window's
 ## default, never a Tuning key). A `local` row whose const moved to another script names it in
-## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd).
+## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd; Story 1.16: the eye pulse to core/fx.gd).
 const M1: Array[Dictionary] = [
 	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
 	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
@@ -68,7 +68,7 @@ const M1: Array[Dictionary] = [
 	{m1 = "lurker.hunt_speed", value = 95.0, keys = [&"lurker_hunt_speed"]},
 	{m1 = "lurker.hunt_accel", value = 220.0, keys = [&"lurker_hunt_accel"]},
 	{m1 = "lurker.return_speed", value = 40.0, keys = [&"lurker_return_speed"]},
-	{m1 = "lurker.eye_pulse_hz", value = 2.0, local = "EYE_PULSE_HZ"},
+	{m1 = "lurker.eye_pulse_hz", value = 2.0, local = "EYE_PULSE_HZ", home = "res://scripts/core/fx.gd"},  # Story 1.16: the flash-rate table owns it
 	{m1 = "lurker.screen_margin", value = 8.0, local = "SCREEN_MARGIN"},
 	{m1 = "lurker.glow_energy", value = 1.3, local = "GLOW_ENERGY"},
 	{m1 = "lurker.eye_open_time", value = 0.2, local = "EYE_OPEN_TIME"},

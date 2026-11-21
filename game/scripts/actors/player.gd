@@ -93,7 +93,9 @@ func _tick_timers(delta: float) -> void:
 	_coyote = maxf(_coyote - delta, 0.0)
 	_swing_cd = maxf(_swing_cd - delta, 0.0)
 	_invuln = maxf(_invuln - delta, 0.0)
-	_sprite.visible = _invuln <= 0.0 or fmod(_invuln, 0.4) < 0.25  # 2.5 Hz blink stays under the 3 flashes/s cap
+	# Story 1.16 D4: alpha, not visible, so the reduce-flashing variant (steady transparency) is the
+	# same path; the rate and both variants live in Fx's gate (NFR8, UX-DR126).
+	_sprite.modulate.a = Fx.blink_alpha(_invuln)
 
 
 ## Held past the tap window = Snuff; PlayerInput times it on real time (FR9). A tap is Flare Toss (1.23).
@@ -301,6 +303,7 @@ func _take_knockback(body: Node2D) -> void:
 	_end_cling()
 	var t := Game.tuning
 	_invuln = t.f(&"invuln_time")
+	_sprite.modulate.a = Fx.blink_alpha(_invuln)  # from this tick's draw, not the next (steady under reduce flashing)
 	_jumping = false
 	var away := signf(global_position.x - body.global_position.x)
 	velocity = Vector2(t.f(&"knockback_x") * (away if away != 0.0 else -_facing), t.f(&"knockback_y"))

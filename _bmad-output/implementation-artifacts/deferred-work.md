@@ -177,3 +177,8 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
   → **Owner: Story 7.13** — its web runs read the console; fix it before them (or earlier, if a story needs the web console first).
 - **CP1 measured only two perf runs** — by sonlm's choice, the laptop desktop (RTX 3050) and Firefox on the Intel iGPU, both glow off; not made: glow on (no-go), Chrome, the laptop desktop on the Intel iGPU, a separate HD 620 machine (none available).
   → **Owner: Story 7.13** — the 10-minute pass runs Chrome and the Intel iGPU desktop (Windows Graphics settings → Power saving) as part of NFR1.
+
+## Deferred from: dev of 1-16-effects-accessibility-gate-and-flash-cap.md (2026-11-21)
+
+- **The pogo squash is undone on the hit frame** — `game/scripts/actors/player.gd` `_process` recovers the squash with `delta / Engine.time_scale`. A pogo requests its hitstop in the physics tick that runs before `_process`, while that frame's delta was scaled at the old 1.0, so the recovery reads 1/60 / 0.05 = 0.33 s and snaps the (0.75, 1.3) squash back to 1 at once (and the frame the hitstop ends reads a tiny delta). Same trap Story 1.16 fixed in `CameraRig` (probed on 4.7.2: a time-scale change mid-tick never rescales that tick's delta). A fix: real time from `Time.get_ticks_usec()` differences, or the squash moved to the physics tick at one tick = 1/60 s.
+  → **Owner: Story 1.19** — its hit flash (67 ms white, 100 ms dim under reduce flashing) is another real-time player-sprite visual triggered on a hit tick; fix the squash's clock with it, and check both on the laptop.

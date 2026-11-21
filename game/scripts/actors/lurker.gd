@@ -19,7 +19,6 @@ const NOTICE_MIN_RADIUS := 80.0  ## px of light before it can notice you, chain 
 const NOTICE_FACTOR := 1.6  ## × the light radius it senses from (GDD Lurker "radius × 1.6"); Sensing in 1.20 (M1 lurker.notice_factor).
 const SCREEN_MARGIN := 8.0  ## px: only notice this far inside the play rect (between the gutters), so the telegraph is seen; Sensing in 1.20 (M1 lurker.screen_margin).
 # Presentation, which no system bends:
-const EYE_PULSE_HZ := 2.0  ## smooth sine; accessibility caps pulses at 2 Hz, so nothing may raise it (M1 lurker.eye_pulse_hz).
 const GLOW_ENERGY := 1.3  ## red light the eyes cast on the wall around them; presentation (M1 lurker.glow_energy).
 const EYE_OPEN_TIME := 0.2  ## s for the eyes to open (squash -> full) at the start of the telegraph; presentation (M1 lurker.eye_open_time).
 
@@ -81,7 +80,8 @@ func _physics_process(delta: float) -> void:
 				_enter(State.TELEGRAPH)
 		State.TELEGRAPH:
 			_timer -= delta
-			_eyes.modulate.a = 0.55 + 0.45 * sin(_t * TAU * EYE_PULSE_HZ)
+			# The rate is declared in Fx.EFFECTS and held to the 2 Hz pulse cap there (NFR8).
+			_eyes.modulate.a = 0.1 + 0.9 * Fx.pulse(_t, Fx.EYE_PULSE_HZ)
 			_body_sprite.position.x = sin(_t * 40.0) * 0.5  # a small shiver
 			if not sensed:
 				_enter(State.IDLE if global_position.distance_to(_home) < 1.0 else State.RETURN)

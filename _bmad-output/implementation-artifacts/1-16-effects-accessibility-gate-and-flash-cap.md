@@ -4,7 +4,7 @@ baseline_commit: c9143ca44cffd9ad5066806dac1a006838f7d661
 
 # Story 1.16: Effects accessibility gate and flash cap
 
-Status: ready-for-dev
+Status: in-progress
 
 **Type:** dev · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30), first story · **Branch:** `feat/m2-e1`
 
@@ -56,28 +56,28 @@ so that the game is safe to play from the first kit build.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 9).** `cd game && ./run_tests.sh` → `== ALL GREEN (22 tests)`, 1397 `ok`, 0 `FAIL` (measured at story creation on `c9143ca`, 2026-11-21); re-run and record in the Dev Agent Record.
-- [ ] **Task 2: Settings keys (AC: 1, 7).**
-  - [ ] Three `SCHEMA` rows + typed vars in `rules/settings.gd`, with `##` comments citing UX-DR126/127/128 and AR57. Update the header comment ("Brightness … and the Light tap window … exist so far").
-  - [ ] `test_state`: defaults, `from_dict` fallbacks for bad values (`1`, `"true"`, `null` → default, unclean), `to_dict` round-trip. Update the 1.11 comment that calls the fake bool key a stand-in "until 1.16 adds real ones"; keep the fake-schema check (it tests the passed-schema path).
-  - [ ] `test_dev_args:139`: the help string now lists five keys, sorted. Add one `--set=shake:false` row (valid) and one `--set=shake:0` row (invalid).
-- [ ] **Task 3: The gate and the table in `core/fx.gd` (AC: 1, 2).**
-  - [ ] `reduce_flashing()`, `shake_on()`, `reduced_motion()` read `Game.settings`.
-  - [ ] Consts `INVULN_BLINK_HZ := 2.5`, `EYE_PULSE_HZ := 2.0`, `STEADY_ALPHA := 0.5`; an `enum Kind { ONCE, PULSE, BLINK }`; `EFFECTS` rows for `pogo_sparks`, `popup`, `camera_shake`, `light_kick`, `invuln_blink`, `lurker_eye_pulse` (D3).
-  - [ ] Helpers: `blink_alpha(remaining: float) -> float` (1.0 or 0.0 at 2.5 Hz; `STEADY_ALPHA` under reduce flashing; 1.0 at `remaining <= 0`) and `pulse(t: float, hz: float) -> float` (0..1 sine).
-- [ ] **Task 4: Move the readers onto the gate (AC: 2, 3, 4, 5).**
-  - [ ] `player.gd` `_tick_timers`: replace the `visible` toggle with `_sprite.modulate.a = Fx.blink_alpha(_invuln)` (D4). Keep `visible` untouched.
-  - [ ] `lurker.gd`: delete `EYE_PULSE_HZ`; the telegraph uses `0.55 + 0.45 * Fx.pulse(...)`-equivalent through `Fx.EYE_PULSE_HZ` (same curve as today: `0.55 + 0.45 * sin(_t * TAU * hz)`). `test_tuning` row `lurker.eye_pulse_hz` moves `home` to `res://scripts/core/fx.gd` (D11).
-  - [ ] `Fx.pop`: half count and half max scale under `reduce_flashing()` (D5).
-  - [ ] `Fx.popup`: no `position:y` tween under `reduced_motion()`; the fade is unchanged.
-  - [ ] `camera_rig.gd`: `kick()` returns early when `not Fx.shake_on()`; `_physics_process` zeroes `_shake` and `offset` when off (D7). Update the 1.16 comment on `kick()`.
-- [ ] **Task 5: Warm-up (AC: 6).** `Fx.warm_up(room: Node)`; one call in `World._swap_room()` after `_room_holder.add_child(room)`. Probe first (D10) and record the result under Verified facts.
-- [ ] **Task 6: Lint `a11y_gate` (AC: 1).** Row, firing samples (`actors/player.gd` reading `Game.settings.reduce_flashing`; `world/camera_rig.gd` reading `Game.settings.shake`; `ui/gutters.gd` naming `&"reduced_motion"`), near-misses (`core/fx.gd`, `rules/settings.gd`, `var _shake := 0.0`, `kick(`, a comment-only mention if the rule scans code only). Docs table row (D9).
-- [ ] **Task 7: Tests (AC: 2–6, 8).**
-  - [ ] `test_fx`: the gate readers follow `Game.settings` (set, read, `Game.reset_for_tests()` after); the `EFFECTS` table checks; the sampling checks for blink and pulse (default and reduce-flashing: steady alpha never changes); `pop` counts and scales both ways; `popup` rises by default and stays put under reduced motion; the reflection check; `warm_up` adds three children to a parent, with the three materials, all freed within a second.
-  - [ ] `smoke_world` (or a new `smoke_a11y.gd`, D11): in `m1_shaft`, with `shake` false, a pogo hit leaves `offset == ZERO` for 30 ticks while a hitstop request is active and the crawler's sparks appear under the room; with `shake` true the same hit moves `offset` (existing check). Turning `shake` off mid-shake zeroes `offset` the next tick. A crawler knock with `reduce_flashing` on keeps the player sprite at `STEADY_ALPHA` and visible for the whole invulnerability.
-  - [ ] Red-check every new check (D13).
-- [ ] **Task 8: Docs (AC: 9; D12).**
+- [x] **Task 1: Baseline (AC: 9).** `cd game && ./run_tests.sh` → `== ALL GREEN (22 tests)`, 1397 `ok`, 0 `FAIL` (measured at story creation on `c9143ca`, 2026-11-21); re-run and record in the Dev Agent Record.
+- [x] **Task 2: Settings keys (AC: 1, 7).**
+  - [x] Three `SCHEMA` rows + typed vars in `rules/settings.gd`, with `##` comments citing UX-DR126/127/128 and AR57. Update the header comment ("Brightness … and the Light tap window … exist so far").
+  - [x] `test_state`: defaults, `from_dict` fallbacks for bad values (`1`, `"true"`, `null` → default, unclean), `to_dict` round-trip. Update the 1.11 comment that calls the fake bool key a stand-in "until 1.16 adds real ones"; keep the fake-schema check (it tests the passed-schema path).
+  - [x] `test_dev_args:139`: the help string now lists five keys, sorted. Add one `--set=shake:false` row (valid) and one `--set=shake:0` row (invalid).
+- [x] **Task 3: The gate and the table in `core/fx.gd` (AC: 1, 2).**
+  - [x] `reduce_flashing()`, `shake_on()`, `reduced_motion()` read `Game.settings`.
+  - [x] Consts `INVULN_BLINK_HZ := 2.5`, `EYE_PULSE_HZ := 2.0`, `STEADY_ALPHA := 0.5`; an `enum Kind { ONCE, PULSE, BLINK }`; `EFFECTS` rows for `pogo_sparks`, `popup`, `camera_shake`, `light_kick`, `invuln_blink`, `lurker_eye_pulse` (D3).
+  - [x] Helpers: `blink_alpha(remaining: float) -> float` (1.0 or 0.0 at 2.5 Hz; `STEADY_ALPHA` under reduce flashing; 1.0 at `remaining <= 0`) and `pulse(t: float, hz: float) -> float` (0..1 sine).
+- [x] **Task 4: Move the readers onto the gate (AC: 2, 3, 4, 5).**
+  - [x] `player.gd` `_tick_timers`: replace the `visible` toggle with `_sprite.modulate.a = Fx.blink_alpha(_invuln)` (D4). Keep `visible` untouched.
+  - [x] `lurker.gd`: delete `EYE_PULSE_HZ`; the telegraph uses `0.55 + 0.45 * Fx.pulse(...)`-equivalent through `Fx.EYE_PULSE_HZ` (same curve as today: `0.55 + 0.45 * sin(_t * TAU * hz)`). `test_tuning` row `lurker.eye_pulse_hz` moves `home` to `res://scripts/core/fx.gd` (D11).
+  - [x] `Fx.pop`: half count and half max scale under `reduce_flashing()` (D5).
+  - [x] `Fx.popup`: no `position:y` tween under `reduced_motion()`; the fade is unchanged.
+  - [x] `camera_rig.gd`: `kick()` returns early when `not Fx.shake_on()`; `_physics_process` zeroes `_shake` and `offset` when off (D7). Update the 1.16 comment on `kick()`.
+- [x] **Task 5: Warm-up (AC: 6).** `Fx.warm_up(room: Node)`; one call in `World._swap_room()` after `_room_holder.add_child(room)`. Probe first (D10) and record the result under Verified facts.
+- [x] **Task 6: Lint `a11y_gate` (AC: 1).** Row, firing samples (`actors/player.gd` reading `Game.settings.reduce_flashing`; `world/camera_rig.gd` reading `Game.settings.shake`; `ui/gutters.gd` naming `&"reduced_motion"`), near-misses (`core/fx.gd`, `rules/settings.gd`, `var _shake := 0.0`, `kick(`, a comment-only mention if the rule scans code only). Docs table row (D9).
+- [x] **Task 7: Tests (AC: 2–6, 8).**
+  - [x] `test_fx`: the gate readers follow `Game.settings` (set, read, `Game.reset_for_tests()` after); the `EFFECTS` table checks; the sampling checks for blink and pulse (default and reduce-flashing: steady alpha never changes); `pop` counts and scales both ways; `popup` rises by default and stays put under reduced motion; the reflection check; `warm_up` adds three children to a parent, with the three materials, all freed within a second.
+  - [x] `smoke_world` (or a new `smoke_a11y.gd`, D11): in `m1_shaft`, with `shake` false, a pogo hit leaves `offset == ZERO` for 30 ticks while a hitstop request is active and the crawler's sparks appear under the room; with `shake` true the same hit moves `offset` (existing check). Turning `shake` off mid-shake zeroes `offset` the next tick. A crawler knock with `reduce_flashing` on keeps the player sprite at `STEADY_ALPHA` and visible for the whole invulnerability.
+  - [x] Red-check every new check (D13).
+- [x] **Task 8: Docs (AC: 9; D12).**
 - [ ] **Task 9: Laptop check (human gate, AC: 6).** HALT for sonlm: the debug web build (`tools/export.sh`), `?room=perf_worst&perf`, Firefox on the Intel iGPU and the laptop's Chrome, recording `worst … at … s` in `docs/perf.md` next to the 1.15 rows; plus a look with `?set=reduce_flashing:true`, `?set=shake:false` and `?set=reduced_motion:true` in `m1_shaft` (sparks smaller, steady transparency after a crawler hit, no shake, popups stay put). The agent records no numbers and claims no feel; report "tests green; needs a feel check on the laptop".
 
 ## Dev Notes
@@ -157,7 +157,7 @@ so that the game is safe to play from the first kit build.
 - DevTools `--set` already parses bools (`dev_tools.gd` `set_value_of`, `TYPE_BOOL`: `true`/`false` only) and validates against `Settings.is_valid()`, so AC7 needs no DevTools code.
 - `test_dev_args.gd:139` hard-codes the `schema_help` string (`keys: brightness (0, 1, 2, 3), light_tap_window (0.12, 0.2, 0.3)`); it changes with the new keys.
 - `test_tuning` keeps the M1 `lurker.eye_pulse_hz = 2.0` row as a `local` constant read through `get_script_constant_map()` of `home`; a `home` of `fx.gd` with `local = "EYE_PULSE_HZ"` works the same way.
-- To fill in during dev: the alpha-cull probe result (D10).
+- **Alpha-cull probe (D10), 4.7.2-stable source:** `RendererCanvasCull::_cull_canvas_item` returns early when `(ci->modulate * p_modulate).a < 0.007`, so `1/255` (0.0039) is culled. `Fx.WARM_ALPHA` is 0.01; `test_fx` checks it against 0.007.
 
 ### References
 
@@ -171,10 +171,69 @@ so that the game is safe to play from the first kit build.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
+
 ### Debug Log References
+
+- Baseline (Task 1) on `0316d42`: `== ALL GREEN (22 tests)`, 1397 `ok`, 0 `FAIL`. After: `== ALL GREEN (23 tests)`, 1526 `ok`, 0 `FAIL`.
+- D10 probe: see Verified facts (culled below 0.007 alpha; `WARM_ALPHA` 0.01).
+- **Pre-existing bug found and fixed (sonlm chose "fix it here", 2026-11-21):** the pogo shake has not shown since 1.7. On a pogo hit the player requests the hitstop earlier in the same physics tick, but that tick's `delta` was already scaled at 1.0. Probed on 4.7.2: `dt` stays 1/60 on the tick `time_scale` drops to 0.05, and is 1/1200 on the tick it returns to 1.0. So `CameraRig`'s `delta / Engine.time_scale` read 0.33 s and zeroed the 2.5 px shake at once (and could move the lead up to 46 px). The rig now counts one tick as 1/60 s of real time (PlayerInput's Story 1.8 D3 rule). `smoke_a11y` drives a real pogo with its hitstop and checks the shake; reverting the line turns it red (0 of 6 ticks shaken).
+- Same trap in `player.gd` `_process` (the pogo squash): deferred, owner Story 1.19.
+- Red-checks (D13). Each broke one thing, saw `FAIL` and was restored:
+  - `INVULN_BLINK_HZ` 3.5 and `EYE_PULSE_HZ` 2.5 (test_fx)
+  - the `kick()` guard removed, then the `_physics_process` guard removed (smoke_a11y)
+  - the rig back to `delta / time_scale` (smoke_a11y)
+  - the `pop` count or size not halved (test_fx)
+  - the `pogo_sparks` row deleted (test_fx reflection)
+  - the popup rise not gated (test_fx)
+  - `WARM_ALPHA` 1/255 (test_fx)
+  - the blink's reduce-flashing branch removed (test_fx, smoke_a11y)
+  - the warm-up sprite dropped (test_fx)
+  - `shake` default false (test_state)
+  - `Game.settings.reduce_flashing` read in `player.gd` (test_lint `a11y_gate`)
+  - the knock-tick alpha write removed (smoke_a11y)
+- D11: the room child count at `smoke_world:169` is compared within one frame, so it stays green while the warm-up children exist.
+- `smoke_a11y`'s knock covers two invulnerabilities back to back (72 ticks): the player still touches the walker when the first one ends. Both hold steady.
 
 ### Completion Notes List
 
 - Story created 2026-11-21: ultimate context engine analysis completed - comprehensive developer guide created.
+- AC1/AC7: three `Settings` keys, defaulting to off / on / off. No version bump: an older file is unclean and gets rewritten with the defaults. `Fx.reduce_flashing()` / `shake_on()` / `reduced_motion()` read them live. Lint `a11y_gate` (5 firing samples, 10 near-misses) keeps the key names inside `core/fx.gd` and `rules/settings.gd`. `--set=` takes them through the existing bool path (`test_dev_args`).
+- AC2: `Fx.EFFECTS` has 7 rows: D3's six plus `chain_popup`, so the reflection check covers every public effect function. Each row names its `fn`. `Spec.FLASH_HZ_MAX` / `PULSE_HZ_MAX` / `BLINK_HZ` cite the GDD. `test_fx` checks the table, samples the blink (2.5 rises/s) and the pulse (2 peaks/s) at 60 ticks/s, and fails on an undeclared public static function.
+- AC3: `pop()` halves the count and the max size under reduce flashing, keeping the 1 px floor (D5). `Player` writes `Fx.blink_alpha(_invuln)` to `_sprite.modulate.a` every tick, and once more on the knock tick itself (without that, the knock frame drew at 1.0 before going steady). `visible` is no longer touched.
+- AC4: `kick()` refuses shake while it is off, and `_physics_process` zeroes `_shake` / `offset` while it is off (no `randf` draw). AC4/AC8's "the same hit moves offset" also needed the real-time fix above.
+- AC5: `popup()` skips the rise under reduced motion; the fade is unchanged.
+- AC6: `Fx.warm_up(room, pos)`. The `pos` argument is new to D10's sketch: it is the entry position, which puts the items inside the first view. `World._swap_room()` calls it once, after the room enters the tree. Whether it removes the hitch is Task 9's laptop run.
+- AC8: the defaults are unchanged: 14 sparks at 1–2 px, the 2.5 Hz blink with M1's 0.25 of 0.4 s lit, the eye curve `0.1 + 0.9 * pulse` (= M1's `0.55 + 0.45 * sin`) and the 14 px rise. The one deliberate change at the defaults is that the pogo shake now shows (the fix above).
+- **Task 9 (laptop, human gate) is open.** Tests green; needs a feel check on the laptop:
+  - the debug web build with `?room=perf_worst&perf` on Firefox (Intel iGPU) and Chrome, with `worst … at … s` recorded in `docs/perf.md`
+  - `m1_shaft` with `?set=reduce_flashing:true`, then `?set=shake:false`, then `?set=reduced_motion:true`
+  - the pogo shake at the defaults, new to anyone who played since 1.7
 
 ### File List
+
+- `game/scripts/rules/settings.gd`
+- `game/scripts/core/fx.gd`
+- `game/scripts/world/camera_rig.gd`
+- `game/scripts/world/world.gd`
+- `game/scripts/actors/player.gd`
+- `game/scripts/actors/lurker.gd`
+- `game/tests/spec.gd`
+- `game/tests/test_fx.gd`
+- `game/tests/test_lint.gd`
+- `game/tests/test_state.gd`
+- `game/tests/test_dev_args.gd`
+- `game/tests/test_tuning.gd`
+- `game/tests/smoke_a11y.gd` (new)
+- `game/tests/smoke_a11y.gd.uid` (new)
+- `docs/development-guide.md`
+- `docs/component-inventory.md`
+- `docs/perf.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-11-21: Tasks 1–8 implemented: the accessibility gate in `Fx`, `EFFECTS` with the flash-cap tests, the reduced variants, the shake gate, warm-up, lint `a11y_gate`, `smoke_a11y` and the docs. Also fixed the pre-existing hitstop/real-time bug in `CameraRig` (sonlm's call). Status stays in-progress until Task 9's laptop check.

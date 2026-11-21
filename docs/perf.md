@@ -23,7 +23,7 @@ Each pass wakes the lurkers as their screen comes into reach. Hunting lurkers (9
 
 **The light budget** (`BudgetLight`, `World`'s `LightBudget` node, every physics tick): at most 6 lights keep their `PointLight2D` in the whole 480 × 270 view; lurker glows beyond that show an additive sprite glow instead. The player's light and flares are never demoted. Overlay 4 shows `lights n/6, sprites m`.
 
-**Known first-second hitch:** the first demotion is the additive material's first use, which can compile a shader. A worst frame within the first second may be that warm-up (Story 1.16's job), not steady-state cost. Always record `worst … at … s` with the number.
+**Known first-second hitch:** the first demotion is the additive material's first use, which can compile a shader. A worst frame within the first second may be that compile, not steady-state cost. Since Story 1.16, `Fx.warm_up()` draws the shared materials (sparks, a label, an additive light sprite) once at every room load, at an alpha no one sees, to pay that compile up front; whether it removes the 1.15 hitch (562 ms at 0.0 s, Firefox on the Intel iGPU) is the 1.16 laptop run in the table below. Always record `worst … at … s` with the number.
 
 ## How to run
 

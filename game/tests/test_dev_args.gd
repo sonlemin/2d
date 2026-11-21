@@ -136,8 +136,13 @@ func _test_set_values() -> void:
 	r = DevTools.set_value_of("fake_bool:true")
 	check(r[2].begins_with("--set: no setting 'fake_bool'"), "...and with the real schema fake_bool is an unknown key (%s)" % r[2])
 	r = DevTools.set_value_of("nope:1")
-	check(r[2] != "" and r[2].ends_with("(keys: brightness (0, 1, 2, 3), light_tap_window (0.12, 0.2, 0.3))"),
+	check(r[2] != "" and r[2].ends_with("(keys: brightness (0, 1, 2, 3), light_tap_window (0.12, 0.2, 0.3), reduce_flashing (false, true), reduced_motion (false, true), shake (false, true))"),
 			"--set=nope:1 is an error listing every key and its choices, sorted (got %s)" % r[2])
+	# Story 1.16 AC7: the real bool keys go through the same path.
+	r = DevTools.set_value_of("shake:false")
+	check(r[2] == "" and r[0] == &"shake" and typeof(r[1]) == TYPE_BOOL and r[1] == false, "--set=shake:false gives bool false (got %s)" % [r])
+	r = DevTools.set_value_of("shake:0")
+	check(r[2] != "" and r[0] == &"", "--set=shake:0 is an error: a bool is only true or false (%s)" % r[2])
 	r = DevTools.set_value_of("brightness")
 	check(r[2] != "" and r[2].contains("<key>:<value>"), "--set=brightness (no ':') is an error (%s)" % r[2])
 	var odd := {&"name": {default = "x", choices = ["x"]}}

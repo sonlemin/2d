@@ -5,7 +5,8 @@ extends RefCounted
 ## `changed(key)` (AR18). The session's instance lives in `core/game.gd`.
 ## rules/ does no file I/O (R15): `core/save_store.gd` persists these as `settings.json`, and the
 ## session's instance decides when to write.
-## Brightness (Story 1.4) and the Light tap window (Story 1.8) exist so far. Each story adds its own key as one SCHEMA entry plus
+## Brightness (Story 1.4), the Light tap window (Story 1.8) and the three accessibility keys (Story
+## 1.16) exist so far. Each story adds its own key as one SCHEMA entry plus
 ## a typed var of the same name, and needs no version bump: a missing key takes its default.
 
 signal changed(key: StringName)
@@ -15,6 +16,9 @@ signal changed(key: StringName)
 const SCHEMA := {
 	&"brightness": {default = 1, choices = [0, 1, 2, 3]},
 	&"light_tap_window": {default = 0.12, choices = [0.12, 0.2, 0.3]},
+	&"reduce_flashing": {default = false, choices = [false, true]},
+	&"shake": {default = true, choices = [false, true]},
+	&"reduced_motion": {default = false, choices = [false, true]},
 }
 
 ## Index of the world's ambient level (4 levels, UX A1 / R1); 1 is the M1 default (the M1 shaft's
@@ -25,6 +29,16 @@ var brightness := 1
 ## never breaks the chain (FR9, UX-DR119; M1's 0.12 s Snuff hold is the default). Read by
 ## PlayerInput at each tick; Options > Accessibility shows it from Story 1.36.
 var light_tap_window := 0.12
+## UX-DR126 / AR57: blinks become steady transparency and sparks shrink. Read only through
+## Fx.reduce_flashing() (the one gate, lint a11y_gate); never per effect.
+var reduce_flashing := false
+## UX-DR128 / FR38: false = the camera never shakes; freeze frames and sparks stay. Read only through
+## Fx.shake_on().
+var shake := true
+## UX-DR127: popups fade in place, UI easing (from the menu kit) snaps. Read only through
+## Fx.reduced_motion(). Off on every platform here; the web first-run default from the OS's
+## prefers-reduced-motion is Options' choice (Story 1.36), since rules/ can't ask the OS.
+var reduced_motion := false
 
 
 func set_value(key: StringName, v: Variant) -> void:

@@ -100,6 +100,14 @@ const RULES: Array[Dictionary] = [
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])+\s*\.\s*(append|append_array|push_back|push_front|insert|erase|remove_at|clear|merge|assign|fill|resize|sort|sort_custom|shuffle|reverse|pop_back|pop_front|pop_at)\s*\(",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\s*\.\s*set(_indexed|_deferred)?\s*\("],
 		code = [], only = [], skip = ["rules/"], allow = []},
+	# AR57 (Story 1.16 D9): one accessibility gate. Only Fx (and Settings, which declares them) names
+	# the three keys; everything else asks Fx.reduce_flashing() / shake_on() / reduced_motion(), so
+	# no effect grows its own toggle. `shake` alone is too common a word (`_shake`, `kick()`), so it
+	# is matched only as a settings field or a key string. dev/ is skipped: DevTools sets keys
+	# generically through SCHEMA and never names one.
+	{id = &"a11y_gate", bare = [r"(?<!Fx\.)\b(reduce_flashing|reduced_motion)\b", r"\bsettings\s*\.\s*shake\b"],
+		code = [r"[\x22\x27](reduce_flashing|reduced_motion|shake)[\x22\x27]"],
+		only = [], skip = ["dev/"], allow = ["core/fx.gd", "rules/settings.gd"]},
 ]
 
 var _fail := 0
@@ -422,6 +430,21 @@ const SAMPLES: Array = [
 	[&"state_write", "world/world.gd", "\tvar n := Game.dive.killed.size()", false],
 	[&"state_write", "world/world.gd", "\t# Game.settings.brightness = 2 compiles, so the lint stops it", false],
 	[&"state_write", "rules/slot_state.gd", "\tGame.slot.best_chain = 3", false],
+	[&"a11y_gate", "actors/player.gd", "\tif Game.settings.reduce_flashing:", true],
+	[&"a11y_gate", "world/camera_rig.gd", "\tif not Game.settings.shake:", true],
+	[&"a11y_gate", "ui/gutters.gd", "\tif Game.settings.get(&\"reduced_motion\"):", true],
+	[&"a11y_gate", "ui/gutters.gd", "\tGame.settings.changed.connect(func(k): if k == &\"shake\": _redraw())", true],
+	[&"a11y_gate", "actors/lurker.gd", "\tvar reduced_motion := false", true],
+	[&"a11y_gate", "core/fx.gd", "\treturn Game.settings.reduce_flashing", false],
+	[&"a11y_gate", "rules/settings.gd", "\t&\"shake\": {default = true, choices = [false, true]},", false],
+	[&"a11y_gate", "dev/dev_tools.gd", "\tGame.override_setting(&\"shake\", false)", false],
+	[&"a11y_gate", "actors/player.gd", "\tif Fx.reduce_flashing():", false],
+	[&"a11y_gate", "ui/gutters.gd", "\tvar t := 0.0 if Fx.reduced_motion() else 0.2", false],
+	[&"a11y_gate", "world/camera_rig.gd", "\tif not Fx.shake_on():", false],
+	[&"a11y_gate", "world/camera_rig.gd", "\tvar _shake := 0.0", false],
+	[&"a11y_gate", "world/world.gd", "\t_player.pogo_hit.connect(_camera.kick.bind(CameraRig.POGO_SHAKE))", false],
+	[&"a11y_gate", "actors/player.gd", "\t# steady under reduce_flashing (Fx decides)", false],
+	[&"a11y_gate", "actors/player.gd", "\tvar s := \"shake it\"", false],
 ]
 
 

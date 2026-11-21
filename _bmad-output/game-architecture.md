@@ -436,7 +436,7 @@ user://
 - `World/UI` is a `CanvasLayer` with `PROCESS_MODE_ALWAYS`: **Gutters** (HUD, bound to state signals) and **ScreenRouter**, which shows exactly one screen at a time (Pause, Options, Death card, Station menu, Slot picker, Title…). Opening a screen replaces the current one.
 - **UI kit (E1):** MenuList, TabBar, EmberCursor, ConfirmStep, Toggle, Slider, GlyphPrompt; one Theme built in code (no `.tres`, consistent with M1).
 - **Strings:** every player-facing string goes through `tr()` from `game/text/strings.csv` (English only in M2). Commit the generated `.translation` and `.import` files with it.
-- **Accessibility gate:** `Settings` exposes `reduce_flashing`, `shake`, `reduced_motion`; `Fx`, camera shake, invulnerability blink and UI easing read only these flags. No per-effect toggles.
+- **Accessibility gate:** `Settings` exposes `reduce_flashing`, `shake`, `reduced_motion`; `Fx`, camera shake, invulnerability blink and UI easing read only these flags. No per-effect toggles. `Fx` is the gate (Story 1.16): only it names the keys (`Fx.reduce_flashing()` / `shake_on()` / `reduced_motion()`, lint `a11y_gate`), and `Fx.EFFECTS` declares every effect's flash rate and reduced variant.
 - **Brightness** (readiness U2, 2026-11-12): `Settings.brightness` (4 levels; Options > Accessibility from E1, Video from E7; replaces M1's F1 `ambient_index`) scales only the world's ambient level (the darkness the lights cut through). It never changes light radii, `Sensing`, the reserved colours or anything on the UI `CanvasLayer`, so the gameplay rules and the contrast floors hold at every level.
 
 ### Audio (E3)

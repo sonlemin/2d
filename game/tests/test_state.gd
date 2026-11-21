@@ -113,7 +113,10 @@ func _test_settings_defaults() -> void:
 	var s := Settings.new()
 	check(s.brightness == 1, "Settings: brightness defaults to 1, the M1 level (got %s)" % s.brightness)
 	check(s.light_tap_window == 0.12 and typeof(s.light_tap_window) == TYPE_FLOAT, "...and the Light tap window defaults to 0.12 s, M1's Snuff hold (Story 1.8 D5; got %s)" % s.light_tap_window)
-	check(s.to_dict() == {"brightness": 1, "light_tap_window": 0.12}, "...and to_dict() is {brightness: 1, light_tap_window: 0.12} (got %s)" % s.to_dict())
+	# Story 1.16 D2: the accessibility keys default to the full effects (UX Accessibility Floor, A11).
+	check(not s.reduce_flashing and s.shake and not s.reduced_motion, "...and reduce flashing off, shake on, reduced motion off (Story 1.16 D2; got %s, %s, %s)" % [s.reduce_flashing, s.shake, s.reduced_motion])
+	var want := {"brightness": 1, "light_tap_window": 0.12, "reduce_flashing": false, "shake": true, "reduced_motion": false}
+	check(s.to_dict() == want, "...and to_dict() is %s (got %s)" % [want, s.to_dict()])
 	# {&"k": 1} == {"k": 1} is true, so the comparison above can't tell the key type.
 	check(s.to_dict().keys().all(func(k: Variant) -> bool: return k is String), "...with String keys, as SlotState and DiveState give (D4)")
 
@@ -145,11 +148,13 @@ func _test_settings_reset() -> void:
 	var got := []
 	s.changed.connect(func(key: StringName) -> void: got.append(key))
 	s.set_value(&"light_tap_window", 0.3)
+	s.set_value(&"shake", false)
 	s.reset()
-	check(s.brightness == 1 and s.light_tap_window == 0.12 and got == [&"light_tap_window", &"brightness", &"light_tap_window"], "reset() restores brightness 1 and the 0.12 s window in place and emits changed for every key (D2; got %s, %s, %s)" % [s.brightness, s.light_tap_window, got])
+	var keys: Array = Settings.SCHEMA.keys()
+	check(s.brightness == 1 and s.light_tap_window == 0.12 and s.shake and got == [&"light_tap_window", &"shake"] + keys, "reset() restores brightness 1, the 0.12 s window and shake on in place and emits changed for every key (D2; got %s, %s, %s, %s)" % [s.brightness, s.light_tap_window, s.shake, got])
 	got.clear()
 	s.reset()
-	check(got == [&"brightness", &"light_tap_window"], "...and a reset that changes nothing still emits (D2; got %s)" % [got])
+	check(got == keys, "...and a reset that changes nothing still emits (D2; got %s)" % [got])
 
 
 func _test_settings_round_trips() -> void:
@@ -161,11 +166,24 @@ func _test_settings_round_trips() -> void:
 	var clean := u.from_dict(_through_json(s.to_dict()))
 	check(clean and u.brightness == 2 and typeof(u.brightness) == TYPE_INT, "...through JSON too, as an int (D3: JSON numbers come back as floats; got %s, type %d)" % [u.brightness, typeof(u.brightness)])
 	var v := Settings.new()
-	check(v.from_dict({"brightness": 3, "light_tap_window": 0.12, "unknown_key": true}) and v.brightness == 3, "an unknown key is ignored and the data is still clean (D3)")
+	var full := Settings.new().to_dict()
+	full["brightness"] = 3
+	var extra := full.duplicate()
+	extra["unknown_key"] = true
+	check(v.from_dict(extra) and v.brightness == 3, "an unknown key is ignored and the data is still clean (D3)")
 	var got := []
 	v.changed.connect(func(key: StringName) -> void: got.append(key))
-	v.from_dict({"brightness": 3, "light_tap_window": 0.12})
-	check(got == [&"brightness", &"light_tap_window"], "from_dict() emits changed for every key, changed or not (D2; got %s)" % [got])
+	v.from_dict(full)
+	check(got == Settings.SCHEMA.keys(), "from_dict() emits changed for every key, changed or not (D2; got %s)" % [got])
+	check(not Settings.new().from_dict({"brightness": 3, "light_tap_window": 0.12}), "a file from before Story 1.16 (no accessibility keys) is unclean, so Game rewrites it with the defaults (no version bump)")
+	# Story 1.16: each bool key round-trips through JSON as a bool, both ways.
+	for key: StringName in [&"reduce_flashing", &"shake", &"reduced_motion"]:
+		for b: bool in [false, true]:
+			var a := Settings.new()
+			a.set_value(key, b)
+			var c := Settings.new()
+			var ok := c.from_dict(_through_json(a.to_dict()))
+			check(ok and c.get(key) == b and typeof(c.get(key)) == TYPE_BOOL, "%s %s survives JSON as a bool (got %s)" % [key, b, var_to_str(c.get(key))])
 	check(not Settings.new().from_dict({"brightness": 3}), "a file from before Story 1.8 (no light_tap_window) is unclean, so Game rewrites it with the default")
 	# Story 1.8 D5: a float setting survives JSON exactly, for every choice.
 	for w: float in Settings.SCHEMA[&"light_tap_window"].choices:
@@ -188,18 +206,30 @@ func _test_settings_fallbacks() -> void:
 		s.set_value(&"light_tap_window", 0.3)
 		var clean := s.from_dict({"brightness": 1, "light_tap_window": bad})
 		check(not clean and s.light_tap_window == 0.12, "light_tap_window %s is unclean and falls back to 0.12 (got %s)" % [var_to_str(bad), s.light_tap_window])
+	# Story 1.16: a bool key takes only true or false; 1, "true" and null fall back to the default.
+	for key: StringName in [&"reduce_flashing", &"shake", &"reduced_motion"]:
+		var default: bool = Settings.SCHEMA[key].default
+		for bad: Variant in [1, 0, "true", null]:
+			var s := Settings.new()
+			s.set_value(key, not default)
+			var d := Settings.new().to_dict()
+			d[String(key)] = bad
+			var clean := s.from_dict(d)
+			check(not clean and s.get(key) == default, "%s %s is unclean and falls back to %s (got %s)" % [key, var_to_str(bad), default, var_to_str(s.get(key))])
 
 
 # --- SlotState ---
 
 ## Story 1.11 D8: the one validity rule, public so DevTools' --set validator can share it; a passed
-## schema is only ever a test's or DevTools' (a fake bool key until 1.16 adds real ones).
+## schema is only ever a test's or DevTools'. The fake bool key stays (Story 1.16 added real ones):
+## it tests the passed-schema path, which the real keys can't.
 func _test_settings_is_valid() -> void:
 	check(Settings.is_valid(&"brightness", 1) and Settings.is_valid(&"light_tap_window", 0.12), "is_valid: the defaults are valid")
 	check(not Settings.is_valid(&"brightness", 1.0) and not Settings.is_valid(&"brightness", true) and not Settings.is_valid(&"light_tap_window", 0),
 			"is_valid: a type mismatch is false (1.0 and true for an int, 0 for a float)")
 	check(not Settings.is_valid(&"brightness", 4) and not Settings.is_valid(&"light_tap_window", 0.25), "is_valid: a value outside the choices is false")
 	check(not Settings.is_valid(&"nope", 1), "is_valid: an unknown key is false")
+	check(Settings.is_valid(&"shake", false) and not Settings.is_valid(&"shake", 0) and not Settings.is_valid(&"reduce_flashing", "true"), "is_valid: a real bool key takes false, never 0 or \"true\" (Story 1.16)")
 	var fake := Settings.SCHEMA.duplicate(true)
 	fake[&"fake_bool"] = {default = false, choices = [false, true]}
 	check(Settings.is_valid(&"fake_bool", true, fake) and Settings.is_valid(&"fake_bool", false, fake), "is_valid: with a passed schema, a key the real SCHEMA lacks is valid for its values")
@@ -653,10 +683,11 @@ func _test_settings_file() -> void:
 	await get_tree().process_frame
 	check(Game.settings.brightness == 1 and _tmp_holds(1), "bad key: the default, rewritten (got %s)" % _read_tmp().c_escape())
 
-	await _prime('{"version": 1, "settings": {"brightness": 3, "light_tap_window": 0.2}, "keep": true}', 0)
+	await _prime('{"version": 1, "settings": {"brightness": 3, "light_tap_window": 0.2, "reduce_flashing": true, "shake": false, "reduced_motion": true}, "keep": true}', 0)
 	Game.load_settings()
 	check(Game.settings.brightness == 3 and typeof(Game.settings.brightness) == TYPE_INT, "valid file: brightness 3, as an int")
 	check(Game.settings.light_tap_window == 0.2, "...and the Light tap window 0.2 s (Story 1.8; got %s)" % Game.settings.light_tap_window)
+	check(Game.settings.reduce_flashing and not Game.settings.shake and Game.settings.reduced_motion, "...and the three accessibility keys as written (Story 1.16)")
 	await get_tree().process_frame
 	check(_read_tmp().contains("\"keep\""), "...and the file is kept, not rewritten")
 

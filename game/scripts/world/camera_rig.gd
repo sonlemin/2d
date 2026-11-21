@@ -7,7 +7,8 @@ extends Camera2D
 ## updates its screen centre there, so its own smoothing and reset can't cut on a teleport
 ## (Story 1.7 D8, probed on 4.7.2). The rig therefore smooths and clamps itself on the physics
 ## tick, the engine smoothing is off, and play_rect() never reads the engine camera.
-## The lead and the shake decay run on real time, so they keep going during a hitstop, as in M1.
+## The lead and the shake decay run on real time (one tick = 1/60 s), so they keep going during a
+## hitstop, as in M1.
 
 const GUTTER_WIDTH := 60.0  ## px each HUD gutter takes from the 480 px view (UX DESIGN.md Layout & Spacing, UX-DR18)
 const PLAY_WIDTH := 360.0  ## px of play area between the two gutters (UX DESIGN.md Layout & Spacing, UX-DR18)
@@ -55,8 +56,11 @@ func snap() -> void:
 	reset_physics_interpolation()
 
 
-## The only way to shake the screen: Story 1.16 gates it on Settings.shake here.
+## The only way to shake the screen. Screen shake off adds nothing (FR38, UX-DR128, asked through
+## Fx's gate, AR57); the pogo's freeze frame and sparks are elsewhere and stay.
 func kick(amount: float) -> void:
+	if not Fx.shake_on():
+		return
 	_shake = maxf(_shake, amount)
 
 
@@ -97,7 +101,11 @@ func _physics_process(delta: float) -> void:
 	if not _has_target():
 		offset = Vector2.ZERO  # never leave the last random shake frozen on screen
 		return
-	var real := delta / maxf(Engine.time_scale, 0.001)
+	# Real time is one tick (PlayerInput's rule, Story 1.8 D3): ticks stay at 60 per real second
+	# under the time scale. Never delta / Engine.time_scale: a pogo requests its hitstop earlier in
+	# this same tick, so that read 1/60 / 0.05 = 0.33 s and killed the shake the tick it started
+	# (probed on 4.7.2, Story 1.16).
+	var real := 1.0 / Engine.physics_ticks_per_second
 	_shake = move_toward(_shake, 0.0, SHAKE_DECAY * real)
 	var want_lead := LOOK_AHEAD if target.velocity.y > 40.0 and not target.is_on_floor() else 0.0
 	_lead = move_toward(_lead, want_lead, LEAD_SPEED * real)
@@ -106,6 +114,11 @@ func _physics_process(delta: float) -> void:
 	_smoothed += (want - _smoothed) * minf(SMOOTH_SPEED * delta, 1.0)
 	_centre = _clamp(_smoothed)
 	global_position = _centre
+	if not Fx.shake_on():
+		# Story 1.16 D7: a shake already running when the setting turns off never stays on screen.
+		_shake = 0.0
+		offset = Vector2.ZERO
+		return
 	# The only randf under scripts/: camera shake is presentation, never level behaviour.
 	offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 
