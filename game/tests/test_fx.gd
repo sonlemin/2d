@@ -213,7 +213,7 @@ func _test_popup_motion() -> void:
 		if reduced:
 			check(rise == 0.0 and faded, "popup() under reduced motion stays put and still fades (rose %.2f px, alpha %.2f)" % [rise, l.modulate.a])
 		else:
-			check(rise > 10.0 and rise <= Fx.POPUP_RISE and faded, "popup() at the defaults rises (%.2f of 14 px) and fades (AC8)" % rise)
+			check(rise > 10.0 and rise <= 14.0 and faded, "popup() at the defaults rises (%.2f of 14 px) and fades (AC8)" % rise)
 		await get_tree().create_timer(0.4, true, false, false).timeout  # fade ends at 0.85 s
 		check(not is_instance_valid(l), "...and frees itself")
 		parent.queue_free()

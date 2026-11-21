@@ -157,7 +157,7 @@ so that the game is safe to play from the first kit build.
 - DevTools `--set` already parses bools (`dev_tools.gd` `set_value_of`, `TYPE_BOOL`: `true`/`false` only) and validates against `Settings.is_valid()`, so AC7 needs no DevTools code.
 - `test_dev_args.gd:139` hard-codes the `schema_help` string (`keys: brightness (0, 1, 2, 3), light_tap_window (0.12, 0.2, 0.3)`); it changes with the new keys.
 - `test_tuning` keeps the M1 `lurker.eye_pulse_hz = 2.0` row as a `local` constant read through `get_script_constant_map()` of `home`; a `home` of `fx.gd` with `local = "EYE_PULSE_HZ"` works the same way.
-- **Alpha-cull probe (D10), 4.7.2-stable source:** `RendererCanvasCull::_cull_canvas_item` returns early when `(ci->modulate * p_modulate).a < 0.007`, so `1/255` (0.0039) is culled. `Fx.WARM_ALPHA` is 0.01; `test_fx` checks it against 0.007.
+- **Alpha-cull probe (D10), 4.7.2-stable source:** `RendererCanvasCull::_cull_canvas_item` returns early when `(ci->modulate * p_modulate).a < 0.007`, so `1/255` (0.0039) is culled (line 329, re-checked with curl). `Fx.WARM_ALPHA` is 0.01; `test_fx` checks it against 0.007.
 
 ### References
 
@@ -209,6 +209,7 @@ Claude Opus 5.5 (claude-opus-5-5), 2026-11-21
   - the debug web build with `?room=perf_worst&perf` on Firefox (Intel iGPU) and Chrome, with `worst … at … s` recorded in `docs/perf.md`
   - `m1_shaft` with `?set=reduce_flashing:true`, then `?set=shake:false`, then `?set=reduced_motion:true`
   - the pogo shake at the defaults, new to anyone who played since 1.7
+  - the fall lead on a pogo: it used to snap up to 46 px back in one tick on every pogo hit mid-fall, and now eases at 140 px/s (the same rig fix). The 1.15 "feel yes" was given with the snap.
 
 ### File List
 
