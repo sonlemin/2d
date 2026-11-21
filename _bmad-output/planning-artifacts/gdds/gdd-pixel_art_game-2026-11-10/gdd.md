@@ -669,7 +669,7 @@ Three tracks, none of them XP (Pillar 3):
 - **Steam Deck:** a Deck-size legibility check in E1, done while choosing the font (UX, 2026-11-11); the full test pass in E7. At ×2 integer scaling (960×540, letterboxed) the HUD and text must be readable. "Verified" is the goal if Steam is chosen.
 - **Display:** integer scaling only (×2, ×3, ×4), nearest filtering, letterboxed.
 - **Saves:** automatic at every Lift Station rest, on the hub, and **when you quit at a lit lantern anchor**. Quitting at an anchor saves your position, so a long first descent can span two sessions. Carried embers stay at risk until a station. Progress moments (a difficulty change, a purchase, a story flag, the Weaver phase checkpoint and its defeat) also save world progress without moving where you wake (readiness, 2026-11-12). **3 save slots** (UX, 2026-11-10): the slot picker shows depth, best chain, play time and difficulty; Continue loads the most recent slot; Load on the title opens the picker. A failed save is shown to the player.
-- **Flash safety:** no more than 3 flashes per second anywhere. Settings include "reduce flashing", a screen-shake toggle, reduced motion and 4 brightness levels (see Options rollout in Controls and Input).
+- **Flash safety:** no more than 3 flashes per second anywhere. A flash is a change in brightness: effects that only move or scale a sprite (the lurker's warning shiver, the pogo squash) are declared with the other effects but don't count against the cap. Settings include "reduce flashing", a screen-shake toggle, reduced motion and 4 brightness levels (see Options rollout in Controls and Input).
 
 ### Asset Requirements
 

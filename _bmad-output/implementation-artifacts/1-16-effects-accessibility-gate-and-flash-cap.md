@@ -115,7 +115,7 @@ Code review 2026-11-21 over `c9143ca..HEAD` (Blind Hunter, Edge Case Hunter, Acc
 
 **Decision 2 (sonlm: option 1): declare the motion effects, no behaviour change.**
 - New kind `Fx.Kind.MOTION`: position or scale only, no brightness change; declared, not rate-capped. Rows `lurker_shiver` (6.37 Hz, from the new `Fx.SHIVER_RATE` that `lurker.gd` now reads; same value as before), `lurker_eye_open`, `pogo_squash`.
-- This amends AC2 bullet 4 ("nothing is above `Spec.FLASH_HZ_MAX`") for `MOTION` rows only, by sonlm's decision. `test_fx` requires every row to name a reduced variant or a `why`.
+- This amends AC2 bullet 4 ("nothing is above `Spec.FLASH_HZ_MAX`") for `MOTION` rows only, by sonlm's decision. The design text now says so (sonlm, 2026-11-21): the GDD's Flash safety bullet defines a flash as a change in brightness, and NFR8 in `epics.md` exempts warning and hit-feedback sprite motion from reduced motion. `test_fx` requires every row to name a reduced variant or a `why`.
 
 **Patches applied:**
 - Warm-up frees after `Fx.WARM_FRAMES` (3) process frames, not a 0.05 s tween; the particle no longer finishes first. `test_fx` checks the items are still there two frames later.
