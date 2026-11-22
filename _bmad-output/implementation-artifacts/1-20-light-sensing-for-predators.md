@@ -4,7 +4,7 @@ baseline_commit: c40e75f
 
 # Story 1.20: Light sensing for predators
 
-Status: ready-for-dev
+Status: in-progress
 
 **Type:** dev (with one human gate: sonlm's laptop look, Task 12) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -137,57 +137,57 @@ so that I always know what wakes them and I'm never hunted from the dark.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline and the M1 trace (AC: 3, 8).** Do this **before editing any game file**.
-  - [ ] At story creation on `c40e75f` (2026-11-22), `cd game && ./run_tests.sh` gave `== ALL GREEN (29 tests)`, 2005 `ok`. Re-run it and record the result in the Dev Agent Record.
-  - [ ] Record the M1 trace (D8). Write a throwaway script outside the repo that builds `m1_shaft` with `RoomHarness` and picks the second lurker from the top by position. It then holds the player with its physics off at chain 10 at fixed positions, all with the lurker inside `play_rect().grow(-8)`:
+- [x] **Task 1: Baseline and the M1 trace (AC: 3, 8).** Do this **before editing any game file**.
+  - [x] At story creation on `c40e75f` (2026-11-22), `cd game && ./run_tests.sh` gave `== ALL GREEN (29 tests)`, 2005 `ok`. Re-run it and record the result in the Dev Agent Record.
+  - [x] Record the M1 trace (D8). Write a throwaway script outside the repo that builds `m1_shaft` with `RoomHarness` and picks the second lurker from the top by position. It then holds the player with its physics off at chain 10 at fixed positions, all with the lurker inside `play_rect().grow(-8)`:
     - 100 px beside it for 1.5 s (a telegraph, then a hunt);
     - then `chain.break_chain()` (the light drops; the lurker loses the scent);
     - then 1.5 s more (the wait, then the return).
     - Log per tick `[state, monitorable, roundi(pos.x), roundi(pos.y)]`.
     - Run it through the runner (`godot --headless --path game res://tests/runner.tscn -- <script>`): under `--script`, anything that touches `Game` fails to compile.
-  - [ ] Save it as `game/tests/fixtures/lurker_trace_m1.json` with a header field naming the commit (`c40e75f`) and the scenario. `smoke_lurker` replays the same scenario on the new code (with `force()` never used: the lurker notices on its own) and compares tick for tick. Read the fixture with `JSON.new().parse()` (never `JSON.parse_string()`, which prints engine `ERROR:` lines).
-- [ ] **Task 2: `rules/sensing.gd` + `tests/test_sensing.gd` + Spec (AC: 1).**
-  - [ ] Write `Sensing` as AC1. Header `##`: the one rule for every predator (Pillar 2: notice only where the telegraph is seen; the hunt follows the light, Q1); a pure helper, so `test_sensing` tests the boundaries without a scene.
-  - [ ] Add `Spec.NOTICE_FACTOR` and `Spec.STIR_REACH`, one line each with the GDD quote.
-  - [ ] `test_sensing.gd`: the AC1 cases. Expected numbers come from `Spec` (`Spec.NOTICE_MIN_RADIUS`, `Spec.NOTICE_FACTOR`, `Spec.STIR_REACH`). The margin is the one value with no GDD line: read `Sensing.SCREEN_MARGIN`, but first check `Sensing.SCREEN_MARGIN >= 0.0` and that `notice_rect(r)` is inside `r` (a margin may only shrink the notice region, D3).
-  - [ ] Also check `Sensing.NOTICE_MIN_RADIUS == Spec.NOTICE_MIN_RADIUS`, `NOTICE_FACTOR == Spec.NOTICE_FACTOR` and `STIR_REACH == Spec.STIR_REACH`. These are exact, because the GDD gives exact values. `smoke_rooms._check_tuning()`'s `Lurker.NOTICE_MIN_RADIUS` line reads `Sensing` now.
-- [ ] **Task 3: `actors/light_source.gd` and the player (AC: 2).**
-  - [ ] Write `LightSource` as AC2. Header `##`: AR28; `radius()` is the rule value, the shown radius is presentation; it drives its BudgetLight's size and never its `enabled` (the budget's, Story 1.12); `extinguish()` is for a death (D5).
-  - [ ] `player.tscn`:
+  - [x] Save it as `game/tests/fixtures/lurker_trace_m1.json` with a header field naming the commit (`c40e75f`) and the scenario. `smoke_lurker` replays the same scenario on the new code (with `force()` never used: the lurker notices on its own) and compares tick for tick. Read the fixture with `JSON.new().parse()` (never `JSON.parse_string()`, which prints engine `ERROR:` lines).
+- [x] **Task 2: `rules/sensing.gd` + `tests/test_sensing.gd` + Spec (AC: 1).**
+  - [x] Write `Sensing` as AC1. Header `##`: the one rule for every predator (Pillar 2: notice only where the telegraph is seen; the hunt follows the light, Q1); a pure helper, so `test_sensing` tests the boundaries without a scene.
+  - [x] Add `Spec.NOTICE_FACTOR` and `Spec.STIR_REACH`, one line each with the GDD quote.
+  - [x] `test_sensing.gd`: the AC1 cases. Expected numbers come from `Spec` (`Spec.NOTICE_MIN_RADIUS`, `Spec.NOTICE_FACTOR`, `Spec.STIR_REACH`). The margin is the one value with no GDD line: read `Sensing.SCREEN_MARGIN`, but first check `Sensing.SCREEN_MARGIN >= 0.0` and that `notice_rect(r)` is inside `r` (a margin may only shrink the notice region, D3).
+  - [x] Also check `Sensing.NOTICE_MIN_RADIUS == Spec.NOTICE_MIN_RADIUS`, `NOTICE_FACTOR == Spec.NOTICE_FACTOR` and `STIR_REACH == Spec.STIR_REACH`. These are exact, because the GDD gives exact values. `smoke_rooms._check_tuning()`'s `Lurker.NOTICE_MIN_RADIUS` line reads `Sensing` now.
+- [x] **Task 3: `actors/light_source.gd` and the player (AC: 2).**
+  - [x] Write `LightSource` as AC2. Header `##`: AR28; `radius()` is the rule value, the shown radius is presentation; it drives its BudgetLight's size and never its `enabled` (the budget's, Story 1.12); `extinguish()` is for a death (D5).
+  - [x] `player.tscn`:
     - add `LightSource` (Node2D, `light_source.gd`, `kind = &"player"`, no offset);
     - reparent `Light` under it with every property unchanged (colour, energy 1.4, texture, `texture_scale`, the BudgetLight script, `rank = 0`);
     - re-save in the editor or by hand with the same `ext_resource` ids;
     - commit the new `.gd.uid`.
-  - [ ] `player.gd`: as AC2. The pogo's `_shown_radius += LIGHT_KICK` (line 251) becomes `light_source.kick(LIGHT_KICK)`. Update the header line "Pogo hits feed the ChainState, which drives … Chain-Light (light radius)" to name `LightSource`.
-  - [ ] Update the four `Light` paths (AC2). In `perf_run.gd` keep the stand-ins as plain BudgetLights: they stay lights only and wake no lurker (D13; 1.22 and 1.23 replace them with the real cache and flare, which are LightSources). Change its header comment from "there is no LightSource until 1.20" to say that.
-  - [ ] **Q1 changes `perf_worst`:** hunters that trail out of view now keep hunting while in reach. `perf_run.gd`'s `PATH_SPEED` comment ("hunters trail and fall away") still holds, since they fall out of reach, but check it. If `smoke_perf`'s counts or the perf summary move, report the numbers to sonlm; never retune the path or the lurker to restore them.
-  - [ ] `World._retire_player()`'s comment ("out of groups `player` / `light_source` now") stays true: the LightSource is a child of the removed Player. Leave it.
-- [ ] **Task 4: The lurker (AC: 3, 4, 5).**
-  - [ ] Rewrite `_physics_process` from D6's table. Keep the presentation code (`_update_look`, the eye pulse, the shiver) and the movement code (accel, brake ×2, return speed) as they are.
-  - [ ] Delete the M1 D6 block that refetches `_player`. D6 is now row T1/H1: the target is not live → RETURN at once.
-  - [ ] `force()`, `notices()`, `senses()`, `stirs_for()`, `_harmful()`, `target`, `stir`, `stirring`, `STIR_STEP_TIME` (AC3, AC5).
-  - [ ] Header `##` rewrite: it senses light through `LightSource` + `Sensing`; it notices only on screen; it hunts while it senses (Q1); it retargets per FR16/FR21; it stirs off screen.
-  - [ ] The comment "The sensing rule stays here until Story 1.20" goes.
-  - [ ] Optional, cheap: one guarded log line per state change: `if Log.enabled(Log.LURKER): Log.debug(Log.LURKER, …)`. Nothing unguarded in the tick.
-- [ ] **Task 5: Migrate every caller in one change (AC: 3, 6; D8).** None of these may outlive the lurker edit (the debug build won't compile):
-  - [ ] `scripts/dev/overlays.gd`: `Lurker.NOTICE_FACTOR` / `NOTICE_MIN_RADIUS` / `SCREEN_MARGIN` (lines 274, 326, 361, 363) and `p.senses(player)` (line 337) move to `Sensing` and `notices()`.
-  - [ ] `tests/smoke_rooms.gd`:
+  - [x] `player.gd`: as AC2. The pogo's `_shown_radius += LIGHT_KICK` (line 251) becomes `light_source.kick(LIGHT_KICK)`. Update the header line "Pogo hits feed the ChainState, which drives … Chain-Light (light radius)" to name `LightSource`.
+  - [x] Update the four `Light` paths (AC2). In `perf_run.gd` keep the stand-ins as plain BudgetLights: they stay lights only and wake no lurker (D13; 1.22 and 1.23 replace them with the real cache and flare, which are LightSources). Change its header comment from "there is no LightSource until 1.20" to say that.
+  - [x] **Q1 changes `perf_worst`:** hunters that trail out of view now keep hunting while in reach. `perf_run.gd`'s `PATH_SPEED` comment ("hunters trail and fall away") still holds, since they fall out of reach, but check it. If `smoke_perf`'s counts or the perf summary move, report the numbers to sonlm; never retune the path or the lurker to restore them.
+  - [x] `World._retire_player()`'s comment ("out of groups `player` / `light_source` now") stays true: the LightSource is a child of the removed Player. Leave it.
+- [x] **Task 4: The lurker (AC: 3, 4, 5).**
+  - [x] Rewrite `_physics_process` from D6's table. Keep the presentation code (`_update_look`, the eye pulse, the shiver) and the movement code (accel, brake ×2, return speed) as they are.
+  - [x] Delete the M1 D6 block that refetches `_player`. D6 is now row T1/H1: the target is not live → RETURN at once.
+  - [x] `force()`, `notices()`, `senses()`, `stirs_for()`, `_harmful()`, `target`, `stir`, `stirring`, `STIR_STEP_TIME` (AC3, AC5).
+  - [x] Header `##` rewrite: it senses light through `LightSource` + `Sensing`; it notices only on screen; it hunts while it senses (Q1); it retargets per FR16/FR21; it stirs off screen.
+  - [x] The comment "The sensing rule stays here until Story 1.20" goes.
+  - [x] Optional, cheap: one guarded log line per state change: `if Log.enabled(Log.LURKER): Log.debug(Log.LURKER, …)`. Nothing unguarded in the tick.
+- [x] **Task 5: Migrate every caller in one change (AC: 3, 6; D8).** None of these may outlive the lurker edit (the debug build won't compile):
+  - [x] `scripts/dev/overlays.gd`: `Lurker.NOTICE_FACTOR` / `NOTICE_MIN_RADIUS` / `SCREEN_MARGIN` (lines 274, 326, 361, 363) and `p.senses(player)` (line 337) move to `Sensing` and `notices()`.
+  - [x] `tests/smoke_rooms.gd`:
     - `lurker.senses(_player)` becomes `lurker.notices(_player.light_source)` (lines 266, 274, 279, 291, 295, 304);
     - `Lurker.NOTICE_*` and `SCREEN_MARGIN` become `Sensing.*` (lines 162, 276, 287, 329, 353);
     - each `lurker._enter(Lurker.State.HUNT)` / `TELEGRAPH` (lines 382, 387, 495, 573, 623) becomes `lurker.force(state, _player.light_source)`.
-  - [ ] `tests/smoke_health.gd`: `l._enter(Lurker.State.HUNT)` (lines 275, 336, 366) becomes `force(HUNT, p.light_source)`. `test_lurker_harmless`' IDLE, TELEGRAPH and RETURN go through `force(s, p.light_source)`, and its `_enter(IDLE)` resets go through `force(IDLE)`.
-  - [ ] `tests/smoke_world.gd` `test_hunt_over_death` (line 323): `c.force(Lurker.State.HUNT, p.light_source)`. Its check, "one frame after the death the lurker drops the hunt", must pass unchanged. It is now row H1 (the target was extinguished).
-  - [ ] `tests/smoke_dev_tools.gd:723`: `lurker.senses(p)` becomes `lurker.notices(p.light_source)`.
-  - [ ] `grep -rn "senses(\|NOTICE_\|SCREEN_MARGIN\|_enter(Lurker" game/` is empty outside `sensing.gd` and `lurker.gd`, and every hit inside them is the new code.
-- [ ] **Task 6: `tests/smoke_lurker.gd` + `tests/rooms/sensing/t_sensing.txt` (AC: 3, 4, 5).**
-  - [ ] **The fixture room.** Header comment: "Story 1.20 sensing test room. Not a level." It is 22 columns wide (spine width, so the play rect covers it sideways), about 40 rows tall (so the camera scrolls and a lurker can sit above or below the view), with:
+  - [x] `tests/smoke_health.gd`: `l._enter(Lurker.State.HUNT)` (lines 275, 336, 366) becomes `force(HUNT, p.light_source)`. `test_lurker_harmless`' IDLE, TELEGRAPH and RETURN go through `force(s, p.light_source)`, and its `_enter(IDLE)` resets go through `force(IDLE)`.
+  - [x] `tests/smoke_world.gd` `test_hunt_over_death` (line 323): `c.force(Lurker.State.HUNT, p.light_source)`. Its check, "one frame after the death the lurker drops the hunt", must pass unchanged. It is now row H1 (the target was extinguished).
+  - [x] `tests/smoke_dev_tools.gd:723`: `lurker.senses(p)` becomes `lurker.notices(p.light_source)`.
+  - [x] `grep -rn "senses(\|NOTICE_\|SCREEN_MARGIN\|_enter(Lurker" game/` is empty outside `sensing.gd` and `lurker.gd`, and every hit inside them is the new code.
+- [x] **Task 6: `tests/smoke_lurker.gd` + `tests/rooms/sensing/t_sensing.txt` (AC: 3, 4, 5).**
+  - [x] **The fixture room.** Header comment: "Story 1.20 sensing test room. Not a level." It is 22 columns wide (spine width, so the play rect covers it sideways), about 40 rows tall (so the camera scrolls and a lurker can sit above or below the view), with:
     - one in-wall `L` on the left wall about 12 rows down;
     - `P` on a ledge near the bottom, and open air between them;
     - no crawlers;
     - exits as `t_spikes` has them (self-loops), only if `RoomLoader.validate()` needs them.
-  - [ ] Load it with `RoomLoader.add_root("res://tests/rooms/sensing")` and `RoomHarness.build(self, &"t_sensing")`.
-  - [ ] Drive the player with its physics off, placing it by hand, and the camera with `cam.snap()` after each placement, so the play rect is exact.
-  - [ ] Cases (each prints `ok`/`FAIL`, picks nodes by position, and frees what it spawns):
+  - [x] Load it with `RoomLoader.add_root("res://tests/rooms/sensing")` and `RoomHarness.build(self, &"t_sensing")`.
+  - [x] Drive the player with its physics off, placing it by hand, and the camera with `cam.snap()` after each placement, so the play rect is exact.
+  - [x] Cases (each prints `ok`/`FAIL`, picks nodes by position, and frees what it spawns):
     1. **The M1 trace** (Task 1): replay it, and match every tick (state, monitorable, position rounded).
     2. **Target choice:** with the player (chain 10, ~110 px) and a flare stand-in at 120 px both noticed, the lurker telegraphs at the flare (`target.kind == &"flare"`), then hunts it, and is never `monitorable` on any tick of that telegraph or hunt (the player's poll reads `monitorable` itself, so that is "no damage"; `smoke_health` proves the poll). A tie (the stand-in's `fixed_radius` = the player's `radius()`) goes to the flare.
     3. **Flare → player:** while it hunts the flare, drop the stand-in's `fixed_radius` to 60 (under the notice radius). On the next tick the state is TELEGRAPH at the player, and it holds TELEGRAPH for at least `ceil(Spec.TELEGRAPH_MIN × 60)` ticks (to within one, as `smoke_rooms` counts) with `monitorable` false throughout, then HUNT and `monitorable`.
@@ -201,20 +201,20 @@ so that I always know what wakes them and I'm never hunted from the dark.
     9. **Q1, off screen:** a HUNT lurker whose target is sensed but which has left the play rect keeps hunting (still HUNT and `monitorable` after 0.3 s). A TELEGRAPH lurker that leaves the notice rect drops to IDLE or RETURN on that tick.
     10. **Q2, re-sense in the wait:** HUNT at the player, then the light under 80 px for 0.3 s (under the 0.6 s wait), then back. The lurker is HUNT and `monitorable` again on the next tick, with no TELEGRAPH (M1 behaviour, kept).
     11. **No world node:** with the stub removed from group `world`, a lurker never notices (the AR20 fallback).
-- [ ] **Task 7: Overlays (AC: 6).**
-  - [ ] Move the player's marks code into a per-light version, plus the per-predator label child, plus the hand-interpolated sense line and the stirring edge marker, as AC6.
-  - [ ] Keep `light_marks()`, `hp_text()` and `play_rect_on_screen()` public and pure.
-  - [ ] `smoke_dev_tools`:
+- [x] **Task 7: Overlays (AC: 6).**
+  - [x] Move the player's marks code into a per-light version, plus the per-predator label child, plus the hand-interpolated sense line and the stirring edge marker, as AC6.
+  - [x] Keep `light_marks()`, `hp_text()` and `play_rect_on_screen()` public and pure.
+  - [x] `smoke_dev_tools`:
     - its mode-2 tests (lines 699–767) pin today's drawers: `ov.player_marks` (a child of the player, lines 733, 745, 758, 767) and the `_draws` keys `"player"` and `"world"` (line 740, "lurker labels in the world"). They move with AC6: the player's marks now sit on its `LightSource`, and the lurker labels sit on `DevPredatorMarks`. Rewrite these checks to the new drawers, keeping what each proves (marks follow the live player across a respawn; leaving mode 2 frees them);
     - it still draws with no error;
     - with a flare stand-in present, mode 2 puts a `DevLightMarks` child on both the player's and the stand-in's `LightSource`, and a `DevPredatorMarks` child on each lurker;
     - leaving mode 2 frees them all;
     - `light_marks()` agrees with `Sensing` at 79.9 and 80.
-  - [ ] The steadiness itself can only be judged on the laptop (Task 12).
-- [ ] **Task 8: Lint (AC: 7).** Add `light_query` with its samples. Confirm `rules_purity` and `core_layer` stay quiet on `sensing.gd` (it names no Node, no Game, no actor class) and that the lint passes on the new `lurker.gd`.
-- [ ] **Task 9: Red-checks (AC: 8; D12).** Break each once, see `FAIL`, restore, and list them in the Completion Notes.
-- [ ] **Task 10: Docs and ledger (AC: 8; D13, D14).**
-- [ ] **Task 11: Full run.** `cd game && ./run_tests.sh` → `== ALL GREEN`; record the counts. Then `tools/export.sh` → `BUILD OK` (the web debug smoke boots with no `console.error`).
+  - [x] The steadiness itself can only be judged on the laptop (Task 12).
+- [x] **Task 8: Lint (AC: 7).** Add `light_query` with its samples. Confirm `rules_purity` and `core_layer` stay quiet on `sensing.gd` (it names no Node, no Game, no actor class) and that the lint passes on the new `lurker.gd`.
+- [x] **Task 9: Red-checks (AC: 8; D12).** Break each once, see `FAIL`, restore, and list them in the Completion Notes.
+- [x] **Task 10: Docs and ledger (AC: 8; D13, D14).**
+- [x] **Task 11: Full run.** `cd game && ./run_tests.sh` → `== ALL GREEN`; record the counts. Then `tools/export.sh` → `BUILD OK` (the web debug smoke boots with no `console.error`).
 - [ ] **Task 12: HALT for sonlm: the laptop look (AC: 8). Human gate.**
   - [ ] Hand sonlm the build lines (memory: laptop build-look commands).
     - **Web debug** (`?room=m1_shaft`, backquote to overlay 2) for the overlay and stirring.
@@ -471,12 +471,69 @@ The first matching row wins.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-22.
+
 ### Debug Log References
+
+- **Task 1 baseline** (tree `6dacb7d`, whose `game/` differs from `c40e75f` only in `art/player.png`): `./run_tests.sh` → `== ALL GREEN (29 tests)`, 2005 `ok`, matching the story's record.
+- **The M1 trace** was recorded by a throwaway script in the session scratchpad (run through the runner with an absolute path) before any game file was edited. Saved as `game/tests/fixtures/lurker_trace_m1.json`, 180 ticks: TELEGRAPH from tick 0, HUNT at 54 (`monitorable`), the chain break at 90 (harmless at once), RETURN at 125, still returning at 180. It was re-run after each step: identical after the light move (Task 3) and after the lurker rewrite (Tasks 4–5).
+- **Probe (4.7.2): freed objects and typed parameters.** Passing a `queue_free()`d `LightSource` to any typed parameter, `Object` included, is a `SCRIPT ERROR` ("previously freed … not a subclass of the expected argument class") before the body runs. A `Variant` parameter works, and `is_instance_valid()` is false. So `LightSource.live(s)` and the lurker's `notices()` / `senses()` / `stirs_for()` take an untyped source: a deviation from AC2/AC3's typed signatures, needed so each one answers false for a freed light, as the ACs require.
+- **Probe (4.7.2): when `queue_free()` lands.** A node freed after an `await physics_frame` is still valid for that same tick's callbacks and gone by the next tick. `smoke_lurker` case 5 waits for `is_instance_valid()` to turn false, then reads the state one tick later.
+- **Debugging during dev:** `var made := ov.mark_nodes()` failed type inference in a test (an untyped `Array` return), fixed with `var made: Array`. A `RETURN`-row ordering detail: M1 read the light before the step home, so the new `RETURN` computes its pick and stir before moving.
 
 ### Completion Notes List
 
+- **Sensing (AC1):** `rules/sensing.gd` as specified. `pick_target()` uses one `_beats()` comparison (a strictly larger radius, or a non-player light tying the player), so a tie between two decoys keeps the earlier index. `Spec` gained `NOTICE_FACTOR` and `STIR_REACH` with GDD quotes. `test_sensing` has 43 checks, with expected values from `Spec` and only the margin read from `Sensing` (after the ≥ 0 and "inside the play rect" checks).
+- **LightSource (AC2):** `player.tscn` has `LightSource` (kind `player`) at `Light`'s old slot, with `Light` under it unchanged. `player.gd` lost `_update_light`, `_shown_radius`, `_light`, `LIGHT_LERP` and `LIGHT_TEXTURE_HALF`, and gained the public `light_source`. The pogo calls `kick(LIGHT_KICK)` and `die()` calls `extinguish()`. `LIGHT_LERP` moved to `light_source.gd` (`test_tuning`'s M1 row now names that home, and the three sensing rows name `rules/sensing.gd`). `LightSource` keeps ticking with the player's physics off: presentation only, and no lurker reads it. Paths updated: `perf_run.gd` (its stand-ins stay plain BudgetLights, and the header says so), `smoke_perf.gd` (path and the parent filter), `test_light_budget.gd`, and `screenshot.gd` (the texture width replaces `Player.LIGHT_TEXTURE_HALF`).
+- **Lurker (AC3–AC5):** rewritten per D6, row by row, with one row per tick (no fall-through from the light-out rows). `force()`, `notices()`, `senses()`, `stirs_for()`, `_harmful()`, `target`, `stir`, `stirring`, `STIR_STEP_TIME` 0.35 s, plus a guarded `Log.LURKER` line per state change. **One contradiction in the story, resolved by AC5:** row I1 says `_enter(TELEGRAPH)` sets `stir = 0`, but AC5, D9 and D12 say `stir` never resets outside its clock (a reset on TELEGRAPH is one of D12's red-checks). The build follows AC5: `stir` steps on one clock in every state, and nothing else writes it. A `STIR_CLOCK_SLACK` of 1e-6 keeps the step on tick 21: 21 × 1/60 sums to a hair under 0.35.
+- **Callers migrated in the same change (Task 5):** `overlays.gd`, `smoke_rooms.gd`, `smoke_health.gd`, `smoke_world.gd`, `smoke_dev_tools.gd`, plus `test_dev_args.gd`, which the story's list missed (it read `Lurker.NOTICE_*`). Every M1 guarantee in `smoke_rooms`, `smoke_world` and `smoke_health` passed with only the seam change; no threshold or expected value was touched.
+- **smoke_lurker (Tasks 1, 6):** all 11 cases. Two additions beyond the list: a **T3 case** (a switch from the flare onto the player mid-telegraph restarts the telegraph in full). Case 3 drops the flare while the lurker *hunts* it, which is row H3, so D12's "T3 continuing the timer" red-check had nothing to fail without it. Also a separate **first-tick** case on a freshly spawned player at chain 10. The across-the-edge pacing run alternates **two ticks a side**: a lurker stirs only on a tick it starts in IDLE or RETURN, so flipping every tick only swapped TELEGRAPH and RETURN, and `stir` never moved (a vacuous count; the premise check caught it).
+- **Overlays (AC6):** per-node `DevLightMarks` on every lit `LightSource` (radius ring, reach ring, `<kind> N px`, and the HP line for the player's) and `DevPredatorMarks` on every predator (`IDLE` / `TELEGRAPH flare` / `HUNT player`, ` stir N`). The sense line's ends are blended by hand from positions recorded at physics priority 100; a jump over 32 px counts as a teleport and snaps. The magenta stir marker sits at the play rect's edge in screen pixels. `player_marks` is gone; `mark_nodes()`, `predator_label()` and `stir_marker_at()` are new (public). `smoke_dev_tools`' mode-2 tests were rewritten to the new drawers, keeping what each proved, plus a stir-marker draw.
+- **Lint (AC7):** `light_query` (`code` pattern, `only = ["actors/"]`, `allow` empty), with 3 firing samples and 5 near-misses. The rule's `why` is printed on each FAIL line (a small `test_lint` change: rows may now carry `why`). `rules_purity` and `core_layer` are quiet on `sensing.gd`: lint 34 files, 16 rules, 0 hits.
+- **Perf (Task 3, Q1):** `smoke_perf` stays green. Its 3 s summary moved one number, `sprites max` from 1 to 3 (`lights max 6/6`, `over 0` unchanged), as Q1 predicted: hunters that trail out of view keep hunting, so more lurker glows are lit at once and the budget demotes more of them to sprites. Frame times are server noise (worst 10.6 → 12.0 ms, 0 over 20 ms). Nothing was retuned.
+- **Ledger (D13):** closed the overlay-constants item and the `LightSource`-drives-`BudgetLight` item; appended to the 1.22 and 1.23 items; added the Q1 note under "way too easy to dodge". The drift item stays open until the laptop look (Task 12). No new items.
+- **Docs (D14):** `component-inventory.md` (new Sensing and LightSource sections; the Player, Lurker, overlays and test rows), `development-guide.md` (overlays 1 and 2, "Tune a lurker", `light_query`, the test list), `architecture.md` (the Lurker warning gap), `source-tree-analysis.md`, `game/README.md`, `game-architecture.md` (Light-as-Signal: the table, data flow, the notice/sense split, stir regions and step, the "as built" note, the lint), the GDD's Lurker bullets (dated lines for Q1–Q3 only; the three veto-able calls stay in the decision log), `decision-log.md` (the 2026-11-22 entry), and `project-context.md`.
+
+- **Red-checks (Task 9, D12):** each mutation applied by a script, its test run, the file restored. Every one turned red:
+  - `can_sense` with `<`: `test_sensing` "160 px … inclusive" (and straight up).
+  - `NOTICE_MIN_RADIUS` 79: `test_sensing` "79.9 px never sensed / noticed / stirs" and the Spec equality.
+  - `pick_target` letting the player win ties: `test_sensing`'s three tie checks and `smoke_lurker`'s tie ("target player").
+  - `can_stir` without the notice-rect exclusion: "0.5 px inside the notice rect: notices and does not stir".
+  - T3 continuing the timer: the new mid-telegraph case ("24 ticks, at least 45").
+  - H3 staying in HUNT (an extra, not in D12): case 3 ("state HUNT", "1 ticks").
+  - H4 entering TELEGRAPH: case 4 ("state TELEGRAPH"; "never a TELEGRAPH tick").
+  - `_harmful` without the kind test: "never monitorable … of that telegraph or hunt" and case 4's "monitorable true".
+  - `extinguish()` removed from `die()`: `smoke_lurker` (the group check, "next tick is RETURN" got HUNT, "never notices a dead player's light") and `smoke_world`'s "one frame after the death the lurker drops the hunt (state 2)".
+  - `stir` with no step limit: "stir 2 after 21 ticks (got 1)", the pacing counts by the light (60) and across the edge (30).
+  - `stir` reset to 0 on entering TELEGRAPH: the across-the-edge count (6 > 3).
+  - `LightSource.radius()` returning the shown radius: the tick after `kick()` (and 28 other checks, the M1 trace included).
+  - `LightSource` setting `light.enabled = true` each tick: "a demoted light stays demoted".
+  - T2 using the sense rule: case 9's telegraph half ("got TELEGRAPH"), plus the edge-pacing premise.
+  - The lint pattern emptied: `light_query`'s three firing samples.
+- **Full run (Task 11):** `cd game && ./run_tests.sh` gave `== ALL GREEN (31 tests)`, 2120 `ok` (from 29 and 2005). `smoke_rooms`' guarantees are unchanged and green. `xvfb-run … screenshot.gd` renders both shots and the three Deck mocks with no error (the chain-10 light and the lurker's telegraph show). `tools/export.sh` gave **BUILD OK** `builds/20261122-6dacb7d-dirty` (uncommitted tree): web 11.0 MB gzip (raw 40.8 MB), PCK files 94 / 94 / 94 / 102, the Linux release boot clean, the web smoke 7 passed, 149 s.
+- **Status:** tests green; needs a look on the laptop (Task 12, HALT). The story stays `in-progress` until sonlm's answers are recorded.
+
 ### File List
+
+**New**
+- `game/scripts/rules/sensing.gd`, `game/scripts/rules/sensing.gd.uid`
+- `game/scripts/actors/light_source.gd`, `game/scripts/actors/light_source.gd.uid`
+- `game/tests/test_sensing.gd`, `game/tests/test_sensing.gd.uid`
+- `game/tests/smoke_lurker.gd`, `game/tests/smoke_lurker.gd.uid`
+- `game/tests/rooms/sensing/t_sensing.txt`
+- `game/tests/fixtures/lurker_trace_m1.json`
+
+**Changed**
+- `game/scenes/actors/player.tscn`
+- `game/scripts/actors/player.gd`, `game/scripts/actors/lurker.gd`
+- `game/scripts/dev/overlays.gd`, `game/scripts/dev/perf_run.gd`
+- `game/tests/spec.gd`, `game/tests/test_lint.gd`, `game/tests/test_light_budget.gd`, `game/tests/test_tuning.gd`, `game/tests/test_dev_args.gd`, `game/tests/smoke_rooms.gd`, `game/tests/smoke_health.gd`, `game/tests/smoke_world.gd`, `game/tests/smoke_dev_tools.gd`, `game/tests/smoke_perf.gd`, `game/tests/screenshot.gd`
+- `game/README.md`, `docs/component-inventory.md`, `docs/development-guide.md`, `docs/architecture.md`, `docs/source-tree-analysis.md`
+- `_bmad-output/game-architecture.md`, `_bmad-output/project-context.md`
+- `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md`, `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/decision-log.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`, `_bmad-output/implementation-artifacts/1-20-light-sensing-for-predators.md`
 
 ## Change Log
 
 - 2026-11-22: story created (`gds-create-story`), status ready-for-dev; Q1–Q3 answered by sonlm at creation (all three recommended options).
+- 2026-11-22: implemented (`gds-dev-story`), Tasks 1–11 done: `Sensing`, `LightSource` on the player, the lurker rewrite (D6, Q1–Q3), overlay 2 per light and per predator, lint `light_query`, `test_sensing` and `smoke_lurker` (the M1 trace fixture); 31 tests, 2120 ok; BUILD OK `20261122-6dacb7d-dirty`. HALT at Task 12 for sonlm's laptop look.

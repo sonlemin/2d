@@ -26,7 +26,8 @@ const ACTORS := {
 ## A row is moved to Tuning (`keys`), kept as a local const (`local`), per instance (`instance`),
 ## or became a player setting (`setting`, Story 1.8: the Snuff hold is Settings.light_tap_window's
 ## default, never a Tuning key). A `local` row whose const moved to another script names it in
-## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd; Story 1.16: the eye pulse to core/fx.gd).
+## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd; Story 1.16: the eye pulse to core/fx.gd;
+## Story 1.20: the light easing to actors/light_source.gd, the sensing consts to rules/sensing.gd).
 ## BASE keys new in M2, with no M1 export behind them (Story 1.19: bank_heal_min, GDD Health).
 const M2_KEYS: Array[StringName] = [&"bank_heal_min"]
 const M1: Array[Dictionary] = [
@@ -57,21 +58,21 @@ const M1: Array[Dictionary] = [
 	{m1 = "player.knockback", value = Vector2(150, -150), keys = [&"knockback_x", &"knockback_y"]},
 	{m1 = "player.invuln_time", value = 0.6, keys = [&"invuln_time"]},
 	{m1 = "player.snuff_hold", value = 0.12, setting = &"light_tap_window", gone = "SNUFF_HOLD"},
-	{m1 = "player.light_lerp", value = 10.0, local = "LIGHT_LERP"},
+	{m1 = "player.light_lerp", value = 10.0, local = "LIGHT_LERP", home = "res://scripts/actors/light_source.gd"},  # Story 1.20: the light eases itself
 	{m1 = "crawler.hover", value = false, instance = true},
 	{m1 = "crawler.walk_speed", value = 25.0, keys = [&"crawler_walk_speed"]},
 	{m1 = "crawler.gravity", value = 900.0, keys = [&"crawler_gravity"]},
 	{m1 = "crawler.hover_drift", value = 10.0, keys = [&"crawler_hover_drift"]},
 	{m1 = "crawler.hover_period", value = 2.4, keys = [&"crawler_hover_period"]},
-	{m1 = "lurker.notice_min_radius", value = 80.0, local = "NOTICE_MIN_RADIUS"},
-	{m1 = "lurker.notice_factor", value = 1.6, local = "NOTICE_FACTOR"},
+	{m1 = "lurker.notice_min_radius", value = 80.0, local = "NOTICE_MIN_RADIUS", home = "res://scripts/rules/sensing.gd"},  # Story 1.20: one rule for every predator
+	{m1 = "lurker.notice_factor", value = 1.6, local = "NOTICE_FACTOR", home = "res://scripts/rules/sensing.gd"},
 	{m1 = "lurker.telegraph_time", value = 0.9, keys = [&"lurker_telegraph_time"]},
 	{m1 = "lurker.lose_track_time", value = 0.6, keys = [&"lurker_lose_track_time"]},
 	{m1 = "lurker.hunt_speed", value = 95.0, keys = [&"lurker_hunt_speed"]},
 	{m1 = "lurker.hunt_accel", value = 220.0, keys = [&"lurker_hunt_accel"]},
 	{m1 = "lurker.return_speed", value = 40.0, keys = [&"lurker_return_speed"]},
 	{m1 = "lurker.eye_pulse_hz", value = 2.0, local = "EYE_PULSE_HZ", home = "res://scripts/core/fx.gd"},  # Story 1.16: the flash-rate table owns it
-	{m1 = "lurker.screen_margin", value = 8.0, local = "SCREEN_MARGIN"},
+	{m1 = "lurker.screen_margin", value = 8.0, local = "SCREEN_MARGIN", home = "res://scripts/rules/sensing.gd"},
 	{m1 = "lurker.glow_energy", value = 1.3, local = "GLOW_ENERGY"},
 	{m1 = "lurker.eye_open_time", value = 0.2, local = "EYE_OPEN_TIME"},
 ]

@@ -323,8 +323,8 @@ func _tscn_files(dir: String) -> Array[String]:
 ## The two scenes with lights, instanced but never added to the tree (no _ready, no side effects).
 func _test_scene_ranks() -> void:
 	var player := (load("res://scenes/actors/player.tscn") as PackedScene).instantiate()
-	var light := player.get_node_or_null(^"Light")
-	check(light is BudgetLight, "player.tscn's Light is a BudgetLight")
+	var light := player.get_node_or_null(^"LightSource/Light")
+	check(light is BudgetLight, "player.tscn's LightSource/Light is a BudgetLight")
 	if light is BudgetLight:
 		check(light.rank == A, "...of rank ALWAYS: the player's light is never demoted")
 	player.queue_free()

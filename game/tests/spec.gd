@@ -9,6 +9,8 @@ const TELEGRAPH_MIN := 0.75  ## GDD Predators: Lurker: "Telegraph: 0.9 s (never 
 const BOT_MIN_CHAIN := 5  ## GDD Level Progression: "an automated bot must reach a chain of ≥ 5 in every spine shaft", plain movement, no dash.
 const BASE_LIGHT := 40.0  ## GDD Attack, pogo and chain: Chain-Light "40 px at 0 links"; never noticed, since a lurker wakes only at ≥ 80 px.
 const NOTICE_MIN_RADIUS := 80.0  ## GDD Predators: Lurker: "Wakes: when your light radius is ≥ 80 px (4 links)"; a floor: a lurker may wake later, never earlier.
+const NOTICE_FACTOR := 1.6  ## GDD Predators: Lurker: "Wakes: … it is within radius × 1.6 of you" and Hunt: "you are within radius × 1.6"; exact: the reach of every light-sensing predator.
+const STIR_REACH := 96.0  ## GDD Predators: Lurker: "Stirs (off screen): if it would wake but sits just off screen (within 96 px of the edge)"; exact: how far past the play area a lurker still warns.
 const LEDGE_FALL_TIME := 1.5  ## GDD Level Types: spine shaft "ledges every ≤ 1.5 s of fall"; Sequence Breaking: "a ledge or wall to cling to within a 210 px/s fall of 1.5 s".
 const LEDGE_FALL_MAX := 315.0  ## GDD Level Types / Sequence Breaking: 1.5 s at 210 px/s = 315 px; spine ledges and hazard pits are measured in rows against it.
 const NARROW_MIN := 6  ## GDD Level Types: Narrow stretch "6–10 tiles wide; no ledges; walls always within reach": the narrowest open run in a cling= stretch row.

@@ -1,7 +1,8 @@
 class_name Player
 extends CharacterBody2D
 ## The descender. Runs, jumps, dashes, slashes on the ground and pogos (Attack in the air).
-## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light (light radius).
+## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light: the light
+## radius its LightSource child reports to predators and shows through its BudgetLight (Story 1.20).
 ## Landing or holding Light past the tap window (Snuff) breaks the chain. A hit costs HP (Health, per
 ## life); a predator hurts only while monitorable. hurt() is the one damage path, for every source
 ## (Story 1.19 D2): World's spike poll calls it, and so does the contact poll here.
@@ -14,10 +15,8 @@ signal pogo_hit
 
 # Gameplay numbers live in rules/tuning.gd and are read through Game.tuning each tick (AR15).
 # These stay local because no system bends them (Story 1.3 D1).
-const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads chain.light_radius(), never this (M1 player.light_kick).
-const LIGHT_LERP := 10.0  ## 1/s easing of the visible light toward its target radius; presentation (M1 player.light_lerp).
+const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads LightSource.radius() (the chain's), never this (M1 player.light_kick).
 const HITSTOP_SCALE := 0.05  ## time scale during a pogo hitstop: it only makes the freeze a freeze; its length is Tuning hitstop (Story 1.3 D3).
-const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px
 
 var chain := ChainState.new()
 var health := Health.new()  ## per-life (AR12): a respawn is a new Player, so full HP (FR13)
@@ -36,7 +35,6 @@ var _swing_left := 0.0
 var _swing_cd := 0.0
 var _swing_is_pogo := false
 var _swing_hit := false                 ## a swing connects at most once for the chain
-var _shown_radius := ChainState.BASE_RADIUS
 var _clinging := false
 var _cling_side := 0
 var _cling_left := 0.0
@@ -49,16 +47,18 @@ var _flash_white := false  # that flash may draw white (the Q1 gap allowed it)
 var last_white_frame := -1
 
 @onready var _sprite: Sprite2D = $Sprite
-@onready var _light: PointLight2D = $Light
 @onready var _slash: Area2D = $Slash
 @onready var _pogo: Area2D = $Pogo
 @onready var _hurtbox: Area2D = $Hurtbox
 ## Public for tests and scripted moments (`player.input.lock()`).
 @onready var input: PlayerInput = $PlayerInput
+## The Chain-Light as predators sense it (AR28): radius() is chain.light_radius(); it sizes the light.
+@onready var light_source: LightSource = $LightSource
 
 
 func _ready() -> void:
 	add_to_group("player")
+	light_source.radius_fn = chain.light_radius
 	chain.changed.connect(_on_chain_changed)
 	chain.banked.connect(_on_banked)
 	chain.ended.connect(_on_chain_ended)
@@ -94,7 +94,7 @@ func _physics_process(delta: float) -> void:
 		chain.break_chain()  # Landing breaks the chain; the ground is a sanctuary.
 	_process_swing()
 	_poll_contacts()  # after the landing break, Snuff and cling: a hit on an escape tick finds the chain already banked (D3)
-	_update_light(delta)
+	# The light eases in LightSource's own tick, which runs after this one (a child after its parent).
 
 
 ## The pogo squash eases back on the physics tick at one tick = 1/60 s of real time, as CameraRig
@@ -248,7 +248,7 @@ func _on_pogo_hit() -> void:
 	_can_dash = true  # pogo refreshes the air dash: keeps the chain steerable
 	_cling_left = Game.tuning.f(&"cling_grace")
 	chain.add_hit()
-	_shown_radius += LIGHT_KICK
+	light_source.kick(LIGHT_KICK)
 	_sprite.scale = Vector2(0.75, 1.3)  # stretch up out of the bounce
 	pogo_hit.emit()
 	Fx.chain_popup(_fx_parent(), global_position, chain.count, ChainState.ember_value(chain.count))
@@ -294,11 +294,6 @@ func _apply_bloom() -> void:
 	_slash.scale = Vector2(s * _facing, s)
 	_pogo.scale = Vector2(s, s)
 
-
-func _update_light(delta: float) -> void:
-	var target := chain.light_radius()
-	_shown_radius = lerpf(_shown_radius, target, clampf(LIGHT_LERP * delta, 0.0, 1.0))
-	_light.texture_scale = _shown_radius / LIGHT_TEXTURE_HALF
 
 
 ## Contact damage, polled every tick, never entered/exited (D3): a crawler or a lurker still
@@ -413,6 +408,7 @@ func die(cause: StringName = &"") -> void:
 		return
 	death_cause = cause
 	is_dead = true
+	light_source.extinguish()  # D5: nothing senses a dead player; a hunt of this light ends at once
 	_end_cling()
 	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen
 	var lost := chain.lose()  # unbanked embers die with you

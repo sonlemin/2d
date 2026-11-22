@@ -159,7 +159,7 @@ func _check_tuning() -> void:
 			"Spec.LEDGE_FALL_MAX %.0f px at the tuned max fall %.0f px/s takes %.2f s, at most Spec.LEDGE_FALL_TIME %.2f s" % [Spec.LEDGE_FALL_MAX, max_fall, Spec.LEDGE_FALL_MAX / max_fall, Spec.LEDGE_FALL_TIME])
 	var telegraph := Game.tuning.f(&"lurker_telegraph_time")
 	check(telegraph >= Spec.TELEGRAPH_MIN, "the tuned telegraph %.2f s is at least Spec.TELEGRAPH_MIN %.2f s" % [telegraph, Spec.TELEGRAPH_MIN])
-	check(Lurker.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "a lurker never wakes below Spec.NOTICE_MIN_RADIUS (Lurker.NOTICE_MIN_RADIUS %.0f)" % Lurker.NOTICE_MIN_RADIUS)
+	check(Sensing.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "a lurker never wakes below Spec.NOTICE_MIN_RADIUS (Sensing.NOTICE_MIN_RADIUS %.0f)" % Sensing.NOTICE_MIN_RADIUS)
 
 
 # --- The harness ------------------------------------------------------------------------------
@@ -256,14 +256,14 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 	await _build(rec)
 	var lurker := _lurkers()[index]
 	var who := "%s lurker %d at %s" % [rec.id, index, Vector2i(lurker.global_position / Room.TILE)]
-	_only(null)  # paused: senses() is only asked
+	_only(null)  # paused: notices() is only asked
 	_player.set_physics_process(false)
 	# 1. Base light, point-blank.
 	_player.chain.break_chain()
 	place(lurker.global_position)
 	await frames(1)
 	check(_player.light_radius() <= Spec.BASE_LIGHT, "%s: base light is at most Spec.BASE_LIGHT %.0f px (got %.1f)" % [who, Spec.BASE_LIGHT, _player.light_radius()])
-	check(not lurker.senses(_player), "%s: base light is never noticed, even point-blank" % who)
+	check(not lurker.notices(_player.light_source), "%s: base light is never noticed, even point-blank" % who)
 	# 2. The notice floor: the largest light under it is never noticed point-blank; one more link
 	# (over the lurker's own floor) is, from the same spot, so "never" is not "never on screen".
 	var under := 0
@@ -271,12 +271,12 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 		under += 1
 	_add_links(under)
 	check(under > 0 and _player.light_radius() < Spec.NOTICE_MIN_RADIUS, "%s: setup: chain %d gives %.1f px, the largest light under Spec.NOTICE_MIN_RADIUS %.0f px" % [who, under, _player.light_radius(), Spec.NOTICE_MIN_RADIUS])
-	check(not lurker.senses(_player), "%s: light under Spec.NOTICE_MIN_RADIUS is never noticed, even point-blank (chain %d)" % [who, under])
+	check(not lurker.notices(_player.light_source), "%s: light under Spec.NOTICE_MIN_RADIUS is never noticed, even point-blank (chain %d)" % [who, under])
 	var added := 0  # bounded on its own: the chain caps at MAX_CHAIN, so a count bound could never end
-	while _player.light_radius() < Lurker.NOTICE_MIN_RADIUS and added < ChainState.MAX_CHAIN:
+	while _player.light_radius() < Sensing.NOTICE_MIN_RADIUS and added < ChainState.MAX_CHAIN:
 		_player.chain.add_hit()
 		added += 1
-	check(lurker.senses(_player), "%s: control: chain %d (%.1f px) is noticed from the same spot" % [who, _player.chain.count, _player.light_radius()])
+	check(lurker.notices(_player.light_source), "%s: control: chain %d (%.1f px) is noticed from the same spot" % [who, _player.chain.count, _player.light_radius()])
 	# 3. Off-screen: the biggest light, the lurker just outside the play rect but in its reach.
 	_player.chain.break_chain()
 	_add_links(ChainState.MAX_CHAIN)
@@ -284,15 +284,15 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 	if side == "":
 		check(true, "%s: off-screen skipped: no spot in the room puts the lurker off screen within reach" % who)
 	else:
-		var reach := _player.light_radius() * Lurker.NOTICE_FACTOR
+		var reach := _player.light_radius() * Sensing.NOTICE_FACTOR
 		var d := lurker.global_position.distance_to(_player.global_position)
 		check(d <= reach and not _parts.world.play_rect().has_point(lurker.global_position),
 				"%s: premise: the player %s it, %.0f px away (reach %.0f px), and it is just outside the play rect" % [who, side, d, reach])
-		check(not lurker.senses(_player), "%s: a lurker outside the play rect never notices, whatever the light (chain %d)" % [who, _player.chain.count])
+		check(not lurker.notices(_player.light_source), "%s: a lurker outside the play rect never notices, whatever the light (chain %d)" % [who, _player.chain.count])
 		# Control: the same light at the same distance with the lurker on screen is noticed, so the
 		# verdict above is the screen rule, not distance or light.
 		if _place_on_screen(lurker, d):
-			check(lurker.senses(_player), "%s: control: the same light %.0f px away with the lurker on screen is noticed" % [who, d])
+			check(lurker.notices(_player.light_source), "%s: control: the same light %.0f px away with the lurker on screen is noticed" % [who, d])
 		else:
 			check(true, "%s: off-screen control skipped: no spot %.0f px away keeps the lurker on screen" % [who, d])
 	# 4. The telegraph, measured: frames seen in TELEGRAPH until it ends (it may have started up to a
@@ -301,7 +301,7 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 	_add_links(ESCAPE_CHAIN)
 	var toward := signf(_room.bounds().get_center().x - lurker.global_position.x)
 	place(lurker.global_position + Vector2((toward if toward != 0.0 else 1.0) * TELEGRAPH_GAP, 0))
-	check(lurker.senses(_player), "%s: setup: chain %d, %.0f px away on screen, is noticed" % [who, ESCAPE_CHAIN, TELEGRAPH_GAP])
+	check(lurker.notices(_player.light_source), "%s: setup: chain %d, %.0f px away on screen, is noticed" % [who, ESCAPE_CHAIN, TELEGRAPH_GAP])
 	_only(lurker)
 	for i in 10:
 		await frames(1)
@@ -323,10 +323,10 @@ func _test_lurker(rec: Dictionary, index: int) -> void:
 
 ## Straight below the lurker, else above, else beside it (a room wider than the play area hides
 ## it behind a gutter), at the first distance where it leaves the play rect (AR20: "on screen" is
-## the play rect, so the lurker's own SCREEN_MARGIN is what is tested). The player stays inside the
+## the play rect, so Sensing's SCREEN_MARGIN is what is tested). The player stays inside the
 ## room and inside the light's reach. Returns where the player is, or "" when no direction works.
 func _place_off_screen(lurker: Lurker) -> String:
-	var reach := _player.light_radius() * Lurker.NOTICE_FACTOR
+	var reach := _player.light_radius() * Sensing.NOTICE_FACTOR
 	var dirs := {"is below": Vector2.DOWN, "is above": Vector2.UP, "is left of": Vector2.LEFT, "is right of": Vector2.RIGHT}
 	for label: String in dirs:
 		var d := 0.0
@@ -350,7 +350,7 @@ func _place_on_screen(lurker: Lurker, d: float) -> bool:
 		if dir == Vector2.ZERO or not _room.bounds().has_point(pos):
 			continue
 		place(pos)
-		if _parts.world.play_rect().grow(-Lurker.SCREEN_MARGIN).has_point(lurker.global_position):
+		if Sensing.notice_rect(_parts.world.play_rect()).has_point(lurker.global_position):
 			return true
 	return false
 
@@ -379,12 +379,12 @@ func _test_contact(rec: Dictionary) -> void:
 	check(lurker.state == Lurker.State.IDLE and hits.is_empty() and _player.health.hp == Spec.MAX_HP,
 			"%s: touching an IDLE lurker deals no damage (no telegraph yet; damaged %s, HP %d)" % [rec.id, hits, _player.health.hp])
 	_add_links(ESCAPE_CHAIN)  # a big light: the lurker keeps the scent
-	lurker._enter(Lurker.State.TELEGRAPH)
+	lurker.force(Lurker.State.TELEGRAPH, _player.light_source)
 	lurker.global_position = _player.global_position
 	await frames(3)
 	check(lurker.state == Lurker.State.TELEGRAPH and not lurker.monitorable and hits.is_empty() and _player.health.hp == Spec.MAX_HP,
 			"%s: touching a TELEGRAPHING lurker deals no damage, even with a big light (the telegraph is the warning; damaged %s)" % [rec.id, hits])
-	lurker._enter(Lurker.State.HUNT)
+	lurker.force(Lurker.State.HUNT, _player.light_source)
 	lurker.global_position = _player.global_position
 	var harmful := false
 	for i in 3:
@@ -492,7 +492,7 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 		check(held == need - 2 and not _player.input.snuff_active, "%s: premise: Light held %d ticks, not yet a Snuff (it Snuffs on held tick %d)" % [who, held, need])
 	var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
 	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * gap, 0)
-	lurker._enter(Lurker.State.HUNT)
+	lurker.force(Lurker.State.HUNT, _player.light_source)
 	lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
 	_only(lurker)
 	await frames(1)
@@ -570,7 +570,7 @@ func _test_tightest_escape(rec: Dictionary) -> void:
 	_player.velocity.y = 60.0  # falling
 	var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
 	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * ESCAPE_GAP, 0)
-	lurker._enter(Lurker.State.HUNT)
+	lurker.force(Lurker.State.HUNT, _player.light_source)
 	lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
 	_only(lurker)
 	# At least one tick first: is_on_floor() still reads the move before the teleport.
@@ -620,7 +620,7 @@ func _test_listed_on_landing(rec: Dictionary) -> void:
 		_player.velocity.y = 60.0  # falling
 		var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
 		lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * ESCAPE_GAP, 0)
-		lurker._enter(Lurker.State.HUNT)
+		lurker.force(Lurker.State.HUNT, _player.light_source)
 		lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
 		_only(lurker)
 		var waited := 0

@@ -272,14 +272,14 @@ func test_lurker_hunt() -> void:
 	await _fresh(spot)
 	var l := _lurker()
 	_hits.clear()
-	l._enter(Lurker.State.HUNT)
+	l.force(Lurker.State.HUNT, _p().light_source)
 	l.global_position = _p().global_position + Vector2(-4, 0)
 	var at := await _await_hit(10)
 	var p := _p()
 	check(at > 0 and _hits[0] == [Spec.DAMAGE[&"lurker"], &"lurker"] and p.health.hp == Spec.MAX_HP - 2,
 			"a HUNT lurker on the player: damaged(2, lurker), HP %d (got %s, HP %d)" % [Spec.MAX_HP - 2, _hits, p.health.hp])
 	check(p.velocity == Vector2(150.0, -150.0), "...knocked back away from it, as a crawler knocks (got %s)" % p.velocity)
-	l._enter(Lurker.State.IDLE)
+	l.force(Lurker.State.IDLE)
 	l.global_position = l._home
 
 
@@ -307,7 +307,7 @@ func test_lurker_harmless() -> void:
 		await _fresh(spot)
 		var l := _lurker()
 		_hits.clear()
-		l._enter(s)
+		l.force(s, _p().light_source)
 		var premise := true
 		for i in 20:
 			l.global_position = _p().global_position
@@ -317,7 +317,7 @@ func test_lurker_harmless() -> void:
 					and l.global_position.distance_to(_p().global_position) < 7.0
 		check(premise, "(premise) the %s lurker stays on the player, out of HUNT and not monitorable, for the 20 ticks (state %s)" % [Lurker.State.keys()[s], Lurker.State.keys()[l.state]])
 		check(_hits.is_empty() and _p().health.hp == Spec.MAX_HP, "a %s lurker on the player for 20 ticks deals no damage (got %s)" % [Lurker.State.keys()[s], _hits])
-		l._enter(Lurker.State.IDLE)
+		l.force(Lurker.State.IDLE)
 		l.global_position = l._home
 
 
@@ -333,7 +333,7 @@ func test_stale_list() -> void:
 	var hurtbox := p.get_node("Hurtbox") as Area2D
 	_hits.clear()
 	p.health.invuln = 10.0
-	l._enter(Lurker.State.HUNT)
+	l.force(Lurker.State.HUNT, p.light_source)
 	l.global_position = p.global_position
 	var listed := false
 	for i in 10:
@@ -348,7 +348,7 @@ func test_stale_list() -> void:
 	await frames(1)
 	check(listed and still and _hits.is_empty() and p.health.hp == Spec.MAX_HP,
 			"a lurker listed by the Hurtbox but no longer monitorable deals no damage on that tick (premise: listed %s, still listed %s; got %s)" % [listed, still, _hits])
-	l._enter(Lurker.State.IDLE)
+	l.force(Lurker.State.IDLE)
 	l.global_position = l._home
 
 
@@ -363,7 +363,7 @@ func test_predator_first() -> void:
 	_hits.clear()
 	p.health.invuln = 10.0
 	p.place_at(Vector2(_walker().position.x + 6.0, 132.0))
-	l._enter(Lurker.State.HUNT)
+	l.force(Lurker.State.HUNT, p.light_source)
 	var both := false
 	for i in 10:
 		l.global_position = p.global_position
@@ -374,7 +374,7 @@ func test_predator_first() -> void:
 	p.health.invuln = 0.0  # between ticks: the next poll sees both
 	await frames(1)
 	check(both and _hits == [[Spec.DAMAGE[&"lurker"], &"lurker"]], "a lurker and a walker on the player in one tick: the lurker's 2 is taken, one hit only (premise: both listed %s; got %s)" % [both, _hits])
-	l._enter(Lurker.State.IDLE)
+	l.force(Lurker.State.IDLE)
 	l.global_position = l._home
 
 

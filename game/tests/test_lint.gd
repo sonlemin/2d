@@ -125,6 +125,15 @@ const RULES: Array[Dictionary] = [
 	# can't see (review covers it): text built in a variable on an earlier line, a sink and its
 	# literal on different lines (a wrapped call), and a sink reached by name
 	# (`call("set_text", …)`). dev/ is skipped: the overlays are debug text, never shipped.
+	# AR29 (Story 1.20 D11): "Never call get_first_node_in_group("player") to sense light". Actors
+	# (predators live there) never look the player up by group: they sense lights through
+	# LightSource + Sensing (group light_source). dev/ (the overlays) and world/ may still find the
+	# player; an actor that truly needs it later goes in `allow` with its reason. `why` is printed
+	# with each hit.
+	{id = &"light_query", bare = [],
+		code = [r"\b(get_first_node_in_group|get_nodes_in_group|is_in_group)\s*\(\s*&?[\x22\x27]player[\x22\x27]"],
+		only = ["actors/"], skip = [], allow = [],
+		why = "predators sense light through LightSource + Sensing (AR28, AR29)"},
 	{id = &"raw_text", bare = [], code = [
 			r"(?:(?<!\w)(?<!var\s)(?<!const\s)text\s*\+?=(?!=)|\b(?:tooltip_text|placeholder_text)\s*\+?=(?!=)|\b(?:set_text|popup|draw_string|draw_multiline_string|add_item|append_text|add_text)\s*\()(?:[^\x22\x27]|\x22(?:\\.|[^\x22\\])*\x22|\x27(?:\\.|[^\x27\\])*\x27)*?(?:(?<!&)\x22(?![A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\x22)(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x22\\\p{L}])*+\p{L}(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x22\\\p{L}])*+\p{L}|(?<!&)\x27(?![A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\x27)(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x27\\\p{L}])*+\p{L}(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x27\\\p{L}])*+\p{L})"],
 		only = [], skip = ["dev/"], allow = []},
@@ -422,6 +431,15 @@ const SAMPLES: Array = [
 	[&"raw_light", "actors/flare.gd", "\t# PointLight2D.new()", false],
 	[&"raw_light", "actors/flare.gd", "\tvar s := \"PointLight2D.new()\"", false],
 	[&"raw_light", "actors/player.gd", "@onready var _light: PointLight2D = $Light", false],
+	# Story 1.20 D11: actors never look the player up by group.
+	[&"light_query", "actors/lurker.gd", "\t_player = get_tree().get_first_node_in_group(\"player\") as Node2D", true],
+	[&"light_query", "actors/weaver.gd", "\tfor p in get_tree().get_nodes_in_group(&\"player\"):", true],
+	[&"light_query", "actors/lurker.gd", "\tif body.is_in_group('player'):", true],
+	[&"light_query", "actors/lurker.gd", "\tfor n in get_tree().get_nodes_in_group(LightSource.GROUP):", false],
+	[&"light_query", "actors/lurker.gd", "\tfor n in get_tree().get_nodes_in_group(&\"light_source\"):", false],
+	[&"light_query", "actors/player.gd", "\tadd_to_group(\"player\")", false],
+	[&"light_query", "dev/overlays.gd", "\tvar p := get_tree().get_first_node_in_group(\"player\")", false],
+	[&"light_query", "world/world.gd", "\tvar p := get_tree().get_first_node_in_group(\"player\")", false],
 	[&"tests_ref", "world/world.gd", "const S := preload(\"res://tests/spec.gd\")", true],
 	[&"tests_ref", "core/game.gd", "\tvar p := \"res://tests/fixtures/slot_v1.json\"", true],
 	[&"tests_ref", "world/world.gd", "## the spec lives in res://tests/spec.gd", false],
@@ -564,7 +582,8 @@ func _test_tree() -> void:
 	var total := 0
 	for rel: String in sources:
 		for h in lint_text(rel, sources[rel], names):
-			print("FAIL lint %s:%d %s" % [rel, h.line, h.rule])
+			var why: String = RULES.filter(func(r: Dictionary) -> bool: return r.id == h.rule)[0].get("why", "")
+			print("FAIL lint %s:%d %s%s" % [rel, h.line, h.rule, (": " + why) if why != "" else ""])
 			_fail += 1
 			total += 1
 	if total == 0:

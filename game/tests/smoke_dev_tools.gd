@@ -127,6 +127,7 @@ func run() -> void:
 	await test_overlay_cycle()
 	await test_overlay_play_rect_steady()
 	await test_overlay_light()
+	test_overlay_light_pure()
 	await test_overlay_light_respawn()
 	await test_clock_rows()
 	await test_lights()
@@ -696,10 +697,12 @@ func test_overlay_play_rect_steady() -> void:
 	await _teardown()
 
 
-## AC7 mode 2 past the notice radius, beside a lurker that senses the player (the cycle test's
-## chain-0 spawn reaches only the dashed branch): the solid reach ring, the label and the sense line
-## draw with no error, and light_marks() agrees with the lurker's own decision. The player is held
-## still with its physics off, as the screenshot script does; the lurker is the second from the top.
+## AC7 mode 2 past the notice radius, beside a lurker that notices the player (the cycle test's
+## chain-0 spawn reaches only the dashed branch), plus a flare stand-in (Story 1.20 D10): every lit
+## light gets its DevLightMarks and every predator its DevPredatorMarks, each a child the engine
+## interpolates with it; the rings, labels and the sense line draw with no error; leaving mode 2
+## frees them all. The player is held still with its physics off, as the screenshot script does;
+## the lurker is the second from the top.
 func test_overlay_light() -> void:
 	_build([])
 	await frames(2)
@@ -720,34 +723,75 @@ func test_overlay_light() -> void:
 	(_world.get_node("Camera") as CameraRig).snap()
 	await get_tree().process_frame
 	var m := Overlays.light_marks(p.light_radius())
-	check(lurker.senses(p) and m.noticeable and p.global_position.distance_to(lurker.global_position) <= m.reach,
-			"(premise) at chain 10, 120 px from a lurker: it senses the player, and light_marks says noticeable within reach (got %s)" % [m])
+	check(lurker.notices(p.light_source) and m.noticeable and p.global_position.distance_to(lurker.global_position) <= m.reach,
+			"(premise) at chain 10, 120 px from a lurker: it notices the player, and light_marks says noticeable within reach (got %s)" % [m])
+	var o := Vector2(100, 100)
+	for r: float in [Sensing.NOTICE_MIN_RADIUS - 0.1, Sensing.NOTICE_MIN_RADIUS]:
+		check(Overlays.light_marks(r).noticeable == Sensing.can_sense(o, r, o) and Overlays.light_marks(r).reach == r * Sensing.NOTICE_FACTOR,
+				"light_marks(%.1f) agrees with Sensing: noticeable %s, reach radius × NOTICE_FACTOR" % [r, Sensing.can_sense(o, r, o)])
+	# A decoy beside the player, a child of the room (AR23): its own marks, as the cache's and the
+	# flare's will have (1.22, 1.23).
+	var flare := LightSource.new()
+	flare.kind = Sensing.KIND_FLARE
+	flare.fixed_radius = 60.0  # under the notice radius: the lurker keeps the player
+	flare.position = p.global_position + Vector2(-30, -20)
+	_world.current_room().add_child(flare)
 	var ov := _dev().overlays
 	_draws = {}
-	(ov.get_node("WorldMarks") as Node2D).draw.connect(_on_draw.bind("world"))
 	ov.mode = 2
 	await get_tree().process_frame
-	# sonlm, laptop 2026-11-19: overlay marks drawn in world space at the player's tick position
-	# trail and shake against its interpolated sprite while it falls. On a child of the player, the
-	# engine interpolates them with it.
-	var marks: Node2D = ov.player_marks
-	check(is_instance_valid(marks) and marks.get_parent() == p and marks.position == Vector2.ZERO and marks.material == Overlays.unshaded_material(),
-			"mode 2's light marks ride on the player: a child at its origin, unshaded (got %s)" % [marks])
-	if is_instance_valid(marks):
-		marks.draw.connect(_on_draw.bind("player"))
+	# sonlm, laptop 2026-11-19: marks drawn in world space at a tick position trail and shake
+	# against the interpolated sprite while it falls. On a child, the engine interpolates them with it.
+	var pm := p.light_source.get_node_or_null(^"DevLightMarks") as Node2D
+	var fm := flare.get_node_or_null(^"DevLightMarks") as Node2D
+	var lm: Array[Node2D] = []
+	for l: Node in lurkers:
+		var x := l.get_node_or_null(^"DevPredatorMarks") as Node2D
+		if x != null:
+			lm.append(x)
+	check(pm != null and pm.position == Vector2.ZERO and pm.material == Overlays.unshaded_material() and fm != null,
+			"mode 2 puts DevLightMarks on the player's LightSource and on the stand-in's, each at its origin, unshaded (got %s, %s)" % [pm, fm])
+	check(lm.size() == lurkers.size() and lm.all(func(x: Node2D) -> bool: return x.position == Vector2.ZERO and x.material == Overlays.unshaded_material()),
+			"...and a DevPredatorMarks child on each of the %d lurkers (got %d)" % [lurkers.size(), lm.size()])
+	if pm != null and fm != null and not lm.is_empty():
+		pm.draw.connect(_on_draw.bind("player"))
+		fm.draw.connect(_on_draw.bind("flare"))
+		lurkers[1].get_node(^"DevPredatorMarks").draw.connect(_on_draw.bind("lurker"))
+	# The top lurker sits far above the view: an open eye there draws mode 2's stir marker on screen.
+	var top := lurkers[0] as Lurker
+	top.stir = 2
+	(ov.get_node("Screen/ScreenMarks") as Node2D).draw.connect(_on_draw.bind("screen"))
+	for i in 3:
+		await frames(1)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(_draws.get("player", 0) > 0 and _draws.get("world", 0) > 0,
-			"mode 2 draws the notice-reach ring and the sense line on the player's marks and the lurker labels in the world, with no error (got %s)" % [_draws])
+	check(lurker.state == Lurker.State.TELEGRAPH and lurker.target == p.light_source, "(premise) the lurker telegraphs at the player, so its sense line draws (state %s)" % Lurker.State.keys()[lurker.state])
+	check(_draws.get("player", 0) > 0 and _draws.get("flare", 0) > 0 and _draws.get("lurker", 0) > 0,
+			"mode 2 draws the rings and labels on both lights and the label and sense line on the lurker, with no error (got %s)" % [_draws])
+	check(top.stir > 0 and not _world.play_rect().has_point(top.global_position) and _draws.get("screen", 0) > 0,
+			"...and the stir marker for the open-eyed lurker off screen, with no error (stir %d)" % top.stir)
+	var made: Array = ov.mark_nodes()
 	ov.mode = 3
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(not is_instance_valid(marks) and ov.player_marks == null, "...and leaving mode 2 takes the player's marks away")
+	check(made.size() >= 2 + lurkers.size() and made.all(func(x: Variant) -> bool: return not is_instance_valid(x)) and ov.mark_nodes().is_empty(),
+			"...and leaving mode 2 frees every mark (%d)" % made.size())
+	flare.queue_free()
 	await _teardown()
 
 
-## Mode 2 across a death: the marks go with the old player, and the next frame puts new ones on
-## the respawned player.
+## The pure pieces of mode 2: a predator's label and where its stir marker goes.
+func test_overlay_light_pure() -> void:
+	check(Overlays.predator_label("IDLE", &"", 0) == "IDLE" and Overlays.predator_label("TELEGRAPH", &"flare", 0) == "TELEGRAPH flare"
+			and Overlays.predator_label("HUNT", &"player", 0) == "HUNT player" and Overlays.predator_label("IDLE", &"", 2) == "IDLE stir 2",
+			"predator labels: IDLE, TELEGRAPH flare, HUNT player, IDLE stir 2")
+	var play := Rect2(0, 100, 360, 270)
+	check(Overlays.stir_marker_at(play, Vector2(8, 60)) == Vector2(8, 104) and Overlays.stir_marker_at(play, Vector2(200, 450)) == Vector2(200, 366),
+			"the stir marker sits level with the lurker, 4 px inside the play rect's top or bottom edge")
+
+
+## Mode 2 across a death: the marks go with the old player's light (extinguished, D5), and the next
+## frame puts new ones on the respawned player's.
 func test_overlay_light_respawn() -> void:
 	_build([])
 	await frames(2)
@@ -755,17 +799,20 @@ func test_overlay_light_respawn() -> void:
 	ov.mode = 2
 	await get_tree().process_frame  # resumes before this frame's _process: the marks come in it
 	await get_tree().process_frame
-	var first: Node2D = ov.player_marks
-	check(is_instance_valid(first) and first.get_parent() == _spawned[0], "(premise) mode 2's marks ride on the first player")
+	var first := _spawned[0].light_source.get_node_or_null(^"DevLightMarks") as Node2D
+	check(first != null, "(premise) mode 2's marks ride on the first player's light")
 	_spawned[0].die()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(not is_instance_valid(first), "a death takes the marks off at once: the light is out (D5)")
 	var start_ms := Time.get_ticks_msec()
 	while _spawned.size() < 2 and Time.get_ticks_msec() - start_ms < 3000:
 		await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var q: Player = _spawned[1] if _spawned.size() == 2 else null
-	check(q != null and not is_instance_valid(first) and is_instance_valid(ov.player_marks) and ov.player_marks.get_parent() == q,
-			"after a death the marks are gone with the old player and ride on the respawned one")
+	check(q != null and q.light_source.get_node_or_null(^"DevLightMarks") != null,
+			"...and the respawned player's light gets its own")
 	await _teardown()
 
 

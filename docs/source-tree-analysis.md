@@ -27,13 +27,14 @@ pixel_art_game/
 │   │   ├── world/
 │   │   │   └── world.tscn        # ★ ENTRY: main scene (run/main_scene). Darkness, RoomHolder, Camera, UI (gutters, router)
 │   │   └── actors/
-│   │       ├── player.tscn       # Player prefab: body, light, slash/pogo/hurt areas
+│   │       ├── player.tscn       # Player prefab: body, LightSource/Light, slash/pogo/hurt areas
 │   │       ├── crawler.tscn      # Crawler prefab (CharacterBody2D + edge ray)
 │   │       └── lurker.tscn       # Lurker prefab (Area2D + eyes + red glow light)
 │   ├── scripts/
 │   │   ├── rules/
 │   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
 │   │   │   ├── health.gd         # ★ Health: per-life HP, the damage table, the cause registry, invulnerability, bank-heal (Story 1.19)
+│   │   │   ├── sensing.gd        # ★ Sensing: the one light-sensing rule for every predator: notice, sense, stir, pick_target (Story 1.20)
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
 │   │   │   ├── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
 │   │   │   ├── settings.gd       # Settings: global settings (brightness so far), set_value() + changed
@@ -53,8 +54,9 @@ pixel_art_game/
 │   │   ├── actors/
 │   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, hurt() (the one damage path), the contact poll and death
 │   │   │   ├── player_input.gd   # PlayerInput: the only Input reader; intents, Light tap/hold, real-time buffers, lock()
+│   │   │   ├── light_source.gd   # LightSource: a light predators sense (group light_source); radius() is the rule value; sizes its BudgetLight (Story 1.20)
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
-│   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
+│   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN, through LightSource + Sensing; retargets; stirs off screen
 │   │   ├── core/
 │   │   │   ├── game.gd           # The Game autoload: refs to session state (`settings`, `slot`, `dive`, `tuning`, `clock`, `display`, `palette`, `store`), boot(), no rules
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
@@ -87,6 +89,7 @@ pixel_art_game/
 │   │   ├── test_dev_args.gd      # DevTools' pure parts: URL query, arg grammar, validators, entry pick, Clock rows, --glow/--perf, perf stats
 │   │   ├── test_fx.gd            # Fx: the shared materials built once; effects free themselves; the gate, the EFFECTS table, the sampled rates
 │   │   ├── test_light_budget.gd  # BudgetLight: the rule, jitter, apply() on nodes, sprite fallback, scene audit
+│   │   ├── test_sensing.gd       # Sensing: the floor, the reach, the notice rect's edges, stir, pick_target (Story 1.20)
 │   │   ├── test_strings.gd       # The string table: shape, registered and current, en fallback, key scan, dead keys, copy rules, scene text
 │   │   ├── test_palettes.gd      # Palettes against DESIGN: tokens, derived gutter, contrast floors, minimal overrides, ratios, mock regions
 │   │   ├── test_theme.gd         # Font import pins, coverage, widths, Theme variations and pitches, CAP_TOP, play_text, popups at 8 px
@@ -100,6 +103,7 @@ pixel_art_game/
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
+│   │   ├── smoke_lurker.gd       # Light sensing on tests/rooms/sensing/: the M1 trace, LightSource, retargeting, stirring, Q1/Q2 (Story 1.20)
 │   │   ├── smoke_health.gd       # HP on world.tscn with tests/rooms/hazards/: contact, spikes, safe ground, bank-heal, death, flash, squash
 │   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, the SMOKE boot marker, each arg, the overlay cycle, no F-key
 │   │   ├── smoke_a11y.gd         # The accessibility gate on m1_shaft: shake off, blink and steady variant, look-ahead on a pogo
@@ -108,7 +112,8 @@ pixel_art_game/
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots + the ×2 Deck mock per zone (needs a real renderer: xvfb-run)
 │   │   ├── deck_mock.gd          # Helper (not a test): the 480×270 gutter-HUD mock for the Deck-size check, one zone's colours
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
-│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt, hazards/t_spikes.txt); never exported
+│   │   ├── fixtures/             # Test data: lurker_trace_m1.json (the M1 lurker trace, recorded before Story 1.20; smoke_lurker replays it)
+│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt, hazards/t_spikes.txt, sensing/t_sensing.txt); never exported
 │   └── art/                      # ⚠ GENERATED by tools/build_sprites.py — do not hand-edit
 │       ├── player.png  crawler.png  lurker.png  lurker_eyes.png  slash.png  tile.png  spike.png
 │       ├── light.png             # 128×128 radial gradient used by every PointLight2D

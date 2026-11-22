@@ -133,7 +133,7 @@ Full catalogue with fields and tuning: [Component Inventory](./component-invento
 ```
 input.sample() → _tick_timers → _handle_snuff → _handle_cling ─(not clinging)→ _handle_horizontal, _handle_vertical, _handle_attack
 → move_and_slide → if on floor: end cling, refill cling/coyote/dash, chain.break_chain()
-→ _process_swing (pogo hit → _on_pogo_hit) → _poll_contacts (predator, then crawler → hurt()) → _update_light
+→ _process_swing (pogo hit → _on_pogo_hit) → _poll_contacts (predator, then crawler → hurt()); then its LightSource child eases the light (Story 1.20: a child's tick runs after its parent's)
 ```
 
 Before the dead return, `_physics_process` ticks the hit flash and eases the pogo squash back at one tick = 1 / 60 s of real time (Story 1.19), so the squash keeps moving during hitstop; the player has no `_process`. `CameraRig` counts real time the same way (Story 1.16), because `delta / Engine.time_scale` reads about 0.33 s on the tick a pogo requests its hitstop: the old `Player._process` squash had that misread and snapped back on the hit frame.
@@ -267,7 +267,7 @@ Observations from comparing this code with GDD v1.0 and the UX spines (2026-11-1
 | Light key | Hold V past the tap window = Snuff; a tap is a `light_tap` intent that does nothing yet, Flare Toss in 1.23 (Story 1.8's `PlayerInput`, window in `Settings`) | Tap = Flare Toss (needs ≥ 2 links, halves the chain); tap window 0.12/0.2/0.3 s setting; optional Snuff toggle key (GDD Controls) | Light input state machine; Flare entity that predators sense |
 | Input | Keyboard only; `PlayerInput` is the only gameplay reader of `Input` (Story 1.8); no function keys: DevTools (Story 1.11, debug builds) has one action, `dev_overlay` on the backquote key, and brightness changes only through `--set=brightness:N`, session only, until Options (1.36) | Gamepad from M2; Pause (Esc/P); rebinding in E7; DevTools sets brightness until Options (Story 1.36) | Input map + settings; the M1 debug hotkeys are gone |
 | HUD | None since Story 1.6: two flat gutters; the chain popups still show the count in the world | Gutter HUD, Fusion Pixel Font 8px (OFL files must ship), alert frame in the gutters (UX DESIGN) | Real HUD scene; font licence files in builds |
-| Lurker warning | On-screen telegraph only | Off-screen "stir": panned audio + half-open eye at the edge (GDD Lurker) | Needs audio and an edge indicator |
+| Lurker warning | On-screen telegraph; off-screen stirring exposed as `Lurker.stir` / `stirring` (Story 1.20, overlay 2 only) | Off-screen "stir": panned audio + half-open eye at the edge (GDD Lurker) | The edge cue draws `stir` in 1.27; the stirring sound is E3 |
 | Persistence | `settings.json` only (brightness); session state in `Game`, not saved | 3 save slots, autosave at stations/hub/anchor quit, visible save failure (GDD Saves, UX) | Save system |
 | Audio | None | SFX + chain-reactive music (E3) | Audio bus layout |
 | Death feedback | "−N lost" popup | Death card lines stored from E1 for the E7 Journal (UX); Field Journal line (deferred-work) | Record the death cause |

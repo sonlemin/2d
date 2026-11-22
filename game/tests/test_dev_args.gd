@@ -201,18 +201,18 @@ func _test_clock_rows() -> void:
 	check(rows == [{id = &"hitstop", scale = 0.5, live = true}], "clock_rows: a live id shows its live scale (got %s)" % [rows])
 
 
-## Mode 2 draws Lurker.senses()'s rule (review of 1.11): reach = radius × NOTICE_FACTOR, and only a
+## Mode 2 draws Sensing's rule (Story 1.20; was Lurker.senses()) (review of 1.11): reach = radius × NOTICE_FACTOR, and only a
 ## light at or past NOTICE_MIN_RADIUS can be noticed. The base light is safe by the GDD (Spec).
 func _test_light_marks() -> void:
 	var m := Overlays.light_marks(Spec.BASE_LIGHT)
-	check(not m.noticeable and is_equal_approx(m.reach, Spec.BASE_LIGHT * Lurker.NOTICE_FACTOR),
-			"light_marks: the %d px base light can't be noticed, reach %d px (got %s)" % [Spec.BASE_LIGHT, Spec.BASE_LIGHT * Lurker.NOTICE_FACTOR, m])
-	m = Overlays.light_marks(Lurker.NOTICE_MIN_RADIUS - 0.5)
+	check(not m.noticeable and is_equal_approx(m.reach, Spec.BASE_LIGHT * Sensing.NOTICE_FACTOR),
+			"light_marks: the %d px base light can't be noticed, reach %d px (got %s)" % [Spec.BASE_LIGHT, Spec.BASE_LIGHT * Sensing.NOTICE_FACTOR, m])
+	m = Overlays.light_marks(Sensing.NOTICE_MIN_RADIUS - 0.5)
 	check(not m.noticeable, "light_marks: half a pixel below the notice radius can't be noticed (got %s)" % [m])
-	m = Overlays.light_marks(Lurker.NOTICE_MIN_RADIUS)
-	check(m.noticeable and is_equal_approx(m.radius, Lurker.NOTICE_MIN_RADIUS) and is_equal_approx(m.reach, Lurker.NOTICE_MIN_RADIUS * Lurker.NOTICE_FACTOR),
-			"light_marks: at the notice radius it can, reach radius × %.1f (got %s)" % [Lurker.NOTICE_FACTOR, m])
-	check(Lurker.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "(premise) the lurker's notice radius is the GDD floor or later (%d >= %d)" % [Lurker.NOTICE_MIN_RADIUS, Spec.NOTICE_MIN_RADIUS])
+	m = Overlays.light_marks(Sensing.NOTICE_MIN_RADIUS)
+	check(m.noticeable and is_equal_approx(m.radius, Sensing.NOTICE_MIN_RADIUS) and is_equal_approx(m.reach, Sensing.NOTICE_MIN_RADIUS * Sensing.NOTICE_FACTOR),
+			"light_marks: at the notice radius it can, reach radius × %.1f (got %s)" % [Sensing.NOTICE_FACTOR, m])
+	check(Sensing.NOTICE_MIN_RADIUS >= Spec.NOTICE_MIN_RADIUS, "(premise) the lurker's notice radius is the GDD floor or later (%d >= %d)" % [Sensing.NOTICE_MIN_RADIUS, Spec.NOTICE_MIN_RADIUS])
 
 
 # --- Story 1.12: --glow, --perf and the perf run's pure parts ----------------------------------------

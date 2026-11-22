@@ -924,8 +924,8 @@ These patterns ensure consistent implementation across all AI agents.
 
 | Component | Location | Responsibility |
 |---|---|---|
-| `LightSource` (Node2D) | `actors/light_source.gd` | group `light_source`; `kind` (`&"player"`, `&"flare"`, `&"cache"`); `radius() -> float`; drives its `PointLight2D` (or sprite glow) |
-| `Sensing` (static) | `rules/sensing.gd` | pure maths: `can_notice()`, `can_sense()`, `pick_target()`; unit-tested |
+| `LightSource` (Node2D) | `actors/light_source.gd` | group `light_source`; `kind` (`&"player"`, `&"flare"`, `&"cache"`); `radius() -> float` (the rule value); drives its child `BudgetLight`'s size (`texture_scale`, eased; the budget's sprite glow copies it), never its `enabled` (the light budget's, AR46; as built in Story 1.20) |
+| `Sensing` (static) | `rules/sensing.gd` | pure maths: `can_sense()`, `notice_rect()`, `can_notice()`, `can_stir()`, `pick_target()`; unit-tested |
 | `World.play_rect()` | `world/world.gd` | visible play area inside the gutters, world coordinates |
 | Lurker / Weaver | `actors/` | query lights each physics tick, apply their own response |
 
@@ -938,21 +938,23 @@ Cache glow radius (tuning) ───┘          │
                                          ▼
 Lurker: lights = get_tree().get_nodes_in_group("light_source")
         rect   = world.play_rect()
-        sensed = lights.filter(Sensing.can_sense(l, self, rect))
-        target = Sensing.pick_target(sensed)        # brightest; ties → non-player
-        FSM uses target (IDLE → TELEGRAPH → HUNT → RETURN)
+        noticed = lights.filter(Sensing.can_notice(l.pos, l.radius, pos, rect))   # IDLE, RETURN, TELEGRAPH
+        sensed  = lights.filter(Sensing.can_sense(l.pos, l.radius, pos))         # HUNT (no screen test)
+        target  = Sensing.pick_target(noticed or sensed)  # brightest; ties → non-player
+        FSM uses target (IDLE → TELEGRAPH → HUNT → RETURN); see Story 1.20 D6 for the full table
 Weaver: same query; flees the brightest flare; bright/dark from the player's radius
 ```
 
 **Rules:**
 - **Notice:** radius ≥ 80 px **and** distance ≤ radius × 1.6 **and** the predator is inside `play_rect()` (shrunk by the screen margin). The same rule for every kind, so a cache wakes lurkers only if its glow radius is ≥ 80 px (tuning note for the E1 playtest).
+- **Notice vs sense (as built, Story 1.20 Q1, sonlm 2026-11-22):** waking and **every tick of the telegraph** use the notice rule, so the whole warning is seen on screen; the **hunt** uses `can_sense()` (radius and distance only, the GDD's Hunt line), so a hunter that trails out of view keeps hunting while in reach. Re-sensing inside the 0.6 s wait resumes the hunt with no new telegraph (Q2, M1 as built). The lurker's state table is Story 1.20's D6 (`implementation-artifacts/1-20-light-sensing-for-predators.md`).
 - **Target choice:** the sensed light with the largest radius; on a tie, a non-player light wins (a flare is a lure). A fresh flare carries the pre-toss radius, so it normally out-shines the halved chain.
-- **Stirring (off-screen warning, GDD Lurker):** `Sensing.can_stir()` is true when the lurker *would* sense the light but sits outside the play rect, within 96 px of its edge. The lurker stays in `IDLE`, exposes `stir` (`0` closed, `1` half, `2` open, rising while the condition holds), and never telegraphs or hunts while stirring. The gutter edge cue reads `predator` nodes and shows the eye level with the lurker's height; the stirring sound (E3) uses the same value. A guarantee test checks that stirring never leads to a hunt without an on-screen telegraph.
+- **Stirring (off-screen warning, GDD Lurker):** `Sensing.can_stir()` is true when the lurker *would* sense the light but sits outside the **notice** rect and inside `play_rect.grow(96)` (as built, Story 1.20 D3: the 8 px margin band inside the play rect stirs too, so no sensed spot near the view is silent; `grow()` measures along each axis). It runs in `RETURN` as well as `IDLE`. `stir` steps toward its goal at most once per 0.35 s in every state (D9, Q3), so whatever draws it changes at most ~2.9 times a second, under the 3 flashes/s cap. The lurker stays in `IDLE`, exposes `stir` (`0` closed, `1` half, `2` open, rising while the condition holds), and never telegraphs or hunts while stirring. The gutter edge cue reads `predator` nodes and shows the eye level with the lurker's height; the stirring sound (E3) uses the same value. A guarantee test checks that stirring never leads to a hunt without an on-screen telegraph.
 - **Retargeting onto the player needs a fresh telegraph:** if a lurker's target changes from a flare or cache to the player, it re-enters `TELEGRAPH` (≥ 0.75 s). Pillar 2: every hunt of the player is telegraphed. Retargeting from the player to a flare needs no telegraph.
 - **The damage rule is unchanged:** `monitorable` is true only in `HUNT` while the **player** is the sensed target. A lurker sitting on a cache or a flare is harmless until it telegraphs at the player.
 - **Weaver:** bright = player radius ≥ 80 px, dark = ≤ 40 px; flees along strands to the farthest point inside the flare's radius × 1.5 (E2 decides the exact flee target; GDD open question).
 
-**Implementation guide:**
+**Implementation guide** (the original sketch; **as built in Story 1.20** the API is `can_sense(light_pos, light_radius, pred_pos)` with no rect, plus `notice_rect(play_rect)`, `can_notice(…, play_rect)` and `can_stir(…, play_rect)`, and the kinds as `Sensing.KIND_*`, D2):
 
 ```gdscript
 # rules/sensing.gd
@@ -979,7 +981,7 @@ static func pick_target(lights: Array[Dictionary]) -> int:
 	return best
 ```
 
-**Usage:** any new predator or light-reactive object (Layer 2+ bosses) uses `LightSource` + `Sensing`. Never call `get_first_node_in_group("player")` to sense light.
+**Usage:** any new predator or light-reactive object (Layer 2+ bosses) uses `LightSource` + `Sensing`. Never call `get_first_node_in_group("player")` to sense light (lint `light_query` under `actors/`, Story 1.20).
 
 #### 2. Rule-Bending Gear (`Tuning`)
 

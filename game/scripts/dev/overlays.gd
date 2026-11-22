@@ -1,20 +1,25 @@
 extends Node
 ## The four DevTools overlays (AR54, Story 1.11 D9-D11), cycled by the `dev_overlay` action:
-## 1 play rect and gutters, 2 light radii, notice rings and the player's HP, 3 room exits, entries,
-## object ids and the safe ground,
+## 1 play rect and gutters, 2 every light's radius and reach, every predator's state, target and
+## stir, and the player's HP, 3 room exits, entries, object ids and the safe ground,
 ## 4 FPS, the light budget, frame times, the perf run and active Clock requests, then off. Debug
 ## builds only; no class_name, so dev/ adds one global name (DevTools preloads this script).
-## Every mark reads the value the game uses (World.play_rect(), Player.light_radius(), Lurker's
-## sensing constants, the Room's exits), never a copied number. Two drawers, both under DevTools:
-## - WorldMarks draws in world space on World's canvas. The Darkness CanvasModulate would dim it to
-##   a tenth (probed: light_mask = 0 doesn't escape it), so it uses one cached unshaded material.
-##   It never moves, so it stays registered with the room tiles under physics interpolation. A
-##   predator's label sits at its tick position, up to a tick of its travel off its interpolated
-##   sprite (at most 1.6 px at a hunt's 95 px/s; accepted).
-## - Mode 2's light marks ride on the player instead, on a child the engine interpolates with its
-##   sprite: at its tick position they shook while it fell (sonlm, laptop 2026-11-19).
+## Every mark reads the value the game uses (World.play_rect(), LightSource.radius(), Sensing's
+## constants, the Room's exits), never a copied number. The drawers, all under DevTools or on the
+## node they mark:
+## - WorldMarks draws in world space on World's canvas (mode 3). The Darkness CanvasModulate would
+##   dim it to a tenth (probed: light_mask = 0 doesn't escape it), so it uses one cached unshaded
+##   material. It never moves, so it stays registered with the room tiles under physics
+##   interpolation.
+## - Mode 2 draws on children of the nodes it marks (Story 1.20 D10), which the engine interpolates
+##   with their sprites: DevLightMarks on every lit LightSource, DevPredatorMarks on every predator.
+##   At tick positions they shook while falling (sonlm, laptop 2026-11-19; 5ac0bd9 fixed the
+##   player's ring this way). The one line between two moving nodes, a predator's sense line, is
+##   placed by hand: both ends from positions recorded each tick after the actors, blended with the
+##   engine's interpolation fraction.
 ## - ScreenMarks draws in screen pixels on its own CanvasLayer above the UI, over the gutters. Mode
 ##   1's play rect is here too: it moves with the camera, so in world space it shook while falling.
+##   So is mode 2's stir marker for a lurker off screen, a debug stand-in for 1.27's edge cue.
 ## Nothing pulses or blinks (NFR8), and no colour is the reserved amber or red (NFR9).
 
 const PerfRun := preload("perf_run.gd")
@@ -33,6 +38,9 @@ const DIM := Color(0.6, 0.6, 0.65, 0.55)
 const CYAN := Color(0.35, 0.9, 1.0, 0.9)
 const MAGENTA := Color(1.0, 0.4, 1.0, 0.9)
 const GREEN := Color(0.4, 1.0, 0.5, 0.9)
+const LIGHT_MARKS := &"DevLightMarks"
+const PREDATOR_MARKS := &"DevPredatorMarks"
+const TELEPORT_PX := 32.0  ## a tick's jump past this is a teleport (spawn, room entry): the engine snaps it, so the hand-blended line does too
 
 static var _unshaded: CanvasItemMaterial
 
@@ -48,9 +56,11 @@ var perf: Node  ## perf_run.gd, set by DevTools for --perf; else null
 var readout := PackedStringArray()  ## mode 4's rows before the Clock rows; public for tests
 var clock_seen := {}  ## StringName -> {scale, ms}: every Clock request seen this frame or within the linger
 var clock_list: Array[Dictionary] = []  ## the readout's Clock rows at the latest rebuild: {id, scale, live}
-var player_marks: Node2D  ## mode 2's light marks, a child of the live player; else null. Public for tests
 
 var _world_marks: Node2D
+var _light_marks: Array[Node2D] = []  # mode 2's DevLightMarks, each a child of a lit LightSource
+var _predator_marks: Array[Node2D] = []  # mode 2's DevPredatorMarks, each a child of a predator
+var _ticks := {}  # Node2D -> [previous tick's global_position, this tick's], mode 2 only
 var _screen_marks: Node2D
 var _last_frame_usec := 0  # Time.get_ticks_usec() at the previous mode-4 frame; 0 after cycle()
 
@@ -70,6 +80,8 @@ func _ready() -> void:
 	_screen_marks.name = "ScreenMarks"
 	_screen_marks.draw.connect(_draw_screen)
 	screen.add_child(_screen_marks)
+	# After every actor has moved this tick, as DevTools runs (a higher priority runs later).
+	process_physics_priority = 100
 
 
 ## Shared by every World in the session (project-context: cache materials as statics).
@@ -93,7 +105,7 @@ func cycle() -> void:
 
 
 func _process(_delta: float) -> void:
-	_place_player_marks()
+	_place_marks()
 	if mode == 0:
 		return
 	if mode == 4:
@@ -107,9 +119,45 @@ func _process(_delta: float) -> void:
 
 func _redraw() -> void:
 	_world_marks.queue_redraw()
-	if is_instance_valid(player_marks):
-		player_marks.queue_redraw()
+	for m in _light_marks + _predator_marks:
+		if is_instance_valid(m):
+			m.queue_redraw()
 	_screen_marks.queue_redraw()
+
+
+## Mode 2's sense lines: each predator's and each lit light's position at the end of this tick and
+## the last, recorded after the actors move, for _blended().
+func _physics_process(_delta: float) -> void:
+	if mode != 2:
+		_ticks.clear()
+		return
+	var next := {}
+	for n: Node in get_tree().get_nodes_in_group(&"predator") + get_tree().get_nodes_in_group(LightSource.GROUP):
+		if not n is Node2D or not is_instance_valid(n):
+			continue
+		var cur: Vector2 = (n as Node2D).global_position
+		var old: Variant = _ticks.get(n)
+		var prev: Vector2 = cur if old == null or (old[1] as Vector2).distance_to(cur) > TELEPORT_PX else old[1]
+		next[n] = [prev, cur]
+	_ticks = next
+
+
+## Where the engine draws `n` this frame: its last two tick positions blended by the interpolation
+## fraction, as the engine blends them. Its tick position if it has no record yet.
+func _blended(n: Node2D) -> Vector2:
+	var rec: Variant = _ticks.get(n)
+	if rec == null:
+		return n.global_position
+	return (rec[0] as Vector2).lerp(rec[1], Engine.get_physics_interpolation_fraction())
+
+
+## Mode 2's marks, by the node: the light and predator children it has, for tests.
+func mark_nodes() -> Array[Node2D]:
+	var out: Array[Node2D] = []
+	for m in _light_marks + _predator_marks:
+		if is_instance_valid(m):
+			out.append(m)
+	return out
 
 
 # --- Mode 4: readout ----------------------------------------------------------------------------
@@ -241,8 +289,6 @@ func _draw_world() -> void:
 	if not is_instance_valid(world):
 		return
 	match mode:
-		2:
-			_draw_light()
 		3:
 			for item in room_items():
 				match item.kind:
@@ -267,71 +313,114 @@ func _draw_world() -> void:
 						_beside(q.x - 3, q.x + 3, q.y + 4, item.text, WHITE)
 
 
-## Mode 2's numbers for a light of radius `r`, by Lurker.senses()'s rule: a lurker notices it from
-## up to `reach` px, and only when `noticeable` (Pillar 2: below the notice radius, never). Public
-## and pure, so the 80 px boundary is tested without drawing.
+## Mode 2's numbers for a light of radius `r`, by Sensing's rule: a predator senses it from up to
+## `reach` px, and only when `noticeable` (Pillar 2: below the notice radius, never). Public and
+## pure, so the 80 px boundary is tested without drawing.
 static func light_marks(r: float) -> Dictionary:
-	return {radius = r, reach = r * Lurker.NOTICE_FACTOR, noticeable = r >= Lurker.NOTICE_MIN_RADIUS}
+	return {radius = r, reach = r * Sensing.NOTICE_FACTOR, noticeable = r >= Sensing.NOTICE_MIN_RADIUS}
 
 
-## Mode 2 in world space: each predator's state beside it. The player's marks are drawn on the
-## player itself (_draw_player_marks()).
-func _draw_light() -> void:
-	for p: Node in get_tree().get_nodes_in_group("predator"):
-		if not is_instance_valid(p) or not ("state" in p) or not p is Node2D:
+## Mode 2's marks ride on what they mark (D10): a DevLightMarks child on every lit LightSource, a
+## DevPredatorMarks child on every predator, which the engine interpolates with their sprites. A
+## light that goes out (a death, D5), a freed predator and every mark outside mode 2 lose theirs; a
+## respawned player's new light gets new ones the next frame. The nodes they ride never mirror (only
+## sprites flip), so the labels read the right way round.
+func _place_marks() -> void:
+	_light_marks = _prune(_light_marks, func(holder: Variant) -> bool: return LightSource.live(holder))
+	_predator_marks = _prune(_predator_marks, func(holder: Variant) -> bool: return is_instance_valid(holder))
+	if mode != 2:
+		return
+	for n: Node in get_tree().get_nodes_in_group(LightSource.GROUP):
+		if LightSource.live(n) and n.get_node_or_null(NodePath(LIGHT_MARKS)) == null:
+			_light_marks.append(_add_marks(n, LIGHT_MARKS, _draw_light_marks))
+	for n: Node in get_tree().get_nodes_in_group(&"predator"):
+		if n is Node2D and "state" in n and n.get_node_or_null(NodePath(PREDATOR_MARKS)) == null:
+			_predator_marks.append(_add_marks(n, PREDATOR_MARKS, _draw_predator_marks))
+
+
+## Keeps the marks whose owner passes `ok` while mode 2 is on; frees the rest.
+func _prune(marks: Array[Node2D], ok: Callable) -> Array[Node2D]:
+	var keep: Array[Node2D] = []
+	for m in marks:
+		if not is_instance_valid(m):
 			continue
-		var pos: Vector2 = p.global_position
-		var state_name: String = Lurker.State.keys()[p.state] if p is Lurker else str(p.state)
-		_beside(pos.x - 8, pos.x + 8, pos.y - 10, state_name, MAGENTA)  # lurkers sit in the walls, by the gutters
+		if mode == 2 and ok.call(m.get_parent()):
+			keep.append(m)
+		else:
+			m.queue_free()
+	return keep
 
 
-## Mode 2's marks ride on the live player: a child at its origin, which the engine interpolates
-## with its sprite. At the player's tick position they trailed and shook against the sprite while
-## it fell (sonlm, laptop 2026-11-19). The Player node never mirrors (only its sprite flips), so
-## the labels read the right way round. After a respawn the old marks go with the old player and
-## the next frame puts new ones on; outside mode 2 there are none.
-func _place_player_marks() -> void:
-	var player: Player = (get_tree().get_first_node_in_group("player") as Player) if mode == 2 else null
-	if is_instance_valid(player_marks) and player_marks.get_parent() == player:
-		return
-	if is_instance_valid(player_marks):
-		player_marks.queue_free()
-	player_marks = null
-	if player == null:
-		return
-	player_marks = Node2D.new()
-	player_marks.name = "DevLightMarks"
-	player_marks.z_index = 100
-	player_marks.material = unshaded_material()  # must read under the darkness, like WorldMarks
+func _add_marks(holder: Node, mark_name: StringName, drawer: Callable) -> Node2D:
+	var marks := Node2D.new()
+	marks.name = mark_name
+	marks.z_index = 100
+	marks.material = unshaded_material()  # must read under the darkness, like WorldMarks
 	# Bound to its own node: a draw already queued on old marks runs after the field moved on.
-	player_marks.draw.connect(_draw_player_marks.bind(player_marks))
-	player.add_child(player_marks)
+	marks.draw.connect(drawer.bind(marks))
+	holder.add_child(marks)
+	return marks
 
 
-## In the player's own space (the origin is the player). A light that can't be noticed has its
-## reach ring drawn dashed and dim, which shows the 40 px base light as safe. A sense line's
-## player end is exact; its far end is the predator's tick offset, so it can sit up to a tick of
-## their relative travel off the predator's sprite.
-func _draw_player_marks(marks: Node2D) -> void:
-	var player := marks.get_parent() as Player
-	if not is_instance_valid(player) or player.is_dead:
+## In the light's own space (the origin is the light). Its radius ring and its reach ring; a light
+## that can't be noticed has the reach dashed and dim, which shows the 40 px base light as safe.
+## Labels by the light: the camera keeps the player near the middle, and at a ring's edge they would
+## fall under a gutter once the light grows.
+func _draw_light_marks(marks: Node2D) -> void:
+	var holder: Variant = marks.get_parent()
+	if not LightSource.live(holder):
 		return
-	var m := light_marks(player.light_radius())
+	var source := holder as LightSource
+	var m := light_marks(source.radius())
 	marks.draw_arc(Vector2.ZERO, m.radius, 0.0, TAU, 48, CYAN, 1.0)
-	# Labels by the player, whom the camera keeps near the middle: at a ring's edge they would
-	# fall under a gutter once the light grows.
-	_text(marks, Vector2(8, 4), "light %d px" % m.radius, CYAN)
+	_text(marks, Vector2(8, 4), "%s %d px" % [source.kind, m.radius], CYAN)
 	if not m.noticeable:
 		_dashed_circle(marks, Vector2.ZERO, m.reach, DIM)
-		_text(marks, Vector2(8, 14), "reach %d px: below notice (< %d px)" % [m.reach, Lurker.NOTICE_MIN_RADIUS], DIM)
+		_text(marks, Vector2(8, 14), "reach %d px: below notice (< %d px)" % [m.reach, Sensing.NOTICE_MIN_RADIUS], DIM)
 	else:
 		marks.draw_arc(Vector2.ZERO, m.reach, 0.0, TAU, 64, CYAN, 1.0)
 		_text(marks, Vector2(8, 14), "notice reach %d px" % m.reach, CYAN)
 	# Story 1.19 D8: no HP HUD exists until the pips (1.25), and the laptop check needs one.
-	_text(marks, Vector2(8, 24), hp_text(player.health.hp, player.health.invuln), CYAN)
-	for p: Node in get_tree().get_nodes_in_group("predator"):
-		if is_instance_valid(p) and p is Node2D and p.has_method(&"senses") and p.senses(player):
-			marks.draw_line(Vector2.ZERO, marks.to_local((p as Node2D).global_position), MAGENTA, 1.0)
+	var player := source.get_parent() as Player
+	if player != null:
+		_text(marks, Vector2(8, 24), hp_text(player.health.hp, player.health.invuln), CYAN)
+
+
+## In the predator's own space: its label on the side facing the middle of the play rect (lurkers sit
+## in the walls, by the gutters), and while it telegraphs or hunts a lit light, its sense line. The
+## line's ends are both blended by hand (_blended()), so its far end sits on the target's sprite
+## instead of a tick of their relative travel off it (the 1.12 ledger item).
+func _draw_predator_marks(marks: Node2D) -> void:
+	var p := marks.get_parent() as Node2D
+	if not is_instance_valid(p) or not is_instance_valid(world):
+		return
+	var lurker := p as Lurker
+	var engaged := lurker != null and (lurker.state == Lurker.State.TELEGRAPH or lurker.state == Lurker.State.HUNT) and LightSource.live(lurker.target)
+	var s := predator_label(Lurker.State.keys()[lurker.state] if lurker != null else str(p.get(&"state")),
+			lurker.target.kind if engaged else &"", lurker.stir if lurker != null else 0)
+	var w := ThemeDB.fallback_font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+	var x := 11.0 if p.global_position.x < world.play_rect().get_center().x else -11.0 - w
+	_text(marks, Vector2(x, -10), s, MAGENTA)
+	if engaged:
+		marks.draw_line(Vector2.ZERO, _blended(lurker.target) - _blended(p), MAGENTA, 1.0)
+
+
+## A predator's mode-2 label: "IDLE", "TELEGRAPH flare", "HUNT player", plus " stir N" while its eye
+## is open at all. Public and pure, for tests.
+static func predator_label(state_name: String, target_kind: StringName, stir: int) -> String:
+	var s := state_name
+	if target_kind != &"":
+		s += " " + String(target_kind)
+	if stir > 0:
+		s += " stir %d" % stir
+	return s
+
+
+## Where mode 2's stir marker goes for a lurker at `pos` outside `play`: on the play rect's edge,
+## level with it, clamped 4 px inside. Public and pure, for tests.
+static func stir_marker_at(play: Rect2, pos: Vector2) -> Vector2:
+	var inner := play.grow(-4.0)
+	return Vector2(clampf(pos.x, inner.position.x, inner.end.x), clampf(pos.y, inner.position.y, inner.end.y))
 
 
 ## Mode 2's HP line: "hp 3/4", plus "inv 0.42 s" while invulnerable. Public and pure, for tests.
@@ -354,13 +443,16 @@ func play_rect_on_screen() -> Rect2:
 
 func _draw_screen() -> void:
 	match mode:
+		2:
+			if is_instance_valid(world):
+				_draw_stir_markers()
 		1:
 			if is_instance_valid(world):
 				var r := play_rect_on_screen()
 				_screen_marks.draw_rect(r, WHITE, false, 1.0)
-				_dashed_rect(_screen_marks, r.grow(-Lurker.SCREEN_MARGIN), GREY)
+				_dashed_rect(_screen_marks, Sensing.notice_rect(r), GREY)
 				_text(_screen_marks, r.position + Vector2(4, 2), "play rect %d x %d" % [r.size.x, r.size.y], WHITE)
-				_text(_screen_marks, r.position + Vector2(4, 12), "notice: %d px inside" % Lurker.SCREEN_MARGIN, GREY)
+				_text(_screen_marks, r.position + Vector2(4, 12), "notice: %d px inside" % Sensing.SCREEN_MARGIN, GREY)
 			var h := _screen_marks.get_viewport_rect().size.y
 			var g := CameraRig.GUTTER_WIDTH
 			for x in [0.0, g + CameraRig.PLAY_WIDTH]:
@@ -377,6 +469,26 @@ func _draw_screen() -> void:
 			for row in clock_list:
 				_text(_screen_marks, Vector2(3, y), "%s ×%s" % [row.id, row.scale], WHITE if row.live else DIM)
 				y += 10.0
+
+
+## Mode 2, in screen pixels: a magenta square and "stir N" at the play rect's edge for each lurker off
+## screen with its eye open (stir > 0), so the laptop look can see stirring before 1.27's cue. Placed
+## like mode 1's play rect: the game's rect, offset by the view of the same tick.
+func _draw_stir_markers() -> void:
+	var play := world.play_rect()
+	var origin := world.light_rect().position
+	for n: Node in get_tree().get_nodes_in_group(&"predator"):
+		var l := n as Lurker
+		if l == null or l.stir <= 0 or play.has_point(l.global_position):
+			continue
+		var at := stir_marker_at(play, l.global_position) - origin
+		_screen_marks.draw_rect(Rect2(at - Vector2(2, 2), Vector2(4, 4)), MAGENTA)
+		var s := "stir %d" % l.stir
+		var w := ThemeDB.fallback_font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+		var centre := play.get_center() - origin
+		var tx := at.x + 5.0 if at.x < centre.x else at.x - 5.0 - w
+		var ty := at.y + 3.0 if at.y < centre.y else at.y - 13.0
+		_text(_screen_marks, Vector2(tx, ty), s, MAGENTA)
 
 
 ## World text beside a mark spanning `left`..`right`, on the side that faces the middle of the play

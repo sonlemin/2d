@@ -6,13 +6,14 @@ extends Node
 ## pinned: 1.11 D6), and moved every physics tick along a vertical ping-pong down the room's centre,
 ## driven by a tick counter, never the wall clock. Two stand-in BudgetLights ride along: a flare
 ## (ALWAYS, at the player's light radius, FR15) and an Ember Cache (CACHE, 80 px, FR24). They are
-## lights only: there is no LightSource until 1.20, so they wake no lurker.
+## lights only, plain BudgetLights, never LightSources, so they wake no lurker; 1.22 and 1.23 replace
+## them with the real cache and flare, which are LightSources (Story 1.20 D13).
 ## It measures wall time between frames (Time.get_ticks_usec(), never delta, which the time scale
 ## bends), samples the light budget every tick, and at the end freezes one summary, logs it once and
 ## hands it to overlay 4. The autopilot keeps going after that, so the load stays while it is read.
 ## No class_name: DevTools preloads it, so dev/ adds one global name. Debug builds only.
 
-const PATH_SPEED := 100.0  ## px/s up and down the room; just above a hunting lurker's 95 px/s, so hunters trail and fall away rather than pile up
+const PATH_SPEED := 100.0  ## px/s up and down the room; just above a hunting lurker's 95 px/s, so hunters trail and fall away rather than pile up (since Story 1.20 a hunt keeps sensing off screen, so they drop when they fall out of reach, not at the screen edge)
 const PATH_MARGIN := 3  ## tiles kept clear of the room's top and bottom edges
 const FLARE_OFFSET := Vector2(-112, -32)  ## px from the player: on screen for the whole run, the worst case the budget must hold (a real flare sticks)
 const CACHE_OFFSET := Vector2(112, 40)  ## px from the player, likewise (a real cache lies still)
@@ -157,7 +158,7 @@ func _inside(p: Vector2) -> Vector2:
 ## ones. Texture, colour and energy come from the player's Light, never typed in; everything is set
 ## before add_child, because _ready() builds the cache's sprite from it.
 func _build_stand_ins(room: Room, player: Player) -> void:
-	var source := player.get_node(^"Light") as PointLight2D
+	var source := player.get_node(^"LightSource/Light") as PointLight2D
 	stand_ins.clear()
 	for rank: BudgetLight.Rank in [BudgetLight.Rank.ALWAYS, BudgetLight.Rank.CACHE]:
 		var l := BudgetLight.new()

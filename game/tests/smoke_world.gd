@@ -320,7 +320,7 @@ func test_hunt_over_death() -> void:
 		p.chain.add_hit()
 	var c: Lurker = _room().spawn(LurkerScene, p.global_position + Vector2(70, 0))
 	await frames(1)
-	c._enter(Lurker.State.HUNT)
+	c.force(Lurker.State.HUNT, p.light_source)
 	await frames(1)
 	check(c.state == Lurker.State.HUNT, "precondition: the lurker hunts the player")
 	p.die()

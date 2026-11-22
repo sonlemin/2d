@@ -158,7 +158,7 @@ func test_perf_run() -> void:
 	check(perf.stand_ins.size() == 2 and perf.stand_ins[0].rank == BudgetLight.Rank.ALWAYS and perf.stand_ins[1].rank == BudgetLight.Rank.CACHE,
 			"two stand-ins ride along: a flare of rank ALWAYS, then a cache of rank CACHE")
 	check(perf.stand_ins.all(func(l: BudgetLight) -> bool: return l.get_parent() == room), "...both children of the current room (AR23: the room owns them)")
-	var player_light := p.get_node(^"Light") as BudgetLight
+	var player_light := p.get_node(^"LightSource/Light") as BudgetLight
 	var flare: BudgetLight = perf.stand_ins[0]
 	var to_twenty := -1
 	for i in 10:
@@ -330,7 +330,7 @@ func test_room_alone() -> void:
 		var at := _world.current_room().entry_position(&"spawn")
 		check(p.global_position == at and p.chain.count == 0, "...at its P %s with chain 0 (got %s, chain %d)" % [at, p.global_position, p.chain.count])
 	await get_tree().physics_frame
-	var others := _lights().filter(func(n: Node) -> bool: return not (n.get_parent() is Lurker or n.get_parent() is Player))
+	var others := _lights().filter(func(n: Node) -> bool: return not (n.get_parent() is Lurker or (n.get_parent() is LightSource and n.get_parent().get_parent() is Player)))
 	check(others.is_empty(), "...no stand-ins: every BudgetLight is a lurker glow or the player's light (got %s)" % [others])
 	check(dev.get_node_or_null(^"Glow") == null and not dev.glow_on, "...and no Glow WorldEnvironment")
 	check(_warnings.take().is_empty(), "...with no warning")
