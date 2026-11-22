@@ -5,7 +5,7 @@ extends RefCounted
 ## in `core/game.gd`. Written only through methods that emit a typed signal (AR18).
 ## `to_dict()` becomes save format slot_v1 at Story 1.41, when its key names freeze; until then a
 ## key may still change, after it never.
-## Not here yet, each added by its story: deposited embers and the Ember Cache (1.22), gear (E5), the death log and cause ids (1.19 / 1.29), play time and the resume point
+## Not here yet, each added by its story: deposited embers and the Ember Cache (1.22), gear (E5), the death log and its cause ids (Story 1.29, from `player.death_cause`), play time and the resume point
 ## (1.21), abilities and the journal (E4–E7).
 
 signal flag_set(id: StringName, value: bool)
@@ -66,7 +66,7 @@ func record_chain(count: int) -> void:
 	records_changed.emit()
 
 
-## Story 1.19 adds the cause and the room, for the death log.
+## Story 1.29 adds the cause and the room, for the death log, from `player.death_cause`.
 func record_death() -> void:
 	deaths += 1
 	records_changed.emit()

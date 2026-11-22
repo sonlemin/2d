@@ -5,6 +5,9 @@ extends Node2D
 ## or the hub, so tests load any room standalone.
 
 const TILE := 16
+## The hurting part of a hazard cell: its bottom 8 px, where the spikes are drawn (Story 1.19 D5), so
+## the head of a player standing beside a spike run never touches one.
+const HAZARD_HURT_TOP := 8
 
 ## Set by RoomLoader before the room is returned.
 var id: StringName
@@ -15,6 +18,7 @@ var objects := {}  ## obj id (StringName) -> cell (Vector2i)
 var size_cells := Vector2i.ZERO  ## columns, rows
 var spawn_cell := Vector2i(-1, -1)  ## the `P` cell; (-1, -1) when the room has none
 var walls: TileMapLayer
+var hazards := {}  ## every hazard cell (`^`), Vector2i -> true (Story 1.19)
 
 
 ## AR23: args are set before add_child, so the node's _ready() already sees them
@@ -47,6 +51,36 @@ func entry_position(entry: StringName) -> Vector2:
 	assert(has_entry(entry), "Room %s has no entry '%s'" % [id, entry])
 	var cell: Vector2i = spawn_cell if entry == &"spawn" else exit(entry).entry_cell
 	return Vector2(cell.x * TILE + TILE / 2.0, (cell.y + 1) * TILE - 12)
+
+
+## Whether `rect` (room-local, the player's Hurtbox) overlaps the bottom 8 px of a hazard cell.
+## Edges that only touch don't count (Rect2.intersects).
+func touches_hazard(rect: Rect2) -> bool:
+	if hazards.is_empty():
+		return false
+	var first := Vector2i((rect.position / TILE).floor())
+	var last := Vector2i((rect.end / TILE).floor())
+	for y in range(first.y, last.y + 1):
+		for x in range(first.x, last.x + 1):
+			if hazards.has(Vector2i(x, y)) \
+					and Rect2(x * TILE, y * TILE + HAZARD_HURT_TOP, TILE, TILE - HAZARD_HURT_TOP).intersects(rect):
+				return true
+	return false
+
+
+## Story 1.19 D6: where a straight fall from `entry`'s cell first stands on clean floor: the first
+## solid cell below it, when the cell above that is no hazard, with entry_position()'s feet formula.
+## Else (the column ends on spikes, or in an open bottom) entry_position(entry) itself. World seeds
+## its safe ground with it, so an `up` arrival hit before its first floor tick is returned to the
+## floor below, never to the top opening (and the Ember Cache never floats, 1.22).
+func ground_below(entry: StringName) -> Vector2:
+	var cell: Vector2i = spawn_cell if entry == &"spawn" else exit(entry).entry_cell
+	for y in range(cell.y + 1, size_cells.y):
+		if is_solid(Vector2i(cell.x, y)):
+			if hazards.has(Vector2i(cell.x, y - 1)):
+				break
+			return Vector2(cell.x * TILE + TILE / 2.0, y * TILE - 12)
+	return entry_position(entry)
 
 
 func is_solid(cell: Vector2i) -> bool:

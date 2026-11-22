@@ -7,10 +7,15 @@ extends RefCounted
 ## Landing and Snuff break it. All tuning constants live here.
 ##
 ## Embers (M1 reward test): every hit adds ember_value(link) to a HELD pile.
-## Breaking the chain safely (landing, Snuff, a knock) BANKS the pile; dying LOSES it.
+## Breaking the chain safely (landing, Snuff, a cling timeout, a room exit) BANKS the pile, and any
+## hit banks it too, through break_by_hit() (GDD: "pain costs health, not embers"); dying LOSES it.
 
 signal changed(count: int)
 signal banked(amount: int)
+## A chain of `links` > 0 ended and banked: `by_hit` when a hit broke it (break_by_hit()), else a safe
+## end (break_chain(): a landing, a Snuff, a cling timeout, a room exit). The player's bank-heal
+## reads it (FR12, Story 1.19 D4). Never on a death (lose()), and never for a chain already at 0.
+signal ended(links: int, by_hit: bool)
 
 # --- Tuning constants (addendum: "tuning constants to set in the MVP") ---
 const MAX_CHAIN := 20
@@ -40,11 +45,24 @@ func add_hit() -> void:
 
 ## Safe end of a chain: the held embers are banked.
 func break_chain() -> void:
+	_end(false)
+
+
+## A hit broke the chain (FR11): the held embers are banked all the same ("only death loses held
+## embers"), and `ended` says it was a hit, so it never bank-heals (Story 1.19 D4).
+func break_by_hit() -> void:
+	_end(true)
+
+
+func _end(by_hit: bool) -> void:
+	var links := count
 	if held > 0:
 		var amount := held
 		held = 0
 		banked.emit(amount)
 	_reset_count()
+	if links > 0:
+		ended.emit(links, by_hit)
 
 
 ## Death: the held embers are gone. Returns how many were lost.

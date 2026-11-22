@@ -176,11 +176,15 @@ func _knock() -> Dictionary:
 		return {knocked = false}
 	var w := walkers[walkers.size() - 1]
 	var sprite := _player.get_node("Sprite") as Sprite2D
+	# Story 1.19: contact costs HP now, and the walker may knock again as each invulnerability ends,
+	# so each case starts at full HP: one case's knocks must not kill the player in the next (a dead
+	# player's invulnerability never counts down). Never a higher Health.MAX.
+	_player.health.reset()
 	place(w.global_position + Vector2(-4, -2))
 	var knocked := false
 	for i in 20:
 		await frames(1)
-		if _player.get("_invuln") > 0.0:
+		if _player.health.invuln > 0.0:
 			knocked = true
 			break
 	if not knocked:
@@ -189,7 +193,7 @@ func _knock() -> Dictionary:
 	var seq: Array[float] = []
 	var always_visible := true
 	var ticks := 0
-	while _player.get("_invuln") > 0.0 and ticks < 120:
+	while _player.health.invuln > 0.0 and ticks < 120:
 		alphas[sprite.modulate.a] = true
 		seq.append(sprite.modulate.a)
 		always_visible = always_visible and sprite.visible

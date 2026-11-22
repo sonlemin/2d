@@ -251,11 +251,11 @@ func test_pogo_wire() -> void:
 
 
 ## Code review 1.16, AC6: World._swap_room() calls Fx.warm_up() after the room enters the tree, so
-## the three items are under the room when room_entered fires (death, respawn and the bottom loop
+## the four items are under the room when room_entered fires (death, respawn and the bottom loop
 ## above each load a room).
 func test_warm_up_at_room_load() -> void:
-	check(not _warm_counts.is_empty() and _warm_counts.all(func(n: int) -> bool: return n == 3),
-			"every room load warms up: three items at Fx.WARM_ALPHA under the room at room_entered (got %s over %d loads)" % [_warm_counts, _warm_counts.size()])
+	check(not _warm_counts.is_empty() and _warm_counts.all(func(n: int) -> bool: return n == 4),
+			"every room load warms up: four items at Fx.WARM_ALPHA under the room at room_entered (got %s over %d loads)" % [_warm_counts, _warm_counts.size()])
 
 
 ## AC2: a lurker inside the viewport but behind a gutter never notices; a control lurker in the

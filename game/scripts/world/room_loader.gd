@@ -15,6 +15,7 @@ const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's violet index 1 in 
 const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## violet index 3, dimmed: "you can stand here" (M1 finding 7); in every zone until E4, like BACKDROP (ledger, Story 1.18 D10)
 
 const NO_CELL := Vector2i(-1, -1)
+const SPIKE_TEXTURE := preload("res://art/spike.png")  ## 16 × 16, the spikes in the bottom 8 rows (tools/sprites/spike.txt)
 
 static var _id_re := RegEx.create_from_string("^[a-z][a-z0-9_]*$")
 # Coordinates are at most 4 digits: a longer number would wrap in Vector2i (or make to_int() print
@@ -242,6 +243,11 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 	for s in spawns:
 		if not solid_at(grid, s + Vector2i.DOWN):
 			err.call(top + s.y, s.x + 1, "'P' has nothing solid below it")
+	# Story 1.19 D5: a spike sits on a floor, the shape the room sweep assumes for a hazard pit.
+	for r in h_rows:
+		for c in w:
+			if grid[r][c] in RoomLegend.HAZARDS and not solid_at(grid, Vector2i(c, r + 1)):
+				err.call(top + r, c + 1, "spike with nothing solid below it")
 	for o: Dictionary in obj_cells:
 		if o.cell.x >= w or o.cell.y >= h_rows:
 			err.call(o.line, 1, "obj cell %s is outside the %d x %d grid" % [o.cell, w, h_rows])
@@ -355,6 +361,9 @@ static func _build(parsed: Dictionary, dive: DiveState = null) -> Room:
 	var rims := Node2D.new()
 	rims.name = "Rims"
 	room.add_child(rims)
+	var hazards := Node2D.new()
+	hazards.name = "Hazards"
+	room.add_child(hazards)
 	var tile := Room.TILE
 	for r in grid.size():
 		for c in grid[r].length():
@@ -362,11 +371,23 @@ static func _build(parsed: Dictionary, dive: DiveState = null) -> Room:
 			var ch := grid[r][c]
 			if solid_at(grid, cell):
 				room.walls.set_cell(cell, 0, Vector2i.ZERO)
-				# A rim on every floor surface, so places to land read in the dark (M1 finding 7).
+				# A rim on every floor surface, so places to land read in the dark (M1 finding 7). A
+				# spiked floor is not a ledge (RoomSweep.ledge_rows says so too): no rim.
 				var above := cell + Vector2i.UP
-				if r > 0 and not solid_at(grid, above) and not RoomLegend.is_in_wall(grid[r - 1][c]):
+				if r > 0 and not solid_at(grid, above) and not RoomLegend.is_in_wall(grid[r - 1][c]) \
+						and not grid[r - 1][c] in RoomLegend.HAZARDS:
 					rims.add_child(_rim(cell))
-			if ch == RoomLegend.SPAWN:
+			if ch in RoomLegend.HAZARDS:
+				# Unshaded, so a hazard reads in the dark like a ledge rim (Pillar 2: a death must teach).
+				# Lit like walls they were invisible outside the player's light (laptop feel check,
+				# sonlm 2026-11-22, "I can't even see it"); E4 decides the final look with real rooms.
+				var spike := Sprite2D.new()
+				spike.texture = SPIKE_TEXTURE
+				spike.material = Fx.unshaded()
+				spike.position = room.cell_centre(cell)
+				hazards.add_child(spike)
+				room.hazards[cell] = true
+			elif ch == RoomLegend.SPAWN:
 				room.spawn_cell = cell
 			elif RoomLegend.SPAWNS.has(ch):
 				var kind: Dictionary = RoomLegend.SPAWNS[ch]

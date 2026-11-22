@@ -1,8 +1,8 @@
 extends Node
 ## `--perf[=<s>]` (AR5, NFR1, NFR5; Story 1.12 D1, decided by sonlm 2026-11-19: the autopilot): a
 ## timed, repeatable perf run, so glow off/on, the laptop, Chrome, Firefox and an HD 620 can be
-## compared. On every spawn it takes the player: input locked, hurtbox masked off (no kill and no
-## knock can break the chain), the chain paid through DevTools' --chain take-off arming (never
+## compared. On every spawn it takes the player: input locked, hurtbox masked off (no contact can
+## hurt it or break the chain), the chain paid through DevTools' --chain take-off arming (never
 ## pinned: 1.11 D6), and moved every physics tick along a vertical ping-pong down the room's centre,
 ## driven by a tick counter, never the wall clock. Two stand-in BudgetLights ride along: a flare
 ## (ALWAYS, at the player's light radius, FR15) and an Ember Cache (CACHE, 80 px, FR24). They are
@@ -65,8 +65,11 @@ func _on_player_spawned(player: Player) -> void:
 	_spawn_frame = Engine.get_physics_frames()
 	_tick = 0
 	player.input.lock()
-	# Untouchable: no predator kill and no crawler knock can break the chain. Not monitoring =
-	# false: get_overlapping_bodies() then prints an engine ERROR. smoke_perf pins this line.
+	# Untouchable: no predator or crawler contact can hurt or break the chain (the player's poll reads
+	# the Hurtbox's overlaps, Story 1.19). Not monitoring = false: get_overlapping_bodies() then
+	# prints an engine ERROR. smoke_perf pins this line. The mask never stops World's hazard poll (a
+	# rect test on Room, not a physics overlap): perf_worst has no spikes, so the run stays untouched,
+	# and a spike in a perf room would hit the autopilot (ledger, owner Story 7.13).
 	player.get_node(^"Hurtbox").collision_mask = 0
 	player.chain.banked.connect(_on_banked)
 	var room := world.current_room()

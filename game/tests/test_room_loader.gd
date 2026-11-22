@@ -17,6 +17,8 @@ func run() -> void:
 	await _test_spawn_args_before_ready()
 	await _test_m1_shaft()
 	await _test_killed_cells()
+	await _test_spikes()
+	await _test_ground_below_fallbacks()
 	_test_index_queries()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
@@ -101,6 +103,10 @@ func _test_inline_errors() -> void:
 	_has(_inline(ok.replace(exits, "exits=down:ok_min@x5")), p + ":6:3 hole in the room's edge that is not a declared exit", "an undeclared top opening")
 	# M1's in-wall rule looked only at the neighbours; with 1-tile walls the edge counts too (D5).
 	check(_inline(ok.replace("###...L", "###...#")).is_empty(), "an edge L counts as solid, like the wall it replaces")
+	# Story 1.19 D5: a spike sits on a floor. Firing sample: one over the hoverer (not solid); near-miss:
+	# one on the wall row under P's row.
+	_has(_inline(ok.replace("#.....#\n#.P", "#...^.#\n#.P")), p + ":7:5 spike with nothing solid below it", "a spike in mid-air")
+	check(_inline(ok.replace("#.P.h.#", "#^P.h.#")).is_empty(), "a spike on a floor validates clean (got %s)" % [_inline(ok.replace("#.P.h.#", "#^P.h.#"))])
 	var errs := _inline(ok.replace("zone=dusk", "zone=teal\ncolour=red"))
 	check(errs.size() == 2, "every error is reported, not just the first (got %s)" % [errs])
 	_test_cling_key(ok, p)
@@ -219,6 +225,8 @@ func _test_m1_shaft() -> void:
 			"R16: the exits are up@3 and down@1, both to m1_shaft; arrival from below stands at (3, 102) (got %s)" % [room.exits])
 	check(not room.is_solid(Vector2i(1, 104)) and not room.is_solid(Vector2i(2, 104)) and room.is_solid(Vector2i(3, 104)),
 			"the floor hole is cols 1-2")
+	# Story 1.19 D6 (checked at story creation): column 3 under the top entry first meets solid under P.
+	check(room.ground_below(&"up") == room.entry_position(&"spawn"), "ground_below(up) is P's spot: the fall from the top lands on P's ledge (got %s, P %s)" % [room.ground_below(&"up"), room.entry_position(&"spawn")])
 	room.queue_free()
 	await get_tree().process_frame
 
@@ -281,3 +289,69 @@ func _test_index_queries() -> void:
 	var bad := RoomLoader.inspect(&"bad_edge_hole")
 	check(bad.known and bad.entries.is_empty() and not bad.errors.is_empty() and bad.errors == _errors_of(DIR + "bad_edge_hole.txt"),
 			"inspect(bad_edge_hole): known, no entries, validate()'s errors, and no push_error (got %s)" % [bad])
+
+
+## Story 1.19 (AC6): the spike `^` parses, is recorded and drawn, its floor gets no rim, and only its
+## bottom 8 px hurt. On the hazard test room tests/rooms/hazards/t_spikes.txt.
+func _test_spikes() -> void:
+	var path := DIR + "hazards/t_spikes.txt"
+	check(RoomLegend.is_known("^") and "^" in RoomLegend.HAZARDS, "'^' is a known legend char and a hazard")
+	check(_errors_of(path).is_empty(), "t_spikes validates clean (got %s)" % [_errors_of(path)])
+	var room := RoomLoader.load_room_from_path(path)
+	check(room != null, "t_spikes builds")
+	if room == null:
+		return
+	add_child(room)
+	var want_cells: Array[Vector2i] = [Vector2i(6, 12), Vector2i(7, 12), Vector2i(8, 12), Vector2i(9, 12)]
+	var cells: Array = room.hazards.keys()
+	cells.sort()
+	check(cells == want_cells, "room.hazards holds the four spike cells (6-9, 12) (got %s)" % [cells])
+	var sprites: Array = room.get_node("Hazards").get_children()
+	var at := sprites.map(func(n: Node) -> Vector2: return (n as Sprite2D).position)
+	check(sprites.size() == 4 and sprites.all(func(n: Node) -> bool: return n is Sprite2D and n.texture == preload("res://art/spike.png") and n.material == Fx.unshaded())
+			and at == want_cells.map(func(c: Vector2i) -> Vector2: return room.cell_centre(c)),
+			"each spike is a Sprite2D of art/spike.png at its cell centre, drawn with Fx.unshaded() so it reads in the dark (laptop feel check, 2026-11-22; got %s)" % [at])
+	check(not room.is_solid(Vector2i(6, 12)), "a spike is not solid")
+	var rims: Array = room.get_node("Rims").get_children().map(func(r: ColorRect) -> Vector2: return r.position)
+	var spiked := [Vector2(96, 208), Vector2(112, 208), Vector2(128, 208), Vector2(144, 208)]
+	check(not spiked.any(func(v: Vector2) -> bool: return v in rims), "the floor under the spikes gets no rim: it is not a ledge (rims %s)" % [rims])
+	check(Vector2(80, 208) in rims and Vector2(160, 208) in rims, "...while the floor on either side of them does")
+	# The hurt rect: the bottom 8 px of the cell (y 200..208 for row 12), never the top 8.
+	check(room.touches_hazard(Rect2(100, 201, 4, 4)), "touches_hazard: a rect in the bottom 8 px of a spike cell fires")
+	check(not room.touches_hazard(Rect2(100, 193, 4, 4)), "...a rect in its top 8 px does not (near-miss)")
+	check(not room.touches_hazard(Rect2(100, 192, 4, 8)), "...nor one whose edge only meets the spikes' top at y 200")
+	check(not room.touches_hazard(Rect2(84, 201, 12, 4)), "...nor one beside the run whose edge only meets it at x 96")
+	check(room.touches_hazard(Rect2(84, 201, 13, 4)), "...one pixel further in, it fires")
+	check(room.ground_below(&"up") == Vector2(184, 196) and room.ground_below(&"up") != room.entry_position(&"up"),
+			"ground_below(up): the clean floor straight below the top entry, (11, 12) standing (got %s; entry %s)" % [room.ground_below(&"up"), room.entry_position(&"up")])
+	check(room.ground_below(&"spawn") == room.entry_position(&"spawn"), "ground_below(spawn) is P's own spot (got %s)" % room.ground_below(&"spawn"))
+	room.queue_free()
+	await get_tree().process_frame
+
+
+## D6: ground_below() falls back to the entry itself when the column ends on a spiked floor or in an
+## open bottom. Inline rooms, written to user:// and loaded by path.
+func _test_ground_below_fallbacks() -> void:
+	var dir := "user://test_room_loader_tmp"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var cases := {
+		"t_fall_spiked": ["id=t_fall_spiked\nzone=dusk\nexits=up:t_fall_spiked@x2, down:t_fall_spiked@x5\n---\n##.####\n#.....#\n#.....#\n#.^...#\n#####.#\n",
+				"the column ends on a spiked floor"],
+		"t_fall_open": ["id=t_fall_open\nzone=dusk\nexits=up:t_fall_open@x5, down:t_fall_open@x5\n---\n#####.#\n#.....#\n#.....#\n#####.#\n",
+				"the column ends in the open bottom"],
+	}
+	for id: String in cases:
+		var path := dir.path_join(id + ".txt")
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		f.store_string(cases[id][0])
+		f.close()
+		var errors := _errors_of(path)
+		var room := RoomLoader.load_room_from_path(path) if errors.is_empty() else null
+		check(room != null, "%s validates and builds (got %s)" % [id, errors])
+		if room != null:
+			add_child(room)
+			check(room.ground_below(&"up") == room.entry_position(&"up"), "ground_below(up) falls back to the entry itself when %s (got %s)" % [cases[id][1], room.ground_below(&"up")])
+			room.queue_free()
+		DirAccess.remove_absolute(path)
+	DirAccess.remove_absolute(dir)
+	await get_tree().process_frame

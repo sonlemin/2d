@@ -1,6 +1,7 @@
 extends Node
 ## The four DevTools overlays (AR54, Story 1.11 D9-D11), cycled by the `dev_overlay` action:
-## 1 play rect and gutters, 2 light radii and notice rings, 3 room exits, entries and object ids,
+## 1 play rect and gutters, 2 light radii, notice rings and the player's HP, 3 room exits, entries,
+## object ids and the safe ground,
 ## 4 FPS, the light budget, frame times, the perf run and active Clock requests, then off. Debug
 ## builds only; no class_name, so dev/ adds one global name (DevTools preloads this script).
 ## Every mark reads the value the game uses (World.play_rect(), Player.light_radius(), Lurker's
@@ -207,8 +208,9 @@ static func summary_rows(text: String) -> PackedStringArray:
 
 # --- Mode 3: room items -----------------------------------------------------------------------------
 
-## What mode 3 draws, in world space: {kind (exit, entry, obj), text, pos, rect (exits), target
-## (exits)}. Public for tests. Anchors and stations join the entries in Story 1.24.
+## What mode 3 draws, in world space: {kind (exit, entry, obj, safe), text, pos, rect (exits), target
+## (exits)}. `safe` is World.last_safe_position(), where a spike returns the player (Story 1.19).
+## Public for tests. Anchors and stations join the entries in Story 1.24.
 func room_items() -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	var room := world.current_room() if is_instance_valid(world) else null
@@ -229,6 +231,7 @@ func room_items() -> Array[Dictionary]:
 	for id: StringName in room.objects:
 		var cell: Vector2i = room.objects[id]
 		items.append({kind = &"obj", text = String(id), pos = room.cell_centre(cell), cell = cell})
+	items.append({kind = &"safe", text = "safe", pos = world.last_safe_position()})
 	return items
 
 
@@ -256,6 +259,12 @@ func _draw_world() -> void:
 						var o: Vector2 = item.pos
 						_world_marks.draw_rect(Rect2(o - Vector2(2, 2), Vector2(4, 4)), GREY, false, 1.0)
 						_beside(o.x - 2, o.x + 2, o.y + 2, item.text, GREY)
+					&"safe":
+						# An upright cross, unlike the entries' diagonal one.
+						var q: Vector2 = item.pos
+						_world_marks.draw_line(q + Vector2(-3, 0), q + Vector2(4, 0), WHITE)
+						_world_marks.draw_line(q + Vector2(0, -3), q + Vector2(0, 4), WHITE)
+						_beside(q.x - 3, q.x + 3, q.y + 4, item.text, WHITE)
 
 
 ## Mode 2's numbers for a light of radius `r`, by Lurker.senses()'s rule: a lurker notices it from
@@ -318,9 +327,19 @@ func _draw_player_marks(marks: Node2D) -> void:
 	else:
 		marks.draw_arc(Vector2.ZERO, m.reach, 0.0, TAU, 64, CYAN, 1.0)
 		_text(marks, Vector2(8, 14), "notice reach %d px" % m.reach, CYAN)
+	# Story 1.19 D8: no HP HUD exists until the pips (1.25), and the laptop check needs one.
+	_text(marks, Vector2(8, 24), hp_text(player.health.hp, player.health.invuln), CYAN)
 	for p: Node in get_tree().get_nodes_in_group("predator"):
 		if is_instance_valid(p) and p is Node2D and p.has_method(&"senses") and p.senses(player):
 			marks.draw_line(Vector2.ZERO, marks.to_local((p as Node2D).global_position), MAGENTA, 1.0)
+
+
+## Mode 2's HP line: "hp 3/4", plus "inv 0.42 s" while invulnerable. Public and pure, for tests.
+static func hp_text(hp: int, invuln: float) -> String:
+	var s := "hp %d/%d" % [hp, Health.MAX]
+	if invuln > 0.0:
+		s += "  inv %.2f s" % invuln
+	return s
 
 
 ## Mode 1's play rect in screen pixels: World.play_rect() placed by its offset inside the view of

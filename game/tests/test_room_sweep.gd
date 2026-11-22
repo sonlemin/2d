@@ -6,7 +6,8 @@ extends Node
 
 const RoomSweep := preload("res://tests/room_sweep.gd")
 const NO_HAZARDS: Array[String] = []
-## A sample hazard char: RoomLegend.HAZARDS is empty until 1.19 adds the spike.
+## A sample hazard char, a stand-in that is not RoomLegend's spike, so the sweeps are tested apart
+## from the legend (Story 1.19 added `^`; smoke_rooms runs them with RoomLegend.HAZARDS).
 const X_HAZARD: Array[String] = ["x"]
 const MAX_ROWS := 19  ## floor(Spec.LEDGE_FALL_MAX 315 / 16): the samples pin the boundary at 19 / 20
 

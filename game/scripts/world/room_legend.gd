@@ -5,10 +5,13 @@ class_name RoomLegend
 const WALL := "#"
 const EMPTY := "."
 const SPAWN := "P"  ## the player's start; nothing is spawned for it (Room.entry_position(&"spawn"))
-## Tile chars that hurt on contact; 1.19 adds the spike, here and as a known legend char (is_known()
-## must accept it, or validate() calls it unknown). A hazard is never a ledge, and the room sweep
-## (Story 1.10) checks every hazard pit has a ledge or cling stretch within a 1.5 s fall above it.
-const HAZARDS: Array[String] = []
+## A spike (Story 1.19): not solid, it sits on a floor (validate() wants something solid below it).
+## RoomLoader draws art/spike.png there and records the cell in room.hazards; World polls it.
+const SPIKE := "^"
+## Tile chars that hurt on contact, each a known legend char (is_known() accepts them). A hazard is
+## never a ledge, and the room sweep (Story 1.10) checks every hazard pit has a ledge or cling
+## stretch within a 1.5 s fall above it.
+const HAZARDS: Array[String] = [SPIKE]
 
 ## Chars that spawn an entity through Room.spawn(): `args` are set before add_child (AR23).
 ## `in_wall = true`: next to a wall or the room edge, the cell also gets a wall tile, so a lurker
@@ -24,7 +27,7 @@ const SPAWNS := {
 
 
 static func is_known(ch: String) -> bool:
-	return ch == WALL or ch == EMPTY or ch == SPAWN or SPAWNS.has(ch)
+	return ch == WALL or ch == EMPTY or ch == SPAWN or ch in HAZARDS or SPAWNS.has(ch)
 
 
 static func is_in_wall(ch: String) -> bool:

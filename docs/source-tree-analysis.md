@@ -21,7 +21,8 @@ pixel_art_game/
 │   ├── text/                     # strings.csv (keys,en) + its .import and the generated strings.en.translation (committed; Story 1.17)
 │   ├── rooms/
 │   │   ├── l1/m1_shaft.txt       # ★ The level: M1's shaft at 22 columns (header + --- + grid; docs/rooms.md)
-│   │   └── dev/perf_worst.txt    # The worst-case perf scene (Story 1.12): 30 × 68, validated only, never a level (docs/perf.md)
+│   │   ├── dev/perf_worst.txt    # The worst-case perf scene (Story 1.12): 30 × 68, validated only, never a level (docs/perf.md)
+│   │   └── dev/spikes.txt        # A copy of tests/rooms/hazards/t_spikes.txt for the laptop look (Story 1.19): validated only
 │   ├── scenes/
 │   │   ├── world/
 │   │   │   └── world.tscn        # ★ ENTRY: main scene (run/main_scene). Darkness, RoomHolder, Camera, UI (gutters, router)
@@ -32,24 +33,25 @@ pixel_art_game/
 │   ├── scripts/
 │   │   ├── rules/
 │   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
+│   │   │   ├── health.gd         # ★ Health: per-life HP, the damage table, the cause registry, invulnerability, bank-heal (Story 1.19)
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
 │   │   │   ├── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
 │   │   │   ├── settings.gd       # Settings: global settings (brightness so far), set_value() + changed
 │   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags
 │   │   │   └── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
 │   │   ├── world/
-│   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect(), light_rect()
+│   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect(), light_rect(), the hazard poll and safe ground
 │   │   │   ├── light_budget.gd   # LightBudget: World's child that applies the ≤ 6 light budget each physics tick (priority 50); no class_name
 │   │   │   ├── camera_rig.gd     # CameraRig: follow, downward lead, shake, limits, play_rect(), view_rect()
 │   │   │   ├── room_legend.gd    # RoomLegend: the one definition of every grid char
 │   │   │   ├── room_loader.gd    # ★ RoomLoader: parse, pure validate (file:row:col errors), load, build
-│   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position()
+│   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position(), ground_below(), touches_hazard()
 │   │   ├── ui/
 │   │   │   ├── gutters.gd        # Gutters: the two flat 60 px HUD strips
 │   │   │   ├── screen_router.gd  # ScreenRouter: one full-screen UI screen at a time
 │   │   │   └── theme_builder.gd  # ThemeBuilder: the one Theme in code (font, size 8, Label variations), play_text for UI over the play area
 │   │   ├── actors/
-│   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, contact and death
+│   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, hurt() (the one damage path), the contact poll and death
 │   │   │   ├── player_input.gd   # PlayerInput: the only Input reader; intents, Light tap/hold, real-time buffers, lock()
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN
@@ -64,13 +66,14 @@ pixel_art_game/
 │   │   │   ├── text_style.gd     # TextStyle: font, sizes, line metrics, CAP_TOP, the play-area outline (play_text LabelSettings, cached)
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
 │   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; the release presets exclude it (export.sh checks)
-│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --log, --set, --glow, --perf; ?… on web), the overlay key
+│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --hp, --log, --set, --glow, --perf; ?… on web), the overlay key
 │   │   │   ├── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/light budget/frames/perf/Clock); no class_name
 │   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, stand-in lights, frame stats and summary (docs/perf.md); no class_name
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
 │   │   ├── runner.gd / runner.tscn # Runs one test as a scene; fails on no PASS, a timeout or any engine error
 │   │   ├── test_chain_state.gd   # Unit tests for ChainState
+│   │   ├── test_health.gd        # Health: the damage table and causes against Spec, invulnerability, heals, bank-heal (Story 1.19)
 │   │   ├── test_log.gd           # Unit tests for Log
 │   │   ├── test_clock.gd         # Clock: stacking, refresh, real-time expiry, pause, clear on death
 │   │   ├── test_display.gd       # Display: the scale table, window_scale_for, project display settings, inert until start() (Story 1.14)
@@ -97,6 +100,7 @@ pixel_art_game/
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
+│   │   ├── smoke_health.gd       # HP on world.tscn with tests/rooms/hazards/: contact, spikes, safe ground, bank-heal, death, flash, squash
 │   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, the SMOKE boot marker, each arg, the overlay cycle, no F-key
 │   │   ├── smoke_a11y.gd         # The accessibility gate on m1_shaft: shake off, blink and steady variant, look-ahead on a pogo
 │   │   ├── smoke_palettes.gd     # The active zone in world.tscn on tests/rooms/zones/: boot, exit, respawn, same zone; gutters and popup
@@ -104,9 +108,9 @@ pixel_art_game/
 │   │   ├── screenshot.gd         # Renders 2 PNG screenshots + the ×2 Deck mock per zone (needs a real renderer: xvfb-run)
 │   │   ├── deck_mock.gd          # Helper (not a test): the 480×270 gutter-HUD mock for the Deck-size check, one zone's colours
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
-│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt); never exported
+│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt, hazards/t_spikes.txt); never exported
 │   └── art/                      # ⚠ GENERATED by tools/build_sprites.py — do not hand-edit
-│       ├── player.png  crawler.png  lurker.png  lurker_eyes.png  slash.png  tile.png
+│       ├── player.png  crawler.png  lurker.png  lurker_eyes.png  slash.png  tile.png  spike.png
 │       ├── light.png             # 128×128 radial gradient used by every PointLight2D
 │       └── *.png.import          # Godot import settings (committed)
 │
@@ -114,7 +118,7 @@ pixel_art_game/
 │   ├── build_sprites.py          # ★ Text pixel grids + palette → game/art/*.png (needs Pillow)
 │   ├── sprites/
 │   │   ├── palette_edge.txt      # "Edge of the Abyss" palette: one `char #hex` per line
-│   │   └── player.txt crawler.txt lurker.txt lurker_eyes.txt slash.txt tile.txt
+│   │   └── player.txt crawler.txt lurker.txt lurker_eyes.txt slash.txt tile.txt spike.txt (Story 1.19)
 │   │                             # One char = one pixel; '.' = transparent
 │   ├── export.sh                 # ★ Builds every target into builds/<version>/ and checks each one (Story 1.13; docs/build.md)
 │   ├── godot_licenses.gd         # Writes GODOT_LICENSES.txt (Godot's licence, third-party components, licence texts) for export.sh (Story 1.17)

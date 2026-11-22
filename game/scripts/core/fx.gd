@@ -24,6 +24,16 @@ const WARM_ALPHA := 0.01
 ## load would end a timer before anything was drawn (code review 1.16). Three frame starts leave two
 ## drawn frames, whether the room loads in _ready, on a physics tick or in _process.
 const WARM_FRAMES := 3
+## The hit flash (Story 1.19 D9, epics 1.19, UX-DR126), counted in physics ticks: they run at 60 per
+## real second even in a hitstop, and a hit can land in a pogo's. Reviewed at the CP2 gate (1.30).
+const HIT_FLASH_TICKS := 4  ## ticks (67 ms) the sprite draws pure white from the hit tick (epics 1.19 "67 ms white"); reviewed at 1.30.
+const HIT_DIM_TICKS := 6  ## ticks (100 ms) of the dim that replaces the white under reduce flashing (UX-DR126 "a short dim"); reviewed at 1.30.
+const HIT_DIM := 0.6  ## self_modulate brightness of that dim (epics 1.19 "60%"; UX-DR126); reviewed at 1.30.
+## Ticks from one white flash to the next (Q1, sonlm 2026-11-22: once per second). With the 2.5 Hz
+## invulnerability blink, hits back to back at the 0.6 s invulnerability reach 4 flashes per second
+## without it, and 3.0 with it (NFR8; simulated in test_fx). The dim and the blink always run.
+## Reviewed at 1.30.
+const HIT_FLASH_GAP_TICKS := 60
 
 enum Kind { ONCE, PULSE, BLINK, MOTION }
 
@@ -55,11 +65,14 @@ const EFFECTS := {
 	&"lurker_shiver": {kind = Kind.MOTION, hz = SHIVER_RATE / TAU, fn = "", reduced = "",
 			why = "a ±0.5 px body shiver while a lurker telegraphs (lurker.gd): part of the warning, which must read by motion (UX-DR129); reduced motion covers UI easing and popups (UX-DR127)"},
 	&"pogo_squash": {kind = Kind.MOTION, hz = 0.0, fn = "", reduced = "",
-			why = "the sprite stretches to (0.75, 1.3) on a pogo hit and eases back (player.gd): hit feedback on the player's own action; reduced motion covers UI easing and popups (UX-DR127)"},
+			why = "the sprite stretches to (0.75, 1.3) on a pogo hit and eases back on the physics tick, one tick = 1/60 s of real time, so it shows through the hitstop (player.gd, Story 1.19): hit feedback on the player's own action; reduced motion covers UI easing and popups (UX-DR127)"},
+	&"hit_flash": {kind = Kind.ONCE, hz = 0.0, fn = "hit_flash", reduced = "reduce flashing: a 100 ms dim to 60% (self_modulate) instead of the white (UX-DR126 \"a short dim\")",
+			why = "a white flash starts at most once per HIT_FLASH_GAP_TICKS (60): with the 2.5 Hz blink, hits back to back at the 0.6 s invulnerability would reach 4 flashes per second (Q1, sonlm 2026-11-22; NFR8)"},
 }
 
 static var _unshaded_material: CanvasItemMaterial
 static var _additive_material: CanvasItemMaterial
+static var _flash_material: ShaderMaterial
 
 
 ## Shared by every code-built effect, built once (project-context: cache materials as statics, never
@@ -79,6 +92,48 @@ static func additive() -> CanvasItemMaterial:
 		_additive_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		_additive_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	return _additive_material
+
+
+## The hit flash's look (Story 1.19 D9): every opaque texel pure white, unshaded so the darkness
+## can't dim it, transparent texels untouched. `modulate` can't make a sprite white (it multiplies),
+## so the flash swaps this in for its ticks only; the normal draw path is unchanged. Probed on 4.7.2:
+## #ffffff under the dark CanvasModulate, and it composes with the blink's modulate.a. Built in code
+## and cached (no .tres; AR46), and drawn once by warm_up().
+static func flash_material() -> ShaderMaterial:
+	if _flash_material == null:
+		var shader := Shader.new()
+		shader.code = "shader_type canvas_item;\nrender_mode unshaded;\nvoid fragment() {\n\tCOLOR.rgb = vec3(1.0);\n}\n"
+		_flash_material = ShaderMaterial.new()
+		_flash_material.shader = shader
+	return _flash_material
+
+
+## Q1 (sonlm, 2026-11-22): a new white flash only when the last one started at least
+## HIT_FLASH_GAP_TICKS ago. Ticks are Engine.get_physics_frames() values; `last` < 0 is never.
+static func white_flash_allowed(last: int, now: int) -> bool:
+	return last < 0 or now - last >= HIT_FLASH_GAP_TICKS
+
+
+## Draws the hit flash on `item` at `tick` ticks after the hit (0 = the hit tick), and restores it
+## once it is over (`material` null, `self_modulate` white). Returns true while it still draws, so the
+## caller keeps ticking it, and false once it has restored. White for HIT_FLASH_TICKS when `white`
+## (the gap allowed one, white_flash_allowed()); under reduce flashing, a dim to HIT_DIM for
+## HIT_DIM_TICKS instead, on every hit (UX-DR126). The gate is read on every tick, so a setting
+## flipped mid-flash restores cleanly. The caller owns `material` and `self_modulate` meanwhile.
+static func hit_flash(item: CanvasItem, tick: int, white := true) -> bool:
+	var reduced := reduce_flashing()
+	var length := HIT_DIM_TICKS if reduced else (HIT_FLASH_TICKS if white else 0)
+	if tick < 0 or tick >= length:
+		item.material = null
+		item.self_modulate = Color.WHITE
+		return false
+	if reduced:
+		item.material = null
+		item.self_modulate = Color(HIT_DIM, HIT_DIM, HIT_DIM, 1.0)
+	else:
+		item.material = flash_material()
+		item.self_modulate = Color.WHITE
+	return true
 
 
 ## AR57: true when blinks hold steady and sparks shrink (UX-DR126). Read live, so a DevTools --set
@@ -166,9 +221,9 @@ static func popup(parent: Node, pos: Vector2, text: String, color: Color) -> voi
 
 ## AR46, Story 1.16 D10: GL Compatibility compiles a shader variant on an item's first draw. So each
 ## cached material is drawn once at room load: sparks and a label with unshaded(), a light sprite
-## with additive(). Children of the room (AR23), at `pos` (inside the first view: off-screen items
-## are culled), at WARM_ALPHA (no one sees it, and the renderer still draws it), freed after
-## WARM_FRAMES. The room must be in the tree.
+## with additive(), and the player's sprite with flash_material() (Story 1.19). Children of the room
+## (AR23), at `pos` (inside the first view: off-screen items are culled), at WARM_ALPHA (no one sees
+## it, and the renderer still draws it), freed after WARM_FRAMES. The room must be in the tree.
 ## Measured on the laptop (docs/perf.md): no change to the web first-frame stall, which is the load
 ## itself. Kept for the first use of a material later in a session; the stall is Story 7.13's.
 static func warm_up(room: Node, pos: Vector2) -> void:
@@ -194,7 +249,13 @@ static func warm_up(room: Node, pos: Vector2) -> void:
 	s.modulate.a = WARM_ALPHA
 	s.position = pos
 	room.add_child(s)
-	_free_after_frames([p, l, s], room.get_tree(), WARM_FRAMES)
+	var f := Sprite2D.new()
+	f.material = flash_material()
+	f.texture = preload("res://art/player.png")  # what the real flash draws
+	f.modulate.a = WARM_ALPHA
+	f.position = pos
+	room.add_child(f)
+	_free_after_frames([p, l, s, f], room.get_tree(), WARM_FRAMES)
 
 
 ## Frees `items` once `frames` process frames have started. process_frame fires before that frame's

@@ -178,7 +178,9 @@ func _play(rec: Dictionary) -> void:
 		best = maxi(best, _player.chain.count)
 	for a in ["move_left", "move_right", "attack", "jump"]:
 		Input.action_release(a)
-	print("     bot %s: frame %d, best %d, %s, y=%d" % [id, frame, best, ending if crossed == "" else "exit " + crossed, int(_player.global_position.y / Room.TILE)])
+	# Story 1.19: crawler contact costs HP now. The bot's HP is reported, never padded: if it dies,
+	# the line changed (report it; never a higher Health.MAX). Its margin is the CP2 playtest's (1.30).
+	print("     bot %s: frame %d, best %d, %s, y=%d, hp %d/%d" % [id, frame, best, ending if crossed == "" else "exit " + crossed, int(_player.global_position.y / Room.TILE), _player.health.hp, Spec.MAX_HP])
 	check(best >= Spec.BOT_MIN_CHAIN, "%s: the bot chains %d+ pogos with plain movement, no dash (Spec.BOT_MIN_CHAIN; best %d)" % [id, Spec.BOT_MIN_CHAIN, best])
 	var gap_ticks := max_frames
 	for i in range(1, hit_ticks.size()):

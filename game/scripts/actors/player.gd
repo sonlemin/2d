@@ -2,7 +2,9 @@ class_name Player
 extends CharacterBody2D
 ## The descender. Runs, jumps, dashes, slashes on the ground and pogos (Attack in the air).
 ## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light (light radius).
-## Landing or holding Light past the tap window (Snuff) breaks the chain. Touching a predator kills.
+## Landing or holding Light past the tap window (Snuff) breaks the chain. A hit costs HP (Health, per
+## life); a predator hurts only while monitorable. hurt() is the one damage path, for every source
+## (Story 1.19 D2): World's spike poll calls it, and so does the contact poll here.
 ## Reads only its PlayerInput's intents, never Input (AR34, Story 1.8).
 
 signal died
@@ -18,7 +20,11 @@ const HITSTOP_SCALE := 0.05  ## time scale during a pogo hitstop: it only makes 
 const LIGHT_TEXTURE_HALF := 64.0        ## light.png is 128 px
 
 var chain := ChainState.new()
+var health := Health.new()  ## per-life (AR12): a respawn is a new Player, so full HP (FR13)
 var is_dead := false
+## The cause id of the hit that killed this life (Health.CAUSES), or &"" for a death with no cause
+## (World's backstops, a test's die()). The death card reads it (Story 1.29).
+var death_cause: StringName = &""
 
 var _facing := 1
 var _coyote := 0.0
@@ -30,12 +36,14 @@ var _swing_left := 0.0
 var _swing_cd := 0.0
 var _swing_is_pogo := false
 var _swing_hit := false                 ## a swing connects at most once for the chain
-var _invuln := 0.0
 var _shown_radius := ChainState.BASE_RADIUS
 var _clinging := false
 var _cling_side := 0
 var _cling_left := 0.0
 var _kick_left := 0.0
+var _flash_start := -1  # Engine.get_physics_frames() of the hit whose flash is drawing; -1 none
+var _flash_white := false  # that flash may draw white (the Q1 gap allowed it)
+var _last_flash_frame := -1  # where the last white flash started, for the once-per-second gap (Q1)
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _light: PointLight2D = $Light
@@ -50,7 +58,7 @@ func _ready() -> void:
 	add_to_group("player")
 	chain.changed.connect(_on_chain_changed)
 	chain.banked.connect(_on_banked)
-	_hurtbox.area_entered.connect(_on_hurt_area)
+	chain.ended.connect(_on_chain_ended)
 	_set_swing_visible(false)
 	_apply_bloom()
 	_cling_left = Game.tuning.f(&"cling_grace")
@@ -61,6 +69,9 @@ func light_radius() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	# Before the dead return: a lethal hit flashes too, and its sprite must be restored (AC8).
+	_tick_flash()
+	_recover_squash()
 	if is_dead:
 		return
 	input.sample()  # first, so every read this tick sees this tick's input (Story 1.8 D1)
@@ -79,23 +90,26 @@ func _physics_process(delta: float) -> void:
 		_jumping = false
 		chain.break_chain()  # Landing breaks the chain; the ground is a sanctuary.
 	_process_swing()
-	_check_contact()
+	_poll_contacts()  # after the landing break, Snuff and cling: it sees this tick's escape (D3)
 	_update_light(delta)
 
 
-## Real-time juice (runs during hitstop too): the squash recovers. The camera lives in CameraRig.
-func _process(delta: float) -> void:
-	var real := delta / maxf(Engine.time_scale, 0.001)
+## The pogo squash eases back on the physics tick at one tick = 1/60 s of real time, as CameraRig
+## and PlayerInput count it (Story 1.19). Physics ticks run at 60 per real second in a hitstop too,
+## so the squash shows through the freeze; `delta / Engine.time_scale` in _process misread the hit
+## frame (scaled before the request) and snapped it back at once (ledger, Story 1.16).
+func _recover_squash() -> void:
+	var real := 1.0 / Engine.physics_ticks_per_second
 	_sprite.scale = _sprite.scale.lerp(Vector2.ONE, clampf(12.0 * real, 0.0, 1.0))
 
 
 func _tick_timers(delta: float) -> void:
 	_coyote = maxf(_coyote - delta, 0.0)
 	_swing_cd = maxf(_swing_cd - delta, 0.0)
-	_invuln = maxf(_invuln - delta, 0.0)
+	health.tick(delta)  # game time: a hitstop pauses it, as M1's _invuln did
 	# Story 1.16 D4: alpha, not visible, so the reduce-flashing variant (steady transparency) is the
 	# same path; the rate and both variants live in Fx's gate (NFR8, UX-DR126).
-	_sprite.modulate.a = Fx.blink_alpha(_invuln)
+	_sprite.modulate.a = Fx.blink_alpha(health.invuln)
 
 
 ## Held past the tap window = Snuff; PlayerInput times it on real time (FR9). A tap is Flare Toss (1.23).
@@ -284,42 +298,107 @@ func _update_light(delta: float) -> void:
 	_light.texture_scale = _shown_radius / LIGHT_TEXTURE_HALF
 
 
-## Crawler contact: knockback and break the chain, but don't kill. Only predators kill in M1.
-## Polled every frame (not body_entered) so a crawler still overlapping after invulnerability hurts.
-func _check_contact() -> void:
-	if is_dead or _invuln > 0.0:
+## Contact damage, polled every tick, never entered/exited (D3): a crawler or a lurker still
+## overlapping when the invulnerability ends hits again. One hit per tick: a predator first (the
+## larger hit, and deterministic), then a crawler.
+## A predator counts only while `monitorable` is true when the poll reads it (Pillar 2: a predator
+## damages only while monitorable). The overlap list lags a monitorable change by one physics step
+## (probed on 4.7.2), so the poll reads the flag itself: a lurker that lost the scent this tick is
+## harmless this tick, with no tick of lag.
+func _poll_contacts() -> void:
+	if is_dead or health.invulnerable():
 		return
+	for area in _hurtbox.get_overlapping_areas():
+		if area.is_in_group(&"predator") and area.monitorable and area.has_method(&"contact_cause") \
+				and not area.is_queued_for_deletion():
+			hurt(area.contact_cause(), area.global_position)
+			return
 	for body in _hurtbox.get_overlapping_bodies():
-		if not body.is_in_group("enemy") or body.is_queued_for_deletion():
+		if not body.is_in_group(&"enemy") or not body.has_method(&"contact_cause") or body.is_queued_for_deletion():
 			continue
 		# An active pogo swing on this crawler wins over contact damage.
 		if _swing_left > 0.0 and _swing_is_pogo and _pogo.overlaps_body(body):
 			continue
-		_take_knockback(body)
+		hurt(body.contact_cause(), body.global_position)
 		return
 
 
-func _take_knockback(body: Node2D) -> void:
+## The one way damage reaches a player (Story 1.19 D2), for every source. `cause` is a
+## Health.CAUSES id; `from` is where the hit came from (knockback away from it), or Vector2.INF for
+## none (spikes: World returns the player to safe ground instead). Returns whether it landed: false
+## when dead or refused (invulnerable). Lethal first: a lethal hit is a death, so the held embers
+## are lost, not banked ("only death loses held embers", GDD Health).
+func hurt(cause: StringName, from := Vector2.INF) -> bool:
+	if is_dead or health.hit(cause, Game.tuning.f(&"invuln_time")) == 0:
+		return false
+	if health.is_empty():
+		_start_flash()  # a lethal hit flashes too; the flash runs out while dead (AC8)
+		die(cause)
+		return true
+	chain.break_by_hit()  # FR11: held -> carried, and never a bank-heal (D4)
 	_end_cling()
-	var t := Game.tuning
-	_invuln = t.f(&"invuln_time")
-	_sprite.modulate.a = Fx.blink_alpha(_invuln)  # from this tick's draw, not the next (steady under reduce flashing)
-	_jumping = false
-	var away := signf(global_position.x - body.global_position.x)
-	velocity = Vector2(t.f(&"knockback_x") * (away if away != 0.0 else -_facing), t.f(&"knockback_y"))
-	_dash_left = 0.0
-	chain.break_chain()
+	_start_flash()
+	_sprite.modulate.a = Fx.blink_alpha(health.invuln)  # from this tick's draw, not the next (steady under reduce flashing)
+	if from.is_finite():
+		var t := Game.tuning
+		_jumping = false
+		_dash_left = 0.0
+		var away := signf(global_position.x - from.x)
+		velocity = Vector2(t.f(&"knockback_x") * (away if away != 0.0 else -_facing), t.f(&"knockback_y"))
+	return true
 
 
-func _on_hurt_area(area: Area2D) -> void:
-	if is_dead or not area.is_in_group("predator"):
+## The hit flash from this tick (Story 1.19 D9): drawn here for the hit tick, then ticked in
+## _physics_process by physics frames, so a hit before or after this player's own tick shows the
+## same 4 ticks. White at most once per Fx.HIT_FLASH_GAP_TICKS (Q1); Fx owns the gate and the dim.
+func _start_flash() -> void:
+	var now := Engine.get_physics_frames()
+	_flash_white = Fx.white_flash_allowed(_last_flash_frame, now)
+	if _flash_white:
+		_last_flash_frame = now
+	_flash_start = now if Fx.hit_flash(_sprite, 0, _flash_white) else -1
+
+
+func _tick_flash() -> void:
+	if _flash_start >= 0 and not Fx.hit_flash(_sprite, Engine.get_physics_frames() - _flash_start, _flash_white):
+		_flash_start = -1
+
+
+## FR12, D4: a chain banked safely (a landing, a Snuff, a cling timeout, a room exit) of
+## bank_heal_min links or more heals 1 HP. A hit never does, and a death is no `ended` at all.
+func _on_chain_ended(links: int, by_hit: bool) -> void:
+	if by_hit or is_dead:
 		return
-	die()
+	health.bank_heal(links, int(Game.tuning.f(&"bank_heal_min")))
 
 
-func die() -> void:
+## The Hurtbox in world space, for World's hazard poll (Story 1.19 D5).
+func hurt_rect() -> Rect2:
+	var shape := _hurtbox.get_node("Shape") as CollisionShape2D
+	var size := (shape.shape as RectangleShape2D).size
+	return Rect2(shape.global_position - size / 2.0, size)
+
+
+## An in-room teleport (World's spike return): still, out of any cling, dash or swing, no coyote
+## jump, and never a smear (AR6).
+func place_at(pos: Vector2) -> void:
+	position = pos
+	velocity = Vector2.ZERO
+	_end_cling()
+	_dash_left = 0.0
+	_swing_left = 0.0
+	_set_swing_visible(false)
+	_coyote = 0.0
+	_jumping = false
+	reset_physics_interpolation()
+
+
+## `cause`: the Health.CAUSES id that killed (hurt() passes it); &"" for a death with no cause
+## (World's tunnelling and failed-room backstops, tests). The death card reads death_cause (1.29).
+func die(cause: StringName = &"") -> void:
 	if is_dead:
 		return
+	death_cause = cause
 	is_dead = true
 	_end_cling()
 	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen

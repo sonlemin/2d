@@ -11,6 +11,7 @@ extends Node
 ## the store on TMP (reset_for_tests() points it home) and ends in _teardown().
 ## UX numbers are written out (the 60 px gutter is CameraRig's, checked in smoke_world).
 
+const Spec := preload("res://tests/spec.gd")
 const WorldScene := preload("res://scenes/world/world.tscn")
 const PlayerScene := preload("res://scenes/actors/player.tscn")
 const Overlays := preload("res://scripts/dev/overlays.gd")
@@ -119,6 +120,8 @@ func run() -> void:
 	await test_chain_falling_spawn()
 	await test_chain_paused_spawn()
 	await test_chain_mid_tick_spawn()
+	await test_hp_every_life()
+	await test_bad_hp()
 	await test_log()
 	await test_set()
 	await test_overlay_cycle()
@@ -388,13 +391,41 @@ func test_bad_args() -> void:
 	_build(["--foo=1", "--chain=99", "--log=nope,save", "--room=t_swap_a", "--room=t_dev_room"])
 	var w := _warnings.take()
 	var has := func(part: String) -> bool: return w.any(func(t: String) -> bool: return t.contains(part))
-	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, glow, log, perf, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
+	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, glow, hp, log, perf, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
 			and has.call("--chain=99 is outside 0..%d" % ChainState.MAX_CHAIN) and has.call("--log: no category 'nope'"),
 			"bad args: one warning each for --foo, the repeated --room, --chain=99 and --log=nope (got %s)" % [w])
 	check(_room().id == &"t_dev_room" and Log.enabled(Log.SAVE) and not Log.enabled(Log.LURKER),
 			"...and the good parts apply: the last --room, --log's save (got %s)" % _room().id)
 	var dev := _dev()
 	check(dev._chain == 0 and not _world.player_spawned.is_connected(dev._on_player_spawned), "...a bad --chain arms nothing")
+	await _teardown()
+
+
+## Story 1.19 D8: --hp=1 starts every life at 1 HP: the first and the respawned one.
+func test_hp_every_life() -> void:
+	_build(["--room=t_dev_room", "--hp=1"])
+	var p := _spawned[0]
+	check(p.health.hp == 1, "--hp=1: the first life has 1 HP (got %d)" % p.health.hp)
+	var dev := _dev()
+	check(_world.player_spawned.is_connected(dev._on_player_spawned_hp) and not _world.player_spawned.is_connected(dev._on_player_spawned),
+			"...through its own spawn handler; --chain's is not connected")
+	p.die()
+	for i in int((World.RESPAWN_DELAY + 1.0) * Engine.physics_ticks_per_second):
+		if _spawned.size() > 1:
+			break
+		await frames(1)
+	var q: Player = _spawned[-1]
+	check(_spawned.size() == 2 and q != p and q.health.hp == 1, "...and so does the respawned one (got %d)" % q.health.hp)
+	await _teardown()
+
+
+func test_bad_hp() -> void:
+	_build(["--room=t_dev_room", "--hp=0"])
+	var w := _warnings.take()
+	var dev := _dev()
+	check(w.size() == 1 and w[0].contains("--hp=0 is outside 1..%d" % Spec.MAX_HP), "a bad --hp is one warning (got %s)" % [w])
+	check(not _world.player_spawned.is_connected(dev._on_player_spawned_hp) and _spawned[0].health.hp == Spec.MAX_HP,
+			"...connects nothing, and the life starts at full HP (got %d)" % _spawned[0].health.hp)
 	await _teardown()
 
 
@@ -821,6 +852,8 @@ func test_room_items() -> void:
 	check(entries == ["down", "spawn", "up"], "...the spawn, up and down entries (got %s)" % [entries])
 	check(objs.size() == 1 and objs[0].text == "lamp_t_dev_room_1" and objs[0].cell == Vector2i(5, 7) and objs[0].pos == _room().cell_centre(Vector2i(5, 7)),
 			"...and the obj= id at its cell (got %s)" % [objs])
+	var safe := items.filter(func(i: Dictionary) -> bool: return i.kind == &"safe")
+	check(safe.size() == 1 and safe[0].pos == _world.last_safe_position(), "...and the safe ground, World.last_safe_position() (Story 1.19; got %s)" % [safe])
 	var up: Array = items.filter(func(i: Dictionary) -> bool: return i.kind == &"exit" and i.side == &"up")
 	check(up.size() == 1 and up[0].rect == Rect2(128, 0, 16, 16), "...the up exit's opening is its one open cell in row 0 (got %s)" % [up[0].rect if up.size() == 1 else up])
 	_draws = {}

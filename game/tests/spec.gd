@@ -18,3 +18,7 @@ const FLASH_HZ_MAX := 3.0  ## GDD Accessibility: "Flash safety: no more than 3 f
 const POGO_GAP_MIN := 1.0 / FLASH_HZ_MAX  ## GDD Accessibility: "Flash safety: no more than 3 flashes per second anywhere" (NFR8): s of real time between two pogo hits, since each hit plays its sparks, light swell, popup and shake once; a floor on the bot's line in every spine room.
 const PULSE_HZ_MAX := 2.0  ## GDD Predators: Lurker: eyes "pulse at 2 Hz", the gutter frame "pulsing … (≤ 2 Hz)" (UX-DR125: pulses ≤ 2 Hz).
 const BLINK_HZ := 2.5  ## GDD Combat damage table: crawler contact "0.6 s invulnerable (blinking at 2.5 Hz)" (UX-DR125: blinks 2.5 Hz).
+const MAX_HP := 4  ## GDD Health and damage (M2): "Health: 4 HP"; the respawn's HP (FR13).
+const DAMAGE := {&"crawler": 1, &"boss": 1, &"lurker": 2, &"hazard": 1}  ## GDD Health and damage (M2) table: crawler contact 1, boss attack 1, hunting lurker 2, spikes and hazards 1 (FR10).
+const INVULN_S := 0.6  ## GDD Health and damage (M2): crawler contact "0.6 s invulnerable (blinking at 2.5 Hz)"; every hit gives the same (FR10).
+const BANK_HEAL_MIN := 10  ## GDD Health and damage (M2): Healing "+1 HP when you bank a chain of 10 or more" (FR12; [ASSUMPTION: playtest]).

@@ -47,6 +47,12 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## The Health.CAUSES id its contact hurts with: walkers and hoverers have different avoidance tips on
+## the death card (Story 1.28), so they are two causes on one damage row.
+func contact_cause() -> StringName:
+	return &"crawler_hoverer" if hover else &"crawler_walker"
+
+
 func take_hit() -> void:
 	if cell != Vector2i(-1, -1):
 		Game.dive.mark_killed(room_id, cell)  # stays dead this dive, across deaths and room swaps

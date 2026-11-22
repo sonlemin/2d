@@ -6,6 +6,9 @@ extends Node2D
 ## reloads the scene (AR25): World waits RESPAWN_DELAY, rebuilds the respawn room (so enemies
 ## killed this dive stay dead) and spawns a fresh Player, then emits `player_spawned`, so anything
 ## bound to the player rebinds there.
+## World also polls hazards like exits (Story 1.19 D5) and tracks the life's safe ground: the last
+## floor tick that touched no hazard, seeded below the entry at every build (D6). A spike returns the
+## player there; the Ember Cache drops there (Story 1.22, last_safe_position()).
 
 ## Every (re)spawn, including the first: bind to `player.chain` / the player here, never once.
 signal player_spawned(player: Player)
@@ -33,6 +36,7 @@ var start_entry: StringName = &"spawn"
 var _room: Room
 var _player: Player
 var _swap_pending := false
+var _safe_pos := Vector2.ZERO  # room-local; see last_safe_position()
 
 @onready var _darkness: CanvasModulate = $Darkness
 @onready var _room_holder: Node2D = $RoomHolder
@@ -74,6 +78,14 @@ func current_room() -> Room:
 	return _room
 
 
+## D6: where the player last stood on the floor touching no hazard, room-local, recorded exactly (so
+## a return never lands in a spike). Every build seeds it with Room.ground_below(entry), so it is
+## per life and per room, and an `up` arrival has clean floor before its first floor tick. Story
+## 1.22's Ember Cache drops here.
+func last_safe_position() -> Vector2:
+	return _safe_pos
+
+
 ## AR24: the one way into another room for an exit (and later a station or a scripted moment).
 ## Deferred, so it never runs inside a physics callback; a second call before it runs is dropped.
 ## Ignored while the player is dead: the respawn rebuilds the respawn room anyway.
@@ -85,23 +97,49 @@ func enter_room(room_id: StringName, entry: StringName) -> void:
 
 
 ## Exits are polled here, not overlapped (D2, as crawler contact is): the body centre past the
-## floor or the ceiling crosses that side's exit.
+## floor or the ceiling crosses that side's exit. Then, on every tick that crossed nothing, the
+## safe-ground tracker and the hazard poll (Story 1.19). World runs before its children, so both
+## read the player's last tick.
 func _physics_process(_delta: float) -> void:
 	if _swap_pending or not _player_alive():
 		return
+	if _poll_exits():
+		return
+	var hurt_rect := _player.hurt_rect()
+	var touching := _room.touches_hazard(hurt_rect)
+	if _player.is_on_floor() and not touching:
+		_safe_pos = _player.position
+	if touching:
+		_on_hazard()
+
+
+## True when the player crossed an edge this tick (a swap is pending, or the backstop killed them).
+func _poll_exits() -> bool:
 	var side := &""
 	if _player.position.y > _room.bounds().end.y:
 		side = &"down"
 	elif _player.position.y < 0.0:
 		side = &"up"
 	if side == &"":
-		return
+		return false
 	var exit := _room.exit(side)
 	if exit.is_empty():
 		_player.die()  # a closed edge was crossed (tunnelling): never fall forever
-		return
+		return true
 	# Crossing a floor opening arrives at the target's top entry, a ceiling opening at its bottom.
 	_on_exit_reached(exit.target, &"up" if side == &"down" else &"down")
+	return true
+
+
+## D5: a spike costs 1 HP with no knockback (the GDD's row is a return, not a push) and, if the
+## player lives, returns them to the last safe ground. Q2 (sonlm, 2026-11-22): while invulnerable
+## there is no damage, but they are still returned, never left standing in spikes.
+func _on_hazard() -> void:
+	_player.hurt(&"spikes")
+	if not _player_alive():
+		return
+	_player.place_at(_safe_pos)
+	_camera.snap()
 
 
 func _on_exit_reached(target: StringName, entry: StringName) -> void:
@@ -159,6 +197,7 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		if entry != &"up":
 			_player.velocity = Vector2.ZERO
 		_player.reset_physics_interpolation()  # AR6: a teleport, never a smear
+	_safe_pos = room.ground_below(entry)  # D6: seeded at every build, so per life and per room
 	_camera.apply_limits(room.bounds())
 	_camera.snap()
 	# Before the signals: a handler may call enter_room() again (a scripted moment, a station).

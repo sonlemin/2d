@@ -13,7 +13,12 @@ const POPUP_RISE_AC8 := 14.0  ## px, AC8: M1's popup rise, kept (the design docs
 ## combined modulate alpha is < 0.007, so a warm-up drawn below it draws nothing.
 const CANVAS_CULL_ALPHA := 0.007
 ## Public static functions on Fx that are not effects: the materials, the gate readers, warm-up.
-const NOT_EFFECTS := ["unshaded", "additive", "reduce_flashing", "shake_on", "reduced_motion", "warm_up"]
+const NOT_EFFECTS := ["unshaded", "additive", "flash_material", "white_flash_allowed", "reduce_flashing", "shake_on", "reduced_motion", "warm_up"]
+## Story 1.19's hit flash, from its ACs (epics 1.19, UX-DR126), never read from Fx:
+const FLASH_TICKS_AC8 := 4  ## 67 ms of white from the hit tick
+const DIM_TICKS_AC8 := 6  ## 100 ms of dim under reduce flashing
+const DIM_AC8 := 0.6  ## the dim's self_modulate
+const INVULN_TICKS := 36  ## Spec.INVULN_S (0.6 s) at 60 ticks/s: hits back to back as each invulnerability ends
 ## Fx's shared materials (AR46, Story 1.12 D6): each one built once and reused, never one per effect,
 ## and the code-built effects free themselves. Story 1.16: the accessibility gate (AR57), the
 ## flash-rate table held to the cap (NFR8, UX-DR125), the reduced variants (UX-DR126/127) and
@@ -34,6 +39,10 @@ func run() -> void:
 	_test_blink_sampled()
 	_test_pulse_sampled()
 	_test_pop_reduced()
+	_test_hit_flash()
+	_test_hit_flash_reduced()
+	_test_hit_flash_flip()
+	_test_flash_cap()
 	await _test_popup_motion()
 	await _test_warm_up()
 	Game.reset_for_tests()
@@ -216,6 +225,107 @@ func _test_pulse_sampled() -> void:
 		check(v.min() >= 0.0 and v.max() <= 1.0, "...within 0..1 (got %.3f..%.3f)" % [v.min(), v.max()])
 
 
+## Story 1.19 D9: white (the flash material) from the hit tick for 4 ticks, then restored.
+func _test_hit_flash() -> void:
+	Game.reset_for_tests()
+	var m := Fx.flash_material()
+	check(m != null and m == Fx.flash_material() and m.shader != null, "Fx.flash_material() is one cached ShaderMaterial")
+	check(m != null and m.shader.code.contains("unshaded") and m.shader.code.contains("COLOR.rgb = vec3(1.0)"), "...unshaded, every texel white (probed on 4.7.2)")
+	var s := Sprite2D.new()
+	var drawn: Array[bool] = []
+	var white: Array[bool] = []
+	for tick in FLASH_TICKS_AC8 + 2:
+		drawn.append(Fx.hit_flash(s, tick))
+		white.append(s.material == m and s.self_modulate == Color.WHITE)
+	var want_white: Array[bool] = []
+	for tick in FLASH_TICKS_AC8 + 2:
+		want_white.append(tick < FLASH_TICKS_AC8)
+	check(white == want_white and drawn == want_white, "hit_flash() draws white for ticks 0-%d and restores at %d (white %s, running %s)" % [FLASH_TICKS_AC8 - 1, FLASH_TICKS_AC8, white, drawn])
+	check(s.material == null and s.self_modulate == Color.WHITE, "...restored: no material, self_modulate white")
+	check(not Fx.hit_flash(s, 0, false) and s.material == null and s.self_modulate == Color.WHITE, "a hit inside the gap (white = false) draws nothing at the defaults (Q1)")
+	s.free()
+
+
+## UX-DR126: under reduce flashing, a dim (self_modulate 0.6) for 6 ticks, never the white, and on
+## every hit, gap or not.
+func _test_hit_flash_reduced() -> void:
+	Game.reset_for_tests()
+	Game.settings.set_value(&"reduce_flashing", true)
+	var dim := Color(DIM_AC8, DIM_AC8, DIM_AC8, 1.0)
+	for white: bool in [true, false]:
+		var s := Sprite2D.new()
+		var seen: Array[bool] = []
+		var want: Array[bool] = []
+		for tick in DIM_TICKS_AC8 + 2:
+			var running := Fx.hit_flash(s, tick, white)
+			seen.append(running and s.self_modulate.is_equal_approx(dim) and s.material == null)
+			want.append(tick < DIM_TICKS_AC8)
+		check(seen == want, "reduce flashing (white %s): self_modulate %s and no material for ticks 0-%d, restored at %d (got %s)" % [white, DIM_AC8, DIM_TICKS_AC8 - 1, DIM_TICKS_AC8, seen])
+		check(s.material == null and s.self_modulate == Color.WHITE, "...and restored afterwards")
+		s.free()
+	Game.reset_for_tests()
+
+
+## The gate is read on every tick: a setting flipped mid-flash leaves nothing stuck.
+func _test_hit_flash_flip() -> void:
+	Game.reset_for_tests()
+	var s := Sprite2D.new()
+	Fx.hit_flash(s, 0)
+	Fx.hit_flash(s, 1)
+	Game.settings.set_value(&"reduce_flashing", true)
+	Fx.hit_flash(s, 2)
+	var mid := s.material == null and s.self_modulate.is_equal_approx(Color(DIM_AC8, DIM_AC8, DIM_AC8, 1.0))
+	for tick in range(3, DIM_TICKS_AC8 + 1):
+		Fx.hit_flash(s, tick)
+	check(mid and s.material == null and s.self_modulate == Color.WHITE, "turning reduce flashing on mid-flash switches to the dim, then restores (mid %s)" % mid)
+	Fx.hit_flash(s, 0)
+	Game.reset_for_tests()
+	var back := Fx.hit_flash(s, 3)
+	Fx.hit_flash(s, FLASH_TICKS_AC8)
+	check(back and s.material == null and s.self_modulate == Color.WHITE, "...and turning it off mid-dim ends on the white's length and restores")
+	s.free()
+	Game.reset_for_tests()
+
+
+## NFR8, Q1 (D10): the player sprite's brightness, one sample per tick (white 2, lit 1, dark 0), for
+## hits back to back as each invulnerability ends, with the white flash gated by
+## Fx.white_flash_allowed() and the blink from Fx.blink_alpha(). The most flashes (opposing
+## transition pairs) in any 60-tick window. Red-checked with the gap at 0: it reads 4.0.
+func flash_cap_sim(every: int, total := 600) -> float:
+	var s: Array[int] = []
+	var hit := -1
+	var white_start := -1
+	var last_white := -1
+	for t in total:
+		if t > 0 and t % every == 0:
+			hit = t
+			if Fx.white_flash_allowed(last_white, t):
+				last_white = t
+				white_start = t
+		if hit < 0:
+			s.append(1)
+			continue
+		var v := 1 if Fx.blink_alpha(maxf(Spec.INVULN_S - (t - hit) * TICK, 0.0)) > 0.0 else 0
+		if white_start >= 0 and t - white_start < FLASH_TICKS_AC8:
+			v = 2
+		s.append(v)
+	var best := 0.0
+	for w in range(1, total - int(TICKS)):
+		var changes := 0
+		for t in range(w, w + int(TICKS)):
+			if s[t] != s[t - 1]:
+				changes += 1
+		best = maxf(best, changes / 2.0)
+	return best
+
+
+func _test_flash_cap() -> void:
+	Game.reset_for_tests()
+	for every: int in [INVULN_TICKS, 40, 48, 60]:
+		var got := flash_cap_sim(every)
+		check(got <= Spec.FLASH_HZ_MAX, "hit flash + blink, hits every %d ticks: at most %.1f flashes in any second (cap %s)" % [every, got, Spec.FLASH_HZ_MAX])
+
+
 func _sparks(parent: Node) -> CPUParticles2D:
 	Fx.pop(parent, Vector2(10, 10))
 	var p := parent.get_child(parent.get_child_count() - 1) as CPUParticles2D
@@ -276,7 +386,7 @@ func _test_popup_motion() -> void:
 ## D10: one item per cached material, under the parent it is given (the room, AR23), drawn above the
 ## renderer's cull alpha, alive for two frames whatever the frame time (probed under a renderer,
 ## code review 1.16: two drawn frames; the 0.05 s timer it replaced drew none after a slow frame),
-## and all three gone within a second.
+## and all four gone within a second (Story 1.19 adds the flash material's sprite).
 func _test_warm_up() -> void:
 	var parent := Node2D.new()
 	add_child(parent)
@@ -284,13 +394,15 @@ func _test_warm_up() -> void:
 	var kids := parent.get_children()
 	var parts := kids.filter(func(n: Node) -> bool: return n is CPUParticles2D)
 	var labels := kids.filter(func(n: Node) -> bool: return n is Label)
-	var sprites := kids.filter(func(n: Node) -> bool: return n is Sprite2D)
-	check(kids.size() == 3 and parts.size() == 1 and labels.size() == 1 and sprites.size() == 1, "warm_up() adds three children: sparks, a label, a sprite (got %s)" % [kids])
-	if kids.size() != 3 or parts.size() != 1 or labels.size() != 1 or sprites.size() != 1:
+	var glows := kids.filter(func(n: Node) -> bool: return n is Sprite2D and n.material == Fx.additive())
+	var flashes := kids.filter(func(n: Node) -> bool: return n is Sprite2D and n.material == Fx.flash_material())
+	check(kids.size() == 4 and parts.size() == 1 and labels.size() == 1 and glows.size() == 1 and flashes.size() == 1, "warm_up() adds four children: sparks, a label, a glow sprite, a flash sprite (got %s)" % [kids])
+	if kids.size() != 4 or parts.size() != 1 or labels.size() != 1 or glows.size() != 1 or flashes.size() != 1:
 		parent.queue_free()
 		return
-	check(parts[0].material == Fx.unshaded() and labels[0].material == Fx.unshaded() and sprites[0].material == Fx.additive(), "...drawn with the cached unshaded(), unshaded() and additive()")
-	check(sprites[0].texture == preload("res://art/light.png"), "...the sprite with art/light.png, as BudgetLight's fallback")
+	check(parts[0].material == Fx.unshaded() and labels[0].material == Fx.unshaded(), "...the sparks and the label with the cached unshaded()")
+	check(glows[0].texture == preload("res://art/light.png"), "...the glow sprite with additive() and art/light.png, as BudgetLight's fallback")
+	check(flashes[0].texture == preload("res://art/player.png"), "...the flash sprite with flash_material() and art/player.png, what the hit flash draws (Story 1.19)")
 	var real := Node2D.new()
 	add_child(real)
 	Fx.chain_popup(real, Vector2.ZERO, 1, 1)
@@ -302,7 +414,7 @@ func _test_warm_up() -> void:
 	check(kids.all(func(n: CanvasItem) -> bool: return n.get(&"position") == Vector2(40, 50)), "...at the position given (the entry, inside the first view)")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(kids.all(func(n: Variant) -> bool: return is_instance_valid(n) and not n.is_queued_for_deletion()), "...all three still there two frames later (Fx.WARM_FRAMES counts frames, not seconds)")
+	check(kids.all(func(n: Variant) -> bool: return is_instance_valid(n) and not n.is_queued_for_deletion()), "...all four still there two frames later (Fx.WARM_FRAMES counts frames, not seconds)")
 	await get_tree().create_timer(1.0, true, false, false).timeout
-	check(parent.get_child_count() == 0, "...and all three free themselves within a second (got %d left)" % parent.get_child_count())
+	check(parent.get_child_count() == 0, "...and all four free themselves within a second (got %d left)" % parent.get_child_count())
 	parent.queue_free()

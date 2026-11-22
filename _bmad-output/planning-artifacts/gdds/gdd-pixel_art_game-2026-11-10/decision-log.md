@@ -257,3 +257,13 @@ Recorded as R18–R20 in `planning-artifacts/epics.md`.
 - **R20 Flare size (sonlm):** the Weaver flees any burning flare (a chain-2 flare is 71 px), with no 80 px minimum; it ignores the Ember Cache. Updated: Weaver loop table; architecture Light Sensing.
 - **Also fixed in the stories (no GDD change):** HP damage clamps at the 9 and 6 thresholds and ends a stun in progress; hits outside a stun deal 0 (a deflect); the bite reach is a tuned value (default 24 px).
 - **Status:** stays `final`; `updated: 2026-11-12`.
+
+## 2026-11-22 — Story 1.19 decisions (health and the damage table)
+
+Source: `implementation-artifacts/1-19-health-4-hp-and-the-damage-table.md` (Q1, Q2, Q3; answered by sonlm at story creation).
+
+- **Q1 Hit flash vs the flash cap (sonlm):** the white hit flash shows at most once per second; the reduce-flashing dim and the 2.5 Hz invulnerability blink are unchanged. **Why:** simulated per tick with the M1 blink, hits back to back as each 0.6 s invulnerability ends (a hunting lurker can do it) reach 4.0 flashes in some one-second window (3.5 at 40 ticks apart, 3.0 at 48); with the white flash gated to once per 60 ticks every case is ≤ 3.0. Updated: Accessibility (Flash safety). UX `EXPERIENCE.md` carries a dated note.
+- **Q2 Spikes while invulnerable (sonlm):** no damage, but the player is still returned to the last safe ground, never left standing in spikes. Updated: the Health and damage table's spikes row.
+- **Q3 Spike readability (sonlm):** spikes were to be drawn lit like walls for now, with E4 deciding their look with real rooms. **Revised the same day** at the laptop feel check (sonlm: "I can't even see it"; then option a): lit like walls, they were invisible outside the player's light, so they are drawn unshaded, like ledge rims. E4 still decides the final look (ledger owner E4). No GDD change.
+- **Also recorded:** the bank-heal threshold is the `Tuning` key `bank_heal_min` (10). Updated: Health and damage → Healing.
+- **Status:** stays `final`; `updated: 2026-11-22`.

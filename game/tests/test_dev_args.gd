@@ -19,6 +19,7 @@ func run() -> void:
 	_test_query_tokens()
 	_test_parse()
 	_test_chain_values()
+	_test_hp_values()
 	_test_log_names()
 	_test_set_values()
 	_test_room_entry()
@@ -65,7 +66,7 @@ func _test_parse() -> void:
 	var r := DevTools.parse(PackedStringArray(["res://tests/x.gd", "out.png", "--room=a"]), reg)
 	check(r.values == {"room": ["a"]} and r.errors.is_empty(), "parse: tokens without -- are skipped, the runner's test path too (got %s)" % [r])
 	r = DevTools.parse(PackedStringArray(["--foo=1"]))
-	check(r.errors == ["unknown arg --foo (known: chain, glow, log, perf, room, set)"] and r.values.is_empty(),
+	check(r.errors == ["unknown arg --foo (known: chain, glow, hp, log, perf, room, set)"] and r.values.is_empty(),
 			"parse: an unknown arg on ARGS is one error listing the known ones alphabetically (got %s)" % [r.errors])
 	r = DevTools.parse(PackedStringArray(["--room=a=b"]), reg)
 	check(r.values["room"] == ["a=b"], "parse: --room=a=b splits on the first = only (got %s)" % [r.values])
@@ -85,7 +86,7 @@ func _test_parse() -> void:
 		var row: Dictionary = DevTools.ARGS[arg]
 		check(row.help is String and row.help != "" and row.repeat is bool and row.apply is StringName and String(row.apply) in methods,
 				"ARGS '%s' has help, repeat and an apply method that exists (%s)" % [arg, row.apply])
-	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "glow", "perf"], "ARGS apply in the order log, set, room, chain, glow, perf (1.11 D4, 1.12 D1; got %s)" % [DevTools.ARGS.keys()])
+	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "hp", "glow", "perf"], "ARGS apply in the order log, set, room, chain, hp, glow, perf (1.11 D4, 1.12 D1, 1.19 D8: hp after chain, before glow; got %s)" % [DevTools.ARGS.keys()])
 	check(DevTools.ARGS["set"].repeat and DevTools.ARGS["log"].repeat and not DevTools.ARGS["room"].repeat and not DevTools.ARGS["chain"].repeat
 			and not DevTools.ARGS["glow"].repeat and not DevTools.ARGS["perf"].repeat,
 			"only set and log may repeat")
@@ -100,6 +101,18 @@ func _test_chain_values() -> void:
 	for bad in ["-1", str(ChainState.MAX_CHAIN + 1), "8x", "x8", "", "12345", "12345678901234567890", "8.0"]:
 		var r := DevTools.chain_value(bad)
 		check(r[1] != "" and r[0] == 0, "--chain=%s is an error (%s)" % [bad, r[1]])
+
+
+## Story 1.19 D8: 1..Health.MAX (Spec.MAX_HP), whole numbers only, capped before to_int().
+func _test_hp_values() -> void:
+	for ok_text in ["1", str(Spec.MAX_HP)]:
+		var r := DevTools.hp_value(ok_text)
+		check(r[1] == "" and r[0] == ok_text.to_int(), "--hp=%s is %d" % [ok_text, ok_text.to_int()])
+	for bad in ["0", str(Spec.MAX_HP + 1), "-1", "x", "99999", "", "2.0"]:
+		var r := DevTools.hp_value(bad)
+		check(r[1] != "" and r[0] == 0, "--hp=%s is an error (%s)" % [bad, r[1]])
+	check(Overlays.hp_text(3, 0.0) == "hp 3/%d" % Spec.MAX_HP, "overlay 2's HP line: hp 3/%d (got '%s')" % [Spec.MAX_HP, Overlays.hp_text(3, 0.0)])
+	check(Overlays.hp_text(2, 0.4234) == "hp 2/%d  inv 0.42 s" % Spec.MAX_HP, "...plus the invulnerability left while it lasts (got '%s')" % Overlays.hp_text(2, 0.4234))
 
 
 func _test_log_names() -> void:

@@ -27,6 +27,8 @@ const ACTORS := {
 ## or became a player setting (`setting`, Story 1.8: the Snuff hold is Settings.light_tap_window's
 ## default, never a Tuning key). A `local` row whose const moved to another script names it in
 ## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd; Story 1.16: the eye pulse to core/fx.gd).
+## BASE keys new in M2, with no M1 export behind them (Story 1.19: bank_heal_min, GDD Health).
+const M2_KEYS: Array[StringName] = [&"bank_heal_min"]
 const M1: Array[Dictionary] = [
 	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
 	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
@@ -112,7 +114,8 @@ func _moved(t: Tuning) -> Array:
 
 
 func _test_base() -> void:
-	check(Tuning.BASE.size() == 34, "BASE has the 34 keys from the M1 exports (got %d)" % Tuning.BASE.size())
+	check(Tuning.BASE.size() == 35, "BASE has 35 keys: the 34 from the M1 exports and bank_heal_min, new in M2 (Story 1.19; got %d)" % Tuning.BASE.size())
+	check(Tuning.BANK_HEAL_MIN == Spec.BANK_HEAL_MIN, "Tuning.BANK_HEAL_MIN is Spec.BANK_HEAL_MIN, %d links (GDD Health; got %s)" % [Spec.BANK_HEAL_MIN, Tuning.BANK_HEAL_MIN])
 	var t := Tuning.new()
 	check(_moved(t).is_empty(), "a fresh Tuning returns every BASE value (moved: %s)" % [_moved(t)])
 
@@ -312,8 +315,8 @@ func _test_m1_fixture() -> void:
 			var c := Crawler.new()
 			check(vars.has(prop) and c.hover == row.value, "%s stays a per-instance var, default %s (got %s)" % [row.m1, row.value, c.hover])
 			c.queue_free()
-	var orphans := Tuning.BASE.keys().filter(func(k: StringName) -> bool: return seen.get(k, 0) != 1)
-	check(orphans.is_empty(), "every BASE key comes from exactly one M1 export (not: %s)" % [orphans])
+	var orphans := Tuning.BASE.keys().filter(func(k: StringName) -> bool: return seen.get(k, 0) != (0 if k in M2_KEYS else 1))
+	check(orphans.is_empty(), "every BASE key comes from exactly one M1 export, except the M2 keys %s, which come from none (not: %s)" % [M2_KEYS, orphans])
 
 
 ## The playtested FR numbers that never were exports: the boxes, the chain curve and the hitstop

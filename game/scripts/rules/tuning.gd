@@ -51,6 +51,7 @@ const HITSTOP := 0.075  ## s of real time; the freeze frame on each pogo hit, th
 const KNOCKBACK_X := 150.0  ## px/s; push away from a crawler on contact (GDD Health and damage; M1 player.knockback.x). M1 value, unchanged.
 const KNOCKBACK_Y := -150.0  ## px/s; the upward part of the same knock (GDD Health and damage; M1 player.knockback.y). M1 value, unchanged.
 const INVULN_TIME := 0.6  ## s; invulnerable and blinking after a hit, so one contact can't hit twice in a row (GDD Health and damage, Combat "Defense"; M1 player.invuln_time). M1 value, unchanged.
+const BANK_HEAL_MIN := 10.0  ## links; a chain banked safely at this length or more heals 1 HP, so a long chain is also a way back from a hit (GDD Health and damage "+1 HP when you bank a chain of 10 or more", FR12; [ASSUMPTION: playtest]). GDD Health; new in M2.
 
 # --- Crawler (GDD Combat System, enemy table, FR58) ---
 const CRAWLER_WALK_SPEED := 25.0  ## px/s; a walker's patrol pace along its ledge; no number in the GDD yet (GDD Combat, walker row; M1 crawler.walk_speed). M1 value, unchanged.
@@ -92,6 +93,7 @@ const BASE := {
 	&"knockback_x": KNOCKBACK_X,
 	&"knockback_y": KNOCKBACK_Y,
 	&"invuln_time": INVULN_TIME,
+	&"bank_heal_min": BANK_HEAL_MIN,
 	&"crawler_walk_speed": CRAWLER_WALK_SPEED,
 	&"crawler_gravity": CRAWLER_GRAVITY,
 	&"crawler_hover_drift": CRAWLER_HOVER_DRIFT,

@@ -39,7 +39,13 @@ func _ready() -> void:
 	add_to_group("predator")
 	_home = global_position
 	_eyes.modulate.a = 0.0
-	monitorable = false  # harmless until it hunts: contact kills only after a telegraph
+	monitorable = false  # harmless until it hunts: contact hurts only after a telegraph
+
+
+## The Health.CAUSES id a hunting lurker hurts with (2 HP). The player's poll asks only while
+## `monitorable` is true (Pillar 2).
+func contact_cause() -> StringName:
+	return &"lurker"
 
 
 func senses(player: Node2D) -> bool:

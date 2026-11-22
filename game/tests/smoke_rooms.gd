@@ -18,7 +18,7 @@ const ESCAPE_CHAIN := 10
 ## D9: how far beside the player a forced hunt starts: about half a second at hunt speed.
 const ESCAPE_GAP := 48.0
 ## M1's point-blank Snuff (playtest: "saw it, couldn't escape"): a hunt 18 px away, where a braking
-## lurker (≈ 10 px coast) does overlap the player, so "still alive" fails if it stays lethal.
+## lurker (≈ 10 px coast) does overlap the player, so "no damage" fails if it stays harmful (monitorable).
 const POINT_BLANK_GAP := 18.0
 ## D9: the telegraph check's light: chain 10, 100 px from the lurker (in reach, on screen).
 const TELEGRAPH_GAP := 100.0
@@ -247,6 +247,7 @@ func _test_lurkers(rec: Dictionary) -> void:
 	await _test_contact(rec)
 	for e: Array in ESCAPES:
 		await _test_escape(rec, e[0], e[1])
+	await _test_tightest_escape(rec)
 
 
 ## The per-lurker checks, on a fresh room so one lurker's hunt never leaks into the next.
@@ -353,10 +354,12 @@ func _place_on_screen(lurker: Lurker, d: float) -> bool:
 	return false
 
 
-## Contact (the first lurker by position): an IDLE or a TELEGRAPHING lurker is harmless (Pillar 2:
-## the telegraph is the warning, never the attack), a HUNTING one kills. All in mid-air in the open,
-## the lurker moved onto the player: in its wall pocket the body would be pushed out of the tile,
-## and a floor contact breaks the chain (the ground is a sanctuary).
+## Contact (the first lurker by position): an IDLE or a TELEGRAPHING lurker deals no damage (Pillar 2:
+## the telegraph is the warning, never the attack), a HUNTING one deals exactly 2 (Story 1.19: HP, not
+## one-touch death). All in mid-air in the open with the player's physics on (its poll is what
+## hurts), the lurker moved onto the player: in its wall pocket the body would be pushed out of the
+## tile, and a floor contact breaks the chain (the ground is a sanctuary). Crawlers go first: their
+## contact is damage too, and these checks are about the lurker.
 func _test_contact(rec: Dictionary) -> void:
 	await _build(rec)
 	var spot := _open_spot(rec)
@@ -366,28 +369,40 @@ func _test_contact(rec: Dictionary) -> void:
 		return
 	var lurker := _lurkers()[0]
 	_only(lurker)
-	var died := [false]
-	_player.died.connect(func() -> void: died[0] = true)
+	_clear_crawlers()
+	var hits := []
+	_player.health.damaged.connect(func(amount: int, cause: StringName) -> void: hits.append([amount, cause]))
 	place(spot)
 	lurker.global_position = _player.global_position
 	await frames(3)
-	check(lurker.state == Lurker.State.IDLE and not died[0], "%s: touching an IDLE lurker does not kill (no telegraph yet)" % rec.id)
+	check(lurker.state == Lurker.State.IDLE and hits.is_empty() and _player.health.hp == Spec.MAX_HP,
+			"%s: touching an IDLE lurker deals no damage (no telegraph yet; damaged %s, HP %d)" % [rec.id, hits, _player.health.hp])
 	_add_links(ESCAPE_CHAIN)  # a big light: the lurker keeps the scent
 	lurker._enter(Lurker.State.TELEGRAPH)
 	lurker.global_position = _player.global_position
 	await frames(3)
-	check(lurker.state == Lurker.State.TELEGRAPH and not lurker.monitorable and not died[0],
-			"%s: touching a TELEGRAPHING lurker does not kill, even with a big light (the telegraph is the warning)" % rec.id)
+	check(lurker.state == Lurker.State.TELEGRAPH and not lurker.monitorable and hits.is_empty() and _player.health.hp == Spec.MAX_HP,
+			"%s: touching a TELEGRAPHING lurker deals no damage, even with a big light (the telegraph is the warning; damaged %s)" % [rec.id, hits])
 	lurker._enter(Lurker.State.HUNT)
 	lurker.global_position = _player.global_position
-	var lethal := false
+	var harmful := false
 	for i in 3:
 		await frames(1)
-		lethal = lethal or lurker.monitorable
-		if died[0]:
+		harmful = harmful or lurker.monitorable
+		if not hits.is_empty():
 			break
-	check(died[0] and _player.is_dead and lethal, "%s: control: a HUNTING lurker, lethal (monitorable) at contact, kills in the same spot" % rec.id)
+	var want := [Spec.DAMAGE[&"lurker"], &"lurker"]
+	check(harmful and not hits.is_empty() and hits[0] == want and not _player.is_dead and _player.health.hp == Spec.MAX_HP - Spec.DAMAGE[&"lurker"],
+			"%s: control: a HUNTING lurker, harmful (monitorable) at contact, deals exactly %d in the same spot, not a death (damaged %s, HP %d)" % [rec.id, Spec.DAMAGE[&"lurker"], hits, _player.health.hp])
 	await _free()
+
+
+## The escape checks are about the lurker: a crawler's contact would be damage too.
+func _clear_crawlers() -> void:
+	for n in _room.get_children():
+		if n is Crawler:
+			_room.remove_child(n)
+			n.queue_free()
 
 
 ## The first open 3 x 4 block (row, then column) from the top: room for the body to hang in the air
@@ -406,19 +421,32 @@ func _open_spot(rec: Dictionary) -> Vector2:
 
 
 ## Pillar 2 (M1 playtest: "saw it, couldn't escape"): a Snuff, a landing or a cling in time saves you
-## from a hunting lurker at full speed `gap` px away (a Snuff also point-blank, as M1 tested it).
-## Each on a fresh room.
+## from a hunting lurker at full speed `gap` px away: no damage from the escape frame to 1.2 s later,
+## HP still full (Story 1.19: "not dead" became "no damage", which is stricter). Each on a fresh
+## room, with the player's physics on: its contact poll is what would hurt (D3).
+## - The Snuff is a real hold of `light` in mid-air (a grounded player has no chain to Snuff: the
+##   floor breaks it every tick). The lurker hunts from the hold's tick before the Snuff, so it is
+##   harmful (monitorable) the frame before the escape.
+## - "Snuff point-blank" (M1's 18 px case) stays a lurker-level check with the player's physics off:
+##   with physics on, a hunting lurker on the player hits before any Snuff can land (D3). What it
+##   proves is that the lurker drops `monitorable` at once.
 func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	await _build(rec)
 	var lurker := _lurkers()[0]
 	_only(null)
+	_clear_crawlers()
 	var who := "%s %s escape (%.0f px)" % [rec.id, kind, gap]
-	var snuff := kind.begins_with("Snuff")
 	var start := Vector2.ZERO
 	var toward_wall := ""
 	match kind:
-		"Snuff", "Snuff point-blank":
-			_player.set_physics_process(false)  # state level, as M1 tested it: the input can't undo it
+		"Snuff":
+			start = _open_spot(rec)
+			if start == Vector2.INF:
+				check(true, "%s: skipped: no open 3 x 4 cells to Snuff in" % who)
+				await _free()
+				return
+		"Snuff point-blank":
+			_player.set_physics_process(false)  # lurker level (D3): see the comment above
 			start = _player.global_position
 		"landing":
 			var stand := _stand_position(rec)
@@ -437,6 +465,8 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 			var cell: Vector2i = wall.cell
 			start = Vector2(cell.x * Room.TILE + 5.5 if wall.side < 0 else (cell.x + 1) * Room.TILE - 5.5, (cell.y + 1) * Room.TILE)
 			toward_wall = "move_left" if wall.side < 0 else "move_right"
+	var hits := []
+	_player.health.damaged.connect(func(amount: int, cause: StringName) -> void: hits.append([amount, cause]))
 	place(start)
 	if kind == "cling":
 		# Fall clear of coyote time first, holding toward the wall, so Jump clings, never jumps.
@@ -445,6 +475,19 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	_add_links(ESCAPE_CHAIN)
 	if kind == "landing":
 		_player.velocity.y = 60.0  # falling
+	var tps: float = Engine.physics_ticks_per_second
+	if kind == "Snuff":
+		# Hold until held tick ceil(window x 60) - 2 has run: the lurker then hunts on the next tick,
+		# and the Snuff lands on the one after (held tick 8 at the 0.12 s default).
+		var need := ceili(Game.settings.light_tap_window * tps - 1e-6)
+		Input.action_press("light")
+		var held := 0
+		var pressed_for := 0
+		while held < need - 2 and pressed_for < 30:
+			await frames(1)
+			pressed_for += 1
+			held = roundi(_player.input._light_time * tps)
+		check(held == need - 2 and not _player.input.snuff_active, "%s: premise: Light held %d ticks, not yet a Snuff (it Snuffs on held tick %d)" % [who, held, need])
 	var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
 	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * gap, 0)
 	lurker._enter(Lurker.State.HUNT)
@@ -452,20 +495,24 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	_only(lurker)
 	await frames(1)
 	var before := lurker.monitorable
-	if snuff:
+	if kind == "Snuff point-blank":
 		_player.chain.set_snuffed(true)
 	elif kind == "cling":
 		Input.action_press("jump")
-	# The escape frame: the Snuff's next tick, the first on the floor, the first clinging.
+	# The escape frame: the Snuff's tick, the first on the floor, the first clinging.
 	var waited := 0
+	var airborne_snuff := false
 	while waited < 30:
 		await frames(1)
 		waited += 1
-		if snuff or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging):
+		if kind == "Snuff" and _player.input.snuff_active:
+			airborne_snuff = not _player.is_on_floor()
+		if kind.begins_with("Snuff") or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging):
 			break
 		before = lurker.monitorable
-	var escaped := snuff or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging)
-	check(escaped and before, "%s: premise: it escapes on frame %d, and the hunting lurker was lethal the frame before" % [who, waited])
+	var escaped := (kind == "Snuff" and airborne_snuff and _player.chain.snuffed) or kind == "Snuff point-blank" \
+			or (kind == "landing" and _player.is_on_floor()) or (kind == "cling" and _player._clinging)
+	check(escaped and before, "%s: premise: it escapes on frame %d%s, and the hunting lurker was harmful (monitorable) the frame before" % [who, waited, " in mid-air" if kind == "Snuff" else ""])
 	var since := 0  # frames since the escape frame
 	var harmless := not lurker.monitorable
 	if not harmless:
@@ -473,9 +520,9 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 		since += 1
 		harmless = not lurker.monitorable
 	check(harmless, "%s: the lurker is harmless (monitorable off) on the escape frame or the one after" % who)
-	var lose := int(ceil((Game.tuning.f(&"lurker_lose_track_time") + 0.2) * Engine.physics_ticks_per_second))
-	var m1_lose := int(ceil(M1_LOSE_TRACK * Engine.physics_ticks_per_second))
-	var total := int(ceil(1.2 * Engine.physics_ticks_per_second))
+	var lose := int(ceil((Game.tuning.f(&"lurker_lose_track_time") + 0.2) * tps))
+	var m1_lose := int(ceil(M1_LOSE_TRACK * tps))
+	var total := int(ceil(1.2 * tps))
 	var left := 0 if lurker.state != Lurker.State.HUNT else -1
 	while since < maxi(total, maxi(lose, m1_lose)):
 		await frames(1)
@@ -483,11 +530,57 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 		if left < 0 and lurker.state != Lurker.State.HUNT:
 			left = since
 		if since == total:
-			check(not _player.is_dead, "%s: still alive 1.2 s later" % who)
+			check(hits.is_empty() and _player.health.hp == Spec.MAX_HP and not _player.is_dead,
+					"%s: no damage from the escape frame to 1.2 s later, HP still %d (damaged %s, HP %d)" % [who, Spec.MAX_HP, hits, _player.health.hp])
 	check(left >= 0 and left <= lose, "%s: the lurker leaves HUNT within lose-track + 0.2 s (%d frames; left after %d)" % [who, lose, left])
 	check(left >= 0 and left <= m1_lose, "%s: the lurker loses track within %.1f s, whatever the tuning (M1's bound; left after %d frames)" % [who, M1_LOSE_TRACK, left])
-	for a in ["move_left", "move_right", "jump"]:
+	for a in ["move_left", "move_right", "jump", "light"]:
 		Input.action_release(a)
+	await _free()
+
+
+## Story 1.19 D3, the tightest in-time escape: the player lands on tick T while the hunting lurker
+## (monitorable on T: it ran before the landing) reaches contact on T+1. It runs before the player each
+## tick, so its own T+1 update already sees the small light and drops `monitorable`, and it is never
+## listed while monitorable: no damage. A guarantee check: the poll's own `monitorable` read is
+## red-checked by smoke_health's stale-list case.
+func _test_tightest_escape(rec: Dictionary) -> void:
+	await _build(rec)
+	var who := "%s tightest escape (land on T, contact on T+1)" % rec.id
+	var stand := _stand_position(rec)
+	if stand == Vector2.INF:
+		check(true, "%s: skipped: no stand cell" % who)
+		await _free()
+		return
+	var lurker := _lurkers()[0]
+	_only(null)
+	_clear_crawlers()
+	var hits := []
+	_player.health.damaged.connect(func(amount: int, cause: StringName) -> void: hits.append([amount, cause]))
+	place(stand + Vector2(0, -6))
+	_add_links(ESCAPE_CHAIN)
+	_player.velocity.y = 60.0  # falling
+	var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
+	lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * ESCAPE_GAP, 0)
+	lurker._enter(Lurker.State.HUNT)
+	lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
+	_only(lurker)
+	# At least one tick first: is_on_floor() still reads the move before the teleport.
+	await frames(1)
+	var waited := 1
+	while waited < 30 and not _player.is_on_floor():
+		await frames(1)
+		waited += 1
+	check(_player.is_on_floor() and lurker.monitorable and lurker.state == Lurker.State.HUNT,
+			"%s: premise: it lands on frame %d with the lurker still hunting and monitorable on that tick" % [who, waited])
+	lurker.global_position = _player.global_position  # contact from its T+1 update on
+	await frames(1)
+	var r := _player.hurt_rect()
+	var c := lurker.global_position
+	var touching := c.distance_to(Vector2(clampf(c.x, r.position.x, r.end.x), clampf(c.y, r.position.y, r.end.y))) < 7.0
+	check(touching and not lurker.monitorable, "%s: premise: on T+1 the lurker touches the Hurtbox and has dropped monitorable (monitorable %s)" % [who, lurker.monitorable])
+	await seconds(1.2)
+	check(hits.is_empty() and _player.health.hp == Spec.MAX_HP, "%s: no damage, HP still %d (damaged %s)" % [who, Spec.MAX_HP, hits])
 	await _free()
 
 

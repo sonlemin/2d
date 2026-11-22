@@ -1,4 +1,4 @@
-; The smallest room that uses every legend char and both exit sides (Story 1.5 D8).
+; The smallest room that uses every legend char but the spike (Story 1.19: t_spikes covers it) and both exit sides (Story 1.5 D8).
 id=ok_min
 zone=dusk
 exits=up:ok_min@x2, down:ok_min@x5

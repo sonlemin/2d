@@ -18,13 +18,14 @@ const PerfRun := preload("perf_run.gd")
 
 ## One row per arg (D4): name -> {help, apply (the method that applies its values), repeat (may be
 ## given more than once)}. Rows apply in this order: log first, so the rest can log; set and room
-## at once; chain on every spawn; glow before perf, so the run's summary knows it; perf last, since
-## it reads --chain. Later stories add one row each: hp (1.19), difficulty (1.22).
+## at once; chain and hp on every spawn; glow before perf, so the run's summary knows it; perf last,
+## since it reads --chain. Later stories add one row each: difficulty (1.22).
 const ARGS := {
 	"log": {help = "--log=<cat>,<cat>: turn on Log categories", apply = &"_apply_log", repeat = true},
 	"set": {help = "--set=<key>:<value>: a setting for this session only; nothing is saved", apply = &"_apply_set", repeat = true},
 	"room": {help = "--room=<id>: start the dive in that room", apply = &"_apply_room", repeat = false},
 	"chain": {help = "--chain=<n>: every life takes off with that chain", apply = &"_apply_chain", repeat = false},
+	"hp": {help = "--hp=<n>: every life starts with n HP (1–4)", apply = &"_apply_hp", repeat = false},
 	"glow": {help = "--glow=on|off: engine glow (a WorldEnvironment) for the perf check; off unless given", apply = &"_apply_glow", repeat = false},
 	"perf": {help = "--perf[=<s>]: a timed perf run (default 60 s): the player locked on a fixed path, untouchable, holding --chain's n (default 20); the summary goes to the log and overlay 4", apply = &"_apply_perf", repeat = false},
 }
@@ -51,6 +52,7 @@ var _chain := 0  # --chain's n, armed on every spawn (D6)
 var _chain_given := false  # a valid --chain was accepted: 0 alone can't tell it from none or a rejected one (1.12 D1)
 var _armed: Player  # the player still owed the chain; only read behind is_instance_valid()
 var _armed_frame := 0  # Engine.get_physics_frames() when _armed spawned
+var _hp := 0  # --hp's n, applied on every spawn (Story 1.19 D8); 0 when not given
 
 
 func _init() -> void:
@@ -168,6 +170,17 @@ static func chain_value(text: String) -> Array:
 	var n := text.to_int()
 	if n < 0 or n > ChainState.MAX_CHAIN:
 		return [0, "--chain=%s is outside 0..%d" % [text, ChainState.MAX_CHAIN]]
+	return [n, ""]
+
+
+## [n, error] for `--hp=<n>`: an integer from 1 to Health.MAX (Story 1.19 D8), capped at MAX_INT_CHARS
+## before to_int(), as --chain is.
+static func hp_value(text: String) -> Array:
+	if not text.is_valid_int() or text.length() > MAX_INT_CHARS:
+		return [0, "--hp=%s is not a whole number from 1 to %d" % [text, Health.MAX]]
+	var n := text.to_int()
+	if n < 1 or n > Health.MAX:
+		return [0, "--hp=%s is outside 1..%d" % [text, Health.MAX]]
 	return [n, ""]
 
 
@@ -368,6 +381,18 @@ func _apply_chain(values: Array[String]) -> String:
 	return "chain %d" % _chain
 
 
+## Story 1.19 D8: like --chain, every life (the first and each respawn) starts with n HP, so E2's
+## Weaver work can start each life at 1 HP. Its own spawn handler, so --chain's stays as it is.
+func _apply_hp(values: Array[String]) -> String:
+	var r := hp_value(values[-1])
+	if r[1] != "":
+		_warn(r[1])
+		return ""
+	_hp = r[0]
+	_world.player_spawned.connect(_on_player_spawned_hp)  # a method: dropped with World
+	return "hp %d" % _hp
+
+
 ## D7: `on` adds a WorldEnvironment (one per viewport; a later story that puts one in World
 ## removes this one); `off` adds none. Game code gets no glow until 1.15's verdict.
 func _apply_glow(values: Array[String]) -> String:
@@ -409,6 +434,10 @@ func _apply_perf(values: Array[String]) -> String:
 func _on_player_spawned(player: Player) -> void:
 	_armed = player
 	_armed_frame = Engine.get_physics_frames()
+
+
+func _on_player_spawned_hp(player: Player) -> void:
+	player.health.reset(_hp)
 
 
 ## D9: World emits room_entered after the room is built and the player spawned, so a broken room
