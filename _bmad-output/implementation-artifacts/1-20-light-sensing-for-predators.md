@@ -56,11 +56,17 @@ so that I always know what wakes them and I'm never hunted from the dark.
      - `_update_light()`, `_shown_radius`, `_light`, `LIGHT_LERP` and `LIGHT_TEXTURE_HALF` go from `player.gd`, and the pogo hit calls `light_source.kick(LIGHT_KICK)` (`LIGHT_KICK` stays a player const);
      - `die()` calls `light_source.extinguish()`;
      - `light_radius()` stays and still returns `chain.light_radius()`.
+   - **Tests for the light itself** (in `smoke_lurker`, D4):
+     - `radius()` equals `chain.light_radius()` through a pogo hit, a Snuff and a cling, and still on the tick right after `kick()` (the shown radius moved, the rule value didn't);
+     - after `die()`, the light is not in group `light_source` and `is_lit()` is false;
+     - a light the budget demoted (`BudgetLight.set_demoted(true)`) stays demoted over 10 ticks of easing (the harness has no `LightBudget`, so only `LightSource` could undo it);
+     - the shown radius starts at `radius()` on the first tick, never eased in from 0 at a spawn. Children run `_ready()` before their parent, so `radius_fn` is set after `LightSource._ready()`: snap the shown radius on the first physics tick, not in `_ready()`.
    - **Paths that name `Light`** become `LightSource/Light`:
      - `scripts/dev/perf_run.gd:160`;
      - `tests/smoke_perf.gd:161`;
      - `tests/test_light_budget.gd:326`;
      - `tests/screenshot.gd:47`. It also used `Player.LIGHT_TEXTURE_HALF`; read the texture width instead.
+   - **Checks on a light's parent** follow the move: `tests/smoke_perf.gd:333` filters on `n.get_parent() is Player`, which is now a `LightSource` (accept a `LightSource` parent whose own parent is the Player). `smoke_perf.gd:135` (`get_parent() is Lurker`) is unchanged.
 
    (FR5, AR28; D4, D5)
 
@@ -93,8 +99,8 @@ so that I always know what wakes them and I'm never hunted from the dark.
 
 5. **Off-screen stirring: `stir` rises while the condition holds, and it never leads to a hunt.**
    - `stirring` is true on a tick when the lurker is in IDLE or RETURN and some live light `stirs_for()` it. It is false in TELEGRAPH and HUNT.
-   - `stir` (0 closed, 1 half, 2 open) moves one step toward its goal (2 while stirring, 0 when not) **at most once per `STIR_STEP_TIME`** (Q3, sonlm: 0.35 s, a lurker const, presentation reviewed at 1.30). The first step from 0 happens on the first stirring tick if no step happened in the last `STIR_STEP_TIME`. Entering TELEGRAPH sets `stir = 0` at once (the lurker is on screen; the gutter alert takes over in 1.27).
-   - The step limit holds the value Story 1.27's eye and glow draw to at most 1 / 0.35 ≈ 2.9 changes per second, under `Spec.FLASH_HZ_MAX`, whatever the condition does (D9). A test toggles the condition every tick for 3 s and counts at most `Spec.FLASH_HZ_MAX` changes of `stir` in every 60-tick window.
+   - `stir` (0 closed, 1 half, 2 open) moves one step toward its goal **at most once per `STIR_STEP_TIME`, in every state, with no exception** (Q3, sonlm: 0.35 s, a lurker const, presentation reviewed at 1.30). The goal is 2 while `stirring`, else 0, so in TELEGRAPH and HUNT it falls by the same clock. The first step from 0 happens on the first stirring tick if no step happened in the last `STIR_STEP_TIME`.
+   - The step limit holds the value Story 1.27's eye and glow draw to at most 1 / 0.35 ≈ 2.9 changes per second, under `Spec.FLASH_HZ_MAX`, whatever the condition and the state do (D9). A test toggles the condition every tick for 3 s, both by the light and across the notice-rect edge, and counts at most `Spec.FLASH_HZ_MAX` changes of `stir` in every 60-tick window.
    - A stirring lurker stays IDLE (or keeps returning) and never telegraphs or hunts. `smoke_lurker` proves the guarantee: from a stirring start, every HUNT of the player is preceded by at least `Spec.TELEGRAPH_MIN` of TELEGRAPH, spent inside the play rect on every tick (Q1). Story 1.27 adds the edge cue and repeats this check with its drawing (AR50).
    - Nothing is drawn for stirring in play in this story. Story 1.27 draws the cue, and E3 plays the sound. Only overlay 2 shows it (AC6).
 
@@ -138,7 +144,8 @@ so that I always know what wakes them and I'm never hunted from the dark.
     - then `chain.break_chain()` (the light drops; the lurker loses the scent);
     - then 1.5 s more (the wait, then the return).
     - Log per tick `[state, monitorable, roundi(pos.x), roundi(pos.y)]`.
-  - [ ] Save it as `game/tests/fixtures/lurker_trace_m1.json` with a header field naming the commit (`c40e75f`) and the scenario. `smoke_lurker` replays the same scenario on the new code (with `force()` never used: the lurker notices on its own) and compares tick for tick.
+    - Run it through the runner (`godot --headless --path game res://tests/runner.tscn -- <script>`): under `--script`, anything that touches `Game` fails to compile.
+  - [ ] Save it as `game/tests/fixtures/lurker_trace_m1.json` with a header field naming the commit (`c40e75f`) and the scenario. `smoke_lurker` replays the same scenario on the new code (with `force()` never used: the lurker notices on its own) and compares tick for tick. Read the fixture with `JSON.new().parse()` (never `JSON.parse_string()`, which prints engine `ERROR:` lines).
 - [ ] **Task 2: `rules/sensing.gd` + `tests/test_sensing.gd` + Spec (AC: 1).**
   - [ ] Write `Sensing` as AC1. Header `##`: the one rule for every predator (Pillar 2: notice only where the telegraph is seen; the hunt follows the light, Q1); a pure helper, so `test_sensing` tests the boundaries without a scene.
   - [ ] Add `Spec.NOTICE_FACTOR` and `Spec.STIR_REACH`, one line each with the GDD quote.
@@ -153,6 +160,7 @@ so that I always know what wakes them and I'm never hunted from the dark.
     - commit the new `.gd.uid`.
   - [ ] `player.gd`: as AC2. The pogo's `_shown_radius += LIGHT_KICK` (line 251) becomes `light_source.kick(LIGHT_KICK)`. Update the header line "Pogo hits feed the ChainState, which drives … Chain-Light (light radius)" to name `LightSource`.
   - [ ] Update the four `Light` paths (AC2). In `perf_run.gd` keep the stand-ins as plain BudgetLights: they stay lights only and wake no lurker (D13; 1.22 and 1.23 replace them with the real cache and flare, which are LightSources). Change its header comment from "there is no LightSource until 1.20" to say that.
+  - [ ] **Q1 changes `perf_worst`:** hunters that trail out of view now keep hunting while in reach. `perf_run.gd`'s `PATH_SPEED` comment ("hunters trail and fall away") still holds, since they fall out of reach, but check it. If `smoke_perf`'s counts or the perf summary move, report the numbers to sonlm; never retune the path or the lurker to restore them.
   - [ ] `World._retire_player()`'s comment ("out of groups `player` / `light_source` now") stays true: the LightSource is a child of the removed Player. Leave it.
 - [ ] **Task 4: The lurker (AC: 3, 4, 5).**
   - [ ] Rewrite `_physics_process` from D6's table. Keep the presentation code (`_update_look`, the eye pulse, the shiver) and the movement code (accel, brake ×2, return speed) as they are.
@@ -186,8 +194,10 @@ so that I always know what wakes them and I'm never hunted from the dark.
     4. **Player → flare:** while it hunts the player, add a stand-in at 130 px radius in reach. The same tick shows HUNT with `target.kind == &"flare"` (never a TELEGRAPH tick) and `monitorable` false.
     5. **The light went out:** a stand-in `queue_free()`d while it is the hunted target gives RETURN on the next tick (not HUNT, not TELEGRAPH). A player `die()` while hunted does the same, and an IDLE lurker never notices a dead player's light (the light is extinguished, though the player is still in the tree).
     6. **Stirring:** player at chain 20 near the lurker's wall, the lurker 40 px above the play rect. Premise: it is outside `play_rect()` and within the reach (√(dx² + dy²) ≤ 138.4 × 1.6 ≈ 221 px). It stays IDLE; `stirring` is true; `stir` is 1 on the first tick and 2 after `STIR_STEP_TIME`; it never enters TELEGRAPH over 2 s. Inside the 8 px band (on screen, not in the notice rect), it stirs and doesn't notice. The 96 px limit itself is `test_sensing`'s: with the camera centred on the player, the reach (≤ 221 px) minus half the view (135 px) is at most 86 px, so no spot in a spine room is in reach and 96 px out.
-    7. **Stir pacing (D9):** the player at chain 0 (never sensed) and a flare stand-in beside the off-screen lurker, its `fixed_radius` toggled between 100 and 60 every tick for 3 s (the camera never moves). Count `stir` changes in every 60-tick window: at most `Spec.FLASH_HZ_MAX`.
-    8. **Stir to hunt (the guarantee):** from a stirring start, scroll the camera so the lurker enters the notice rect. Record every tick until the first HUNT. The HUNT comes after at least `Spec.TELEGRAPH_MIN` of TELEGRAPH, the lurker is inside `play_rect()` on every one of those ticks, and `stir == 0` from the first TELEGRAPH tick.
+    7. **Stir pacing (D9):** two runs of 3 s each, counting `stir` changes in every 60-tick window (at most `Spec.FLASH_HZ_MAX`):
+       - by the light: the player at chain 0 (never sensed) and a flare stand-in beside the off-screen lurker, its `fixed_radius` toggled between 100 and 60 every tick (the camera never moves);
+       - across the edge: the player bright and in reach, the lurker's position set 1 px either side of the notice rect's edge on alternate ticks, so it flips between noticing (TELEGRAPH) and stirring (back to IDLE or RETURN).
+    8. **Stir to hunt (the guarantee):** from a stirring start, scroll the camera so the lurker enters the notice rect. Record every tick until the first HUNT. The HUNT comes after at least `Spec.TELEGRAPH_MIN` of TELEGRAPH, the lurker is inside `play_rect()` on every one of those ticks, `stirring` is false from the first TELEGRAPH tick, and `stir` reaches 0 within two steps.
     9. **Q1, off screen:** a HUNT lurker whose target is sensed but which has left the play rect keeps hunting (still HUNT and `monitorable` after 0.3 s). A TELEGRAPH lurker that leaves the notice rect drops to IDLE or RETURN on that tick.
     10. **Q2, re-sense in the wait:** HUNT at the player, then the light under 80 px for 0.3 s (under the 0.6 s wait), then back. The lurker is HUNT and `monitorable` again on the next tick, with no TELEGRAPH (M1 behaviour, kept).
     11. **No world node:** with the stub removed from group `world`, a lurker never notices (the AR20 fallback).
@@ -195,7 +205,8 @@ so that I always know what wakes them and I'm never hunted from the dark.
   - [ ] Move the player's marks code into a per-light version, plus the per-predator label child, plus the hand-interpolated sense line and the stirring edge marker, as AC6.
   - [ ] Keep `light_marks()`, `hp_text()` and `play_rect_on_screen()` public and pure.
   - [ ] `smoke_dev_tools`:
-    - its mode-2 test (lines 699–741) still draws with no error;
+    - its mode-2 tests (lines 699–767) pin today's drawers: `ov.player_marks` (a child of the player, lines 733, 745, 758, 767) and the `_draws` keys `"player"` and `"world"` (line 740, "lurker labels in the world"). They move with AC6: the player's marks now sit on its `LightSource`, and the lurker labels sit on `DevPredatorMarks`. Rewrite these checks to the new drawers, keeping what each proves (marks follow the live player across a respawn; leaving mode 2 frees them);
+    - it still draws with no error;
     - with a flare stand-in present, mode 2 puts a `DevLightMarks` child on both the player's and the stand-in's `LightSource`, and a `DevPredatorMarks` child on each lurker;
     - leaving mode 2 frees them all;
     - `light_marks()` agrees with `Sensing` at 79.9 and 80.
@@ -266,7 +277,7 @@ The first matching row wins.
 
 - In every HUNT row, `monitorable = _harmful(pick_s == target)` (D7).
 - Movement aims at `target.global_position`.
-- `stirring` is false and `stir` is held at 0 outside I2.
+- `stirring` is false outside I2; `stir` steps toward 0 there by the same clock (AC5).
 
 **Why the notice rule in TELEGRAPH (T2) and the sense rule in HUNT (H2–H5) — Q1, sonlm's answer (b).** The GDD's Hunt line has no screen test ("It senses the player while the light radius is ≥ 80 px and within radius × 1.6"), and the epic AC puts the play rect only on *notice*. The telegraph is the warning, so every tick of it stays watched on screen: the player sees all of it. Once the player has seen it, a hunt isn't dropped just because the view scrolled. For a lone player light the only difference from M1 is a lurker that trails out of view while hunting: it keeps hunting while in reach (at most 138 × 1.6 ≈ 221 px) instead of giving up at the screen edge. Landing, Snuff and cling still save you (they shrink the light, H2).
 
@@ -304,7 +315,8 @@ The first matching row wins.
   - Q1 is the one deliberate change, and it is stated in the 1.30 ledger item.
 - **D9: The stir step limit.**
   - The condition can flicker every tick: a lurker at the reach limit while the view bobs with the pogo. Story 1.27 draws `stir` as an eye with a glow, so a value that flips each tick would be a flash at 30 Hz (NFR8).
-  - Limiting the value itself to one step per 0.35 s holds any drawing of it to ≤ 2.9 changes per second, under `Spec.FLASH_HZ_MAX`, with no rule left for 1.27 to remember.
+  - Limiting the value itself to one step per 0.35 s, in every state with no reset outside the clock, holds any drawing of it to ≤ 2.9 changes per second, under `Spec.FLASH_HZ_MAX`, with no rule left for 1.27 to remember. A reset to 0 on entering TELEGRAPH was rejected: a lurker flickering across the notice-rect edge would go 0 → 1 → 0 about 5.7 times per second.
+  - 1.27 shows the cue only for a lurker off screen, so a `stir` still falling during a telegraph draws nothing.
   - The first step comes at once (GDD: "a half-open eye appears"), and the eye opens fully one step later (GDD: "opens wider as it stirs").
   - The value 0.35 s is presentation, a lurker const like `EYE_OPEN_TIME`, reviewed at the CP2 gate with the HUD defaults (Q3).
 - **D10: Overlay 2 per node.**
@@ -323,7 +335,9 @@ The first matching row wins.
   - H4 entering TELEGRAPH: the player → flare "never a TELEGRAPH tick" check;
   - `_harmful` without the kind test: "never monitorable while hunting the flare";
   - `extinguish()` removed from `die()`: `smoke_world`'s death check and `smoke_lurker` case 5;
-  - `stir` with no step limit: the pacing count;
+  - `stir` with no step limit, and separately a reset to 0 on entering TELEGRAPH: the two pacing counts (by the light, across the edge);
+  - `LightSource.radius()` returning the shown radius: the check on the tick after `kick()`;
+  - `LightSource` setting `light.enabled = true` each tick: the demoted-light check;
   - T2 using the sense rule: case 9's telegraph half;
   - the lint rule's pattern emptied: its firing sample.
 - **D13: Ledger** (`deferred-work.md`):
@@ -356,6 +370,12 @@ The first matching row wins.
     - one sentence in the story list for 1.20;
     - the Predators rule: "Predators sense light only through `LightSource` + `Sensing` (group `light_source`; lint `light_query`)";
     - the Last Updated line.
+
+### Calls made at story creation without a question (sonlm may veto)
+
+- **The 8 px band stirs** (D3): a lurker on screen but inside the notice margin stirs rather than staying silent. Story 1.27's flare-cost hatch and E3's stirring sound will read it there too.
+- **Stirring runs in RETURN as well as IDLE** (row I2): a returning lurker just off screen that would notice warns like an idle one.
+- **A telegraph switching between two non-player lights keeps its timer** (row T4): only a switch onto the player restarts it (FR21).
 
 ### Questions for sonlm (answered at story creation, 2026-11-22)
 
