@@ -36,7 +36,8 @@ var start_entry: StringName = &"spawn"
 var _room: Room
 var _player: Player
 var _swap_pending := false
-var _safe_pos := Vector2.ZERO  # room-local; see last_safe_position()
+var _safe_pos := Vector2.ZERO  # room-local (the room and World both sit at the origin, so it is the player's `position`); see last_safe_position()
+var _last_white_frame := -1  # the retired Player's last_white_frame, for the next life (Q1)
 
 @onready var _darkness: CanvasModulate = $Darkness
 @onready var _room_holder: Node2D = $RoomHolder
@@ -174,10 +175,7 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 			assert(false, "World: the start room '%s' failed to load (errors above)" % start_room)
 		return
 	if respawn and is_instance_valid(_player):
-		# Out of groups `player` / `light_source` before the new room's predators run _ready.
-		remove_child(_player)
-		_player.queue_free()
-		_player = null
+		_retire_player()  # before the new room's predators run _ready
 	if _room != null:
 		_room_holder.remove_child(_room)  # its predators and lights leave their groups now
 		_room.queue_free()
@@ -220,12 +218,23 @@ func _respawn_point() -> Array[StringName]:
 	return [room_id, entry]
 
 
+## The old Player leaves: out of groups `player` / `light_source` now, not at the end of the frame.
+## Its last white hit flash goes to the next life, so "white at most once per second" (Q1) holds
+## across a death: per life, a lethal white and a hit just after the respawn were 37 ticks apart
+## (review of Story 1.19).
+func _retire_player() -> void:
+	_last_white_frame = _player.last_white_frame
+	remove_child(_player)
+	_player.queue_free()
+	_player = null
+
+
 ## A fresh Player at `entry` in the current room; the old one, if any, goes first.
 func _spawn_player(entry: StringName) -> void:
 	if is_instance_valid(_player):
-		remove_child(_player)  # leaves group `player` now, not at the end of the frame
-		_player.queue_free()
+		_retire_player()
 	_player = PlayerScene.instantiate()
+	_player.last_white_frame = _last_white_frame
 	_player.position = _room.entry_position(entry)
 	add_child(_player)
 	move_child(_player, _room_holder.get_index() + 1)  # the player draws on top of the room

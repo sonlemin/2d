@@ -19,6 +19,7 @@ const FLASH_TICKS_AC8 := 4  ## 67 ms of white from the hit tick
 const DIM_TICKS_AC8 := 6  ## 100 ms of dim under reduce flashing
 const DIM_AC8 := 0.6  ## the dim's self_modulate
 const INVULN_TICKS := 36  ## Spec.INVULN_S (0.6 s) at 60 ticks/s: hits back to back as each invulnerability ends
+const RESPAWN_TICKS := 36  ## World's 0.6 s between a death and the next life (M1's wait, until the death card, 1.29)
 ## Fx's shared materials (AR46, Story 1.12 D6): each one built once and reused, never one per effect,
 ## and the code-built effects free themselves. Story 1.16: the accessibility gate (AR57), the
 ## flash-rate table held to the cap (NFR8, UX-DR125), the reduced variants (UX-DR126/127) and
@@ -291,39 +292,67 @@ func _test_hit_flash_flip() -> void:
 ## hits back to back as each invulnerability ends, with the white flash gated by
 ## Fx.white_flash_allowed() and the blink from Fx.blink_alpha(). The most flashes (opposing
 ## transition pairs) in any 60-tick window. Red-checked with the gap at 0: it reads 4.0.
-func flash_cap_sim(every: int, total := 600) -> float:
+## `lethal_every` > 0 (review of Story 1.19): every that-many-th hit kills. The dead sprite draws no
+## blink (its timers stop), the next life starts RESPAWN_TICKS later, and the gap carries over, as
+## World hands it on. A hit due while dead is skipped: nobody is there to take it.
+func flash_cap_sim(every: int, total := 600, lethal_every := 0) -> float:
 	var s: Array[int] = []
 	var hit := -1
 	var white_start := -1
 	var last_white := -1
+	var hits := 0
+	var spawn_at := -1  # the tick the next life starts, while dead
 	for t in total:
-		if t > 0 and t % every == 0:
+		if spawn_at >= 0 and t >= spawn_at:
+			spawn_at = -1
+			hit = -1  # a new life: no blink running
+		if t > 0 and t % every == 0 and spawn_at < 0:
+			hits += 1
 			hit = t
 			if Fx.white_flash_allowed(last_white, t):
 				last_white = t
 				white_start = t
-		if hit < 0:
-			s.append(1)
-			continue
-		var v := 1 if Fx.blink_alpha(maxf(Spec.INVULN_S - (t - hit) * TICK, 0.0)) > 0.0 else 0
+			if lethal_every > 0 and hits % lethal_every == 0:
+				spawn_at = t + RESPAWN_TICKS
+		var v := 1
+		if hit >= 0 and spawn_at < 0:
+			v = 1 if Fx.blink_alpha(maxf(Spec.INVULN_S - (t - hit) * TICK, 0.0)) > 0.0 else 0
 		if white_start >= 0 and t - white_start < FLASH_TICKS_AC8:
 			v = 2
 		s.append(v)
-	var best := 0.0
-	for w in range(1, total - int(TICKS)):
-		var changes := 0
-		for t in range(w, w + int(TICKS)):
-			if s[t] != s[t - 1]:
-				changes += 1
-		best = maxf(best, changes / 2.0)
-	return best
+	# A sliding 60-tick window over the transitions (the same count as trying every window).
+	var best := 0
+	var changes := 0
+	var window := int(TICKS)
+	for t in range(1, total):
+		if s[t] != s[t - 1]:
+			changes += 1
+		if t - window >= 1 and s[t - window] != s[t - window - 1]:
+			changes -= 1
+		best = maxi(best, changes)
+	return best / 2.0
 
 
+## Every cadence a hit can repeat at, from back to back (36 ticks) to one every 2 s, not a sample
+## of four (review of Story 1.19); then the same with every hit, every 2nd and every 4th lethal (a
+## 1 HP life, a lurker's 2 + 2, four 1 HP hits). The white is drawn at alpha 1: on a dark tick of
+## the blink it would be no flash at all.
 func _test_flash_cap() -> void:
 	Game.reset_for_tests()
-	for every: int in [INVULN_TICKS, 40, 48, 60]:
-		var got := flash_cap_sim(every)
-		check(got <= Spec.FLASH_HZ_MAX, "hit flash + blink, hits every %d ticks: at most %.1f flashes in any second (cap %s)" % [every, got, Spec.FLASH_HZ_MAX])
+	for lethal_every: int in [0, 1, 2, 4]:
+		var worst := 0.0
+		var worst_at := 0
+		for every in range(INVULN_TICKS, 121):
+			var got := flash_cap_sim(every, 600, lethal_every)
+			if got > worst:
+				worst = got
+				worst_at = every
+		var who: String = {0: "no death", 1: "every hit lethal", 2: "every 2nd hit lethal", 4: "every 4th hit lethal"}[lethal_every]
+		check(worst <= Spec.FLASH_HZ_MAX, "hit flash + blink, hits every %d to 120 ticks, %s: at most %.1f flashes in any second (cap %s; worst at every %d)" % [INVULN_TICKS, who, worst, Spec.FLASH_HZ_MAX, worst_at])
+	var alphas: Array[float] = []
+	for k in FLASH_TICKS_AC8:
+		alphas.append(Fx.blink_alpha(Spec.INVULN_S - k * TICK))
+	check(alphas.all(func(a: float) -> bool: return a == 1.0), "the blink is lit (alpha 1) on the white flash's %d ticks (got %s)" % [FLASH_TICKS_AC8, alphas])
 
 
 func _sparks(parent: Node) -> CPUParticles2D:

@@ -53,9 +53,13 @@ func tick(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 
 
-## Up to MAX; `changed` only when HP moved.
+## Up to MAX; `changed` only when HP moved. Never lowers HP: `n` <= 0 does nothing, since damage goes
+## through hit(), which emits `damaged` and lets the player die (a heal(-n) left a live player at
+## 0 HP that hit() refused forever; review of Story 1.19).
 func heal(n: int) -> void:
-	var next := clampi(hp + n, 0, MAX)
+	if n <= 0:
+		return
+	var next := mini(hp + n, MAX)
 	if next != hp:
 		hp = next
 		changed.emit(hp)

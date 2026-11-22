@@ -53,7 +53,8 @@ func entry_position(entry: StringName) -> Vector2:
 	return Vector2(cell.x * TILE + TILE / 2.0, (cell.y + 1) * TILE - 12)
 
 
-## Whether `rect` (room-local, the player's Hurtbox) overlaps the bottom 8 px of a hazard cell.
+## Whether `rect` (room-local, the player's Hurtbox; the room sits at the world origin, so
+## Player.hurt_rect()'s world space is the same) overlaps the bottom 8 px of a hazard cell.
 ## Edges that only touch don't count (Rect2.intersects).
 func touches_hazard(rect: Rect2) -> bool:
 	if hazards.is_empty():
@@ -74,6 +75,7 @@ func touches_hazard(rect: Rect2) -> bool:
 ## its safe ground with it, so an `up` arrival hit before its first floor tick is returned to the
 ## floor below, never to the top opening (and the Ember Cache never floats, 1.22).
 func ground_below(entry: StringName) -> Vector2:
+	assert(has_entry(entry), "Room %s has no entry '%s'" % [id, entry])
 	var cell: Vector2i = spawn_cell if entry == &"spawn" else exit(entry).entry_cell
 	for y in range(cell.y + 1, size_cells.y):
 		if is_solid(Vector2i(cell.x, y)):

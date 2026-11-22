@@ -107,6 +107,17 @@ func _test_inline_errors() -> void:
 	# one on the wall row under P's row.
 	_has(_inline(ok.replace("#.....#\n#.P", "#...^.#\n#.P")), p + ":7:5 spike with nothing solid below it", "a spike in mid-air")
 	check(_inline(ok.replace("#.P.h.#", "#^P.h.#")).is_empty(), "a spike on a floor validates clean (got %s)" % [_inline(ok.replace("#.P.h.#", "#^P.h.#"))])
+	# Review of Story 1.19: an arrival cell is never a hazard (the return to safe ground would put the
+	# player back in it on every tick). Firing sample and near-miss for each side, on one small room:
+	# the up entry cell is (1, 1), the down stand cell (4, 3).
+	var arrive := "id=ok_min\nzone=dusk\nexits=up:ok_min@x1, down:ok_min@x5\n---\n#.#####\n#.....#\n###...#\n#..P..#\n#####.#\n"
+	check(_inline(arrive).is_empty(), "(premise) the arrival-cell room validates clean (got %s)" % [_inline(arrive)])
+	var up_spiked := _inline(arrive.replace("#.....#\n###", "#^....#\n###"))
+	check(up_spiked == ([p + ":3:1 up exit's entry cell (1, 1) is a hazard"] as Array[String]), "a spike in the up exit's entry cell is the one error (got %s)" % [up_spiked])
+	check(_inline(arrive.replace("#.....#\n###", "#.^...#\n###")).is_empty(), "...a spike beside the entry cell validates clean (near-miss)")
+	var down_spiked := _inline(arrive.replace("#..P..#", "#..P^.#"))
+	check(down_spiked == ([p + ":3:1 down exit's stand cell (4, 3) is a hazard"] as Array[String]), "a spike in the down exit's stand cell is the one error (got %s)" % [down_spiked])
+	check(_inline(arrive.replace("#..P..#", "#.^P..#")).is_empty(), "...a spike two cells from the stand cell validates clean (near-miss)")
 	var errs := _inline(ok.replace("zone=dusk", "zone=teal\ncolour=red"))
 	check(errs.size() == 2, "every error is reported, not just the first (got %s)" % [errs])
 	_test_cling_key(ok, p)

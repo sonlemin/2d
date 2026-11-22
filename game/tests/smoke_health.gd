@@ -57,7 +57,6 @@ func frames(n: int) -> void:
 
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute(TMP)
-	Game.store.dir = TMP
 	RoomLoader.add_root("res://tests/rooms/hazards")
 	_boot(&"spawn")
 	await frames(2)
@@ -65,6 +64,7 @@ func run() -> void:
 	await test_flash_reduced()
 	await test_lurker_hunt()
 	await test_lurker_harmless()
+	await test_contact_causes()
 	await test_stale_list()
 	await test_predator_first()
 	await test_spikes_walk_off()
@@ -77,6 +77,8 @@ func run() -> void:
 	await test_seed_up_arrival()
 	await _free_world()
 	Game.reset_for_tests()
+	for f in DirAccess.get_files_at(TMP):  # remove_absolute() fails on a folder that is not empty
+		DirAccess.remove_absolute(TMP.path_join(f))
 	DirAccess.remove_absolute(TMP)
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
 
@@ -84,6 +86,7 @@ func run() -> void:
 # --- Setup ------------------------------------------------------------------------------------------
 
 func _boot(entry: StringName) -> void:
+	Game.store.dir = TMP  # per boot: _free_world()'s reset_for_tests() points it home again
 	_spawned.clear()
 	_world = WorldScene.instantiate()
 	_world.start_room = ROOM
@@ -215,11 +218,12 @@ func test_crawler_contact() -> void:
 	check(is_equal_approx(p.health.invuln, Spec.INVULN_S), "...%s s of invulnerability (got %s)" % [Spec.INVULN_S, p.health.invuln])
 	check(held == 6 and Game.dive.carried == carried + 6 and p.chain.held == 0 and p.chain.count == 0, "...and the held 6 are carried (FR11: carried %d -> %d)" % [carried, Game.dive.carried])
 	# The flash, on the hit tick and the 3 after it, then restored (D9).
-	var white: Array[bool] = [_sprite().material == Fx.flash_material()]
+	# With modulate.a at 1: a white drawn on a dark tick of the blink would be no flash at all.
+	var white: Array[bool] = [_sprite().material == Fx.flash_material() and _sprite().modulate.a == 1.0]
 	for i in FLASH_TICKS_AC8:
 		await frames(1)
-		white.append(_sprite().material == Fx.flash_material())
-	check(white == ([true, true, true, true, false] as Array[bool]), "...white (the flash material) on the hit tick and 3 more, then none (got %s)" % [white])
+		white.append(_sprite().material == Fx.flash_material() and _sprite().modulate.a == 1.0)
+	check(white == ([true, true, true, true, false] as Array[bool]), "...white (the flash material, at alpha 1) on the hit tick and 3 more, then none (got %s)" % [white])
 	# Still overlapping, invulnerable: no second hit. Kept standing on the walker's ledge, beside it,
 	# up to two ticks before the invulnerability ends (the walker hits again in the tick it does,
 	# so invulnerable() never reads false in between).
@@ -279,6 +283,23 @@ func test_lurker_hunt() -> void:
 	l.global_position = l._home
 
 
+## Every actor's contact_cause() is a Health.CAUSES id with the GDD's damage: a walker and a hoverer
+## 1, a lurker 2 (review of Story 1.19: the hoverer's was never exercised, and the only guard on an
+## unknown id is an assert, which a release build strips).
+func test_contact_causes() -> void:
+	await _fresh(P_POS)
+	var hoverer: Crawler = preload("res://scenes/actors/crawler.tscn").instantiate()
+	hoverer.hover = true
+	var got := [_walker().contact_cause(), hoverer.contact_cause(), _lurker().contact_cause()]
+	check(got == [&"crawler_walker", &"crawler_hoverer", &"lurker"], "contact_cause(): a walker, a hoverer and a lurker name their own cause (got %s)" % [got])
+	check(got.all(func(c: StringName) -> bool: return Health.CAUSES.has(c)), "...and each is in Health.CAUSES")
+	_hits.clear()
+	var landed := _p().hurt(hoverer.contact_cause(), _p().global_position + Vector2(8, 0))
+	check(landed and _hits == [[Spec.DAMAGE[&"crawler"], &"crawler_hoverer"]] and _p().health.hp == Spec.MAX_HP - 1,
+			"a hoverer's contact through hurt(): one damaged(%d, crawler_hoverer) (got %s)" % [Spec.DAMAGE[&"crawler"], _hits])
+	hoverer.free()
+
+
 ## IDLE, TELEGRAPH and RETURN on the player deal nothing (Pillar 2).
 func test_lurker_harmless() -> void:
 	var spot := Vector2(200, STAND_Y)
@@ -287,9 +308,14 @@ func test_lurker_harmless() -> void:
 		var l := _lurker()
 		_hits.clear()
 		l._enter(s)
+		var premise := true
 		for i in 20:
 			l.global_position = _p().global_position
 			await frames(1)
+			# On the Hurtbox (its radius is 7), still not hunting, still harmless.
+			premise = premise and l.state != Lurker.State.HUNT and not l.monitorable \
+					and l.global_position.distance_to(_p().global_position) < 7.0
+		check(premise, "(premise) the %s lurker stays on the player, out of HUNT and not monitorable, for the 20 ticks (state %s)" % [Lurker.State.keys()[s], Lurker.State.keys()[l.state]])
 		check(_hits.is_empty() and _p().health.hp == Spec.MAX_HP, "a %s lurker on the player for 20 ticks deals no damage (got %s)" % [Lurker.State.keys()[s], _hits])
 		l._enter(Lurker.State.IDLE)
 		l.global_position = l._home
@@ -419,8 +445,9 @@ func test_spikes_invulnerable() -> void:
 	_hits.clear()
 	_p().health.invuln = 30.0
 	var back := await _walk_into_spikes()
-	check(not back.is_empty() and _hits.is_empty() and back.pos == back.safe and back.vel == Vector2.ZERO,
-			"invulnerable: a spike deals no damage but still returns the player to safe ground (got %s, hits %s)" % [back.get("pos"), _hits])
+	check(not back.is_empty() and _hits.is_empty() and back.pos == back.safe and back.vel == Vector2.ZERO
+			and back.pos.x + 4.0 <= SPIKES_LEFT and not _room().touches_hazard(Rect2(back.pos + Vector2(-4, -7), Vector2(8, 18))),
+			"invulnerable: a spike deals no damage but still returns the player to safe ground, left of the spikes and touching none (got %s, hits %s)" % [back.get("pos"), _hits])
 	_p().health.invuln = 0.0
 
 
@@ -492,6 +519,7 @@ func test_death_and_respawn() -> void:
 	for i in 3:
 		p.chain.add_hit()
 	var at := await _await_hit(10)
+	var lethal_frame := Engine.get_physics_frames()
 	check(at > 0 and _died == 1 and p.is_dead and p.death_cause == &"crawler_walker", "at 1 HP a walker's hit kills: died once, death_cause crawler_walker (died %d, cause '%s')" % [_died, p.death_cause])
 	check(Game.dive.carried == carried and p.chain.held == 0, "...and the held 6 are lost, not carried (D2: carried %d -> %d)" % [carried, Game.dive.carried])
 	check(_sprite().material == Fx.flash_material(), "...the lethal hit flashes white on its tick (AC8)")
@@ -505,6 +533,22 @@ func test_death_and_respawn() -> void:
 	check(_spawned.size() == spawned + 1 and q != p and q.health.hp == Spec.MAX_HP and not q.is_dead,
 			"the respawn is a new Player at Spec.MAX_HP, %d (got %d)" % [Spec.MAX_HP, q.health.hp])
 	check(_world.get_instance_id() == world_id and get_tree().current_scene == scene, "...in the same World, with no scene reload (AR25)")
+	# Q1 across a death (sonlm, review of Story 1.19): World hands the gap to the new life, so a hit
+	# inside 60 ticks of the lethal white shows no white. Per life they were 37 ticks apart.
+	_hits.clear()
+	q.place_at(_over_walker())
+	var first := await _await_hit(10)
+	var since := Engine.get_physics_frames() - lethal_frame
+	check(first > 0 and since < GAP_TICKS_Q1 and (q.get_node("Sprite") as Sprite2D).material == null and q.health.hp == Spec.MAX_HP - 1,
+			"the new life's hit %d ticks after the lethal white (under %d) shows no white: the gap outlives a life (material %s)" % [since, GAP_TICKS_Q1, (q.get_node("Sprite") as Sprite2D).material])
+	# The control: kept on the walker, its next hit is over 60 ticks after the lethal white.
+	while q.health.invuln > 2.0 / Engine.physics_ticks_per_second:
+		q.place_at(Vector2(_walker().position.x + 6.0, 132.0))
+		await frames(1)
+	var second := await _await_hit(10)
+	since = Engine.get_physics_frames() - lethal_frame
+	check(second > 0 and since >= GAP_TICKS_Q1 and (q.get_node("Sprite") as Sprite2D).material == Fx.flash_material(),
+			"...and its next hit, %d ticks after it, is white again" % since)
 
 
 # --- AC8: the squash's clock ----------------------------------------------------------------------
@@ -525,14 +569,24 @@ func test_squash() -> void:
 		if hit[0]:
 			break
 	Input.action_release("attack")
+	# D9: a hit that lands in this hitstop flashes for its 4 ticks all the same, since the flash is
+	# counted in physics frames (review of Story 1.19: the ledger claimed this check before it
+	# existed). Spikes: no knockback, so the squash is left alone.
+	var in_hitstop := Engine.time_scale < 1.0
+	var landed := p.hurt(&"spikes")
+	var white: Array[bool] = []
 	var ys: Array[float] = []
 	var scales: Array[float] = []
-	for i in 2:
+	for i in FLASH_TICKS_AC8 + 1:
 		await frames(1)
-		ys.append(_sprite().scale.y)
-		scales.append(Engine.time_scale)
+		white.append(_sprite().material == Fx.flash_material())
+		if i < 2:
+			ys.append(_sprite().scale.y)
+			scales.append(Engine.time_scale)
 	check(hit[0] and scales.all(func(s: float) -> bool: return s < 1.0), "(premise) a pogo hit, and the next 2 ticks are inside its hitstop (time scale %s)" % [scales])
 	check(ys.size() == 2 and ys.all(func(y: float) -> bool: return y > 1.15), "the pogo squash still shows on the 2 ticks after the hit, in the hitstop (scale.y %s > 1.15)" % [ys])
+	check(in_hitstop and landed and white == ([true, true, true, true, false] as Array[bool]),
+			"a hit landing in that hitstop is white for its 4 ticks, then restored (D9; in hitstop %s, got %s)" % [in_hitstop, white])
 	await frames(30)
 	check(is_equal_approx(_sprite().scale.y, 1.0) or absf(_sprite().scale.y - 1.0) < 0.01, "...and has eased back half a second later (scale.y %.3f)" % _sprite().scale.y)
 
@@ -544,9 +598,9 @@ func test_squash() -> void:
 ## entry, standing, never to the top opening.
 func test_seed_up_arrival() -> void:
 	var room := _room()
-	var seed := room.ground_below(&"up")
-	check(_world.last_safe_position() == seed and seed != room.entry_position(&"up") and is_equal_approx(seed.y, STAND_Y),
-			"an up arrival: right after the build, last_safe_position() is ground_below(up), %s, not the entry %s (got %s)" % [seed, room.entry_position(&"up"), _world.last_safe_position()])
+	var seeded := room.ground_below(&"up")
+	check(_world.last_safe_position() == seeded and seeded != room.entry_position(&"up") and is_equal_approx(seeded.y, STAND_Y),
+			"an up arrival: right after the build, last_safe_position() is ground_below(up), %s, not the entry %s (got %s)" % [seeded, room.entry_position(&"up"), _world.last_safe_position()])
 	_hits.clear()
 	_ticks.clear()
 	_recording = true
@@ -573,6 +627,6 @@ func test_seed_up_arrival() -> void:
 		touched_floor = touched_floor or t.floor
 	check(not back.is_empty() and not touched_floor and _hits == [[Spec.DAMAGE[&"hazard"], &"spikes"]],
 			"(premise) it falls onto the spikes before any floor tick (hits %s, a floor tick first: %s)" % [_hits, touched_floor])
-	check(not back.is_empty() and back.pos == seed and back.vel == Vector2.ZERO, "...and is returned to that seed, still, not the top opening (got %s)" % [back.get("pos")])
+	check(not back.is_empty() and back.pos == seeded and back.vel == Vector2.ZERO, "...and is returned to that seed, still, not the top opening (got %s)" % [back.get("pos")])
 	await frames(2)
-	check(p.is_on_floor() and p.position == seed, "...standing there (on floor %s at %s)" % [p.is_on_floor(), p.position])
+	check(p.is_on_floor() and p.position == seeded, "...standing there (on floor %s at %s)" % [p.is_on_floor(), p.position])

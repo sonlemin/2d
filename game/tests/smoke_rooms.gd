@@ -248,6 +248,7 @@ func _test_lurkers(rec: Dictionary) -> void:
 	for e: Array in ESCAPES:
 		await _test_escape(rec, e[0], e[1])
 	await _test_tightest_escape(rec)
+	await _test_listed_on_landing(rec)
 
 
 ## The per-lurker checks, on a fresh room so one lurker's hunt never leaks into the next.
@@ -429,7 +430,8 @@ func _open_spot(rec: Dictionary) -> Vector2:
 ##   harmful (monitorable) the frame before the escape.
 ## - "Snuff point-blank" (M1's 18 px case) stays a lurker-level check with the player's physics off:
 ##   with physics on, a hunting lurker on the player hits before any Snuff can land (D3). What it
-##   proves is that the lurker drops `monitorable` at once.
+##   proves is that the lurker drops `monitorable` at once and keeps it off: sampled on every frame
+##   to 1.2 s, since with the poll off a "no damage" line could never fail (review of Story 1.19).
 func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	await _build(rec)
 	var lurker := _lurkers()[0]
@@ -524,14 +526,20 @@ func _test_escape(rec: Dictionary, kind: String, gap: float) -> void:
 	var m1_lose := int(ceil(M1_LOSE_TRACK * tps))
 	var total := int(ceil(1.2 * tps))
 	var left := 0 if lurker.state != Lurker.State.HUNT else -1
+	var rearmed := -1  # the first frame the lurker read monitorable again, once harmless
 	while since < maxi(total, maxi(lose, m1_lose)):
 		await frames(1)
 		since += 1
 		if left < 0 and lurker.state != Lurker.State.HUNT:
 			left = since
+		if rearmed < 0 and since <= total and lurker.monitorable:
+			rearmed = since
 		if since == total:
-			check(hits.is_empty() and _player.health.hp == Spec.MAX_HP and not _player.is_dead,
-					"%s: no damage from the escape frame to 1.2 s later, HP still %d (damaged %s, HP %d)" % [who, Spec.MAX_HP, hits, _player.health.hp])
+			if kind == "Snuff point-blank":
+				check(rearmed < 0, "%s: the lurker stays harmless (monitorable off) on every frame from then to 1.2 s later (first monitorable again on frame %d; -1 is never)" % [who, rearmed])
+			else:
+				check(hits.is_empty() and _player.health.hp == Spec.MAX_HP and not _player.is_dead,
+						"%s: no damage from the escape frame to 1.2 s later, HP still %d (damaged %s, HP %d)" % [who, Spec.MAX_HP, hits, _player.health.hp])
 	check(left >= 0 and left <= lose, "%s: the lurker leaves HUNT within lose-track + 0.2 s (%d frames; left after %d)" % [who, lose, left])
 	check(left >= 0 and left <= m1_lose, "%s: the lurker loses track within %.1f s, whatever the tuning (M1's bound; left after %d frames)" % [who, M1_LOSE_TRACK, left])
 	for a in ["move_left", "move_right", "jump", "light"]:
@@ -582,6 +590,60 @@ func _test_tightest_escape(rec: Dictionary) -> void:
 	await seconds(1.2)
 	check(hits.is_empty() and _player.health.hp == Spec.MAX_HP, "%s: no damage, HP still %d (damaged %s)" % [who, Spec.MAX_HP, hits])
 	await _free()
+
+
+## Story 1.19 D3, the other side of the tightest escape: a contact already listed on the landing
+## tick T is not "in time". The lurker runs before the player, so on T it still senses the big light
+## and reads monitorable when the player's poll runs, after the landing: 2 HP on the landing tick,
+## the chain already banked by the floor. The overlap list lags a move by one physics step, so the
+## lurker is put on the player two frames before the landing shows. The fall is run twice: once to
+## count its frames, once with the lurker.
+func _test_listed_on_landing(rec: Dictionary) -> void:
+	var who := "%s contact listed on the landing tick" % rec.id
+	var land_frame := -1
+	for pass_no in 2:
+		await _build(rec)
+		var stand := _stand_position(rec)
+		if stand == Vector2.INF:
+			check(true, "%s: skipped: no stand cell" % who)
+			await _free()
+			return
+		var lurker := _lurkers()[0]
+		_only(null)
+		_clear_crawlers()
+		var hits := []
+		var ends := []  # [links, by_hit] for every chain end
+		_player.health.damaged.connect(func(amount: int, cause: StringName) -> void: hits.append([amount, cause]))
+		place(stand + Vector2(0, -6))
+		_add_links(ESCAPE_CHAIN)
+		_player.chain.ended.connect(func(links: int, by_hit: bool) -> void: ends.append([links, by_hit]))
+		_player.velocity.y = 60.0  # falling
+		var toward := signf(_room.bounds().get_center().x - _player.global_position.x)
+		lurker.global_position = _player.global_position + Vector2((toward if toward != 0.0 else 1.0) * ESCAPE_GAP, 0)
+		lurker._enter(Lurker.State.HUNT)
+		lurker._velocity = lurker.global_position.direction_to(_player.global_position) * Game.tuning.f(&"lurker_hunt_speed")
+		_only(lurker)
+		var waited := 0
+		var hit_frame := -1
+		while waited < 30:
+			await frames(1)
+			waited += 1
+			if hit_frame < 0 and not hits.is_empty():
+				hit_frame = waited
+			if _player.is_on_floor():
+				break
+			if pass_no == 1 and waited == land_frame - 2:
+				lurker.global_position = _player.global_position
+		if pass_no == 0:
+			land_frame = waited
+			check(_player.is_on_floor() and land_frame >= 3 and hits.is_empty(), "%s: premise: the fall alone lands on frame %d (3 or later), with no damage" % [who, land_frame])
+		else:
+			check(_player.is_on_floor() and waited == land_frame and hit_frame == land_frame,
+					"%s: premise: the same fall lands on frame %d, and the hit shows on that frame, not before (hit on frame %d)" % [who, land_frame, hit_frame])
+			check(hits == [[Spec.DAMAGE[&"lurker"], &"lurker"]] and _player.health.hp == Spec.MAX_HP - Spec.DAMAGE[&"lurker"],
+					"%s: the lurker deals %d: touched while it was lethal is not in time (D3; damaged %s)" % [who, Spec.DAMAGE[&"lurker"], hits])
+			check(ends == [[ESCAPE_CHAIN, false]], "%s: the landing ended the chain before the hit: ended(%d, by_hit false), once (got %s)" % [who, ESCAPE_CHAIN, ends])
+		await _free()
 
 
 ## D9: where a landing ends: the room's `P`, else its down entry, else the first ledge cell (row,

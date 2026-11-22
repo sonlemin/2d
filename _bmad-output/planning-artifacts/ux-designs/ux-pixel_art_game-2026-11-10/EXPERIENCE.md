@@ -297,7 +297,7 @@ Reduce flashing (Accessibility, E1) changes these effects (log 2026-11-11):
 | Invulnerability | Pips (and player) blink at 2.5 Hz | Steady transparency |
 | Bank burst and bloom | Full | Toned down |
 
-Note (2026-11-22, Story 1.19, sonlm): the white hit flash (67 ms) shows at most once per second; a hit inside that second shows only the blink. With the 2.5 Hz blink, hits back to back at the 0.6 s invulnerability would otherwise reach 4 flashes per second. The dim under reduce flashing (60% for 100 ms) shows on every hit.
+Note (2026-11-22, Story 1.19, sonlm): the white hit flash (67 ms) shows at most once per second; a hit inside that second shows only the blink. With the 2.5 Hz blink, hits back to back at the 0.6 s invulnerability would otherwise reach 4 flashes per second. The dim under reduce flashing (60% for 100 ms) shows on every hit. The second carries across a death, and a killing blow inside it shows no white: the death card is its feedback (sonlm, 2026-11-22, code review of Story 1.19).
 
 ## Accessibility Floor
 

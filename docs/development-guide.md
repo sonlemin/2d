@@ -57,8 +57,8 @@ Args apply in the order `log`, `set`, `room`, `chain`, `hp`, `glow`, `perf`, and
 **Overlays:** the backquote key (`` ` ``, action `dev_overlay`, physical keycode 96; no project action is bound to a function key) cycles, from off:
 
 1. the play rect (`World.play_rect()`), the notice rect (the play rect shrunk by `Lurker.SCREEN_MARGIN`, 8 px), and both 60 px gutters with their 58 px usable bands;
-2. the player's light radius and its notice reach (× 1.6), the reach dashed and dim with "below notice" while the light is under 80 px, plus each predator's state and a line to the player while it senses them;
-3. each exit (`side -> target`), the `spawn` / `up` / `down` entries, and each `obj=` id at its cell;
+2. the player's light radius and its notice reach (× 1.6), the reach dashed and dim with "below notice" while the light is under 80 px, plus each predator's state and a line to the player while it senses them, and the player's HP line (`hp 3/4`, plus `inv 0.42 s` while invulnerable);
+3. each exit (`side -> target`), the `spawn` / `up` / `down` entries, each `obj=` id at its cell, and `safe` at `World.last_safe_position()`, where a spike returns the player;
 4. the readout, rebuilt at 4 Hz: `FPS`; `lights n/6, sprites m` (plus `, over k` when the always-lights alone exceed the budget), from `BudgetLight.counts()` on `World.light_rect()`, so it shows exactly what the light budget counts; `frame x.x ms, worst y.y ms` in wall time since mode 4 opened; with `--perf`, the run's progress, then its summary over up to three rows (a row over 90 characters wraps at a space); then the active `Clock` requests (each stays listed, greyed, 0.5 s after it ends);
 
 then off. It works while paused (DevTools is `PROCESS_MODE_ALWAYS`). World marks use one cached unshaded `CanvasItemMaterial`, so they read under the darkness; screen marks sit on DevTools' own CanvasLayer 11, above the UI (10). A mark at an actor can sit up to one physics tick off the interpolated sprite (accepted for a dev overlay). Nothing blinks.

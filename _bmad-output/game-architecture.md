@@ -416,7 +416,7 @@ user://
 
 - `LightSource` node (group `light_source`) on the player, a thrown flare and the Ember Cache. It exposes `radius()`, `kind` (`player`, `flare`, `cache`) and `global_position`.
 - `Sensing` is a node-free helper with the pure maths: notice (radius ≥ 80 px, distance ≤ radius × 1.6, inside the play rect), sense, and target choice. It is unit-tested.
-- Lurkers query `light_source` each physics tick and hunt the chosen target; the lethal-only-while-`monitorable` rule is unchanged. A flare is sensed like the player; the cache's glow radius is a tuning value (E1 playtest).
+- Lurkers query `light_source` each physics tick and hunt the chosen target; the damages-only-while-`monitorable` rule is unchanged. A flare is sensed like the player; the cache's glow radius is a tuning value (E1 playtest).
 - The Weaver uses the same query and flees the brightest burning flare whose radius × 1.5 reaches it, with no 80 px notice minimum (readiness R20); a flare cancels a bite in telegraph (R19). It ignores Ember Caches; its bright/dark bands read the player's radius directly.
 
 ### Gameplay Rules and Tuning
@@ -632,7 +632,7 @@ func _on_exit_reached(target: StringName) -> void:
 |---|---|
 | **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; Story 1.12 added `--glow=on\|off` (a code-built `WorldEnvironment` under DevTools, for the perf check only) and `--perf[=<s>]` (the perf run, below); `--hp` (1.19, landed: `--hp=<n>`, 1–4, every life starts with n HP through its own spawn handler) and `--difficulty` (1.22) each add one row to DevTools' `ARGS` registry |
 | **Session settings** | `-- --set=brightness:0` sets any `Settings` key for this session only (typed by its default: int, float, bool `true`/`false`; repeatable) through `Game.override_setting()`; a session with any override writes no settings.json at all. Until Options (1.36) it is how brightness changes |
-| **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20) · 3: room exits, entries + persistent object ids · 4: FPS, `lights n/6, sprites m` (+ `over k`) from `BudgetLight.counts()` on `World.light_rect()` (what the budget counts, Story 1.12), wall-clock frame and worst-frame times, the perf run's progress and summary, active Clock requests |
+| **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: the player's light radius + notice reach, predator states (sense/stir rings with 1.20), the player's HP line (Story 1.19) · 3: room exits, entries + persistent object ids, the safe ground a spike returns to (Story 1.19) · 4: FPS, `lights n/6, sprites m` (+ `over k`) from `BudgetLight.counts()` on `World.light_rect()` (what the budget counts, Story 1.12), wall-clock frame and worst-frame times, the perf run's progress and summary, active Clock requests |
 | **Log categories** | `-- --log=lurker,clock` (names from `Log.CATEGORIES`, any case) |
 | **Smoke markers** | debug web exports print console markers (`SMOKE boot ok`, `SMOKE save ok`) that the Playwright smoke check reads; the release web export gets a boot-only check. As built (Story 1.13): DevTools prints `[room] SMOKE boot ok` (`Log.ROOM`) once, on World's first `room_entered` (one-shot), in real runs only (the current-scene gate the args use), so tests never print it; `SMOKE save ok` comes with 1.39 |
 | **Tests and bot** | `./run_tests.sh`, the reachability bot, `screenshot.gd` (unchanged) |
@@ -949,7 +949,7 @@ Weaver: same query; flees the brightest flare; bright/dark from the player's rad
 - **Target choice:** the sensed light with the largest radius; on a tie, a non-player light wins (a flare is a lure). A fresh flare carries the pre-toss radius, so it normally out-shines the halved chain.
 - **Stirring (off-screen warning, GDD Lurker):** `Sensing.can_stir()` is true when the lurker *would* sense the light but sits outside the play rect, within 96 px of its edge. The lurker stays in `IDLE`, exposes `stir` (`0` closed, `1` half, `2` open, rising while the condition holds), and never telegraphs or hunts while stirring. The gutter edge cue reads `predator` nodes and shows the eye level with the lurker's height; the stirring sound (E3) uses the same value. A guarantee test checks that stirring never leads to a hunt without an on-screen telegraph.
 - **Retargeting onto the player needs a fresh telegraph:** if a lurker's target changes from a flare or cache to the player, it re-enters `TELEGRAPH` (≥ 0.75 s). Pillar 2: every hunt of the player is telegraphed. Retargeting from the player to a flare needs no telegraph.
-- **Lethality is unchanged:** `monitorable` is true only in `HUNT` while the **player** is the sensed target. A lurker sitting on a cache or a flare is harmless until it telegraphs at the player.
+- **The damage rule is unchanged:** `monitorable` is true only in `HUNT` while the **player** is the sensed target. A lurker sitting on a cache or a flare is harmless until it telegraphs at the player.
 - **Weaver:** bright = player radius ≥ 80 px, dark = ≤ 40 px; flees along strands to the farthest point inside the flare's radius × 1.5 (E2 decides the exact flee target; GDD open question).
 
 **Implementation guide:**
@@ -1182,7 +1182,7 @@ func _apply(i: int) -> void:
 - Changing a guarantee means changing the GDD first, with the user, then `spec.gd`.
 - Per-room guarantees run on every room automatically; adding a room adds its checks.
 
-**Per-room guarantees (`smoke_rooms.gd`):** file validates; ids are unique; every lurker's telegraph ≥ 0.75 s; no lurker notices outside the play rect; a Snuff/landing/cling in time drops a hunting lurker's lethality; base light (40 px) is never noticed; every hazard pit has a ledge or wall within a 1.5 s fall.
+**Per-room guarantees (`smoke_rooms.gd`):** file validates; ids are unique; every lurker's telegraph ≥ 0.75 s; no lurker notices outside the play rect; a Snuff/landing/cling in time leaves a hunting lurker harmless (`monitorable` off, no damage); base light (40 px) is never noticed; every hazard pit has a ledge or wall within a 1.5 s fall.
 
 **Implementation guide:**
 
@@ -1270,7 +1270,7 @@ func _physics_process(delta: float) -> void:
 			elif _timer <= 0.0:
 				_enter(State.HUNT)
 		State.HUNT:
-			pass  # move toward target; lethality per Light-as-Signal rules
+			pass  # move toward target; damage per Light-as-Signal rules
 		State.RETURN:
 			pass
 

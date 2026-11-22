@@ -43,7 +43,10 @@ var _cling_left := 0.0
 var _kick_left := 0.0
 var _flash_start := -1  # Engine.get_physics_frames() of the hit whose flash is drawing; -1 none
 var _flash_white := false  # that flash may draw white (the Q1 gap allowed it)
-var _last_flash_frame := -1  # where the last white flash started, for the once-per-second gap (Q1)
+## Engine.get_physics_frames() where the last white hit flash started, for the once-per-second gap
+## (Q1); -1 never. Public: World hands it to the next life at a respawn, so the gap holds across a
+## death (review of Story 1.19).
+var last_white_frame := -1
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _light: PointLight2D = $Light
@@ -90,7 +93,7 @@ func _physics_process(delta: float) -> void:
 		_jumping = false
 		chain.break_chain()  # Landing breaks the chain; the ground is a sanctuary.
 	_process_swing()
-	_poll_contacts()  # after the landing break, Snuff and cling: it sees this tick's escape (D3)
+	_poll_contacts()  # after the landing break, Snuff and cling: a hit on an escape tick finds the chain already banked (D3)
 	_update_light(delta)
 
 
@@ -305,12 +308,17 @@ func _update_light(delta: float) -> void:
 ## damages only while monitorable). The overlap list lags a monitorable change by one physics step
 ## (probed on 4.7.2), so the poll reads the flag itself: a lurker that lost the scent this tick is
 ## harmless this tick, with no tick of lag.
+## "In time" (D3): predators run before the player, so one already listed on the tick of an escape
+## still reads monitorable here and hurts: the player was touched while it was lethal. It re-senses
+## on the next tick, so any contact from then on is safe (smoke_rooms pins both sides).
 func _poll_contacts() -> void:
 	if is_dead or health.invulnerable():
 		return
 	for area in _hurtbox.get_overlapping_areas():
-		if area.is_in_group(&"predator") and area.monitorable and area.has_method(&"contact_cause") \
-				and not area.is_queued_for_deletion():
+		if area.is_in_group(&"predator") and area.monitorable and not area.is_queued_for_deletion():
+			# Only an enemy may leave contact_cause() out (dev guide); a predator without one would
+			# be silently harmless.
+			assert(area.has_method(&"contact_cause"), "predator %s has no contact_cause()" % area.name)
 			hurt(area.contact_cause(), area.global_position)
 			return
 	for body in _hurtbox.get_overlapping_bodies():
@@ -332,7 +340,7 @@ func hurt(cause: StringName, from := Vector2.INF) -> bool:
 	if is_dead or health.hit(cause, Game.tuning.f(&"invuln_time")) == 0:
 		return false
 	if health.is_empty():
-		_start_flash()  # a lethal hit flashes too; the flash runs out while dead (AC8)
+		_start_flash()  # a lethal hit flashes too when the gap allows; the flash runs out while dead (AC8)
 		die(cause)
 		return true
 	chain.break_by_hit()  # FR11: held -> carried, and never a bank-heal (D4)
@@ -351,11 +359,14 @@ func hurt(cause: StringName, from := Vector2.INF) -> bool:
 ## The hit flash from this tick (Story 1.19 D9): drawn here for the hit tick, then ticked in
 ## _physics_process by physics frames, so a hit before or after this player's own tick shows the
 ## same 4 ticks. White at most once per Fx.HIT_FLASH_GAP_TICKS (Q1); Fx owns the gate and the dim.
+## A hit inside the gap shows no white, a killing blow included (sonlm, review of Story 1.19: a dim
+## or a white there reaches 3.5 flashes per second in a back-to-back death, over NFR8's cap of 3);
+## the death card is the killing blow's feedback (Story 1.29).
 func _start_flash() -> void:
 	var now := Engine.get_physics_frames()
-	_flash_white = Fx.white_flash_allowed(_last_flash_frame, now)
+	_flash_white = Fx.white_flash_allowed(last_white_frame, now)
 	if _flash_white:
-		_last_flash_frame = now
+		last_white_frame = now
 	_flash_start = now if Fx.hit_flash(_sprite, 0, _flash_white) else -1
 
 
@@ -372,7 +383,8 @@ func _on_chain_ended(links: int, by_hit: bool) -> void:
 	health.bank_heal(links, int(Game.tuning.f(&"bank_heal_min")))
 
 
-## The Hurtbox in world space, for World's hazard poll (Story 1.19 D5).
+## The Hurtbox in world space, for World's hazard poll (Story 1.19 D5). The room sits at the world
+## origin, so world space is also room-local (World._poll_exits() reads positions the same way).
 func hurt_rect() -> Rect2:
 	var shape := _hurtbox.get_node("Shape") as CollisionShape2D
 	var size := (shape.shape as RectangleShape2D).size
@@ -390,6 +402,7 @@ func place_at(pos: Vector2) -> void:
 	_set_swing_visible(false)
 	_coyote = 0.0
 	_jumping = false
+	_kick_left = 0.0  # no wall-kick lockout carried to the new spot
 	reset_physics_interpolation()
 
 

@@ -264,12 +264,21 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 			continue
 		# Room.entry_position() puts a player arriving from above one cell inside the top opening,
 		# and one arriving from below on the floor beside the bottom opening (D3).
+		# Neither arrival cell is ever a hazard (review of Story 1.19): Room.ground_below() would fall
+		# back to the entry itself, inside the spike, and World would return the player there on
+		# every tick until dead.
 		if e.side == "up":
 			var inside := Vector2i(e.col, 1)
 			if solid_at(grid, inside):
 				err.call(e.line, 1, "%s exit's entry cell %s is solid" % [e.side, inside])
-		elif down_entry_cell(grid, e.col) == NO_CELL:
-			err.call(e.line, 1, "%s exit has no floor beside its opening to arrive on" % e.side)
+			elif inside.y < h_rows and grid[inside.y][inside.x] in RoomLegend.HAZARDS:
+				err.call(e.line, 1, "%s exit's entry cell %s is a hazard" % [e.side, inside])
+		else:
+			var stand := down_entry_cell(grid, e.col)
+			if stand == NO_CELL:
+				err.call(e.line, 1, "%s exit has no floor beside its opening to arrive on" % e.side)
+			elif grid[stand.y][stand.x] in RoomLegend.HAZARDS:
+				err.call(e.line, 1, "%s exit's stand cell %s is a hazard" % [e.side, stand])
 		var c: int = e.col
 		while c < w - 1 and not solid_at(grid, Vector2i(c, row)):
 			opening[Vector2i(c, row)] = true

@@ -2,9 +2,9 @@
 ; Web debug build). Dev only: validated, never swept, excluded from release exports.
 ; P on a ledge (walk off right: the drop at column 4 lands on clean floor, then ^^^^ at columns 6-9);
 ; a walker on its own ledge (row 9, columns 1-3); an in-wall lurker at (0, 7). The up exit at
-; column 11 falls onto clean floor at (11, 12), and the spikes are within a steer of that fall (the
-; seed test). Both exits loop to this room, as m1_shaft's do: crossing the ceiling arrives at the
-; down entry, so an up exit needs one (smoke_rooms' link check).
+; column 11 falls onto clean floor at (11, 12), and the spikes are within a steer of that fall. Both
+; exits loop to this room. Nothing holds the two files equal: the tests run on t_spikes only, and
+; this one may change for a look.
 id=spikes
 zone=violet
 exits=up:spikes@x11, down:spikes@x14
