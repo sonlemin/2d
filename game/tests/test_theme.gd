@@ -7,8 +7,8 @@ extends Node
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_theme.gd
 
 const FONT_PATH := "res://fonts/fusion-pixel-8px-proportional-latin.otf"  ## AC1
-## DESIGN Typography, measured widths at size 8 (px). "+1240" is "about 25" in DESIGN's table;
-## the probe measured 24, which is what is pinned.
+## DESIGN Typography, measured widths at size 8 (px). "+1240" was "about 25" in DESIGN's table;
+## the probe measured 24, and code review corrected the table to it.
 const WIDTHS_8 := {"0123456789": 50, "+1240": 24, "x12 +24": 33}
 const DIGIT_W := 5  ## DESIGN: tabular digits, every digit 5 px wide at size 8
 const CAP_HEIGHT := 6  ## DESIGN typography hud-value: cap 6 / x-height 4 / descender 2
@@ -134,6 +134,22 @@ func _test_play_text() -> void:
 	check(s == TextStyle.play_text(c, o) and s == ThemeBuilder.play_text(c, o), "play_text() caches: the same colours give the same LabelSettings, through ThemeBuilder too")
 	check(s != TextStyle.play_text(Color.WHITE, o) and s != TextStyle.play_text(c, Color.BLACK), "...and other colours give another one")
 	check(s.font_size == 8 and s.font_color == c and s.outline_size == 0, "play_text: size 8, the glyph colour, no font outline (size %d, outline %d)" % [s.font_size, s.outline_size])
+	# A Label with label_settings ignores the Theme's line_spacing (code review, probed: the
+	# LabelSettings default 3 gave a 15 px pitch), so the pitch is measured, as in _test_variations.
+	var holder := Control.new()
+	holder.theme = ThemeBuilder.theme()
+	add_child(holder)
+	var one := Label.new()
+	var two := Label.new()
+	for l: Label in [one, two]:
+		l.label_settings = s
+		holder.add_child(l)
+	one.text = "Ag"
+	two.text = "Ag\nAg"
+	var pitch := two.get_minimum_size().y - one.get_minimum_size().y
+	var body: int = VARIATIONS[&"BodyLine"][1]
+	check(pitch == body, "play_text: a two-line Label has DESIGN's body-line pitch, %d px (got %s)" % [body, pitch])
+	holder.queue_free()
 	var offsets := []
 	var ok := s.stacked_shadow_count == 4
 	for i in s.stacked_shadow_count:

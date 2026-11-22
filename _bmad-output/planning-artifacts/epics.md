@@ -539,7 +539,7 @@ Source: UX `DESIGN.md` + `EXPERIENCE.md` (2026-11-10/11). "The spines win": if a
   - Appears in range and hides out of range at once, with no bob. Follows the last-used device.
   [UX: DESIGN → Components > Glyph prompt, In-world UI positions; EXPERIENCE → Component Patterns] [Owner: E1]
 - UX-DR45: Bank popup (kept from M1):
-  - Amber text `x{links} +{embers}` (e.g. "x12 +24", 33 px wide), 8 px, or 10 px at 10+ links, with the text outline.
+  - Amber text `x{links} +{embers}` (e.g. "x12 +24", 33 px wide), 8 px at every count (Story 1.17 D7, sonlm 2026-11-21: 10 px would scale the 8 px face by a fraction), with the text outline.
   - Starts with its bottom edge 6 px above the top of the player sprite, centred on it.
   [UX: DESIGN → Components > Bank popup, In-world UI positions] [Owner: E1 (implied by HUD v2)]
 

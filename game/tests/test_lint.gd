@@ -109,14 +109,21 @@ const RULES: Array[Dictionary] = [
 		code = [r"[\x22\x27](reduce_flashing|reduced_motion|shake)[\x22\x27]"],
 		only = [], skip = ["dev/"], allow = ["core/fx.gd", "rules/settings.gd"]},
 	# AR41 (Story 1.17 D12): player text goes through tr(), so the string table and its scan see it.
-	# Fires on a text sink followed, on the same line, by a string literal holding two lowercase
-	# letters in a row. The pattern consumes whole literals after the sink, so a closing quote is
-	# never read as an opening one (`tr("POPUP_BANKED") % amount` stays quiet); keys are upper case
-	# and numeric formats ("x%d  +%d") have no two lowercase letters together. What a text scan
-	# can't see (review covers it): text built in a variable on an earlier line, and a sink reached
-	# by name (`call("set_text", …)`). dev/ is skipped: the overlays are debug text, never shipped.
+	# Fires on a text sink followed, on the same line, by a string literal that holds two letters
+	# once its % conversions and escapes are taken out (code review, sonlm: "two lowercase letters in
+	# a row" let "On", "OK" and "PAUSED" through and fired on "%dx"). Quiet on a key-shaped literal
+	# (UPPER_SNAKE, two segments: `tr("MENU_RESUME")`), on a StringName (`&"dash_speed"` is an id,
+	# never text) and on numeric formats ("x%d  +%d", "%dx": one letter). `text =` is a sink with or
+	# without a dot, so a Label script's own `text = "Resume"` fires; `var text` / `const text` are
+	# declarations. The pattern consumes whole literals after the sink, so a closing quote is never
+	# read as an opening one (`tr("POPUP_BANKED") % amount` stays quiet), and reads each conversion
+	# atomically, so the `d` of `%d` is never counted as a letter. Any other text literal on a sink
+	# line fires (`add_item(tr("MENU_X"), "icon")`): hoist it into a variable. What a text scan
+	# can't see (review covers it): text built in a variable on an earlier line, a sink and its
+	# literal on different lines (a wrapped call), and a sink reached by name
+	# (`call("set_text", …)`). dev/ is skipped: the overlays are debug text, never shipped.
 	{id = &"raw_text", bare = [], code = [
-			r"(?:\.\s*text\s*\+?=(?!=)|\b(?:tooltip_text|placeholder_text)\s*\+?=(?!=)|\b(?:set_text|popup|draw_string|draw_multiline_string|add_item|append_text|add_text)\s*\()(?:[^\x22\x27]|\x22(?:\\.|[^\x22\\])*\x22|\x27(?:\\.|[^\x27\\])*\x27)*?(?:\x22(?:\\.|[^\x22\\])*?[a-z]{2}|\x27(?:\\.|[^\x27\\])*?[a-z]{2})"],
+			r"(?:(?<!\w)(?<!var\s)(?<!const\s)text\s*\+?=(?!=)|\b(?:tooltip_text|placeholder_text)\s*\+?=(?!=)|\b(?:set_text|popup|draw_string|draw_multiline_string|add_item|append_text|add_text)\s*\()(?:[^\x22\x27]|\x22(?:\\.|[^\x22\\])*\x22|\x27(?:\\.|[^\x27\\])*\x27)*?(?:(?<!&)\x22(?![A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\x22)(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x22\\\p{L}])*+\p{L}(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x22\\\p{L}])*+\p{L}|(?<!&)\x27(?![A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\x27)(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x27\\\p{L}])*+\p{L}(?>%[-+0-9.*]*[sdcfvxXo]|\\.|[^\x27\\\p{L}])*+\p{L})"],
 		only = [], skip = ["dev/"], allow = []},
 ]
 
@@ -466,6 +473,22 @@ const SAMPLES: Array = [
 	[&"raw_text", "ui/gutters.gd", "\tb.tooltip_text = \"Hold to snuff\"", true],
 	[&"raw_text", "ui/gutters.gd", "\tl.text += \" more\"", true],
 	[&"raw_text", "ui/gutters.gd", "\tlist.add_item(tr(\"MENU_RESUME\"), \"icon\")", true],
+	# Code review (sonlm): two letters, whatever their case; a Label script's own `text`.
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"On\"", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"OK\"", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = 'PAUSED'", true],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"POPUP\"", true],
+	[&"raw_text", "ui/kit/menu_row.gd", "\ttext = \"Resume\"", true],
+	[&"raw_text", "ui/kit/menu_row.gd", "\tif open: text = \"Resume\"", true],
+	[&"raw_text", "ui/kit/menu_row.gd", "\tvar text := \"Resume\"", false],
+	[&"raw_text", "ui/kit/menu_row.gd", "\tconst text = \"Resume\"", false],
+	[&"raw_text", "ui/kit/menu_row.gd", "\tcontext = \"Resume\"", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"%dx\" % n", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"%.1fx\" % n", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"x%d%%\" % n", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = \"\\n\"", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = tr(\"MENU_X\") % Game.tuning.f(&\"dash_speed\")", false],
+	[&"raw_text", "ui/gutters.gd", "\tl.text = tr_n('MENU_ONE', \"MENU_MANY\", n)", false],
 	[&"raw_text", "ui/gutters.gd", "\tl.text = tr(\"MENU_RESUME\")", false],
 	[&"raw_text", "ui/gutters.gd", "\tl.text = \"x\"", false],
 	[&"raw_text", "actors/player.gd", "\tFx.popup(p, pos, \"x%d  +%d\" % [a, b], SPARK)", false],

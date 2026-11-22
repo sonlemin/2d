@@ -9,6 +9,19 @@ cd "$(dirname "$0")"
 GODOT="${GODOT:-$(command -v godot || echo "$HOME/.local/bin/godot")}"
 TESTS_DIR="${TESTS_DIR:-tests}"
 "$GODOT" --headless --path . --import >/dev/null 2>&1
+# The import regenerates text/*.translation whenever its CSV changed since the last import (an
+# edit, or a pull), so a CSV committed without its re-imported .translation is repaired before
+# test_strings could see it (Story 1.17 code review, probed). What is left to see is the tree's
+# state: a .translation that differs from the commit while its CSV is as committed means the
+# committed one is stale. Mid-edit both differ, which is the workflow. Without git (an unpacked
+# copy) there is no commit to compare with.
+stale_translation=0
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+		&& [ -n "$(git status --porcelain -- 'text/*.translation')" ] \
+		&& [ -z "$(git status --porcelain -- 'text/*.csv' 'text/*.csv.import')" ]; then
+	echo "FAIL text/*.translation differs from the commit while its CSV is as committed: the committed .translation is stale. Commit the regenerated one."
+	stale_translation=1
+fi
 # The runner's own 120 s watchdog can't fire if a test blocks the main loop, so each run also
 # gets a wall-clock limit (Story 1.1: a missed path can hang Godot instead of failing).
 LIMIT=150
@@ -25,8 +38,9 @@ if [ ${#tests[@]} -eq 0 ]; then
 	echo "== NO TESTS FOUND in $TESTS_DIR/ (test_*.gd, smoke_*.gd)"
 	exit 1
 fi
-fail=0
+fail=$stale_translation
 failed=()
+[ $stale_translation -eq 0 ] || failed+=("import (a stale committed .translation)")
 for f in "${tests[@]}"; do
 	t="${f%.gd}"
 	echo "== $t"

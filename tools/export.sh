@@ -113,7 +113,7 @@ tv="$(cat "$TEMPLATES/version.txt" 2>/dev/null || true)"
 for f in "${TEMPLATE_FILES[@]}"; do
 	[ -f "$TEMPLATES/$f" ] || missing+=("export template $f in $TEMPLATES (docs/build.md: templates)")
 done
-for c in timeout gzip git; do
+for c in timeout gzip git cmp diff; do
 	command -v "$c" > /dev/null || missing+=("the $c command")
 done
 # Each check runs whatever failed before it, so one run names everything (AC2). Only the browser
@@ -163,13 +163,16 @@ V="$(date +%Y%m%d)-$(git rev-parse --short=7 HEAD)"
 # An assignment, so a failed git status fails the build instead of reading as a clean tree.
 porcelain="$(git status --porcelain)"
 [ -z "$porcelain" ] || V="$V-dirty"
+# The tracked files modified now, for the import step's check below.
+tracked_before="$(git diff HEAD --name-only)"
 # The guard on the one delete: never anything outside builds/<version>/.
 [[ "$V" =~ ^[0-9]{8}-[0-9a-f]{7,}(-dirty)?$ ]] || fail "version: unexpected version '$V'"
 OUT="$ROOT/builds/$V"
 rm -rf -- "$OUT"
 mkdir -p "$OUT/windows" "$OUT/linux" "$OUT/web" "$OUT/web_debug" "$OUT/logs"  # Godot refuses a missing folder
 LOGS="$OUT/logs"
-# The game's user:// for the runs of a build (the PCK listings and the Linux boot): a fresh one
+# The game's user:// for the runs of a build (the licence notice, the PCK listings and the Linux
+# boot): a fresh one
 # per build, so a boot never reads what an earlier build left (a newer settings or save schema)
 # and never writes the server's own (code review, decided by sonlm). Exports keep the real
 # XDG_DATA_HOME: the templates live there.
@@ -179,13 +182,36 @@ echo "   builds/$V"
 
 # --- 3. import ----------------------------------------------------------------------------------
 step import
+# A tree that was never imported (a fresh clone) has no .godot/: the project loads its font
+# (gui/theme/custom_font) before the import has made the font's data, which logs errors once
+# (Story 1.17 code review, seen on a fresh clone). So that first import runs unscanned, and the
+# scanned one below still fails on anything that persists.
+if [ ! -d "$ROOT/game/.godot/imported" ]; then
+	godot_run "$LOGS/import_first.log" 600 --headless --path "$ROOT/game" --import
+	echo "   first import of this tree (logs/import_first.log, not scanned)"
+fi
 godot_run "$LOGS/import.log" 600 --headless --path "$ROOT/game" --import
 check_run "import" "$LOGS/import.log"
+# The import regenerates text/strings.en.translation whenever its CSV changed since the last
+# import (an edit, or a pull), so a CSV committed without its re-imported .translation is repaired
+# here, before test_strings could see it: the build would carry a table that is not the commit's,
+# under a version computed before the import (Story 1.17 code review, probed). Two checks:
+# a clean tree stays clean (files the import creates, .godot/ and a new .uid, are untracked and
+# don't count), and a .translation never differs from the commit while its CSV is as committed.
+tracked_after="$(git diff HEAD --name-only)"
+if [ -z "$tracked_before" ] && [ -n "$tracked_after" ]; then
+	echo "$tracked_after" | sed 's/^/   rewritten: /'
+	fail "import: the import rewrote tracked files on a clean tree, so the commit was stale; commit them and build again" "$LOGS/import.log"
+fi
+if [ -n "$(git status --porcelain -- "$ROOT/game/text/*.translation")" ] && [ -z "$(git status --porcelain -- "$ROOT/game/text/*.csv" "$ROOT/game/text/*.csv.import")" ]; then
+	fail "import: game/text/*.translation differs from the commit while its CSV is as committed: the committed .translation is stale; commit the regenerated one" "$LOGS/import.log"
+fi
 
 # --- 4. content: every room file and every string key, before any export (AR52, D12) ----------
 # smoke_rooms validates every rooms/**/*.txt (legend, unique ids, exit links) and runs the
-# per-room guarantees, in ~12 s; test_strings (Story 1.17) checks the string table, that the
-# committed .translation is current, and every key reference in scripts/ and scenes/. The whole
+# per-room guarantees, in ~12 s; test_strings (Story 1.17) checks the string table, that every
+# key is registered, and every key reference in scripts/ and scenes/ (that the committed
+# .translation is current is the import step's check above). The whole
 # suite (~2 min) is run_tests.sh's job. The runner's exit code is the verdict; the scan is a
 # second net. 5.7 adds flags and lengths here.
 step content
@@ -218,6 +244,15 @@ export_one "Web debug" --export-debug web_debug index.html
 # tools/godot_licenses.gd on the pinned 4.7.2 editor binary, then copied the same way.
 step licences
 FONT_LICENCES="$ROOT/game/fonts"
+# The sources first, each by name (Story 1.17 D1; code review): counting non-empty files on both
+# sides passed when a licence was deleted or emptied, since both counts fell together.
+LICENCE_FILES=(OFL.txt LICENSES/boutique-bitmap-7x7/OFL.txt LICENSES/galmuri/LICENSE.txt LICENSES/misaki/misaki.txt LICENSES/miseki-bitmap/LICENSE.txt)
+for f in "${LICENCE_FILES[@]}"; do
+	[ -s "$FONT_LICENCES/$f" ] || fail "licences: game/fonts/$f is missing or empty"
+done
+# A font update that adds a licence file names it above, or nothing would check it.
+lic_src="$(find "$FONT_LICENCES/LICENSES" -type f | wc -l)"
+[ "$lic_src" -eq $((${#LICENCE_FILES[@]} - 1)) ] || fail "licences: game/fonts/LICENSES/ holds $lic_src files, not the $((${#LICENCE_FILES[@]} - 1)) named in LICENCE_FILES"
 XDG_DATA_HOME="$RUN_DATA" godot_run "$LOGS/licences.log" 60 --headless --path "$ROOT/game" -s "$ROOT/tools/godot_licenses.gd" -- "$LOGS/GODOT_LICENSES.txt"
 check_run "licences: GODOT_LICENSES.txt" "$LOGS/licences.log"
 [ -s "$LOGS/GODOT_LICENSES.txt" ] || fail "licences: tools/godot_licenses.gd wrote no GODOT_LICENSES.txt" "$LOGS/licences.log"
@@ -226,15 +261,12 @@ for key in "${LICENCE_DIRS[@]}"; do
 	cp -- "$FONT_LICENCES/OFL.txt" "$LOGS/GODOT_LICENSES.txt" "$OUT/$key/"
 	cp -R -- "$FONT_LICENCES/LICENSES" "$OUT/$key/"
 done
-# Checked in every folder, apart from the copy, so a folder the copy skipped fails here.
-lic_src="$(find "$FONT_LICENCES/LICENSES" -type f -size +0c | wc -l)"
-[ "$lic_src" -ge 1 ] || fail "licences: game/fonts/LICENSES/ holds no licence file"
+# Checked in every folder, apart from the copy, so a folder the copy skipped fails here. Each copy
+# is compared with its source, byte for byte: a licence ships unmodified or not at all.
 for key in windows linux web web_debug; do
-	for f in OFL.txt GODOT_LICENSES.txt; do
-		[ -s "$OUT/$key/$f" ] || fail "licences: $key/$f is missing or empty"
-	done
-	lic_n="$(find "$OUT/$key/LICENSES" -type f -size +0c 2> /dev/null | wc -l)" || true
-	[ "$lic_n" -eq "$lic_src" ] || fail "licences: $key/LICENSES/ holds $lic_n non-empty files, not $lic_src"
+	cmp -s -- "$FONT_LICENCES/OFL.txt" "$OUT/$key/OFL.txt" || fail "licences: $key/OFL.txt is missing or differs from game/fonts/OFL.txt"
+	cmp -s -- "$LOGS/GODOT_LICENSES.txt" "$OUT/$key/GODOT_LICENSES.txt" || fail "licences: $key/GODOT_LICENSES.txt is missing or differs from logs/GODOT_LICENSES.txt"
+	diff -r -q -- "$FONT_LICENCES/LICENSES" "$OUT/$key/LICENSES" > /dev/null 2>&1 || fail "licences: $key/LICENSES/ is missing or differs from game/fonts/LICENSES/"
 done
 echo "   OFL.txt, LICENSES/ ($lic_src files), GODOT_LICENSES.txt ($(stat -c %s -- "$LOGS/GODOT_LICENSES.txt") bytes) in each of windows, linux, web, web_debug"
 

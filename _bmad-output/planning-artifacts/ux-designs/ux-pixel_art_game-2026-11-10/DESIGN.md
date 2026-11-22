@@ -548,7 +548,7 @@ Rules and dividers stay at index 1 (1.3–2.4:1). [ASSUMPTION] They are decorati
 |---|---|---|---|
 | `0123456789` | 50 px | Any gutter number | Yes |
 | `+999` (held row) | about 20 px, from x 22 to x 42 | Left gutter | Yes |
-| `+1240` (held row) | about 25 px, to x 47 | Left gutter | Yes |
+| `+1240` (held row) | 24 px (measured, Story 1.17), to x 46 | Left gutter | Yes |
 | `x12 +24` (bank popup) | 33 px | Play area | Yes |
 | `EMBERS` (old text label) | 31 px | Not used; labels are icons | n/a |
 

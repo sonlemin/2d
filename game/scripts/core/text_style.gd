@@ -38,6 +38,9 @@ static func font() -> FontFile:
 ## `outline_color`. Four stacked shadows at OUTLINE_OFFSETS, each with outline size 0: the font's
 ## own outline_size strokes the diagonals too, which UX-DR15 rules out. Cached per colour pair, so
 ## a popup never builds a resource of its own (project rule: shared resources are statics).
+## A Label with label_settings takes its line spacing from the settings, never from the Theme, and
+## LabelSettings defaults to 3 (a 15 px pitch, probed in code review): so the body-line pitch is
+## set here, for the death card and the "Not saved" note.
 static func play_text(color: Color, outline_color: Color) -> LabelSettings:
 	var key := color.to_html() + "|" + outline_color.to_html()
 	var s: LabelSettings = _play_text.get(key)
@@ -46,6 +49,7 @@ static func play_text(color: Color, outline_color: Color) -> LabelSettings:
 		s.font = _FONT
 		s.font_size = SIZE
 		s.font_color = color
+		s.line_spacing = LINE_SPACING_BODY
 		s.stacked_shadow_count = OUTLINE_OFFSETS.size()
 		for i in OUTLINE_OFFSETS.size():
 			s.set_stacked_shadow_offset(i, OUTLINE_OFFSETS[i])

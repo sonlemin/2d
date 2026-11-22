@@ -25,6 +25,7 @@ func run() -> void:
 	_report("registered and current", StringsCheck.check_registered(rows, TranslationServer.translate))
 	_test_locales(rows)
 	_report("copy rules", StringsCheck.check_copy(rows))
+	_report("formats", StringsCheck.check_formats(rows, StringsCheck.FORMATS))
 	_test_tree(rows)
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
@@ -50,10 +51,11 @@ static func _read_csv(path: String) -> Array:
 	if f == null:
 		return rows
 	while not f.eof_reached():
-		var row := f.get_csv_line()
-		if row.size() == 1 and row[0] == "":
-			continue  # the empty line after the last newline
-		rows.append(row)
+		rows.append(f.get_csv_line())
+	# Only the empty line after the last newline goes. A blank line inside the table stays, as a
+	# one-cell row check_table fails, so every later "row N" still names its CSV line (code review).
+	while not rows.is_empty() and rows[-1].size() == 1 and rows[-1][0] == "":
+		rows.pop_back()
 	return rows
 
 
@@ -71,7 +73,8 @@ func _test_locales(rows: Array) -> void:
 func _test_tree(rows: Array) -> void:
 	var keys := []
 	for i in range(1, rows.size()):
-		keys.append(rows[i][0])
+		if rows[i].size() == StringsCheck.HEADER.size():  # a short row is check_table's to report
+			keys.append(rows[i][0])
 	var gd := StringsCheck.files_under(SCRIPTS, ".gd")
 	var tscn := StringsCheck.files_under(SCENES, ".tscn")
 	# So the scan can't pass on a wrong root or an empty walk.
@@ -87,10 +90,12 @@ func _test_tree(rows: Array) -> void:
 		refs[path] = StringsCheck.refs_in(text, path.ends_with(".gd"))
 		if path.ends_with(".tscn"):
 			scene_errors.append_array(StringsCheck.check_scene_text(path, text))
-	var calls := 0
+	# So a scanner that reads nothing can't pass. Tied to the table, not to today's two popups:
+	# Story 1.26 deletes both keys, and an empty table has nothing to find (code review).
+	var found := 0
 	for path: String in refs:
-		calls += (refs[path] as Array).filter(func(r: Dictionary) -> bool: return r.kind == "call").size()
-	check(calls >= 2, "the scan finds the tr() calls (%d)" % calls)
+		found += (refs[path] as Array).filter(func(r: Dictionary) -> bool: return r.kind != "bad_call").size()
+	check(keys.is_empty() or found >= 1, "the scan finds key references while the table has keys (%d references, %d keys)" % [found, keys.size()])
 	_report("code scan", StringsCheck.check_refs(refs, keys))
 	_report("scene text", scene_errors)
 
@@ -110,12 +115,16 @@ func _test_samples() -> void:
 			[["keys", "en"], "a repeated key", ["MENU_RESUME", "Resume"], ["MENU_RESUME", "Go on"]],
 			[["keys", "en"], "an empty en", ["MENU_RESUME", ""]],
 			[["keys", "en"], "a trailing space", ["MENU_RESUME", "Resume "]],
+			[["keys", "en"], "a trailing escaped newline (whitespace once the importer unescapes it)", ["MENU_RESUME", "Resume\\n"]],
+			[["keys", "en"], "a blank line inside the table", [""], ["MENU_RESUME", "Resume"]],
 			[["keys", "en"], "a missing cell", ["MENU_RESUME"]]]:
 		var rows := [PackedStringArray(bad[0])]
 		for r in bad.slice(2):
 			rows.append(PackedStringArray(r))
 		var errs := StringsCheck.check_table(rows)
 		check(errs.size() == 1, "table fires on %s (%s)" % [bad[1], errs])
+	var inner := [PackedStringArray(["keys", "en"]), PackedStringArray(["MENU_A", "Line one\\nline two"])]
+	check(StringsCheck.check_table(inner).is_empty(), "table: an escaped newline inside the text passes (%s)" % [StringsCheck.check_table(inner)])
 
 	var font := TextStyle.font()
 	var glyphs_ok := [PackedStringArray(["keys", "en"]), PackedStringArray(["MENU_X", "Ça déjà\\nŁódź"])]
@@ -137,9 +146,22 @@ func _test_samples() -> void:
 			PackedStringArray(["MENU_REDO", "Credits"]), PackedStringArray(["POPUP_BANKED", "+%d banked"])]
 	check(StringsCheck.check_copy(copy_ok).is_empty(), "copy: shapes, narrative colour, 'Credits'/'REDO' (not 'red') and %%d pass (%s)" % [StringsCheck.check_copy(copy_ok)])
 	for bad: Array in [["MENU_X", "A roguelike descent"], ["MENU_X", "Downwell-like"], ["MENU_X", "100%% done"],
-			["MENU_X", "50 percent"], ["DEATH_X", "The red eyes"], ["MENU_X", "Grey ledge"], ["MENU_BLUE_DOOR", "Door"]]:
+			["MENU_X", "50 percent"], ["DEATH_X", "The red eyes"], ["MENU_X", "Grey ledge"], ["MENU_BLUE_DOOR", "Door"],
+			["MENU_X", "A rogue-like descent"], ["DEATH_X", "the\\nred door"]]:
 		var ce := StringsCheck.check_copy([PackedStringArray(["keys", "en"]), PackedStringArray(bad)])
 		check(ce.size() == 1, "copy fires on %s = '%s' (%s)" % [bad[0], bad[1], ce])
+
+	var formats := {"POPUP_BANKED": ["%d"]}
+	var fmt_ok := [PackedStringArray(["keys", "en"]), PackedStringArray(["POPUP_BANKED", "+%d banked"]), PackedStringArray(["MENU_RESUME", "Resume"])]
+	check(StringsCheck.check_formats(fmt_ok, formats).is_empty(), "formats: a listed %%d and a text with no %% pass (%s)" % [StringsCheck.check_formats(fmt_ok, formats)])
+	for bad: Array in [[["POPUP_BANKED", "+ banked"], "a dropped conversion"], [["POPUP_BANKED", "+%d of %d"], "an added conversion"],
+			[["POPUP_BANKED", "+%s banked"], "another conversion"], [["POPUP_BANKED", "+%d banked"], ["MENU_X", "%d left"], "a conversion on an unlisted key"],
+			[["POPUP_BANKED", "+%d banked"], ["MENU_X", "100% done"], "a lone percent sign"], [["MENU_RESUME", "Resume"], "a listed key the table lacks"]]:
+		var rows := [PackedStringArray(["keys", "en"])]
+		for r in bad.slice(0, -1):
+			rows.append(PackedStringArray(r))
+		var fe := StringsCheck.check_formats(rows, formats)
+		check(fe.size() == 1, "formats fire on %s (%s)" % [bad[-1], fe])
 
 	var keys := ["POPUP_BANKED", "MENU_RESUME"]
 	var gd := "\tFx.popup(p, pos, tr(\"POPUP_BANKED\") % amount, c)\n\t# tr(\"MENU_GONE\") in a comment\n\tconst LINES := {&\"lurker\": \"MENU_RESUME\"}\n\tvar s := str(\"POPUP_X\".length())"
@@ -151,6 +173,7 @@ func _test_samples() -> void:
 	for bad: Array in [
 			["\tl.text = tr(\"POPUP_BANKD\")\n\tl.text = tr(\"MENU_RESUME\") + tr(\"POPUP_BANKED\")", "a misspelt key"],
 			["\tl.text = tr(\"DEATH_%s_LINE\" % cause)\n\tvar a := [\"POPUP_BANKED\", \"MENU_RESUME\"]", "a composed key"],
+			["\tl.text = tr(\"MENU_RESUME\" + suffix)\n\tvar a := [\"POPUP_BANKED\", \"MENU_RESUME\"]", "a key composed from a whole key and a suffix"],
 			["\tl.text = TranslationServer.translate(&\"MENU_NOPE\")\n\tvar a := [\"POPUP_BANKED\", \"MENU_RESUME\"]", "a missing key in TranslationServer.translate()"],
 			["\tl.text = tr_n('MENU_RESUME', \"POPUP_BANKED\", n)\n\tvar d := {\"x\": \"DEATH_FALL\"}", "a missing key held as data"],
 			["\tl.text = atr(\"POPUP_BANKED\")", "a dead key (MENU_RESUME unused)"]]:
@@ -161,7 +184,23 @@ func _test_samples() -> void:
 	var tscn_refs := StringsCheck.refs_in("[node name=\"L\" type=\"Label\"]\ntext = \"MENU_RESUME\"\n# not a comment in a scene: \"POPUP_BANKED\"", false)
 	check(tscn_refs.size() == 2, "refs_in: a scene's lines are read whole (%s)" % [tscn_refs])
 
-	check(StringsCheck.check_scene_text("a.tscn", "[node name=\"Title\" type=\"Label\"]\ntext = \"Resume\"").size() == 1,
-			"scene text fires on text = \"Resume\"")
-	check(StringsCheck.check_scene_text("a.tscn", "text = \"x\"\ntext = \"MENU_RESUME\"\ntext = \"+1\"\nname = \"Resume\"\n[node name=\"Resume\" type=\"Label\"]").is_empty(),
-			"scene text: one letter, a key, digits and node names pass")
+	for bad: Array in [
+			["[node name=\"Title\" type=\"Label\"]\ntext = \"Resume\"", 2, "text = \"Resume\""],
+			["text = \"On\"", 1, "two letters of any case"],
+			["text = \"\\\"Go\\\" on\"", 1, "a value that starts with an escaped quote"],
+			["[node name=\"L\" type=\"Label\"]\ntext = \"A\nlower case\"\nvisible = false", 2, "a value that runs over two lines"],
+			["tooltip_text = \"Hold to snuff\"", 1, "tooltip_text"],
+			["popup/item_0/text = \"Resume\"", 1, "a popup item's text"]]:
+		var se2 := StringsCheck.check_scene_text("a.tscn", bad[0])
+		check(se2.size() == 1 and se2[0].begins_with("a.tscn:%d:" % bad[1]), "scene text fires on %s, at the property's line (%s)" % [bad[2], se2])
+	check(StringsCheck.check_scene_text("a.tscn", "text = \"x\"\ntext = \"MENU_RESUME\"\ntext = \"+1\"\ntext = \"x%d  +%d\"\nname = \"Resume\"\ncontext = \"Resume\"\n[node name=\"Resume\" type=\"Label\"]").is_empty(),
+			"scene text: one letter, a key, digits, a numeric format, node names and a property that only ends in 'text' pass")
+
+	# The lint's raw_text pattern and is_raw_text() are one definition written twice (a regex rule
+	# and a function): held to one answer on every literal here.
+	for lit: String in ["Resume", "On", "OK", "PAUSED", "POPUP", "+%d banked", "x", "x%d  +%d", "%dx", "%.1fx", "12", "MENU_RESUME", "\\n", "a\\nb"]:
+		var hits := StringsCheck.Lint.lint_text("ui/gutters.gd", "\tl.text = \"" + lit + "\"", {})
+		var fires := hits.any(func(h: Dictionary) -> bool: return h.rule == &"raw_text")
+		check(StringsCheck.is_raw_text(lit) == fires, "is_raw_text('%s') agrees with lint raw_text (%s)" % [lit.c_escape(), fires])
+	check(StringsCheck.is_raw_text("On") and not StringsCheck.is_raw_text("x%d  +%d") and not StringsCheck.is_raw_text("MENU_RESUME"),
+			"is_raw_text: 'On' is text; a numeric format and a key are not")
