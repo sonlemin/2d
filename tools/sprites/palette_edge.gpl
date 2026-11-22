@@ -1,0 +1,12 @@
+GIMP Palette
+Name: palette_edge
+Columns: 8
+#
+255   0 255	transparent (never paint with it)
+ 13  11  20	0
+ 42  36  64	1
+ 79  93 117	2
+169 180 194	3
+255 210 122	L
+217  71  63	E
+255 176 138	e

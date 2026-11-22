@@ -184,8 +184,11 @@ The level is a room file, `game/rooms/l1/m1_shaft.txt` (Story 1.5): a `key=value
 
 ```
 tools/sprites/palette_edge.txt ─┐
-tools/sprites/<name>.txt ───────┼─► python3 tools/build_sprites.py ─► game/art/<name>.png
+tools/sprites/<name>.txt ───────┼─► python3 tools/build_sprites.py ─► game/art/<name>.png (several frames → one strip)
                                 └─► (generated) ─────────────────────► game/art/light.png (128×128 radial, smoothstep falloff)
+
+Aseprite PNG ─► python3 tools/import_sprite.py <png> <name> ─► tools/sprites/<name>.txt (exact palette match)
+palette_edge.txt ─► python3 tools/import_sprite.py --gpl … ─► tools/sprites/palette_edge.gpl (committed, for Aseprite)
 ```
 
 - Each grid char is a palette key, and `.` is transparent. Rows must be the same width. An unknown key is an error with the coordinates.

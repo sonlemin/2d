@@ -16,7 +16,7 @@ Development is split across two machines:
 | Tool | Version seen | Needed for |
 |---|---|---|
 | Godot | 4.7.2 stable | Everything in `game/` |
-| Python 3 + Pillow | Pillow 12.1.1 | `tools/build_sprites.py` only |
+| Python 3 + Pillow | Pillow 12.1.1 | the sprite pipeline only: `tools/build_sprites.py`, `import_sprite.py`, `test_sprites.py` |
 | `xvfb-run` (optional) | — | `tests/screenshot.gd` on the headless server |
 | Godot export templates | 4.7.2 stable (`linux_release`, `windows_release`, `web_nothreads_*`) | `tools/export.sh`, server only |
 | Node | 24.14 | `tools/web_smoke/` (the web boot smoke), server only |
@@ -172,6 +172,22 @@ Every word the player reads comes from `game/text/strings.csv` (AR41, NFR17; Sto
 4. Commit the `.txt`, the `.png` and any new `.png.import`.
 
 Never hand-edit `game/art/*.png`; the next build overwrites them. Do not name a grid `light.txt`.
+
+**Animation strips.** A grid file may hold several frames of the same size, separated by exactly one empty line. `build_sprites.py` renders them left to right, in file order, as one strip PNG (what a `Sprite2D` with `hframes` reads). A file with one frame renders as before. Frames of different sizes, a whitespace-only row, or two empty lines in a row between frames are errors naming the line, so a stray blank line can't silently cut a sprite in two.
+
+### Art from Aseprite (or any pixel editor)
+
+The grid stays the source; the editor's PNG is only how it gets there.
+
+1. Load `tools/sprites/palette_edge.gpl` in Aseprite (Palette menu > Load Palette). It is committed, generated from `palette_edge.txt`; after a palette change, regenerate it with `python3 tools/import_sprite.py --gpl tools/sprites/palette_edge.gpl` (`test_sprites` fails while it is stale). Its entry 0 is a spare magenta "transparent" slot, because an Indexed Aseprite sprite treats index 0 as transparent: slot `0` (the outline colour) sits at index 1, so it never vanishes. Never paint with the magenta slot.
+2. Draw with those colours only, on a transparent layer: no anti-aliasing, no partial opacity. Draw facing right; the game mirrors for left.
+3. Export one frame as PNG (File > Export As), or a horizontal strip (File > Export Sprite Sheet: Horizontal Strip, no borders, padding or trim). RGBA, or Indexed with the transparent colour left at index 0. 8-bit, one image (an animated PNG and a 16-bit PNG are refused).
+4. `python3 tools/import_sprite.py <png> <name>` for one frame, or add `--cell 16x24` (or `--frames N`) for a strip. `<name>` is lower snake case (`a-z`, `0-9`, `_`), never `light` or `palette_*`. It writes `tools/sprites/<name>.txt` with LF line endings, through a temp file, and refuses to overwrite an existing grid without `--force`.
+5. Steps 2–4 of Edit Art above: build, re-import, commit the grid, the PNG and the `.import` together.
+
+The importer matches every pixel to a palette colour exactly. Alpha 0 is `.` (even when its RGB is slot 0's `#0d0b14`), and alpha 255 is the colour's key. An unknown colour or a partly transparent pixel stops it, naming the frame and pixel, and nothing is written. Free art (CC0 packs) comes in the same way, after it is recoloured to the palette.
+
+Test the pipeline: `python3 -m unittest discover -s tools -p 'test_*.py' -v` (it works in temporary folders and also checks that every committed grid rebuilds its committed PNG pixel for pixel).
 
 ## Edit the Level
 
