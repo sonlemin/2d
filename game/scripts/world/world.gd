@@ -145,6 +145,11 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_room.queue_free()
 	_room_holder.add_child(room)
 	_room = room
+	# UX-DR5, Story 1.18 D2: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
+	# Before the warm-up, which outlines its label in the active zone's surface (code review of 1.18:
+	# set after the camera snap, the warm-up drew the previous zone's). The room's own nodes ran
+	# _ready above, on the old zone: whatever reads the palette there re-reads on `changed`.
+	Game.palette.set_zone(room.zone)
 	Fx.warm_up(room, room.entry_position(entry))  # AR46, Story 1.16 D10: each shared material's first draw is paid at the load
 	if respawn:
 		_spawn_player(entry)
@@ -156,8 +161,6 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_player.reset_physics_interpolation()  # AR6: a teleport, never a smear
 	_camera.apply_limits(room.bounds())
 	_camera.snap()
-	# UX-DR5, Story 1.18 D2: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
-	Game.palette.set_zone(room.zone)
 	# Before the signals: a handler may call enter_room() again (a scripted moment, a station).
 	_swap_pending = false
 	if respawn:

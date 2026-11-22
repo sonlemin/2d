@@ -56,6 +56,9 @@ const ROLE_KEYS := {Palettes.Role.HP: "hp", Palettes.Role.LABEL: "label", Palett
 		Palettes.Role.RULE: "rule", Palettes.Role.SURFACE: "surface", Palettes.Role.GUTTER: "gutter"}
 const OVERRIDE_BASE := {"label": 2, "empty": 1}
 const OVERRIDE_FLOOR := {"label": TEXT_MIN, "empty": SHAPE_MIN}
+## DeckMock's marked elements per region (D12), as in the shots sonlm signed off: one ColorRect per
+## fill, outline side or icon pixel run, one Label per text.
+const MOCK_COUNTS := {&"left": 27, &"right": 58, &"play": 25}
 
 var _fail := 0
 var _changed := 0
@@ -182,6 +185,14 @@ func _test_tokens() -> void:
 	check(Palettes.zones() == want, "zones() is DESIGN's order: dusk, umber, violet (got %s)" % [Palettes.zones()])
 	check(Palettes.has_zone(&"umber") and not Palettes.has_zone(&"sepia"), "has_zone: umber yes, sepia no")
 	check(Palettes.DEFAULT_ZONE == &"dusk", "DEFAULT_ZONE is dusk (UX D13: menus outside play use Dusk)")
+	# A role added to the enum without a DESIGN key here would be read by nothing below.
+	check(ROLE_KEYS.size() == Palettes.Role.size(), "the test's ROLE_KEYS names every Palettes.Role (%d of %d)" % [ROLE_KEYS.size(), Palettes.Role.size()])
+	var short := []
+	for zone: StringName in Palettes.ZONES:
+		var z: Dictionary = Palettes.ZONES[zone]
+		if z.roles.size() != Palettes.Role.size() or z.world.size() != 4:
+			short.append("%s: %d roles, %d world" % [zone, z.roles.size(), z.world.size()])
+	check(short.is_empty(), "every zone has a colour for each of the %d roles and four world colours (off: %s)" % [Palettes.Role.size(), short])
 	for zone: StringName in DESIGN:
 		var d: Dictionary = DESIGN[zone]
 		var bad := []
@@ -200,12 +211,14 @@ func _test_tokens() -> void:
 ## AC4: the roles that are a world index are that index; the gutter is index 0 at 55%, half up.
 func _test_derived() -> void:
 	for zone: StringName in DESIGN:
+		# The expected side is DESIGN's world row, the test's own copy (D4; code review of 1.18: it
+		# was Palettes.world_in(), which compared Palettes with itself).
 		var role := func(r: Palettes.Role) -> String: return Palettes.role_in(zone, r).to_html(false)
-		var world := func(i: int) -> String: return Palettes.world_in(zone, i).to_html(false)
-		check(role.call(Palettes.Role.HP) == world.call(3), "%s: HP is index 3 (#%s)" % [zone, role.call(Palettes.Role.HP)])
-		check(role.call(Palettes.Role.RULE) == world.call(1), "%s: RULE is index 1, exempt from the floors as decorative (A15; #%s)" % [zone, role.call(Palettes.Role.RULE)])
-		check(role.call(Palettes.Role.SURFACE) == world.call(0), "%s: SURFACE is index 0 (#%s)" % [zone, role.call(Palettes.Role.SURFACE)])
-		var g := html(gutter8(hex8(Palettes.world_in(zone, 0))))
+		var world: Array = DESIGN[zone].world
+		check(role.call(Palettes.Role.HP) == world[3], "%s: HP is index 3 (#%s)" % [zone, role.call(Palettes.Role.HP)])
+		check(role.call(Palettes.Role.RULE) == world[1], "%s: RULE is index 1, exempt from the floors as decorative (A15; #%s)" % [zone, role.call(Palettes.Role.RULE)])
+		check(role.call(Palettes.Role.SURFACE) == world[0], "%s: SURFACE is index 0 (#%s)" % [zone, role.call(Palettes.Role.SURFACE)])
+		var g := html(gutter8(of(world[0])))
 		check(role.call(Palettes.Role.GUTTER) == g, "%s: GUTTER is index 0 x 0.55 per channel, half up: #%s (got #%s)" % [zone, g, role.call(Palettes.Role.GUTTER)])
 
 
@@ -288,8 +301,10 @@ func _test_ratios() -> void:
 
 ## AC2: Game.palette, the active zone.
 func _test_game_palette() -> void:
+	# A fresh instance: run() has already reset Game.palette, which would hide a wrong initialiser.
+	check(Palettes.new().zone() == &"dusk", "a new Palettes starts on dusk, before any reset (got %s)" % Palettes.new().zone())
 	var p := Game.palette
-	check(p.zone() == &"dusk", "Game.palette starts on dusk (got %s)" % p.zone())
+	check(p.zone() == &"dusk", "Game.palette is on dusk after Game.reset_for_tests() (got %s)" % p.zone())
 	_changed = 0
 	p.changed.connect(_on_changed)
 	p.set_zone(&"umber")
@@ -298,10 +313,10 @@ func _test_game_palette() -> void:
 	check(_changed == 1, "set_zone() to the same zone emits nothing (got %d)" % _changed)
 	var bad := []
 	for role: Palettes.Role in ROLE_KEYS:
-		if p.color(role) != Palettes.role_in(&"umber", role):
-			bad.append(ROLE_KEYS[role])
-	check(bad.is_empty(), "color(role) is role_in(zone, role) for every role (wrong: %s)" % [bad])
-	check(p.color(Palettes.Role.SURFACE).to_html(false) == "1e1714", "...the umber surface is DESIGN's #1e1714")
+		var key: String = ROLE_KEYS[role]
+		if p.color(role).to_html(false) != DESIGN[&"umber"][key]:
+			bad.append("%s #%s, DESIGN #%s" % [key, p.color(role).to_html(false), DESIGN[&"umber"][key]])
+	check(bad.is_empty(), "color(role) is DESIGN's umber colour for all six roles (wrong: %s)" % [bad])
 	p.reset()
 	check(p.zone() == &"dusk" and _changed == 2, "reset() goes back to dusk, emitting changed (got %s, %d)" % [p.zone(), _changed])
 	p.set_zone(&"violet")
@@ -366,8 +381,10 @@ func _test_deck_mock() -> void:
 			if c is Label and (c as Label).text == "+1240":
 				held = c
 		check(outside.is_empty(), "%s mock: every element is inside its region (outside: %s)" % [zone, outside])
-		check(counts[&"left"] >= 10 and counts[&"right"] >= 30 and counts[&"play"] >= 25, "%s mock: the check sees the HUD and the play text (left %d, right %d, play %d)" % [zone, counts[&"left"], counts[&"right"], counts[&"play"]])
-		var end := held.position.x + held.get_minimum_size().x if held != null else -1.0
-		check(held != null and end <= 46, "%s mock: +1240 starts at x 22 and ends by x 46, DESIGN's measured width (ends %s)" % [zone, end])
+		# Exact: a floor would let the mock lose its empty segments or an icon and stay green.
+		check(counts == MOCK_COUNTS, "%s mock: the check sees every HUD element and play line (left 27, right 58, play 25; got %s)" % [zone, counts])
+		var start := held.position.x if held != null else -1.0
+		var end := start + held.get_minimum_size().x if held != null else -1.0
+		check(held != null and start == 22.0 and end <= 46, "%s mock: +1240 starts at x 22 and ends by x 46, DESIGN's measured width (starts %s, ends %s)" % [zone, start, end])
 		mock.queue_free()
 		await get_tree().process_frame

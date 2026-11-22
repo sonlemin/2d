@@ -174,7 +174,8 @@ func _test_popups() -> void:
 		var a: Label = labels[0]
 		var b: Label = labels[1]
 		check(a.label_settings == TextStyle.play_text(Color.WHITE, Color("#1e1714")), "Fx.popup's Label carries play_text outlined in the active zone's surface (umber: DESIGN zone-umber-0 #1e1714; Story 1.18 D8)")
+		check(b.label_settings == TextStyle.play_text(Color("#ffd27a"), Color("#1e1714")), "...and chain_popup's carries chain-amber #ffd27a on the same surface")
 		check(b.label_settings != null and b.label_settings.font_size == 8 and b.text == "x12  +24", "chain_popup at 12 links is 8 px, not M1's 10 (D7; got %s, '%s')" % [b.label_settings.font_size if b.label_settings else -1, b.text])
 		check(not a.has_theme_font_size_override(&"font_size") and not a.has_theme_constant_override(&"outline_size"), "...with no theme overrides left over from M1")
 	parent.queue_free()
-	Game.palette.reset()
+	Game.reset_for_tests()  # Testing standards (Story 1.18): a test that touches Game.palette ends with it

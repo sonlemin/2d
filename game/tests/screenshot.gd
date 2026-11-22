@@ -59,8 +59,12 @@ func run() -> void:
 		await RenderingServer.frame_post_draw
 		var img := get_viewport().get_texture().get_image()
 		if img.get_size() != Vector2i(480, 270):
+			# Never saved: resized, it would carry the `_x2` name without being an exact x2.
 			print("FAILED deck_%s: the render is %s, not 480x270" % [zone, img.get_size()])
 			ok = false
+			mock.queue_free()
+			await _frames(1)
+			continue
 		img.resize(960, 540, Image.INTERPOLATE_NEAREST)
 		var path := out.path_join("deck_%s_x2.png" % zone)
 		var err := img.save_png(path)

@@ -36,7 +36,8 @@ static func font() -> FontFile:
 ## (`Game.palette.color(Palettes.Role.SURFACE)`, DESIGN components.text-outline). Four stacked shadows at OUTLINE_OFFSETS, each with outline size 0: the font's
 ## own outline_size strokes the diagonals too, which UX-DR15 rules out. Cached per colour pair, so
 ## a popup never builds a resource of its own (project rule: shared resources are statics); the
-## three zones add at most three entries per glyph colour.
+## three zones add at most three entries per glyph colour while zones snap (E4's cross-fade must
+## hand a popup the target zone's surface, never a blended one, or the cache grows per step: ledger).
 ## A Label with label_settings takes its line spacing from the settings, never from the Theme, and
 ## LabelSettings defaults to 3 (a 15 px pitch, probed in code review): so the body-line pitch is
 ## set here, for the death card and the "Not saved" note.

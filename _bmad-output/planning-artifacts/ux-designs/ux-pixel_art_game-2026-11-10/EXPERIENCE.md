@@ -521,7 +521,7 @@ No longer open: pause key, off-screen edge eye, flare cost hatch, reduce-flashin
 
 ### Decided 2026-11-11 (update)
 
-- O1. Font: Fusion Pixel Font 8px, proportional (latin build), OFL 1.1; cap 6 / x-height 4 / descender 2 (DESIGN Typography). The Deck-size check still runs in E1.
+- O1. Font: Fusion Pixel Font 8px, proportional (latin build), OFL 1.1; cap 6 / x-height 4 / descender 2 (DESIGN Typography). The Deck-size check still runs in E1. *Update 2026-11-22 (Story 1.18): the check ran and passed with notes; see DESIGN Typography and the deferred-work ledger.*
 - O4. Zone change: gutter tint and UI colours cross-fade over 500 ms when the camera centre crosses a zone boundary; no flash; snaps under reduced motion (Game Feel & Juice, State Patterns).
 - O13. Motor access: Cling toggle and Snuff toggle (hold→press) ship in Options > Accessibility in E1; full rebinding stays in E7 (Options tabs).
 - O16. Copy rule: name the shape (eye, glow, frame), never the colour (Voice and Tone).

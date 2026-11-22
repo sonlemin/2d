@@ -94,11 +94,14 @@ const RULES: Array[Dictionary] = [
 	# Write state only through rule methods that emit signals, and never replace Game's instances
 	# (deferred from 1.4: `Game.settings.brightness = 2` compiled, emitted nothing, never saved).
 	# Covers nested fields and indexes, container mutators and reflective `set()` (code review of 1.9).
+	# `display` and `palette` hold no mutable containers, so the mutator pattern leaves them out; the
+	# reflective one names them (code review of 1.18: `Game.palette.set(&"_zone", …)` changed the
+	# zone with no `changed` and passed).
 	{id = &"state_write", bare = [
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning|clock|store|display|palette)\s*=(?!=)",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning|display|palette)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])+\s*([-+*/%]|\*\*|<<|>>|&|\||\^)?=(?!=)",
 			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])+\s*\.\s*(append|append_array|push_back|push_front|insert|erase|remove_at|clear|merge|assign|fill|resize|sort|sort_custom|shuffle|reverse|pop_back|pop_front|pop_at)\s*\(",
-			r"\bGame\s*\.\s*(settings|slot|dive|tuning)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\s*\.\s*set(_indexed|_deferred)?\s*\("],
+			r"\bGame\s*\.\s*(settings|slot|dive|tuning|display|palette)(\s*\.\s*\w+|\s*\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\s*\.\s*set(_indexed|_deferred)?\s*\("],
 		code = [], only = [], skip = ["rules/"], allow = []},
 	# AR57 (Story 1.16 D9): one accessibility gate. Only Fx (and Settings, which declares them) names
 	# the three keys; everything else asks Fx.reduce_flashing() / shake_on() / reduced_motion(), so
@@ -434,6 +437,9 @@ const SAMPLES: Array = [
 	[&"state_write", "world/world.gd", "\tGame.palette = Palettes.new()", true],
 	[&"state_write", "ui/gutters.gd", "\tGame.palette._zone = &\"umber\"", true],
 	[&"state_write", "world/world.gd", "\tGame.palette.set_zone(room.zone)", false],
+	[&"state_write", "ui/gutters.gd", "\tGame.palette.set(&\"_zone\", &\"umber\")", true],
+	[&"state_write", "ui/gutters.gd", "\tGame.palette.set_deferred(&\"_zone\", &\"umber\")", true],
+	[&"state_write", "ui/gutters.gd", "\tGame.display.set(&\"scale\", 2.0)", true],
 	[&"state_write", "ui/gutters.gd", "\tstrip.color = Game.palette.color(Palettes.Role.GUTTER)", false],
 	[&"state_write", "world/world.gd", "\tGame.slot.cache.embers = 3", true],
 	[&"state_write", "ui/gutters.gd", "\tGame.slot.flags[ids[0]] = true", true],

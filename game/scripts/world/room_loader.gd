@@ -12,7 +12,7 @@ const SINGLE_KEYS: Array[String] = ["id", "zone", "spine", "exits"]
 ## sweep reads it, to know where a long fall is meant to be clung through.
 const REPEAT_KEYS: Array[String] = ["obj", "cling"]
 const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's violet index 1 in every zone until E4 applies the zone palettes to world art (ledger, Story 1.18 D10)
-const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
+const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## violet index 3, dimmed: "you can stand here" (M1 finding 7); in every zone until E4, like BACKDROP (ledger, Story 1.18 D10)
 
 const NO_CELL := Vector2i(-1, -1)
 

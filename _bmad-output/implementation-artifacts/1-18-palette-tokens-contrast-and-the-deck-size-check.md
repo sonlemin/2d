@@ -4,7 +4,7 @@ baseline_commit: 18fde0a
 
 # Story 1.18: Palette tokens, contrast and the Deck-size check
 
-Status: review
+Status: done
 
 **Type:** dev (with one human gate: sonlm's Deck-size sign-off, Task 9) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -247,6 +247,65 @@ so that I can read the game at ×2 on a small screen.
   - [x] Docs (D15).
   - [x] Red-checks (D14), each recorded in the Debug Log.
   - [x] `./run_tests.sh` → `== ALL GREEN`, with the `ok` count recorded.
+
+### Review Findings
+
+Code review 2026-11-22 over the uncommitted tree on `940e6ce` (Blind Hunter, Edge Case Hunter, Acceptance Auditor; 47 raw findings). The suite on that tree is `== ALL GREEN (27 tests)`, 1815 `ok`, and the run left the tree unchanged. The File List matches the diff, the story-file hunk changes no AC, Task, Decision or threshold, and the Acceptance Auditor recomputed every hex, blend step and ratio against DESIGN.md with no difference (the Blind Hunter, on the diff alone, found `palettes.gd` and the tests' copies agree). 1 decision, 12 patches, 3 deferred, 15 dismissed. The decision was resolved and every patch applied the same day (see Review resolution below). Engine claims probed on 4.7.2 before triage: a freed listener's connection is dropped by the engine (1 connection before, 0 after, no error on the next emit); comparing a live node with a freed reference returns `true` for `!=` with no error; `roundi(16.5)` is 17; `", ".join()` on an `Array[StringName]` gives `dusk, umber, violet`.
+
+- [x] [Review][Decision] The Deck-size gate was recorded as "pass with notes", an outcome AC6 does not have, and the ledger settles the font question in the agent's words — AC6 and Task 9 give two outcomes: sonlm signs off, or the font choice is revisited before Story 1.25. D13 keeps the font decision with sonlm. The record says sonlm picked "pass with notes" from an option list, with three legibility complaints among the five answers ("386 harder", body lines "quite hard", "the darker 0"). The ledger items then say "No font change" (Story 1.25's item) and "set its lines at 16 px … rather than changing the face" (Story 1.29's item), on the reasoning "every 8 px face is that size"; none of that is in sonlm's answers. Options: (1) the font stays for now, and the ledger items say what to try first (16 px, `HudValueLarge`) while a font change stays sonlm's call at each later check; (2) the font question is closed: keep the items as written; (3) revisit the font before Story 1.25 (AC6's "no" branch). The wording patch below follows the answer. **Resolved (sonlm, 2026-11-22): option 1.** The font stays for now and a font change stays sonlm's call; the ledger items name what to try first and report each later Deck-size check to sonlm.
+- [x] [Review][Patch] `Fx.warm_up()` reads the previous zone: `_swap_room()` calls it at line 148 and sets the zone at line 160, so on every zone-changing build (every real boot: the default is dusk, `m1_shaft` is violet) the warm-up label is outlined in the old zone's surface, against AC3. Move `Game.palette.set_zone(room.zone)` to just before `Fx.warm_up()`: still "after the room is placed" (AC2), but a departure from Task 3's "after `_camera.snap()`", for which D2 gives no reason. Tests: the warm-up label's outline is the new room's surface after a zone-changing swap (read in a `room_entered` handler: the label is freed three frames later); `chain_popup`'s outline is the active surface; a popup after the respawn is outlined in dusk `#2b1d14` (Task 7 lists both surfaces, the smoke has only umber). [`game/scripts/world/world.gd:148-160`, `game/tests/smoke_palettes.gd`, `game/tests/test_theme.gd:176`] (blind+edge+auditor)
+- [x] [Review][Patch] Lint `state_write` covers `palette` (and `display`) in two of its four patterns: `Game.palette.set(&"_zone", &"umber")` changes the zone with no `changed` and passes, while the guide's row reads as if `.set(` were covered. Add `display|palette` to the reflective pattern, with a firing sample and `Game.palette.set_zone(` as the near-miss; reword the row. [`game/tests/test_lint.gd:101`, `docs/development-guide.md:143`] (blind+edge+auditor)
+- [x] [Review][Patch] Four `test_palettes` checks cannot fail or compare `Palettes` with itself, against D4: "starts on dusk" runs after `Game.reset_for_tests()` (check `Palettes.new().zone()`); `_test_derived` takes both sides from `Palettes` (take the expected side from the test's `DESIGN` table); `color(role)` is compared with `role_in()` (compare all six roles with `DESIGN`'s umber row); nothing ties `ROLE_KEYS` and each zone's `roles` / `world` sizes to `Palettes.Role.size()` / 4, so a seventh role would go untested. [`game/tests/test_palettes.gd:201-209`, `:292-303`] (blind+auditor)
+- [x] [Review][Patch] The Deck mock check asserts less than its message: "+1240 starts at x 22 and ends by x 46" tests only the end, and the count floors (left ≥ 10, right ≥ 30) are far under the mock's real 27 / 58 / 25, so the mock could lose every empty segment and stay green. Assert the start, and the exact counts. [`game/tests/test_palettes.gd:369-371`] (blind+auditor)
+- [x] [Review][Patch] `smoke_palettes.test_respawn` never counts `changed`: a respawn that emitted twice (a default-zone flash between rooms) would pass. Reset the count before `die()` and expect exactly one. [`game/tests/smoke_palettes.gd:107-112`] (blind)
+- [x] [Review][Patch] `screenshot.gd` prints FAILED when a render is not 480×270, then still resizes it and saves it as `deck_<zone>_x2.png`: a picture that is not an exact ×2 under the sign-off name. Skip the save. [`game/tests/screenshot.gd:61-66`] (blind)
+- [x] [Review][Patch] `test_theme` sets the zone and ends with `Game.palette.reset()`, not `Game.reset_for_tests()` as Testing standards asks (Dev Notes said the former; the standard wins). [`game/tests/test_theme.gd:180`] (auditor)
+- [x] [Review][Patch] `project-context.md` says the popup outline "follows it on `changed`"; a popup reads the surface once, when it is made (`fx.gd:3-4`). And its new "UI colours" rule says "only from `Game.palette`", while `palettes.gd` and the guide send menus outside play to `Palettes.role_in(Palettes.DEFAULT_ZONE, …)`. Fix both sentences. [`_bmad-output/project-context.md`] (blind)
+- [x] [Review][Patch] D15 asks for a "UI colours" line in the guide's task table; it was added as a bullet under Player-facing text, and Common Tasks has no row. Add the row. [`docs/development-guide.md:179`] (auditor)
+- [x] [Review][Patch] The E4 ledger item narrows D10's text and misses two things E4 must do: it says "backdrop, tint and tiles" where D10 says sprites and names `palette_edge.txt`; `RoomLoader.LEDGE_RIM` ("palette 3, dimmed") is a third violet world literal, and its comment has no "until E4" note; and `play_text`'s "at most three entries per glyph colour" holds only while zones snap, so a popup made during E4's cross-fade must take the target zone's surface or the cache grows per fade step. Extend the item and the two comments. [`_bmad-output/implementation-artifacts/deferred-work.md:215`, `game/scripts/world/room_loader.gd:15`, `game/scripts/core/text_style.gd:38-39`] (blind+auditor)
+- [x] [Review][Patch] The Deck-size wording in three documents, after the decision above: the GDD says "passed" with no notes; DESIGN names three of the four notes (the Latin-1 one is missing); `EXPERIENCE.md` O1 still says "The Deck-size check still runs in E1" (a dated decision log: append a dated note, don't rewrite the entry); and the ledger items' remedies follow the decision. [`gdd.md:669`, `DESIGN.md:538`, `EXPERIENCE.md:524`, `deferred-work.md:216-223`] (blind+auditor)
+- [x] [Review][Patch] The story's record: `test_palettes` prints 87 `ok`, not the 85 logged (87 + 10 is the 97 the total grew by); and Tasks 6 and 7 are ticked as written, though the code compares ratios as integer hundredths, not `snappedf`, and `floor_errors` takes `(rows, bgs)`. Add both to the Completion Notes. [this file, Debug Log] (blind)
+- [x] [Review][Defer] Nothing restores the clear colour once World and its Gutters are gone: the palette goes back to dusk on `reset()`, the clear colour stays on the last zone [`game/scripts/ui/gutters.gd:32-36`] — deferred, pre-existing (Gutters set it in `_ready` before this story too); owner Story 1.33
+- [x] [Review][Defer] DESIGN's Gutter HUD table gives the 7 px heart as "centred x 30" and the 7 px pips as "x 26". A 7 px icon can't centre exactly in the 60 px gutter (x 26 or x 27 both fit); the mock drew the heart at x 27, one pixel right of the pips [`DESIGN.md:573-574`, `game/tests/deck_mock.gd:50-53`] — deferred, pre-existing (DESIGN leaves the x open); owner Story 1.25
+- [x] [Review][Defer] "Never a colour literal for UI" has no lint, unlike its sibling rules; `scripts/ui/` holds none today [`game/tests/test_lint.gd`] — deferred, the rule's shape needs the first coloured UI; owner Story 1.25
+
+### Review resolution (2026-11-22)
+
+**Decision (sonlm): the font stays for now, and a font change stays sonlm's call** (option 1). "Pass with notes" stands as the gate's outcome. The ledger items for Stories 1.25 and 1.29 now name what to try first (16 px, `HudValueLarge`) and report each later Deck-size check to sonlm; "No font change" and "rather than changing the face" are gone, as is the claim that the notes are "not the face". The Debug Log above keeps the dev agent's words as written at the time.
+
+**Patches applied (12):**
+
+1. **The zone is set before the warm-up.** `Game.palette.set_zone(room.zone)` moved from after `_camera.snap()` to just before `Fx.warm_up()` in `_swap_room()`. This departs from Task 3's wording, which D2 gives no reason for; AC2's "after the room is placed and before `room_entered`" still holds. `smoke_palettes` reads the warm-up label in a `room_entered` handler (the label is freed three frames later) at boot and after the exit, and checks a popup in dusk after the respawn; `test_theme` checks `chain_popup`'s outline. [`game/scripts/world/world.gd`, `game/tests/smoke_palettes.gd`, `game/tests/test_theme.gd`]
+2. **Lint `state_write`:** the reflective pattern names `display` and `palette`; three firing samples (`Game.palette.set(…)`, `.set_deferred(…)`, `Game.display.set(…)`), with `Game.palette.set_zone(` still quiet. The guide's row says which forms cover which refs. [`game/tests/test_lint.gd`, `docs/development-guide.md`]
+3. **`test_palettes`, four checks:** a fresh `Palettes.new()` starts on dusk; `_test_derived` takes its expected side from the test's `DESIGN` table; `color(role)` is compared with `DESIGN`'s umber row for all six roles; `ROLE_KEYS` and each zone's `roles` / `world` sizes are held to `Palettes.Role.size()` / 4. [`game/tests/test_palettes.gd`]
+4. **The Deck mock check** asserts `+1240` starts at x 22 and the exact element counts (left 27, right 58, play 25). [`game/tests/test_palettes.gd`]
+5. **`smoke_palettes.test_respawn`** expects exactly one `changed`. [`game/tests/smoke_palettes.gd`]
+6. **`screenshot.gd`** no longer saves a deck shot whose render is not 480×270. [`game/tests/screenshot.gd`]
+7. **`test_theme`** ends its popup test with `Game.reset_for_tests()`. [`game/tests/test_theme.gd`]
+8. **`project-context.md`:** a popup reads the surface once, when it is made; the UI colours rule names the menu case (`Palettes.role_in(Palettes.DEFAULT_ZONE, …)`).
+9. **`docs/development-guide.md`:** a "Colour a UI element" row in Common Tasks (D15).
+10. **The E4 ledger item** names `LEDGE_RIM`, the sprites and `palette_edge.txt`, and the `play_text` cache under the cross-fade; `LEDGE_RIM`'s and `play_text`'s comments and the inventory row say the same. [`deferred-work.md`, `game/scripts/world/room_loader.gd`, `game/scripts/core/text_style.gd`, `docs/component-inventory.md`]
+11. **The Deck-size wording:** the GDD says "passed with notes"; DESIGN names all four notes, the viewing method and that the face stays for now; `EXPERIENCE.md` O1 gains a dated update note (its 2026-11-11 text is unchanged); the ledger remedies follow the decision.
+12. **The story's record:** see the two Completion Notes added below.
+
+**Red-checks (D14)**, each broken, run, then restored:
+
+- `set_zone` back after the camera snap → `FAIL ...and the room's warm-up label was outlined in zone-dusk-0 #2b1d14, not the last zone's surface`, `FAIL ...and t_zone_b's warm-up label was outlined in zone-umber-0 #1e1714`.
+- The reflective pattern without `display|palette` → three `FAIL state_write fires on ui/gutters.gd: …` lines.
+- `var _zone` initialised to umber → `FAIL a new Palettes starts on dusk, before any reset (got umber)`.
+- Dusk index 3 and HP both moved to `#d8c3a1` (so `Palettes` still agrees with itself) → `FAIL dusk: HP is index 3 (#d8c3a1)`, beside the tokens check.
+- `color()` reading the default zone → `FAIL color(role) is DESIGN's umber colour for all six roles`.
+- A seventh `Role` with no table entry → `FAIL the test's ROLE_KEYS names every Palettes.Role (6 of 7)` and `FAIL every zone has a colour for each of the 7 roles …`.
+- The mock without one outline side → `FAIL … (left 27, right 58, play 25; got { &"left": 26, &"right": 50, &"play": 25 })` in all three zones; `+1240` at x 21 → `FAIL … (starts 21.0, ends 45.0)`.
+- A second zone set on the way → `FAIL ...with exactly one changed for the respawn … (got 2)`.
+- `Fx.popup` on a fixed umber outline → `FAIL ...and Fx.popup in t_zone_a is outlined in zone-dusk-0 #2b1d14`; on a fixed violet one → `test_theme` fails both popup checks.
+- `screenshot.gd` with its size check made to fail → three `FAILED deck_<zone>` lines and no deck file saved.
+
+**After the patches:** `./run_tests.sh` → `== ALL GREEN (27 tests)`, 1825 `ok`, 0 `FAIL` (`test_palettes` 89, `smoke_palettes` 14, `test_theme` 34, `test_lint` 252). The screenshot run saves all five shots and prints `PASS`; the three `deck_*_x2.png` files are byte-identical to the ones sonlm signed off in `builds/shots-1.18/`, so no new look is needed. Nothing on screen changed in a real room: the warm-up label draws at 1% alpha.
+
+**Deferred (3)**, in `deferred-work.md` under "code review of 1-18-…": the clear colour outside play (owner Story 1.33), the heart's x in DESIGN (owner Story 1.25), a `raw_colour` lint (owner Story 1.25).
+
+**Dismissed (15):** `set_zone()` with an unknown id in a release build (`RoomLoader.validate()` rejects the room first; programmer errors are asserts); the `changed` connection never disconnected (probed: the engine drops it); comparing against a freed room (probed: safe); pixel read-back in `screenshot.gd` and colour or y checks on the mock (the shots are a human look, and the mock is replaced by Story 1.25's HUD); `add_root` not undone and the respawn wait (the same patterns as `smoke_room_swap`, one process per test); a room-zone check that repeats the validator; tokens with no caller yet (the story asks for them); the popup's "0.85 s" against "fades over 0.6 s" (0.25 s hold + 0.6 s fade, both true); no violet boot check (the violet gutter hex and "the gutter follows the zone" are each tested); the replace guard on `Game.palette` not exercised (an assert, as for `display`); and three information-only notes.
 
 ## Dev Notes
 
@@ -528,7 +587,9 @@ Claude Opus 5.5 (claude-opus-5-5), Claude Code, 2026-11-22.
 - `core/palettes.gd` is the one home for UI colours; `Game.palette` is the active zone, set by `World._swap_room()` on every room build. Gutters (strips and clear colour) and `Fx` popups follow it; `PLACEHOLDER` and `PLACEHOLDER_SURFACE` are gone; room zone ids come from `Palettes.zones()`. World art stays violet until E4 (D10, ledger).
 - `test_palettes` reproduces every DESIGN hex, derived gutter, floor, minimal override and glow step, and ratio with its own maths; `smoke_palettes` covers boot, exit, death and same-zone swaps. Every new check was red-checked (D14).
 - `m1_shaft` is unchanged on screen (violet, gutter `#07060b`); no playtest is needed for this story.
-- Deck-size check (AC6): sonlm, 2026-11-22, laptop at about 11.3 cm wide, **pass with notes**. The four notes are ledger items owned by Stories 1.25, 1.26 and 1.29 and the M2 retrospective; no font change.
+- Deck-size check (AC6): sonlm, 2026-11-22, laptop at about 11.3 cm wide, **pass with notes**. The four notes are ledger items owned by Stories 1.25, 1.26 and 1.29 and the M2 retrospective. The font stays for now; a font change stays sonlm's call (review decision, 2026-11-22).
+- Code review (2026-11-22): `test_palettes` printed 87 `ok` at the end of dev, not the 85 the Debug Log records from its first run (87 + 10 is the 97 the total grew by); after the review patches it prints 89 and `smoke_palettes` 14.
+- Deviations from the task text, both deliberate: ratios compare as integer hundredths (`hundredths()`), not `snappedf(x, 0.01)` (Task 6), so no float `==`; and the validator is `floor_errors(rows, bgs)`, not `floor_errors(table)`, so the firing sample can pass its own row. Task 7's dusk surface check was missing until the review added it.
 
 ### File List
 
@@ -550,6 +611,7 @@ Claude Opus 5.5 (claude-opus-5-5), Claude Code, 2026-11-22.
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/EXPERIENCE.md` (code review: a dated note on O1)
 - `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md`
 - `_bmad-output/project-context.md`
 - `_bmad-output/game-architecture.md`
@@ -563,3 +625,4 @@ Claude Opus 5.5 (claude-opus-5-5), Claude Code, 2026-11-22.
 - 2026-11-22: sonlm answered Q1 (`Game.palette`) and Q2 (world art stays violet until E4); D1 and D10 stand.
 - 2026-11-22: Dev: Tasks 1–8 done (`Palettes`, `Game.palette`, per-zone gutters, clear colour and popup outline, zone ids from `Palettes`, `test_palettes`, `smoke_palettes`, the Deck mock and its ×2 shots). 27 tests green, 1815 `ok`. HALT at Task 9 for sonlm's Deck-size sign-off.
 - 2026-11-22: Task 9: sonlm's Deck-size check passed with notes (laptop, about 11.3 cm wide); DESIGN.md Typography and the GDD Steam Deck line updated, notes ledgered. Task 10: ledger and docs. 27 tests green, 1815 `ok`. Status review.
+- 2026-11-22: Code review: 1 decision (the font stays for now; a change stays sonlm's call), 12 patches (the zone is set before the warm-up; lint `state_write` covers reflective writes on `palette` and `display`; test and doc fixes), 3 deferred, 15 dismissed. 27 tests green, 1825 `ok`. Status done.
