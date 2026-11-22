@@ -25,7 +25,7 @@ exits=up:m1_shaft@x3, down:m1_shaft@x1
 | Key | Required | Value |
 |---|---|---|
 | `id` | yes | snake_case, equal to the file's base name. Ids are global and **never renamed once testers have saves**. |
-| `zone` | yes | `dusk`, `umber` or `violet` (the GDD's Layer 1 zones) |
+| `zone` | yes | `dusk`, `umber` or `violet` (the GDD's Layer 1 zones; the ids are `Palettes.zones()`). World sets `Game.palette` to it on every room build (Story 1.18) |
 | `spine` | no (`false`) | `true` / `false`. A spine room must be exactly **22 columns wide, walls included** (352 px in the 360 px play area). |
 | `exits` | no | Comma-separated `<side>:<target_id>@x<col>`, side `up` or `down`, `col` in `1..width-2` (never a corner). At most one exit per side. |
 | `obj` | no, repeatable | `<id>@<col>,<row>`: a persistent object's id and cell. Ids are unique across every room file: the validator checks one file, `smoke_rooms` checks across files (Story 1.10). |

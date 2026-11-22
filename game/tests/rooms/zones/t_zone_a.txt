@@ -1,0 +1,13 @@
+; Story 1.18 zone-change test room. Not a level. A: P on a ledge, a floor hole down to B (dusk).
+id=t_zone_a
+zone=dusk
+exits=down:t_zone_b@x1
+---
+##########
+#........#
+#.P......#
+#####....#
+#........#
+#........#
+#........#
+#..#######

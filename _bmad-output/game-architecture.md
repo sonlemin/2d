@@ -311,7 +311,7 @@ Taken in dependency order in step 4:
 | Global | `Game.settings : Settings` | accessibility, tap window, toggles, volumes, video, bindings (E7), last-used slot | never (per machine) |
 
 - All four classes are `RefCounted`, node-free, with typed signals and `to_dict()` / `from_dict()`. Rules on them are unit-tested in `tests/test_<subject>.gd`, like `ChainState` (`tests/test_chain_state.gd`).
-- `Game` (autoload) holds `settings`, `slot`, `dive`, `tuning` (rebuilt when the slot's gear changes), the `Clock`, the `SaveStore` (`store`, Story 1.4) and device tracking. It contains **no gameplay rules**.
+- `Game` (autoload) holds `settings`, `slot`, `dive`, `tuning` (rebuilt when the slot's gear changes), the `Clock`, the `SaveStore` (`store`, Story 1.4), `display` (Story 1.14) and `palette` (the active zone's UI colours, a `Palettes` instance, Story 1.18; presentation, not save data), and device tracking. It contains **no gameplay rules**.
 - **Allowed autoloads:** `Game`, `Audio` (from E3). Adding another autoload is an architecture change.
 - **Death no longer reloads the scene.** `World` applies the death cost (difficulty tier rules on `DiveState`), rebuilds the respawn room and spawns a fresh `Player`. The M1 `static var`s on `shaft.gd` are retired when E1 touches them.
 - **Entity identity:** persistent world objects (gates, anchors, stations, hoards, secrets, journal objects) carry **explicit ids declared in the room header**; saves reference only these ids, so editing a room's layout never orphans a flag. Enemies use `room_id + grid cell` (per-dive only, never in long-term saves).
@@ -836,7 +836,7 @@ Do the moves in one commit, then rewrite every moved `res://` path by hand (the 
 | Logging | `scripts/core/log.gd` | static `Log` |
 | Effects | `scripts/core/fx.gd` | code-built FX, cached materials, accessibility gate |
 | Light budget | `scripts/core/budget_light.gd`, `scripts/world/light_budget.gd` | every `PointLight2D` as a ranked `BudgetLight`; ≤ 6 lit in `World.light_rect()` each physics tick, sprite fallback (Story 1.12) |
-| Palette zones | `scripts/core/palettes.gd` | Layer 1 zone palettes and UI role colours (DESIGN.md tokens), zone cross-fade data; read by world tint and gutters |
+| Palette zones | `scripts/core/palettes.gd` | As built (Story 1.18): Layer 1 zone palettes (four world colours), the six UI roles with the UX-DR7 overrides and the edge-cue glow floor per zone (DESIGN.md tokens); `Game.palette` is the active zone, set by `World` on each room build and read by the gutters and the popup outline. World tint and the 500 ms zone cross-fade are E4 |
 | Chain, health, embers, gear rules | `scripts/rules/` | pure rules + `Tuning`, unit-tested |
 | Light sensing maths | `scripts/rules/sensing.gd` | notice / stir / sense / target choice |
 | Economy data | `scripts/rules/economy.gd` | prices (map 60, hint 25, gear 200–300, cosmetics 75–150), ember curve, journal payout |

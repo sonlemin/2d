@@ -4,7 +4,7 @@ baseline_commit: 18fde0a
 
 # Story 1.18: Palette tokens, contrast and the Deck-size check
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev (with one human gate: sonlm's Deck-size sign-off, Task 9) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -103,71 +103,71 @@ so that I can read the game at ×2 on a small screen.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Baseline (AC: 8).**
+- [x] **Task 1: Baseline (AC: 8).**
   - At story creation on `18fde0a` (2026-11-22), `cd game && ./run_tests.sh` gave `== ALL GREEN (25 tests)`, 1715 `ok`, 0 `FAIL`.
   - Re-run it and record the result in the Dev Agent Record.
-- [ ] **Task 2: `core/palettes.gd` (AC: 1, 2).**
-  - [ ] `class_name Palettes extends RefCounted`.
-  - [ ] Declarations:
+- [x] **Task 2: `core/palettes.gd` (AC: 1, 2).**
+  - [x] `class_name Palettes extends RefCounted`.
+  - [x] Declarations:
     - `signal changed`;
     - `enum Role { HP, LABEL, EMPTY, RULE, SURFACE, GUTTER }`;
     - `const AMBER`, `const RED`, `const DEFAULT_ZONE := &"dusk"`;
     - `const ZONES := { &"dusk": {world = [...4], roles = [...6 in Role order], glow = Color(...)}, &"umber": …, &"violet": … }`, holding the hexes in Verified facts. Write each as `Color("#rrggbb")` with a trailing comment naming the DESIGN token. Overrides carry their `+N%` and the old index, for example `# ui-label-umber: index 2 +41% toward index 3 (UX-DR7)`.
-  - [ ] Statics:
+  - [x] Statics:
     - `role_in(zone: StringName, role: Role) -> Color`;
     - `world_in(zone: StringName, index: int) -> Color`;
     - `glow_floor(zone: StringName) -> Color`;
     - `zones() -> Array[StringName]`, in DESIGN order: dusk, umber, violet;
     - `has_zone(zone: StringName) -> bool`.
     - Each asserts on an unknown zone or a bad index (a programmer error).
-  - [ ] Instance:
+  - [x] Instance:
     - `var _zone: StringName = DEFAULT_ZONE`;
     - `zone() -> StringName`;
     - `color(role: Role) -> Color` (it reads `role_in(_zone, role)`);
     - `set_zone(zone: StringName)`: it asserts `has_zone`, returns if the zone is the same, otherwise sets it and emits `changed`;
     - `reset()`, which is `set_zone(DEFAULT_ZONE)`.
-  - [ ] Header `##` comment:
+  - [x] Header `##` comment:
     - this is the one home for UI colours (AR27, DESIGN Colors);
     - UI reads roles from `Game.palette` and re-reads on `changed`, never caching by zone id, because E4's cross-fade will emit `changed` with blended colours (D2);
     - menus outside play (title, slot picker, gate) read `role_in(DEFAULT_ZONE, …)` (UX D13).
-  - [ ] Nothing in `palettes.gd` names `World`, `Room` or any upper layer (lint `core_layer`).
-- [ ] **Task 3: `Game.palette` and World (AC: 2).**
-  - [ ] `core/game.gd`: `var palette := Palettes.new():` with the same replace-guard setter as `display` (assert message "Game.palette is session-long: set_zone() changes it, never replace it"). It is a RefCounted, not a child node. Header comment: "`palette` (Story 1.18): the active zone's UI colours; presentation, not save data".
-  - [ ] `reset_for_tests()` adds `palette.reset()`.
-  - [ ] `world/world.gd` `_swap_room()`: after `_camera.snap()` and before `_swap_pending = false` / the signals, call `Game.palette.set_zone(room.zone)` with one `#` line: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
-  - [ ] `test_lint.gd` `state_write`:
+  - [x] Nothing in `palettes.gd` names `World`, `Room` or any upper layer (lint `core_layer`).
+- [x] **Task 3: `Game.palette` and World (AC: 2).**
+  - [x] `core/game.gd`: `var palette := Palettes.new():` with the same replace-guard setter as `display` (assert message "Game.palette is session-long: set_zone() changes it, never replace it"). It is a RefCounted, not a child node. Header comment: "`palette` (Story 1.18): the active zone's UI colours; presentation, not save data".
+  - [x] `reset_for_tests()` adds `palette.reset()`.
+  - [x] `world/world.gd` `_swap_room()`: after `_camera.snap()` and before `_swap_pending = false` / the signals, call `Game.palette.set_zone(room.zone)` with one `#` line: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
+  - [x] `test_lint.gd` `state_write`:
     - add `palette` to the first pattern's list (replace: `settings|slot|dive|tuning|clock|store|display|palette`);
     - add it to the second (field write: `settings|slot|dive|tuning|display|palette`).
     - Samples: `\tGame.palette = Palettes.new()` fires; `\tGame.palette._zone = &"umber"` fires; `\tGame.palette.set_zone(room.zone)` is quiet.
     - Update the `state_write` row in `docs/development-guide.md`.
-- [ ] **Task 4: Gutters, Fx and TextStyle (AC: 3).**
-  - [ ] `ui/gutters.gd`:
+- [x] **Task 4: Gutters, Fx and TextStyle (AC: 3).**
+  - [x] `ui/gutters.gd`:
     - keep the two strips in a member array;
     - add `_apply_palette()`, which sets both strips' `color` and the clear colour from `Game.palette.color(Palettes.Role.GUTTER)`;
     - call it at the end of `_ready()`, then connect `Game.palette.changed` to it (a method, never a lambda);
     - delete `PLACEHOLDER`;
     - update the header comment: the fill and the clear colour follow the zone (1.18); the 1 px rules and the HUD come in 1.25.
     - On first-colour order: Gutters is World's child, so its `_ready` runs before World's. It paints the current (default or last) zone, then World's first `_swap_room` (inside World's `_ready`) calls `set_zone`, and `changed` repaints before the first frame is drawn.
-  - [ ] `core/fx.gd`:
+  - [x] `core/fx.gd`:
     - `SPARK := Palettes.AMBER` (comment: the reserved amber, one home; was `Color(1.0, 0.82, 0.48)`, `#ffd17a`);
     - `popup()` and `warm_up()` use `TextStyle.play_text(color, Game.palette.color(Palettes.Role.SURFACE))`;
     - the header line says the popup outline is the active zone's surface.
     - Fx already reads `Game` (the a11y gate), so this adds no new dependency.
-  - [ ] `core/text_style.gd`: delete `PLACEHOLDER_SURFACE` and its comment, and say in the `play_text` doc that callers pass the active zone's surface (`Game.palette`). `play_text`'s cache stays keyed by the colour pair; three zones add at most three entries per glyph colour.
-  - [ ] `ui/theme_builder.gd` header: "Colours are not here: UI reads `Game.palette` by role (Story 1.18 D6)".
-- [ ] **Task 5: Zones have one home (AC: 1).**
+  - [x] `core/text_style.gd`: delete `PLACEHOLDER_SURFACE` and its comment, and say in the `play_text` doc that callers pass the active zone's surface (`Game.palette`). `play_text`'s cache stays keyed by the colour pair; three zones add at most three entries per glyph colour.
+  - [x] `ui/theme_builder.gd` header: "Colours are not here: UI reads `Game.palette` by role (Story 1.18 D6)".
+- [x] **Task 5: Zones have one home (AC: 1).**
   - `world/room_loader.gd`: delete `ZONES`; the validator checks `Palettes.has_zone(StringName(h.value))`, and the error lists `", ".join(Palettes.zones())`. The text is unchanged: "zone '…' is not one of dusk, umber, violet".
   - `BACKDROP`'s comment becomes "M1's violet index 1 in every zone until E4 applies the zone palettes to world art (ledger)". `world.gd`'s `AMBIENT_TINT` comment says the same (D10).
-- [ ] **Task 6: `tests/test_palettes.gd` (AC: 4, 5).**
-  - [ ] Its own helpers, written in the test (never `Palettes`):
+- [x] **Task 6: `tests/test_palettes.gd` (AC: 4, 5).**
+  - [x] Its own helpers, written in the test (never `Palettes`):
     - `lum(c8: Array[int]) -> float` (sRGB linearisation: `v/12.92` at or below 0.04045, else `((v+0.055)/1.055)^2.4`; weights 0.2126 / 0.7152 / 0.0722);
     - `contrast(a, b) -> float` = `(Lhi + 0.05) / (Llo + 0.05)`;
     - `blend8(a, b, pct) -> Array[int]` (per channel `roundi(a + (b - a) * pct / 100.0)`);
     - `hex8(Color) -> Array[int]`, through `Color.r8/g8/b8`.
     - Do the maths on 8-bit ints: Umber's gutter (30 × 0.55 = 16.5) only gives DESIGN's `#110d0b` when rounded half up, and `roundi` does that (probed).
-  - [ ] Known answers (AC4).
-  - [ ] A `DESIGN` table const: per zone, the four world hexes, the six role hexes, the glow hex and the DESIGN ratios. Each line cites DESIGN.md (Colors and the front-matter tokens).
-  - [ ] Checks:
+  - [x] Known answers (AC4).
+  - [x] A `DESIGN` table const: per zone, the four world hexes, the six role hexes, the glow hex and the DESIGN ratios. Each line cites DESIGN.md (Colors and the front-matter tokens).
+  - [x] Checks:
     - tokens equal;
     - the derived relations;
     - the floors through a pure `floor_errors(table) -> Array[String]`, with its firing sample and near-miss;
@@ -176,38 +176,38 @@ so that I can read the game at ×2 on a small screen.
     - the reserved colours on all six backgrounds;
     - the computed ratios match DESIGN's two-decimal values (a sanity check on the function: `snappedf(x, 0.01)`).
     - Floors are local consts citing DESIGN Colors > Contrast floors (`TEXT_MIN := 4.5`, `SHAPE_MIN := 3.0`). They are not in `spec.gd`: the GDD has no contrast line, and `spec_citation` requires one (D4).
-  - [ ] `Game.palette`:
+  - [x] `Game.palette`:
     - the default is dusk;
     - `set_zone(&"umber")` emits `changed` once, and the same zone again emits nothing;
     - `color(r) == role_in(zone, r)` for every role;
     - `reset()` goes back to dusk;
     - `Game.reset_for_tests()` resets it.
     - End with `Game.reset_for_tests()`.
-  - [ ] Zones:
+  - [x] Zones:
     - `RoomLoader.validate()` accepts a room for each of `Palettes.zones()` and rejects `zone=sepia` with the unchanged error text. Use `RoomLoader.parse` + `validate` on an in-memory grid, as `smoke_rooms` does;
     - every `res://rooms/**` file's zone is in `Palettes.zones()`.
-  - [ ] Fx: `Fx.SPARK == Color("#ffd27a")` (a DESIGN literal).
-  - [ ] The Deck mock (AC5): for each zone, build `deck_mock.gd`'s Control under the test, wait a frame, and check each element's rect lies inside its region. Also check `+1240` ends by x 46 (DESIGN's measured width). Free it.
-- [ ] **Task 7: `smoke_palettes.gd` (AC: 2, 3).**
-  - [ ] New fixtures `tests/rooms/zones/t_zone_a.txt` (`zone=dusk`, P, a floor hole down to B) and `t_zone_b.txt` (`zone=umber`, a ceiling gap up to A). Copy `tests/rooms/swap/`'s grids, without the walkers, and add a header comment "Story 1.18 zone-change test room. Not a level."
-  - [ ] Set up as `smoke_room_swap` does:
+  - [x] Fx: `Fx.SPARK == Color("#ffd27a")` (a DESIGN literal).
+  - [x] The Deck mock (AC5): for each zone, build `deck_mock.gd`'s Control under the test, wait a frame, and check each element's rect lies inside its region. Also check `+1240` ends by x 46 (DESIGN's measured width). Free it.
+- [x] **Task 7: `smoke_palettes.gd` (AC: 2, 3).**
+  - [x] New fixtures `tests/rooms/zones/t_zone_a.txt` (`zone=dusk`, P, a floor hole down to B) and `t_zone_b.txt` (`zone=umber`, a ceiling gap up to A). Copy `tests/rooms/swap/`'s grids, without the walkers, and add a header comment "Story 1.18 zone-change test room. Not a level."
+  - [x] Set up as `smoke_room_swap` does:
     - `Game.store.dir` points at a temp folder;
     - `RoomLoader.add_root("res://tests/rooms/zones")`;
     - `World.start_room = &"t_zone_a"` before `add_child`.
-  - [ ] Checks (gutter colours as DESIGN literals: dusk `#18100b`, umber `#110d0b`; surfaces `#2b1d14`, `#1e1714`):
+  - [x] Checks (gutter colours as DESIGN literals: dusk `#18100b`, umber `#110d0b`; surfaces `#2b1d14`, `#1e1714`):
     1. After boot: the zone is dusk. Both strips, picked by x position (0 and 420), and `RenderingServer.get_default_clear_color()` are the dusk gutter (probed: headless reads back what was set).
     2. `enter_room(&"t_zone_b", &"up")`: the zone is umber, and the strips and the clear colour are umber. `changed` fired exactly once for the swap.
     3. An `Fx.popup` made in room B has `label_settings == TextStyle.play_text(c, Color("#1e1714"))`.
     4. `player.die()` in B: the respawn rebuilds A (the start room), so the zone is dusk again.
     5. Re-entering a room of the same zone emits no `changed`.
-  - [ ] End with `world.queue_free()`, a frame, then `Game.reset_for_tests()`.
-- [ ] **Task 8: `deck_mock.gd` and the screenshot (AC: 5).**
-  - [ ] `tests/deck_mock.gd`:
+  - [x] End with `world.queue_free()`, a frame, then `Game.reset_for_tests()`.
+- [x] **Task 8: `deck_mock.gd` and the screenshot (AC: 5).**
+  - [x] `tests/deck_mock.gd`:
     - `extends RefCounted`, no `class_name` (tests preload helpers);
     - `static func build(zone: StringName) -> Control` returns a 480×270 `Control` with `theme = ThemeBuilder.theme()`.
     - It draws with `ColorRect`s and `Label`s only, every colour from `Palettes.role_in(zone, …)` / `AMBER`.
     - The layout table is in D12.
-  - [ ] `tests/screenshot.gd`: after the two shaft shots, for each of `Palettes.zones()`:
+  - [x] `tests/screenshot.gd`: after the two shaft shots, for each of `Palettes.zones()`:
     - add the mock to the test (it sits over the freed World, or alone);
     - wait 3 frames;
     - take `get_viewport().get_texture().get_image()` and check it is 480×270;
@@ -215,38 +215,38 @@ so that I can read the game at ×2 on a small screen.
     - save `deck_<zone>_x2.png`;
     - free the mock.
     - Update the header comment.
-  - [ ] Run it: `xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd /home/sonlm/project/pixel_art_game/builds/shots-1.18` (`builds/` is git-ignored). Then open the PNGs with Pillow (`python3`, not `-I`):
+  - [x] Run it: `xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd /home/sonlm/project/pixel_art_game/builds/shots-1.18` (`builds/` is git-ignored). Then open the PNGs with Pillow (`python3`, not `-I`):
     - each is 960×540;
     - every 2×2 block is one colour (an exact ×2);
     - a pixel in each gutter is the zone's gutter hex;
     - a play-area pixel away from text is its surface hex.
     - Record the result in the Debug Log.
-- [ ] **Task 9: HALT for sonlm: Deck-size legibility sign-off (AC: 6). Human gate.**
-  - [ ] Hand sonlm the shots with the exact laptop line (memory: laptop commands). Run it in PowerShell from the `0_ssh` folder:
+- [x] **Task 9: HALT for sonlm: Deck-size legibility sign-off (AC: 6). Human gate.**
+  - [x] Hand sonlm the shots with the exact laptop line (memory: laptop commands). Run it in PowerShell from the `0_ssh` folder:
     `scp -i .\sonlm2026-private.pem -r sonlm@123.31.11.131:/home/sonlm/project/pixel_art_game/builds/shots-1.18 .\uc-1.18-shots`
     If `SendUserFile` is available, also send the three PNGs, so sonlm can check them on a phone.
-  - [ ] The procedure, written for sonlm:
+  - [x] The procedure, written for sonlm:
     - **Size.** A Steam Deck LCD is 7.0" at 1280×800, about 216 PPI, so the 960×540 image shows at about **113 × 64 mm** (OLED: 7.4", about 120 mm wide).
     - **On the laptop.** Open each PNG in a viewer that scales with nearest neighbour (a browser is fine). Zoom until the image is 11.3 cm wide, measured with a ruler. Don't use 100% zoom: on the laptop that is larger than a Deck, and it makes the check too easy.
     - **Or on a phone.** In landscape, full width, on a 6–7" phone.
     - **Distance.** Look from handheld distance, about 30–40 cm.
-  - [ ] The questions, for all three zones:
+  - [x] The questions, for all three zones:
     1. Can you read the four pips (three full, one empty)?
     2. Can you read `+1240` and the carried count?
     3. Can you read every chain digit 0–20?
     4. Can you read the body-line sample and the meter?
     5. Is any role colour hard to tell from its background?
     - The chain numerals are stand-ins: Fusion at ×3 and ×4. The final hand-pixelled digits are 1.26's, and this sign-off doesn't cover them.
-  - [ ] **HALT** and ask sonlm. Record the answer verbatim (date, device or method, per-zone notes) in the Dev Agent Record.
+  - [x] **HALT** and ask sonlm. Record the answer verbatim (date, device or method, per-zone notes) in the Dev Agent Record.
     - **Yes:** edit DESIGN.md Typography: "The Deck-size check still runs in E1 with this face." becomes "The Deck-size check passed with this face (Story 1.18, <date>, sonlm; ×2 shots of a HUD mock at Deck size).". Edit the GDD Platform line (`gdd.md` "Steam Deck: a Deck-size legibility check in E1…") the same way: "… in E1 (passed <date>, Story 1.18) …".
     - **No:** record what failed, and add a ledger item "Deck-size check failed: <what>" → **Owner: Story 1.25** (blocked until sonlm picks the font fix). Stop there: no font change in this story.
-- [ ] **Task 10: Docs, ledger, red-checks (AC: 7, 8).**
-  - [ ] Ledger (`deferred-work.md`):
+- [x] **Task 10: Docs, ledger, red-checks (AC: 7, 8).**
+  - [x] Ledger (`deferred-work.md`):
     - close 1.17's "Play-area text outline uses `TextStyle.PLACEHOLDER_SURFACE`" item with `→ **Closed (Story 1.18): Fx popups and the warm-up outline in Game.palette's surface; the const is gone; smoke_palettes checks a popup in an Umber room.**`;
     - add the E4 world-art item (D10) under a new "Deferred from: dev of 1-18-…" section, with its owner line.
-  - [ ] Docs (D15).
-  - [ ] Red-checks (D14), each recorded in the Debug Log.
-  - [ ] `./run_tests.sh` → `== ALL GREEN`, with the `ok` count recorded.
+  - [x] Docs (D15).
+  - [x] Red-checks (D14), each recorded in the Debug Log.
+  - [x] `./run_tests.sh` → `== ALL GREEN`, with the `ok` count recorded.
 
 ## Dev Notes
 
@@ -488,17 +488,78 @@ so that I can read the game at ×2 on a small screen.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), Claude Code, 2026-11-22.
+
 ### Debug Log References
 
 - Story creation (2026-11-22, `18fde0a`): `./run_tests.sh` → `== ALL GREEN (25 tests)`, 1715 `ok`, 0 `FAIL`.
+- Task 1 (dev start, 2026-11-22, `940e6ce`, clean tree): `./run_tests.sh` → `== ALL GREEN (25 tests)`, 1715 `ok`, 0 `FAIL`.
+- After Tasks 2–5 (code only, before the new tests): `== ALL GREEN (25 tests)`, 1718 `ok` (+4 `state_write` samples, −1 `PLACEHOLDER_SURFACE` pin). `test_room_loader`'s "a bad zone" check still reads `zone 'teal' is not one of dusk, umber, violet`: the joined `Palettes.zones()` gives the old text byte for byte.
+- Probe (4.7.2): Fusion `get_ascent()` is 9, 18, 27, 36 at sizes 8, 16, 24, 32 (9/8 of the size), so the cap top is 3, 6, 9, 12, as D12 assumed. `"20"` is 30 px at 24 and 40 px at 32. The body lines are 158, 158, 181 and 173 px at 8, inside the 328 px block. `(30 * 55 + 50) / 100 == 17` and `roundi(16.5) == 17`.
+- `test_palettes`: 85 `ok` on its first run, every DESIGN number reproduced (tokens, derived gutter, floors, the minimal override and glow steps with 1% less failing, every two-decimal ratio, the mock regions, `+1240` ending at x 46.0).
+- `smoke_palettes`: 10 `ok`. Strengthened after the first run: the session starts on violet, so the boot check can fail (dusk is the default, so a boot check that starts on dusk proves nothing).
+- **Red-checks (D14)**, each broken, run, then restored (the restore diffed clean):
+  - Umber LABEL `#8e7d6f` → `FAIL umber: … DESIGN's tokens (wrong: ["label #8e7d6f, DESIGN #8f7e70"])`, `FAIL umber: HP, LABEL >= 4.5 … (misses: ["umber label on play: 4.47 < 4.5"])`, `FAIL umber label: index 2 + 41% is #8f7e70, Palettes' colour (got #8e7d6f)`.
+  - Dusk gutter `#170f0b` → `FAIL dusk: … DESIGN's tokens (wrong: ["gutter #170f0b, DESIGN #18100b"])`, `FAIL dusk: GUTTER is index 0 x 0.55 per channel, half up: #18100b (got #170f0b)`.
+  - `floor_errors` firing sample: Umber LABEL at index 2 gives `["umber label at index 2 on gutter: 3.76 < 4.5", "umber label at index 2 on play: 3.44 < 4.5"]` (checked on every run), and the near-miss (the real override) gives `[]`.
+  - `set_zone()` without the same-zone return → `FAIL set_zone() to the same zone emits nothing (got 2)`.
+  - World without the `set_zone` call → `smoke_palettes` boot, step 2 (`FAIL enter_room(t_zone_b): the zone is umber (room t_zone_b, zone violet)`, `FAIL ...and changed fired exactly once for the swap (got 0)`), step 3 and step 4 all FAIL.
+  - Gutters not connected to `changed` → `FAIL ...both strips and the clear colour are gutter-umber #110d0b (got ["07060b", "07060b", "07060b"])`, the boot and respawn checks too (`SMOKE FAILED (3)`). This also confirms the first-colour note: Gutters paints before World's first build, so without the signal the boot zone never reaches the strips.
+  - `Fx.popup` on a fixed `#0d0b14` → `FAIL Fx.popup in t_zone_b is play_text outlined in zone-umber-0 #1e1714`.
+  - `Game.palette._zone = &"umber"` in `gutters.gd` → `FAIL lint ui/gutters.gd:33 state_write`.
+  - The heart moved to x 59 → `FAIL <zone> mock: every element is inside its region (outside: [ColorRect [P: (60.0, 10.0) …] in left …])` for all three zones.
+- Screenshot (Task 8): `xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd /home/sonlm/project/pixel_art_game/builds/shots-1.18` saved the two shaft shots and `deck_{dusk,umber,violet}_x2.png`, `PASS`. Its one `ERROR:` line is ALSA's `init_output_device` (no sound card on the server; the dummy audio driver takes over), not from this story. Pillow: each deck PNG is 960×540 and every 2×2 block is one colour (an exact ×2). Gutter pixels (native 40,200 and 475,200) are `18100b` / `110d0b` / `07060b`, a play-area pixel (240,250) is `2b1d14` / `1e1714` / `0d0b14`, and the rules at x 0/59/420/479 are index 1. The shaft shots are still 480×270 with gutter pixel `(7, 6, 11)` = `#07060b`, so nothing on screen changed in `m1_shaft` (AC3).
+- After Tasks 2–8: `./run_tests.sh` → `== ALL GREEN (27 tests)`, 1815 `ok`, 0 `FAIL`.
+- **Task 9, Deck-size sign-off (sonlm, 2026-11-22).** Shots sent through `SendUserFile` and the `scp` line given. Method (sonlm's pick): **laptop, the PNG zoomed to about 11.3 cm wide**, at handheld distance. sonlm's answers, verbatim, for all three zones together (no per-zone notes given):
+  > Why is it so small
+  > 1. yes
+  > 2. 1240 easy, 386 harder
+  > 3. yes
+  > 4. yes but quite hard. Also random sqibbles words at the end is unreadable
+  > 5. maybe the the darker 0
+  - "Why so small", answered: ×3 (1440 px) doesn't fit the Deck's 1280 px, so the Deck shows ×2 letterboxed (75% of the width); a 6 px cap is 12 device px, about 1.4 mm. Any 8 px face is the same size, so the notes are not the face's fault. The "squiggles" are the Latin-1 sample `ÆØÅ éèê ñ ß` (M2 ships English only). The darker 0 is the EMPTY role, which meets the 3:1 shape floor, not 4.5:1.
+  - **Verdict (sonlm's pick from: pass with notes / fail / look again): "Pass with notes".** DESIGN.md Typography and the GDD Steam Deck line now say passed (2026-11-22, Story 1.18). The notes are ledger items: the carried count (Story 1.25), the EMPTY chain 0 (Story 1.26), body lines readable but hard (Story 1.29), Latin-1 accents unreadable at 8 px (the M2 retrospective). No font change.
+- Task 10: ledger: 1.17's `PLACEHOLDER_SURFACE` item closed; new section "Deferred from: dev of 1-18-…" with the E4 world-art item (D10) and the four Deck-size notes (owners Story 1.25, Story 1.26, Story 1.29, the M2 retrospective); `test_deferred_owners`: 59 items, 0 unowned. Docs per D15, plus DESIGN.md Typography and the GDD Steam Deck line (Task 9). The D14 red-checks are above (Tasks 6–8).
+- Final (Task 10): `./run_tests.sh` → `== ALL GREEN (27 tests)`, 1815 `ok`, 0 `FAIL` (docs and ledger only since the last run, so the count is unchanged).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed; comprehensive developer guide created.
+- `core/palettes.gd` is the one home for UI colours; `Game.palette` is the active zone, set by `World._swap_room()` on every room build. Gutters (strips and clear colour) and `Fx` popups follow it; `PLACEHOLDER` and `PLACEHOLDER_SURFACE` are gone; room zone ids come from `Palettes.zones()`. World art stays violet until E4 (D10, ledger).
+- `test_palettes` reproduces every DESIGN hex, derived gutter, floor, minimal override and glow step, and ratio with its own maths; `smoke_palettes` covers boot, exit, death and same-zone swaps. Every new check was red-checked (D14).
+- `m1_shaft` is unchanged on screen (violet, gutter `#07060b`); no playtest is needed for this story.
+- Deck-size check (AC6): sonlm, 2026-11-22, laptop at about 11.3 cm wide, **pass with notes**. The four notes are ledger items owned by Stories 1.25, 1.26 and 1.29 and the M2 retrospective; no font change.
 
 ### File List
+
+- `game/scripts/core/palettes.gd` (new), `game/scripts/core/palettes.gd.uid` (new)
+- `game/scripts/core/game.gd`
+- `game/scripts/core/fx.gd`
+- `game/scripts/core/text_style.gd`
+- `game/scripts/ui/gutters.gd`
+- `game/scripts/ui/theme_builder.gd`
+- `game/scripts/world/world.gd`
+- `game/scripts/world/room_loader.gd`
+- `game/tests/test_palettes.gd` (new), `game/tests/test_palettes.gd.uid` (new)
+- `game/tests/smoke_palettes.gd` (new), `game/tests/smoke_palettes.gd.uid` (new)
+- `game/tests/deck_mock.gd` (new), `game/tests/deck_mock.gd.uid` (new)
+- `game/tests/rooms/zones/t_zone_a.txt` (new), `game/tests/rooms/zones/t_zone_b.txt` (new)
+- `game/tests/screenshot.gd`
+- `game/tests/test_lint.gd`
+- `game/tests/test_theme.gd`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md`
+- `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md`
+- `_bmad-output/project-context.md`
+- `_bmad-output/game-architecture.md`
+- `docs/component-inventory.md`, `docs/architecture.md`, `docs/development-guide.md`, `docs/rooms.md`, `docs/source-tree-analysis.md`
+- `game/README.md`
+- `_bmad-output/implementation-artifacts/1-18-palette-tokens-contrast-and-the-deck-size-check.md`
 
 ## Change Log
 
 - 2026-11-22: Story created (ready-for-dev).
 - 2026-11-22: sonlm answered Q1 (`Game.palette`) and Q2 (world art stays violet until E4); D1 and D10 stand.
+- 2026-11-22: Dev: Tasks 1–8 done (`Palettes`, `Game.palette`, per-zone gutters, clear colour and popup outline, zone ids from `Palettes`, `test_palettes`, `smoke_palettes`, the Deck mock and its ×2 shots). 27 tests green, 1815 `ok`. HALT at Task 9 for sonlm's Deck-size sign-off.
+- 2026-11-22: Task 9: sonlm's Deck-size check passed with notes (laptop, about 11.3 cm wide); DESIGN.md Typography and the GDD Steam Deck line updated, notes ledgered. Task 10: ledger and docs. 27 tests green, 1815 `ok`. Status review.

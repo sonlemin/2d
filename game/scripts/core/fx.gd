@@ -1,13 +1,14 @@
 class_name Fx
 ## One-shot hit effects built in code (no art needed). Unshaded so they read in the dark. Popups
-## draw TextStyle.play_text (Story 1.17).
+## draw TextStyle.play_text (Story 1.17), outlined in the active zone's surface (Game.palette,
+## read when the popup is made: it lives 0.85 s and zones change only at a cut; Story 1.18 D8).
 ## Also the accessibility gate (AR57, Story 1.16 D1): the only script that reads reduce flashing,
 ## screen shake and reduced motion (lint a11y_gate). Camera shake, the invulnerability blink and the
 ## UI kit's easing ask the readers below; there are no per-effect toggles. EFFECTS declares each
 ## effect with its rate: test_fx holds the periodic ones to the caps and smoke_bot holds the pogo-hit
 ## one-shots apart (NFR8, UX-DR125).
 
-const SPARK := Color(1.0, 0.82, 0.48)   ## chain-light amber
+const SPARK := Palettes.AMBER  ## the reserved chain-amber, one home (Story 1.18 D8; was Color(1.0, 0.82, 0.48), #ffd17a)
 const SPARK_COUNT := 14  ## particles per pogo spark burst; presentation (M1 value, was pop()'s default).
 const INVULN_BLINK_HZ := 2.5  ## Hz the player blinks while invulnerable (GDD Combat damage table "blinking at 2.5 Hz"; UX-DR125 blinks are 2.5 Hz).
 const INVULN_LIT := 0.625  ## fraction of each blink period drawn lit (M1: 0.25 s of 0.4 s), so the player is visible more than not.
@@ -152,7 +153,7 @@ static func popup(parent: Node, pos: Vector2, text: String, color: Color) -> voi
 	var l := Label.new()
 	l.material = unshaded()
 	l.text = text
-	l.label_settings = TextStyle.play_text(color, TextStyle.PLACEHOLDER_SURFACE)
+	l.label_settings = TextStyle.play_text(color, Game.palette.color(Palettes.Role.SURFACE))
 	l.z_index = 5
 	parent.add_child(l)
 	l.global_position = pos + Vector2(-10, -30)
@@ -183,7 +184,7 @@ static func warm_up(room: Node, pos: Vector2) -> void:
 	var l := Label.new()
 	l.material = unshaded()
 	l.text = "x"
-	l.label_settings = TextStyle.play_text(SPARK, TextStyle.PLACEHOLDER_SURFACE)  # a real popup's font, size and outline
+	l.label_settings = TextStyle.play_text(SPARK, Game.palette.color(Palettes.Role.SURFACE))  # a real popup's font, size and outline
 	l.modulate.a = WARM_ALPHA
 	l.position = pos
 	room.add_child(l)

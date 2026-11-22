@@ -1,0 +1,10 @@
+; Story 1.18 zone-change test room. Not a level. B: a ceiling gap up to A (umber).
+id=t_zone_b
+zone=umber
+exits=up:t_zone_a@x4
+---
+####.#####
+#........#
+#........#
+#........#
+##########

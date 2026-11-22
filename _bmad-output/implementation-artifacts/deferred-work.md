@@ -198,6 +198,7 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Play-area text outline uses `TextStyle.PLACEHOLDER_SURFACE` (Cold violet), not the active zone's surface** — DESIGN's `components.text-outline.color` is the zone surface colour. Until `core/palettes.gd` exists, `Fx.popup()` outlines every popup in `#0d0b14` (zone-violet-0, the zone `m1_shaft` declares), so a popup in another zone gets the violet outline (Story 1.17 D6).
   → **Owner: Story 1.18** — it brings the palettes and the per-zone colours; replace the const with the active zone's surface and keep `TextStyle.play_text`'s cache keyed by colour pair.
+  → **Closed (Story 1.18): Fx popups and the warm-up outline in Game.palette's surface; the const is gone; smoke_palettes checks a popup in an Umber room.**
 - **Bank popup size: 8 px at every count** (sonlm, 2026-11-21; DESIGN's bank-popup row corrected in 1.17) — M1's 10 px from 5 links scaled the 8 px face by ×1.25 (uneven strokes in the render probe); the gutter chain number carries the long-chain read. A bigger popup, if ever wanted, is 16 px (an exact ×2), never 10.
   → **Owner: Story 1.26** — it owns and rebuilds the bank popup; keep it at 8 px at every count.
 - **The window title isn't a string key** — `project.godot` `config/name` still reads "The Unbroken Chain (M1 prototype)", which shows in the desktop title bar and the web page title, outside the string table.
@@ -207,3 +208,16 @@ promote at most one idea per layer milestone. None are in M2 (GDD Out of Scope: 
 
 - **Lint `raw_text` knows only AC7's text sinks** — `game/tests/test_lint.gd:119` fires on `.text =`, `tooltip_text =`, `placeholder_text =`, `set_text(`, `popup(`, `draw_string(`, `draw_multiline_string(`, `add_item(`, `append_text(` and `add_text(`. Raw text set through `set_item_text(`, `set_tab_title(`, `add_check_item(`, `add_button(`, `title =` or `dialog_text =` passes unseen. Nothing calls these today, and adding them now would guess at controls the game may never use.
   → **Owner: Story 1.31** — the UI kit chooses the controls every menu is built from; add a sink (with a firing sample and a near-miss) for each text-setting call the kit uses.
+
+## Deferred from: dev of 1-18-palette-tokens-contrast-and-the-deck-size-check.md (2026-11-22)
+
+- **World art ignores the room's zone** — `Game.palette` follows each room's `zone` (gutters, clear colour, popup outline), but `game/scripts/world/room_loader.gd` `BACKDROP` (`#2a2440`, M1's violet index 1) and `World.AMBIENT_TINT` are the same in every zone, and the tile sprites have one palette. UX-DR3 is "E1 (tokens); E4 (applied across zones)". The only real rooms (`m1_shaft`, `perf_worst`) are violet, so nothing on screen is wrong today; a dusk or umber room would draw violet world art (Story 1.18 D10, sonlm's Q2).
+  → **Owner: E4** — Layer 1's zones are its rooms: apply `Palettes.world_in()` to the backdrop, tint and tiles there, with the 500 ms cross-fade (`changed` with blended colours).
+- **Deck-size check: the carried count is harder to read than the held count** (sonlm, 2026-11-22, laptop at about 11.3 cm wide: "1240 easy, 386 harder") — in the mock, `+1240` is amber and `386` is the zone's HP role (bone/grey, dimmer), and 3, 8 and 6 are closed loops that close up at 1.4 mm.
+  → **Owner: Story 1.25** — it builds the ember rows; check the carried count at Deck size there (×2 shot, same procedure), and if it still reads hard, try `HudValueLarge` (16 px) or HP-role weight before anything else. No font change.
+- **Deck-size check: the dim chain 0 is hard to see** (sonlm: "maybe the the darker 0") — the chain at 0 draws in the EMPTY role, which meets the 3:1 shape floor but not 4.5:1 (Story 1.18 mock: Fusion ×3 standing in for the final digits).
+  → **Owner: Story 1.26** — it hand-pixels the chain digits and owns the chain-at-0 look; decide there whether the 0 stays EMPTY (a shape, 3:1) or takes the LABEL role (text, 4.5:1), and check it at Deck size.
+- **Deck-size check: body lines are readable but "quite hard"** (sonlm: "yes but quite hard") — the four 8 px lines at the death-text width (328 px). At ×2 on a Deck a 6 px cap is about 1.4 mm; every 8 px face is that size, so this is the text size, not the face.
+  → **Owner: Story 1.29** — the death card is the first screen of body lines; check it at Deck size there, and if it still reads hard, set its lines at 16 px (an exact ×2) rather than changing the face.
+- **Deck-size check: Latin-1 accents are unreadable at 8 px** (sonlm: "random sqibbles words at the end is unreadable", the `ÆØÅ éèê ñ ß` sample) — M2 ships English only (UX-DR17, AR41), so no shipped text uses them. UX-DR17 already names the Fusion 10/12 px builds for a later localisation.
+  → **Owner: the M2 retrospective** — it decides post-M2 work; a localisation plan starts from this note and UX-DR17's larger builds.

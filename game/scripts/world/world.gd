@@ -23,7 +23,7 @@ const RESPAWN_DELAY := 0.6
 ## until Options (1.36) it changes only through DevTools' `--set=brightness:N`, for one session.
 ## Lower = more tension; too low and darkness turns into confusion (Pillar 2).
 const AMBIENT_LEVELS: Array[float] = [0.07, 0.16, 0.28, 0.45]
-const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # keeps the violet cast of the Edge palette
+const AMBIENT_TINT := Color(1.0, 0.86, 1.57)  # the violet cast of the Edge palette in every zone until E4 applies the zone palettes to world art (ledger, Story 1.18 D10)
 
 ## Where a dive with no respawn point starts, and at which entry. Tests set them before add_child;
 ## DevTools' --room= sets them from inside _ready, before the first room is built (Story 1.11 D5).
@@ -156,6 +156,8 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_player.reset_physics_interpolation()  # AR6: a teleport, never a smear
 	_camera.apply_limits(room.bounds())
 	_camera.snap()
+	# UX-DR5, Story 1.18 D2: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
+	Game.palette.set_zone(room.zone)
 	# Before the signals: a handler may call enter_room() again (a scripted moment, a station).
 	_swap_pending = false
 	if respawn:

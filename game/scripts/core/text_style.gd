@@ -18,9 +18,6 @@ const MENU_ROW_PITCH := 24  ## DESIGN spacing menu-row-pitch 24px, for the UI ki
 const CAP_TOP := 3  ## px from a size-8 Label's top to its cap top: ascent 9 - DESIGN cap height 6 (probed: label y 10, first glyph row y 13)
 const CAP_TOP_LARGE := 6  ## the same at size 16: ascent 18 - cap 12
 const OUTLINE_PX := 1  ## DESIGN spacing text-outline 1px, on 4 sides, no diagonals (UX-DR15)
-## The play-area outline colour until Story 1.18's core/palettes.gd gives the active zone's
-## surface: DESIGN zone-violet-0 (Cold violet, index 0), the zone m1_shaft declares (D6).
-const PLACEHOLDER_SURFACE := Color("#0d0b14")
 
 ## The four outline copies, behind the glyph: 4-neighbour, no diagonals (D5, render-probed).
 const OUTLINE_OFFSETS: Array[Vector2] = [Vector2(OUTLINE_PX, 0), Vector2(-OUTLINE_PX, 0), Vector2(0, OUTLINE_PX), Vector2(0, -OUTLINE_PX)]
@@ -35,9 +32,11 @@ static func font() -> FontFile:
 
 
 ## Text drawn over the play area (UX-DR15): size 8 with a 1 px four-side outline in
-## `outline_color`. Four stacked shadows at OUTLINE_OFFSETS, each with outline size 0: the font's
+## `outline_color`, which callers pass as the active zone's surface
+## (`Game.palette.color(Palettes.Role.SURFACE)`, DESIGN components.text-outline). Four stacked shadows at OUTLINE_OFFSETS, each with outline size 0: the font's
 ## own outline_size strokes the diagonals too, which UX-DR15 rules out. Cached per colour pair, so
-## a popup never builds a resource of its own (project rule: shared resources are statics).
+## a popup never builds a resource of its own (project rule: shared resources are statics); the
+## three zones add at most three entries per glyph colour.
 ## A Label with label_settings takes its line spacing from the settings, never from the Theme, and
 ## LabelSettings defaults to 3 (a 15 px pitch, probed in code review): so the body-line pitch is
 ## set here, for the death card and the "Not saved" note.

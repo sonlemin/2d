@@ -3,8 +3,12 @@ extends Node
 ##   xvfb-run -a godot --path game --rendering-driver opengl3 res://tests/runner.tscn -- res://tests/screenshot.gd <out_dir>
 ## Shot 1: spawn, chain 0 (small light). Shot 2: mid-shaft, chain 10, with a lurker telegraphing.
 ## It instances world.tscn (Story 1.6), so the shots show the real gutters, darkness and framing.
+## Then the Deck-size mocks (Story 1.18 D12, UX-DR131): deck_<zone>_x2.png for every zone, the
+## 480x270 render of tests/deck_mock.gd resized x2 with nearest to exactly 960x540, which is what an
+## integer x2 window shows. sonlm views them at Deck size (the story's Task 9 procedure).
 
 const WorldScene := preload("res://scenes/world/world.tscn")
+const DeckMock := preload("res://tests/deck_mock.gd")
 
 
 func _shoot(path: String) -> void:
@@ -46,6 +50,23 @@ func run() -> void:
 	await _frames(25)
 	await _shoot(out.path_join("shaft_chain10_telegraph.png"))
 	world.queue_free()
-	await _frames(1)
+	await _frames(1)  # World's CanvasModulate is gone before the mock draws: it would darken it
+	var ok := true
+	for zone: StringName in Palettes.zones():
+		var mock := DeckMock.build(zone)
+		add_child(mock)
+		await _frames(3)
+		await RenderingServer.frame_post_draw
+		var img := get_viewport().get_texture().get_image()
+		if img.get_size() != Vector2i(480, 270):
+			print("FAILED deck_%s: the render is %s, not 480x270" % [zone, img.get_size()])
+			ok = false
+		img.resize(960, 540, Image.INTERPOLATE_NEAREST)
+		var path := out.path_join("deck_%s_x2.png" % zone)
+		var err := img.save_png(path)
+		print(("saved " if err == OK else "FAILED ") + path)
+		ok = ok and err == OK
+		mock.queue_free()
+		await _frames(1)
 	Game.reset_for_tests()  # the chain above recorded a best chain on Game.slot
-	print("PASS")
+	print("PASS" if ok else "FAILED")

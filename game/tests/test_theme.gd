@@ -122,7 +122,7 @@ func _test_theme_cache() -> void:
 	var t := ThemeBuilder.theme()
 	check(t != null and t == ThemeBuilder.theme(), "ThemeBuilder.theme() returns one cached instance")
 	check(t.default_font == TextStyle.font() and t.default_font_size == 8, "the theme's defaults are the font at size 8 (got %s)" % t.default_font_size)
-	check(t.get_color_list(&"Label").is_empty() and t.get_color_type_list().is_empty(), "the theme carries no colours: palette roles are Story 1.18's")
+	check(t.get_color_list(&"Label").is_empty() and t.get_color_type_list().is_empty(), "the theme carries no colours: UI reads Game.palette by role (Story 1.18 D6)")
 
 
 ## AC3/D5: cached per colour pair; four stacked shadows at the four offsets, each with outline 0;
@@ -159,11 +159,11 @@ func _test_play_text() -> void:
 	var want := OUTLINE_OFFSETS.duplicate()
 	want.sort()
 	check(ok and offsets == want, "play_text: four shadows in the outline colour, outline 0, at (±1, 0) and (0, ±1) (count %d, offsets %s)" % [s.stacked_shadow_count, offsets])
-	check(TextStyle.PLACEHOLDER_SURFACE == o, "the placeholder outline is DESIGN zone-violet-0 #0d0b14 (D6)")
 
 
 ## AC4: popups draw play_text at size 8, at every chain count.
 func _test_popups() -> void:
+	Game.palette.set_zone(&"umber")
 	var parent := Node2D.new()
 	add_child(parent)
 	Fx.popup(parent, Vector2(10, 10), "+1", Color.WHITE)
@@ -173,7 +173,8 @@ func _test_popups() -> void:
 	if labels.size() == 2:
 		var a: Label = labels[0]
 		var b: Label = labels[1]
-		check(a.label_settings == TextStyle.play_text(Color.WHITE, TextStyle.PLACEHOLDER_SURFACE), "Fx.popup's Label carries play_text in the placeholder surface")
+		check(a.label_settings == TextStyle.play_text(Color.WHITE, Color("#1e1714")), "Fx.popup's Label carries play_text outlined in the active zone's surface (umber: DESIGN zone-umber-0 #1e1714; Story 1.18 D8)")
 		check(b.label_settings != null and b.label_settings.font_size == 8 and b.text == "x12  +24", "chain_popup at 12 links is 8 px, not M1's 10 (D7; got %s, '%s')" % [b.label_settings.font_size if b.label_settings else -1, b.text])
 		check(not a.has_theme_font_size_override(&"font_size") and not a.has_theme_constant_override(&"outline_size"), "...with no theme overrides left over from M1")
 	parent.queue_free()
+	Game.palette.reset()

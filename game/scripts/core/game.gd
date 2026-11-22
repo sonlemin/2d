@@ -5,6 +5,8 @@ extends Node
 ## replacing a ref is an assert (Story 1.4 D7). `devices` arrives with Story 1.37.
 ## Two refs are child nodes because they need the tree: `clock` (timers) and `display` (the
 ## window, Story 1.14). Neither holds rule state.
+## `palette` (Story 1.18): the active zone's UI colours; presentation, not save data. A RefCounted,
+## not a child: it needs no tree. World sets its zone on every room build; UI reads it by role.
 ## Starting up touches no file (D6): the entry scene calls `boot()` once, which loads
 ## `settings.json` and arms its writes. A test never boots against the real folder: one that
 ## checks the file points `store.dir` at a temp folder first and ends with `reset_for_tests()`.
@@ -33,6 +35,10 @@ var display := Display.new():  ## AR8: the scale rule; the only code that touche
 	set(_value):
 		@warning_ignore("assert_always_false")
 		assert(false, "Game.display is session-long: never replace it")
+var palette := Palettes.new():  ## AR27, Story 1.18 D1: the active zone; UI reads Palettes roles from it
+	set(_value):
+		@warning_ignore("assert_always_false")
+		assert(false, "Game.palette is session-long: set_zone() changes it, never replace it")
 ## Reads and writes the player's files (AR37). Plumbing, not state, so no guard: tests change its
 ## `dir`, never the instance.
 var store := SaveStore.new()
@@ -116,6 +122,7 @@ func reset_for_tests() -> void:
 	dive.reset()
 	tuning.apply_gear([])
 	clock.clear()
+	palette.reset()
 	store.dir = SaveStore.DEFAULT_DIR
 
 

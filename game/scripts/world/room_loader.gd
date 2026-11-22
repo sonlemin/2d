@@ -6,13 +6,12 @@ class_name RoomLoader
 
 const ROOT := "res://rooms"
 const SPINE_WIDTH := 22  ## spine rooms are 22 columns wall to wall (decision log: 352 px in the 360 px play area)
-const ZONES: Array[String] = ["dusk", "umber", "violet"]  ## the GDD's Layer 1 zones
 const SINGLE_KEYS: Array[String] = ["id", "zone", "spine", "exits"]
 ## Keys a header may repeat: `obj=` (a persistent object) and `cling=<from>-<to>` (a narrow cling
 ## stretch, 0-based grid rows, inclusive; Story 1.10 D6). The build ignores `cling`: only the room
 ## sweep reads it, to know where a long fall is meant to be clung through.
 const REPEAT_KEYS: Array[String] = ["obj", "cling"]
-const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's shaft background until the zone palettes (1.18)
+const BACKDROP := Color(0.164706, 0.141176, 0.25098)  ## M1's violet index 1 in every zone until E4 applies the zone palettes to world art (ledger, Story 1.18 D10)
 const LEDGE_RIM := Color(0.66, 0.71, 0.76, 0.45)  ## palette 3, dimmed: "you can stand here" (M1 finding 7)
 
 const NO_CELL := Vector2i(-1, -1)
@@ -168,8 +167,8 @@ static func validate(path: String, parsed: Dictionary) -> Array[String]:
 				elif h.value != path.get_file().get_basename():
 					err.call(h.line, 1, "id '%s' is not the file name '%s'" % [h.value, path.get_file()])
 			"zone":
-				if not h.value in ZONES:
-					err.call(h.line, 1, "zone '%s' is not one of %s" % [h.value, ", ".join(ZONES)])
+				if not Palettes.has_zone(StringName(h.value)):  # D9: zone ids have one home
+					err.call(h.line, 1, "zone '%s' is not one of %s" % [h.value, ", ".join(Palettes.zones())])
 			"spine":
 				if h.value != "true" and h.value != "false":
 					err.call(h.line, 1, "spine '%s' is not true or false" % h.value)

@@ -2,7 +2,8 @@ class_name ThemeBuilder
 ## The game's one Theme, built in code from TextStyle (AR40, Story 1.17; no .tres). Gutters and
 ## ScreenRouter set it as their `theme`, so every HUD element and screen under them inherits it.
 ## Label type variations carry the DESIGN typography tokens: set `theme_type_variation` to one of
-## the names below. Colours are not here: the palette roles are Story 1.18's.
+## the names below. Colours are not here: UI reads `Game.palette` by role (Story 1.18 D6), since a
+## Label's role depends on what it shows and the zone changes under it.
 
 const HUD_VALUE := &"HudValue"  ## DESIGN typography hud-value: size 8, 8 px rows
 const HUD_VALUE_LARGE := &"HudValueLarge"  ## DESIGN hud-value-large: size 16, 16 px rows
