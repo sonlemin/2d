@@ -285,7 +285,7 @@ so that I can read the game at ×2 on a small screen.
   3. Gutters' `_ready` runs before World's, and World isn't findable from it then.
   4. E4 cross-fades, so readers must ask by role and hear one change signal.
 
-  A World-owned zone fails 1 and 2 unless every popup caller passes the surface. `Game.palette` mirrors `Game.display` (presentation, held by `Game`, no rules). It is a RefCounted, not a child node: it needs no tree. It is not save data and has no `to_dict()`. Architecture AR27 already places "zone palettes, UI role colours, zone cross-fade data" in `core/palettes.gd`. **Flagged for sonlm at story creation** (new `Game` ref): see Questions.
+  A World-owned zone fails 1 and 2 unless every popup caller passes the surface. `Game.palette` mirrors `Game.display` (presentation, held by `Game`, no rules). It is a RefCounted, not a child node: it needs no tree. It is not save data and has no `to_dict()`. Architecture AR27 already places "zone palettes, UI role colours, zone cross-fade data" in `core/palettes.gd`. **Decided by sonlm, 2026-11-22: `Game.palette`** (Q1).
 - **D2: The zone is the room's, set by World, snapped.**
   - `World._swap_room()` is the only room path, so boot, exits and respawns all pass through `set_zone()`.
   - `changed` fires only on a real change, so a same-zone swap redraws nothing.
@@ -380,10 +380,10 @@ so that I can read the game at ×2 on a small screen.
     - the System Location Mapping row for palettes: as built, UI roles and glow floor; the cross-fade is E4.
   - After Task 9, DESIGN.md Typography and the GDD Platform line (Task 9).
 
-### Questions for sonlm (asked at story creation; record the answers here)
+### Questions for sonlm (answered at story creation, 2026-11-22)
 
-- **Q1 (D1): where the active zone lives.** Recommended: `Game.palette` (a `Palettes` instance, like `Game.display`). Alternative: `World` owns the zone, and every popup caller passes the outline colour. That avoids a new `Game` ref, but then each popup caller (and later the cling cue and the death card) has to find the zone itself.
-- **Q2 (D10): world art stays violet until E4.** Recommended: yes, with a ledger item owned by E4. Alternative: switch only `BACKDROP` to the zone's index 1 now. No real room changes (both are violet), but dusk test rooms get a brown backdrop under violet tiles.
+- **Q1 (D1): where the active zone lives.** Recommended: `Game.palette` (a `Palettes` instance, like `Game.display`). Alternative: `World` owns the zone, and every popup caller passes the outline colour. That avoids a new `Game` ref, but then each popup caller (and later the cling cue and the death card) has to find the zone itself. **Answer (sonlm): `Game.palette`.**
+- **Q2 (D10): world art stays violet until E4.** Recommended: yes, with a ledger item owned by E4. Alternative: switch only `BACKDROP` to the zone's index 1 now. No real room changes (both are violet), but dusk test rooms get a brown backdrop under violet tiles. **Answer (sonlm): stay violet until E4.**
 
 ### Testing standards
 
@@ -501,3 +501,4 @@ so that I can read the game at ×2 on a small screen.
 ## Change Log
 
 - 2026-11-22: Story created (ready-for-dev).
+- 2026-11-22: sonlm answered Q1 (`Game.palette`) and Q2 (world art stays violet until E4); D1 and D10 stand.
