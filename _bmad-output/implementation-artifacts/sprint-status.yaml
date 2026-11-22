@@ -1,5 +1,5 @@
 # generated: 2026-11-12T12:16:27+07:00
-# last_updated: 2026-11-22T02:48:25+07:00
+# last_updated: 2026-11-22T10:37:30+07:00
 # project: pixel_art_game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   dependencies live there, not here). Re-run gds-sprint-planning after adding stories.
 
 generated: "2026-11-12T12:16:27+07:00"
-last_updated: "2026-11-22T02:48:25+07:00"
+last_updated: "2026-11-22T10:37:30+07:00"
 project: pixel_art_game
 project_key: NOKEY
 tracking_system: file-system
@@ -63,7 +63,7 @@ development_status:
   1-15-cp1-gate-feel-check-and-performance-verdict: done
   1-16-effects-accessibility-gate-and-flash-cap: done
   1-17-string-table-pixel-font-and-theme: done
-  1-18-palette-tokens-contrast-and-the-deck-size-check: backlog
+  1-18-palette-tokens-contrast-and-the-deck-size-check: ready-for-dev
   1-19-health-4-hp-and-the-damage-table: backlog
   1-20-light-sensing-for-predators: backlog
   1-21-save-store: backlog
