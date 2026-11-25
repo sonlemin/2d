@@ -4,7 +4,8 @@ extends Node
 ## - the M1 trace: a lone player light behaves tick for tick as on c40e75f (D8);
 ## - LightSource: the rule radius vs the shown one, the budget's demotion left alone, the first-tick
 ##   snap, a dead player's light (D4, D5);
-## - target choice and retargeting with a stand-in flare (FR16, FR21; D6);
+## - target choice and retargeting with stand-in lights (FR16, FR21; D6): identity by node, a decoy
+##   to a decoy, and the decoy kept off screen (review of 1.20);
 ## - stirring off screen, its step limit and the stir-to-hunt guarantee (AC5; D3, D9);
 ## - Q1 (the hunt senses off screen, the telegraph doesn't), Q2 (re-sense in the wait), no World.
 ## The player's physics is off throughout (placed by hand, the camera snapped), so the play rect is
@@ -63,6 +64,9 @@ func run() -> void:
 	await test_flare_to_player_in_telegraph()
 	await test_tie()
 	await test_player_to_flare()
+	await test_identity()
+	await test_decoy_to_decoy()
+	await test_off_screen_decoy()
 	await test_light_out()
 	await test_stirring()
 	await test_stir_pacing_light()
@@ -146,7 +150,9 @@ func _name(s: int) -> String:
 	return Lurker.State.keys()[s]
 
 
-## The telegraph floor in ticks: Spec.TELEGRAPH_MIN at 60 ticks/s, to within one (as smoke_rooms).
+## The telegraph floor in ticks: Spec.TELEGRAPH_MIN at 60 ticks/s. Each case here sees the first
+## TELEGRAPH tick, so its count is exact and takes no one-tick allowance (smoke_rooms needs one: its
+## telegraph may start a frame unseen). Review of 1.20: `+ 1` let 44 ticks (0.733 s) pass.
 func _floor_ticks() -> int:
 	return int(ceil(Spec.TELEGRAPH_MIN * Engine.physics_ticks_per_second))
 
@@ -210,7 +216,8 @@ func test_trace() -> void:
 # --- 2. LightSource (AC2; D4, D5) -----------------------------------------------------------------
 
 ## radius() is the chain's, through a pogo hit, a Snuff and a cling, and still the chain's on the tick
-## after kick(): the shown radius moved, the rule value didn't. A death extinguishes it.
+## after kick(): the shown radius moved, the rule value didn't. A death extinguishes it. The pogo hit
+## is the player's own handler (review of 1.20: by hand, the test did the wiring it claimed to check).
 func test_light_source() -> void:
 	await _build()
 	var ls := _p.light_source
@@ -219,8 +226,8 @@ func test_light_source() -> void:
 	_chain(CHAIN_MID)
 	await frames(30)
 	var before := ls.shown_radius()
-	_p.chain.add_hit()  # a pogo hit, as _on_pogo_hit() feeds it
-	ls.kick(Player.LIGHT_KICK)
+	_p._on_pogo_hit()  # the chain's hit and the light's kick, as a landed pogo makes them
+	Game.clock.clear()  # its hitstop would slow the easing below
 	await frames(1)
 	check(ls.radius() == _p.chain.light_radius() and ls.radius() == ChainState.radius_for(CHAIN_MID + 1),
 			"after a pogo hit, radius() is the chain's %.1f px (got %.1f)" % [ChainState.radius_for(CHAIN_MID + 1), ls.radius()])
@@ -244,6 +251,11 @@ func test_light_source() -> void:
 	var shown := ls.shown_radius()
 	await frames(5)
 	check(ls.shown_radius() == shown, "...and its shown radius holds, as M1's dead light did (%.1f)" % shown)
+	# Review of 1.20: `player` is the one kind that makes a hunt harmful, so it is never the default.
+	var bare := LightSource.new()
+	check(bare.kind != Sensing.KIND_PLAYER and not (bare.kind in Sensing.KINDS),
+			"a LightSource built without a kind is not a player light: it has none until its owner sets one (got '%s')" % bare.kind)
+	bare.queue_free()
 	await _free()
 
 
@@ -321,10 +333,12 @@ func test_target_choice() -> void:
 		if _l.state == Lurker.State.TELEGRAPH:
 			held += 1
 			harmless = harmless and not _l.monitorable
-	check(held + 1 >= _floor_ticks() and harmless,
-			"...the full telegraph: %d ticks, at least Spec.TELEGRAPH_MIN %.2f s (%d ticks, to within one), never monitorable" % [held, Spec.TELEGRAPH_MIN, _floor_ticks()])
+	check(held >= _floor_ticks() and harmless,
+			"...the full telegraph: %d ticks, at least Spec.TELEGRAPH_MIN %.2f s (%d ticks), never monitorable" % [held, Spec.TELEGRAPH_MIN, _floor_ticks()])
 	check(_l.state == Lurker.State.HUNT and _l.target == _p.light_source and _l.monitorable,
 			"...then hunts the player, monitorable (state %s, monitorable %s)" % [_name(_l.state), _l.monitorable])
+	# Review of 1.20: the flare hunt ran at full speed; the telegraph must not hand that on.
+	check(_l._velocity == Vector2.ZERO, "...from rest: the flare hunt's speed is not carried through the telegraph (velocity %s)" % _l._velocity)
 	await _free()
 
 
@@ -348,8 +362,8 @@ func test_flare_to_player_in_telegraph() -> void:
 		if _l.state == Lurker.State.TELEGRAPH:
 			held += 1
 			harmless = harmless and not _l.monitorable
-	check(held + 1 >= _floor_ticks() and harmless and _l.state == Lurker.State.HUNT,
-			"...a full telegraph at the player, not the flare's remainder: %d ticks, at least Spec.TELEGRAPH_MIN (%d, to within one), harmless, then HUNT" % [held, _floor_ticks()])
+	check(held >= _floor_ticks() and harmless and _l.state == Lurker.State.HUNT,
+			"...a full telegraph at the player, not the flare's remainder: %d ticks, at least Spec.TELEGRAPH_MIN (%d), harmless, then HUNT" % [held, _floor_ticks()])
 	await _free()
 
 
@@ -383,6 +397,103 @@ func test_player_to_flare() -> void:
 		await frames(1)
 		no_tele = no_tele and _l.state == Lurker.State.HUNT and not _l.monitorable
 	check(no_tele, "...and never a TELEGRAPH tick or a harmful one over the next 30 ticks")
+	await _free()
+
+
+## AC4, "identity is the node, never the kind": a hunt of one player light that meets a second,
+## brighter player light (a new life's light is such a node) owes it a full telegraph (row H3). A
+## rule that compared kinds would hunt on.
+func test_identity() -> void:
+	await _build()
+	_chain(CHAIN_MID)
+	place(BESIDE)
+	_l.force(Lurker.State.HUNT, _p.light_source)
+	await frames(1)
+	check(_l.state == Lurker.State.HUNT and _l.target == _p.light_source and _l.monitorable, "(premise) the lurker hunts the player's light, monitorable")
+	var other := _stand_in(Sensing.KIND_PLAYER, 130.0, DECOY_AT)
+	await frames(1)
+	check(_l.state == Lurker.State.TELEGRAPH and _l.target == other and not _l.monitorable,
+			"a second, brighter player light: the next tick telegraphs at it, harmless (state %s, monitorable %s)" % [_name(_l.state), _l.monitorable])
+	var held := 1
+	var harmless := not _l.monitorable
+	while _l.state == Lurker.State.TELEGRAPH and held < 300:
+		await frames(1)
+		if _l.state == Lurker.State.TELEGRAPH:
+			held += 1
+			harmless = harmless and not _l.monitorable
+	check(held >= _floor_ticks() and harmless and _l.state == Lurker.State.HUNT and _l.target == other,
+			"...a full telegraph: %d ticks, at least Spec.TELEGRAPH_MIN (%d), harmless, then HUNT at the new light" % [held, _floor_ticks()])
+	await _free()
+
+
+## Row T4 (confirmed by sonlm at the review of 1.20): a telegraph that switches from one decoy to a
+## brighter one keeps its timer, so the hunt starts on the tick it would have without the switch.
+func test_decoy_to_decoy() -> void:
+	var lengths: Array[int] = []
+	for switch: bool in [false, true]:
+		await _build()
+		_chain(CHAIN_MID)
+		place(BESIDE)
+		var first := _stand_in(Sensing.KIND_FLARE, 120.0, DECOY_AT)
+		await frames(1)
+		check(_l.state == Lurker.State.TELEGRAPH and _l.target == first, "(premise) a telegraph at the first decoy (switch %s)" % switch)
+		var ticks := 1
+		var second: LightSource = null
+		while _l.state == Lurker.State.TELEGRAPH and ticks < 300:
+			if switch and ticks == 20:
+				second = _stand_in(Sensing.KIND_CACHE, 130.0, DECOY_AT + Vector2(0, 30))
+			await frames(1)
+			if _l.state == Lurker.State.TELEGRAPH:
+				ticks += 1
+				if switch and ticks == 21:
+					check(_l.target == second, "decoy -> decoy mid-telegraph: the target is the brighter one on the next tick (target %s)" % _kind(_l))
+		check(_l.state == Lurker.State.HUNT and not _l.monitorable and (_l.target == second if switch else _l.target == first),
+				"...then a harmless hunt of %s after %d TELEGRAPH ticks" % ["the second decoy" if switch else "the first decoy", ticks])
+		lengths.append(ticks)
+		await _free()
+	check(lengths[0] == lengths[1] and lengths[0] >= _floor_ticks(),
+			"the switch kept the timer: %d ticks with it, %d without (row T4)" % [lengths[1], lengths[0]])
+
+
+## Review of 1.20 (sonlm, 2026-11-25): off screen, a lurker hunting a decoy stays on it when the
+## player's light becomes the largest. It can't telegraph where it isn't seen (Pillar 2), so it never
+## enters TELEGRAPH there and never harms; once the view brings it into the notice rect it switches
+## onto the player with a full telegraph (row H3).
+func test_off_screen_decoy() -> void:
+	await _build()
+	_chain(CHAIN_MID)
+	place(BELOW_40)
+	var decoy := _stand_in(Sensing.KIND_FLARE, 120.0, LURKER_AT + Vector2(50, 30))
+	_l.force(Lurker.State.HUNT, decoy)
+	await frames(5)
+	check(_l.state == Lurker.State.HUNT and _l.target == decoy and not _play().has_point(_l.global_position),
+			"(premise) off screen, the lurker hunts the decoy (state %s, target %s)" % [_name(_l.state), _kind(_l)])
+	_chain(CHAIN_MAX)
+	check(_l.senses(_p.light_source) and not _l.notices(_p.light_source) and _p.light_source.radius() > decoy.radius(),
+			"(premise) the player's %.1f px light is now the largest it senses, and it can't be noticed off screen" % _p.light_source.radius())
+	var kept := true
+	for i in 60:
+		await frames(1)
+		kept = kept and _l.state == Lurker.State.HUNT and _l.target == decoy and not _l.monitorable \
+				and not Sensing.notice_rect(_play()).has_point(_l.global_position)
+	check(kept, "off screen it stays on the decoy for 1 s: HUNT at the flare, never TELEGRAPH, never monitorable (state %s, target %s)" % [_name(_l.state), _kind(_l)])
+	# The view scrolls up until the lurker is inside the notice rect.
+	place(Vector2(BELOW_40.x, 300))
+	check(_l.notices(_p.light_source), "(premise) the view now holds the lurker inside the notice rect")
+	await frames(1)
+	check(_l.state == Lurker.State.TELEGRAPH and _l.target == _p.light_source and not _l.monitorable,
+			"on screen the next tick telegraphs at the player (state %s, target %s)" % [_name(_l.state), _kind(_l)])
+	var held := 1
+	var seen := Sensing.notice_rect(_play()).has_point(_l.global_position)
+	var harmless := not _l.monitorable
+	while _l.state == Lurker.State.TELEGRAPH and held < 300:
+		await frames(1)
+		if _l.state == Lurker.State.TELEGRAPH:
+			held += 1
+			harmless = harmless and not _l.monitorable
+			seen = seen and Sensing.notice_rect(_play()).has_point(_l.global_position)
+	check(held >= _floor_ticks() and harmless and seen and _l.state == Lurker.State.HUNT and _l.monitorable,
+			"...a full telegraph, every tick of it inside the notice rect: %d ticks, at least Spec.TELEGRAPH_MIN (%d), then a harmful hunt" % [held, _floor_ticks()])
 	await _free()
 
 
@@ -441,12 +552,12 @@ func test_stirring() -> void:
 			"(premise) the lurker is 40 px above the play rect, %.0f px from a chain-%d light (reach %.0f px)" % [d, CHAIN_MAX, reach])
 	await frames(1)
 	check(_l.stirring and _l.stir == 1 and _l.state == Lurker.State.IDLE, "off screen in reach: IDLE, stirring, stir 1 on the first tick (half-open at once; got stir %d)" % _l.stir)
-	var step := int(ceil(Lurker.STIR_STEP_TIME * Engine.physics_ticks_per_second))
+	var step := int(ceil(Spec.STIR_STEP * Engine.physics_ticks_per_second))
 	var ones := 0
 	while _l.stir == 1 and ones < 60:
 		await frames(1)
 		ones += 1
-	check(_l.stir == 2 and ones == step, "...stir 2 after STIR_STEP_TIME: %d ticks (got %d, stir %d)" % [step, ones, _l.stir])
+	check(_l.stir == 2 and ones == step, "...stir 2 after Spec.STIR_STEP %.2f s: %d ticks (got %d, stir %d)" % [Spec.STIR_STEP, step, ones, _l.stir])
 	var calm := true
 	for i in 120:
 		await frames(1)
@@ -537,10 +648,10 @@ func test_stir_to_hunt() -> void:
 		return
 	var tele := rows.slice(first_t, hunt)
 	var all_tele := tele.all(func(r: Array) -> bool: return r[0] == Lurker.State.TELEGRAPH)
-	check(all_tele and tele.size() + 1 >= _floor_ticks(), "the hunt came after %d ticks of TELEGRAPH, at least Spec.TELEGRAPH_MIN (%d, to within one)" % [tele.size(), _floor_ticks()])
+	check(all_tele and tele.size() >= _floor_ticks(), "the hunt came after %d ticks of TELEGRAPH, at least Spec.TELEGRAPH_MIN (%d)" % [tele.size(), _floor_ticks()])
 	check(tele.all(func(r: Array) -> bool: return r[1]), "...the lurker inside play_rect() on every tick of it (Q1: the warning is seen)")
 	check(tele.all(func(r: Array) -> bool: return not r[2]), "...stirring false from the first TELEGRAPH tick")
-	var step := int(ceil(Lurker.STIR_STEP_TIME * Engine.physics_ticks_per_second))
+	var step := int(ceil(Spec.STIR_STEP * Engine.physics_ticks_per_second))
 	var closed := -1
 	for i in range(first_t, rows.size()):
 		if rows[i][3] == 0:

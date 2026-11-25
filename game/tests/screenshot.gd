@@ -44,8 +44,6 @@ func run() -> void:
 	player.velocity = Vector2.ZERO
 	for i in 10:
 		player.chain.add_hit()
-	var light: PointLight2D = player.get_node("LightSource/Light")
-	light.texture_scale = player.light_radius() / (light.texture.get_width() / 2.0)
 	cam.snap()
 	await _frames(25)
 	await _shoot(out.path_join("shaft_chain10_telegraph.png"))

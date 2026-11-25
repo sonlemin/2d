@@ -129,8 +129,11 @@ const RULES: Array[Dictionary] = [
 	# (predators live there) never look the player up by group: they sense lights through
 	# LightSource + Sensing (group light_source). dev/ (the overlays) and world/ may still find the
 	# player; an actor that truly needs it later goes in `allow` with its reason. `why` is printed
-	# with each hit.
-	{id = &"light_query", bare = [],
+	# with each hit. Also the type test on something it met (`body is Player`, `x as Player`): the
+	# same shortcut without the group (review of 1.20). What it can't see (review covers it): a
+	# group name held in a const or built at run time (`get_first_node_in_group(G)`), a node path to
+	# the player (`%Player`, `$"../Player"`), and a duck-typed read (`body.get("chain")`).
+	{id = &"light_query", bare = [r"\b(is|as)\s+Player\b"],
 		code = [r"\b(get_first_node_in_group|get_nodes_in_group|is_in_group)\s*\(\s*&?[\x22\x27]player[\x22\x27]"],
 		only = ["actors/"], skip = [], allow = [],
 		why = "predators sense light through LightSource + Sensing (AR28, AR29)"},
@@ -436,6 +439,11 @@ const SAMPLES: Array = [
 	[&"light_query", "actors/weaver.gd", "\tfor p in get_tree().get_nodes_in_group(&\"player\"):", true],
 	[&"light_query", "actors/lurker.gd", "\tif body.is_in_group('player'):", true],
 	[&"light_query", "actors/lurker.gd", "\tfor n in get_tree().get_nodes_in_group(LightSource.GROUP):", false],
+	[&"light_query", "actors/weaver.gd", "\t\tif body is Player:", true],
+	[&"light_query", "actors/lurker.gd", "\tvar p := area.get_parent() as Player", true],
+	[&"light_query", "actors/lurker.gd", "\tif source is LightSource:  # never `is Player`", false],
+	[&"light_query", "actors/lurker.gd", "\tLog.debug(Log.LURKER, \"it is Player light\")", false],
+	[&"light_query", "dev/overlays.gd", "\tvar player := source.get_parent() as Player", false],
 	[&"light_query", "actors/lurker.gd", "\tfor n in get_tree().get_nodes_in_group(&\"light_source\"):", false],
 	[&"light_query", "actors/player.gd", "\tadd_to_group(\"player\")", false],
 	[&"light_query", "dev/overlays.gd", "\tvar p := get_tree().get_first_node_in_group(\"player\")", false],

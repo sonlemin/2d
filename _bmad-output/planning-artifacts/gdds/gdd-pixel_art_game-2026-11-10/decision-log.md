@@ -278,5 +278,14 @@ Source: `implementation-artifacts/1-20-light-sensing-for-predators.md` (Q1, Q2, 
 - **Q1 Where a lurker senses you once it has noticed you (sonlm, (b)):** the telegraph needs the lurker on screen on every tick (the whole warning is seen); the hunt needs only light and distance (the GDD's Hunt line had no screen test). For a lone player light the one change from M1 is a hunter that trails out of view: it keeps hunting while in reach (at most 138 × 1.6 ≈ 221 px) instead of giving up at the screen edge. Landing, Snuff and cling still save you. Updated: Predators: Lurker (Telegraph, Hunt).
 - **Q2 Re-brightening inside the 0.6 s wait (sonlm, (a)):** the hunt resumes at once with no new telegraph, as M1 built it. Updated: Predators: Lurker (Hunt).
 - **Q3 The stir step (sonlm, (a)):** half-open at once, open after 0.35 s, and one step per 0.35 s either way (≤ 2.9 changes a second, under the 3 flashes/s cap), reviewed at the CP2 gate (1.30). Updated: Predators: Lurker (Stirs).
-- **Also recorded (calls made at story creation, sonlm may veto):** the 8 px screen-margin band stirs (no silent gap between noticing and stirring); stirring runs while a lurker returns home as well as at rest; a telegraph switching between two decoys keeps its timer (only a switch onto the player restarts it). No GDD change until sonlm confirms them.
+- **Also recorded (calls made at story creation, sonlm may veto):** the 8 px screen-margin band stirs (no silent gap between noticing and stirring); stirring runs while a lurker returns home as well as at rest; a telegraph switching between two decoys keeps its timer (only a switch onto the player restarts it). No GDD change until sonlm confirms them. (Confirmed 2026-11-25: see the next entry.)
 - **Status:** stays `final`; `updated: 2026-11-22`.
+
+## 2026-11-25 — Story 1.20 code review decisions
+
+Source: `implementation-artifacts/1-20-light-sensing-for-predators.md` (Review Findings; both answered by sonlm at the review, the recommended option each time).
+
+- **The three calls made at story creation (sonlm: confirm all three):** the 8 px strip inside the play-area edge stirs; a lurker on its way home stirs like one at rest; a telegraph switching between two decoys keeps its timer. Updated: Predators: Lurker (Stirs, Retargeting).
+- **A lurker hunting a decoy off screen when the player's light becomes the brighter (sonlm, (a)):** it stays on the decoy. It switches to the player only once it is on screen and can telegraph, so a flare keeps working however long the chain gets, and no telegraph ever runs where it can't be seen. As first built it entered the telegraph for one unseen tick and went home. Updated: Predators: Lurker (Retargeting).
+- **Also fixed at the review, no rule change:** a hunt that follows a retarget telegraph starts from rest, as every hunt did in M1 (it kept the old hunt's 95 px/s).
+- **Status:** stays `final`; `updated: 2026-11-25`.

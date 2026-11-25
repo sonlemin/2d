@@ -4,7 +4,7 @@ baseline_commit: c40e75f
 
 # Story 1.20: Light sensing for predators
 
-Status: in-progress
+Status: done
 
 **Type:** dev (with one human gate: sonlm's laptop look, Task 12) · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -215,16 +215,43 @@ so that I always know what wakes them and I'm never hunted from the dark.
 - [x] **Task 9: Red-checks (AC: 8; D12).** Break each once, see `FAIL`, restore, and list them in the Completion Notes.
 - [x] **Task 10: Docs and ledger (AC: 8; D13, D14).**
 - [x] **Task 11: Full run.** `cd game && ./run_tests.sh` → `== ALL GREEN`; record the counts. Then `tools/export.sh` → `BUILD OK` (the web debug smoke boots with no `console.error`).
-- [ ] **Task 12: HALT for sonlm: the laptop look (AC: 8). Human gate.**
-  - [ ] Hand sonlm the build lines (memory: laptop build-look commands).
+- [x] **Task 12: HALT for sonlm: the laptop look (AC: 8). Human gate.**
+  - [x] Hand sonlm the build lines (memory: laptop build-look commands).
     - **Web debug** (`?room=m1_shaft`, backquote to overlay 2) for the overlay and stirring.
     - **Windows** release for a plain run.
-  - [ ] Questions:
+  - [x] Questions:
     1. Does overlay 2 stay steady while falling: the labels on the lurkers, the sense line's far end, the light rings? (Ledger item from 1.12.)
     2. Do the `stir N` markers show while a lurker sits just above or below the view?
     3. Do lurkers feel the same as before when you play plainly? The one intended change is Q1: a hunt keeps going off screen.
     4. Anything that feels unfair?
-  - [ ] **HALT.** Record the answers verbatim in the Dev Agent Record. A failure becomes a ledger item for Story 1.30 (feel) or Story 1.27 (the cue), unless sonlm asks for a change now.
+  - [x] **HALT.** Record the answers verbatim in the Dev Agent Record. A failure becomes a ledger item for Story 1.30 (feel) or Story 1.27 (the cue), unless sonlm asks for a change now.
+
+### Review Findings
+
+Code review 2026-11-25 over `6dacb7d..` the working tree on `8eaf14a` (commit `84df0b7` plus the uncommitted Task 12 notes; Blind Hunter, Edge Case Hunter, Acceptance Auditor; 42 raw findings). The suite on that tree is `== ALL GREEN (31 tests)`, 2120 `ok`. No acceptance criterion is broken in game code, and no reviewer found a way to be hurt without a telegraph. The findings are two rules that need sonlm's call, one small FSM fix, weak or missing tests, and doc drift. sonlm answered both decisions (the recommended option each time) and chose "apply every patch"; all are applied, with eight red-checks, and the export run found one more (the last patch below). After the patches: `== ALL GREEN (31 tests)`, 2142 `ok`; `tools/export.sh` **BUILD OK**. Four probes ran on 4.7.2 headless (a scratch script through `tests/runner.tscn`):
+
+- **Velocity through a retarget telegraph (confirmed).** A lurker hunting a flare stand-in at 95 px/s, retargeted onto the player (row H3), stands still for the 54-tick telegraph and then starts the hunt at 95 px/s on the old heading (velocity (81, −49) with the player at heading (0.94, 0.34)).
+- **Row H3 off screen (confirmed).** A lurker hunting a decoy 40 px above the play rect, when the player's light passes the decoy's (138.4 px against 120 px), is in TELEGRAPH for one tick off screen and then rests, although it still senses the decoy.
+- **The cost of a lurker tick (measured).** In `perf_worst` (10 lurkers) one lurker tick takes 18 µs of script time, 0.18 ms for all ten. The per-tick arrays and group lookups are not a cost.
+- **A freed object passed to a typed parameter (confirmed).** It is a script error on 4.7.2 ("The Object-derived class of argument 1 (previously freed) is not a subclass of the expected argument class"), so the untyped `live()`, `notices()`, `senses()` and `stirs_for()` are right and AC2/AC3's typed signatures could not be built.
+
+- [x] [Review][Decision] A lurker hunting a decoy off screen drops it when the player's light becomes the largest — Row H3 picks with `senses` (no screen test) and enters TELEGRAPH; on the next tick nothing is noticed off screen, so row T2 sends it home. It spends one tick in TELEGRAPH where it can't be seen (the GDD: "The lurker must stay on screen for every tick of it"), and the decoy stops working the moment the player outshines it, although the lurker still senses it. Safe for the player either way. D6 has no row for it. It can't happen until flares exist (1.23): today the only light is the player's. Options: (a) off screen, keep hunting the decoy: H3 fires only when the lurker notices the player, otherwise it goes for the largest non-player light it senses; (b) keep it as built (it goes home), and say so in D6 and the GDD; (c) leave it to Story 1.23 with a ledger line. (Blind + Edge; probed) [game/scripts/actors/lurker.gd:181-184] **sonlm: (a), keep chasing the flare.** Applied: `Lurker._hunt_pick()`, `test_off_screen_decoy` (1 s on the decoy off screen, never TELEGRAPH, never monitorable; on screen a full telegraph inside the notice rect, then a harmful hunt), D6 row H3, the GDD's Retargeting line, the decision log.
+- [x] [Review][Decision] The three calls made at story creation are still unconfirmed — "The 8 px band stirs", "stirring runs in RETURN as well as IDLE" and "a telegraph switching between two decoys keeps its timer" are built and tested (the third has no test, see below), but the decision log says "No GDD change until sonlm confirms them", and nobody owns the confirmation. The GDD's Stirs line still says "just off screen" only. Options: (a) confirm all three, and the GDD's Stirs line and the decision log say so; (b) veto one or more (which?); (c) leave them open until the CP2 playtest, with a ledger line owned by Story 1.30. (Auditor) [_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/decision-log.md] **sonlm: (a), confirm all three.** Applied: the GDD's Stirs line (the 8 px strip, a lurker on its way home) and Retargeting line (decoy to decoy keeps the timer), the decision log, `game-architecture.md`.
+- [x] [Review][Patch] A hunt that follows a retarget telegraph starts at the old hunt's speed and heading: `_enter()` zeroes `_velocity` only for RETURN, and row H3 goes HUNT → TELEGRAPH → HUNT. Before this story a telegraph was reached only from IDLE or RETURN, so every hunt began from rest. Zero `_velocity` on entering TELEGRAPH, and check it in `test_target_choice` (velocity zero on the first HUNT tick's entry). (Edge; probed) [game/scripts/actors/lurker.gd:247-257]
+- [x] [Review][Patch] `LightSource.kind` defaults to `player`, the one kind that makes a hunt harmful: a flare or cache built in code that forgets `kind` is a decoy that damages, and the `_ready()` assert accepts it. Default to no kind (`&""`), so a debug build asserts and a release build treats it as a harmless non-player light; `player.tscn` already sets `kind = &"player"`. It departs from AC2's literal default. Add a `test_light_budget`-style check that the player scene's `LightSource` is kind `player`. (Blind + Edge) [game/scripts/actors/light_source.gd:17]
+- [x] [Review][Patch] The three telegraph-floor checks pass one tick short: `held + 1 >= _floor_ticks()` and `tele.size() + 1 >= _floor_ticks()` accept 44 ticks (0.733 s) against `Spec.TELEGRAPH_MIN` 0.75 s. Here the first TELEGRAPH tick is observed, so the count is exact and needs no allowance (unlike `smoke_rooms`, whose start may be a frame unseen). Drop the `+ 1` and red-check with a 44-tick telegraph. (Blind + Edge) [game/tests/smoke_lurker.gd:324, 351, 540]
+- [x] [Review][Patch] The stir step is compared against itself: both `step` values come from `Lurker.STIR_STEP_TIME`, so any step time passes, and only the 3/s ceiling is independent. The GDD's Stirs line now says "fully open 0.35 s later". Add `Spec.STIR_STEP := 0.35` with that citation and compare to it. (Blind + Edge + Auditor) [game/tests/smoke_lurker.gd:444, 543; game/tests/spec.gd]
+- [x] [Review][Patch] The pogo's `light_source.kick(LIGHT_KICK)` is not tested: `test_light_source` calls `chain.add_hit()` and `ls.kick()` by hand, so deleting `player.gd:251` fails nothing. Call `_p._on_pogo_hit()` there instead, and check the shown radius rose and `radius()` is still the chain's. (Blind + Auditor) [game/tests/smoke_lurker.gd:222-223]
+- [x] [Review][Patch] AC4's "identity is the node, never the kind" and row T4 have no test: every retarget case has one player light and one flare, so T3/H3 comparing kinds would pass. Add (a) a hunt of one player-kind light switching to a second, larger player-kind stand-in: a full telegraph; (b) row T4: a telegraph at one decoy switching to a larger decoy keeps its timer (HUNT on the same tick as without the switch). (Blind + Auditor) [game/tests/smoke_lurker.gd]
+- [x] [Review][Patch] Lint `light_query` sees only the literal lookup (`get_first_node_in_group` / `get_nodes_in_group` / `is_in_group` with a quoted `player`). Add `\b(is|as)\s+Player\b` for `actors/` except `player.gd` (no actor uses it today), with a firing sample and a near-miss, and list in the rule's comment what it still can't see (a group name held in a const, a node path), as `raw_text` does. (Blind + Edge) [game/tests/test_lint.gd:133-136]
+- [x] [Review][Patch] Small code tidy-ups: (a) `lurker.gd:74` says "tests and overlay 2 call these", but overlay 2 reads only `state`, `target` and `stir`; (b) `screenshot.gd:47-48` still sets `light.texture_scale` by hand, which `LightSource` overwrites on the next tick; (c) `Fx.EFFECTS[&"light_kick"]` says the swell is in `player.gd`, and it now lives in `light_source.gd`; (d) `Spec.NOTICE_MIN_RADIUS` is commented "a floor", while `test_sensing` holds it exact (79.9 never, 80 does): say both uses; (e) `test_dev_args:208-209` takes the expected reach from `Sensing.NOTICE_FACTOR`, and `Spec.NOTICE_FACTOR` now exists. (Blind + Auditor) [game/scripts/actors/lurker.gd:74; game/tests/screenshot.gd:47; game/scripts/core/fx.gd:57; game/tests/spec.gd:11; game/tests/test_dev_args.gd:208]
+- [x] [Review][Patch] Docs still describe the M1 lurker or contradict themselves: (a) `docs/architecture.md:64, 66, 79, 121, 177` (lurkers poll the player through `get_first_node_in_group("player")`, the player eases its own light, "notices while on screen" with no notice/sense split or stirring), and its `spec.gd` row and test table lack the new entries; (b) `game-architecture.md` Stirring bullet says both "It runs in `RETURN` as well as `IDLE`" and "The lurker stays in `IDLE`", and Debug Tools still says "(sense/stir rings with 1.20)"; (c) `docs/development-guide.md` "Add a predator" says nothing of `LightSource` + `Sensing`, and "Light presentation consts stay in `player.gd`" is half true (`LIGHT_LERP` moved); (d) `docs/component-inventory.md:144` says a telegraph whose light went out goes to RETURN, and the code and the diagram above it say IDLE or RETURN; (e) `game/README.md:59` gives the 8 px margin two meanings in one sentence; (f) this story's D6 row I1 still says `stir = 0`, which D9 and the code reject; (g) `sprint-status.yaml`'s header comment date is behind its `last_updated` field. (Blind + Auditor)
+- [x] [Review][Patch] Two hand-offs to later stories have no ledger line: `STIR_STEP_TIME` is "reviewed at the CP2 gate (1.30)" in the code, the GDD and the decision log; and D9's rule for Story 1.27 (the cue shows only for a lurker off screen, although `stir` also rises in the on-screen 8 px band) exists only in this story file. Add both to `deferred-work.md` with their owners (Story 1.30, Story 1.27). (Auditor) [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Patch] Found by the review's own export run: Godot's export cache ships a stale scene when a script's `@export` default changes. `game/.godot/exported/` holds each converted scene keyed on the scene file alone, and the conversion drops properties equal to the script's default. With `LightSource.kind`'s default changed (the patch above), the cached `player.scn` carried no `kind`: the web debug smoke failed on the `_ready()` assert, and a release build would have shipped a player light no lurker can hurt, with no error. Probed on 4.7.2 (the packed scene's `LightSource` has `script` only; after clearing the cache it has `kind = player`). `tools/export.sh` now deletes the cache before every export (about 8 s); `docs/build.md` and `project-context.md` say why. Proven by restoring the stale cache and building: BUILD OK, `kind` in the pack. [tools/export.sh]
+- [x] [Review][Defer] A lurker on the notice edge flips between TELEGRAPH and rest with no rate limit [game/scripts/actors/lurker.gd:161-165] — deferred, pre-existing (M1 dropped a telegraph the same way; only `stir` is paced). Owner: Story 1.27.
+- [x] [Review][Defer] A hunting lurker swings through a light that stands still [game/scripts/actors/lurker.gd:196-201] — deferred, pre-existing (M1's steering; no still light exists until flares). Owner: Story 1.23.
+
+Dismissed (13): rows H1/T1 running before the retarget rows (D6 on purpose: "one row per tick", home at once); the per-tick cost (measured, above); `Rect2.has_point()`'s half-open edge at exactly 96 px (AC1 documents the rule for the notice rect; an exact edge lasts one tick of a moving view); `LightSource` with a `Light` child that is no `BudgetLight`, and a kick before the first tick (`test_light_budget` audits the scenes; no pogo lands on a life's first tick); the overlay's `TELEPORT_PX` guess (dev only, looked at on the laptop); two overlay checks that restate `Sensing` (the overlay is meant to draw the rule's own numbers) or count draws (dev only; sonlm: "yes it shows"); the trace fixture's rounding and its throwaway recorder (the baseline tree it recorded is `c40e75f`); `RULES.filter(...)[0]` in the lint (every hit's id comes from `RULES`); the across-the-edge pacing run flipping every two ticks (a per-tick flip can never stir under D6, as the Completion Notes say); the untyped signatures (probed, above); the drift item closed on "Everything else work" (sonlm's own answer to the list that held the question); the commit message's "Task 12 still pending" (true when written).
 
 ## Dev Notes
 
@@ -262,7 +289,7 @@ The first matching row wins.
 
 | Row | State | Condition | Result |
 |---|---|---|---|
-| I1 | IDLE / RETURN | `pick_n` exists | `target = pick_n`; `_enter(TELEGRAPH)` (full timer; `stir = 0`) |
+| I1 | IDLE / RETURN | `pick_n` exists | `target = pick_n`; `_enter(TELEGRAPH)` (full timer, from rest; `stir` falls by its own clock, D9: no reset, corrected at the review) |
 | I2 | IDLE / RETURN | otherwise | `stirring` = any live light `stirs_for()` this lurker; step `stir` (AC5). IDLE: eyes close. RETURN: drift home, at home → IDLE. `target = null` |
 | T1 | TELEGRAPH | not `tgt_live` | RETURN (IDLE if within 1 px of home), at once: the light went out (M1 D6) |
 | T2 | TELEGRAPH | `pick_n` is null (Q1: the telegraph is watched on screen) | IDLE at home, else RETURN (M1) |
@@ -271,7 +298,7 @@ The first matching row wins.
 | T5 | TELEGRAPH | `pick_n == target` | the timer runs; at ≤ 0 → `_enter(HUNT)` |
 | H1 | HUNT | not `tgt_live` | RETURN at once (M1 D6; a flare burnt out, the cache taken, a death) |
 | H2 | HUNT | `pick_s` is null | lost the scent: `monitorable` false at once, ×2 brake, `_unsensed += delta`; at ≥ `lurker_lose_track_time` → RETURN |
-| H3 | HUNT | `pick_s != target` and `pick_s.kind == player` | `target = pick_s`; `_enter(TELEGRAPH)` (FR21: every hunt of the player is telegraphed; a new life's light is a new node) |
+| H3 | HUNT | `pick_s != target` and `pick_s.kind == player` | `target = pick_s`; `_enter(TELEGRAPH)` (FR21: every hunt of the player is telegraphed; a new life's light is a new node). Review (sonlm, 2026-11-25): `pick_s` comes from `_hunt_pick()`, which leaves out a player light the lurker isn't hunting and doesn't notice, so off screen the hunt stays on the largest of its target and the decoys (rows H4/H5) and no telegraph runs unseen |
 | H4 | HUNT | `pick_s != target` (non-player) | `target = pick_s`; stays HUNT, no telegraph (FR16); `_unsensed = 0` |
 | H5 | HUNT | `pick_s == target` | `_unsensed = 0`; close in at hunt speed (M1); this includes a re-sense inside the wait (Q2) |
 
@@ -372,6 +399,8 @@ The first matching row wins.
     - the Last Updated line.
 
 ### Calls made at story creation without a question (sonlm may veto)
+
+**Confirmed by sonlm at the code review, 2026-11-25 (all three); the GDD's Stirs and Retargeting lines and the decision log now carry them.**
 
 - **The 8 px band stirs** (D3): a lurker on screen but inside the notice margin stirs rather than staying silent. Story 1.27's flare-cost hatch and E3's stirring sound will read it there too.
 - **Stirring runs in RETURN as well as IDLE** (row I2): a returning lurker just off screen that would notice warns like an idle one.
@@ -511,7 +540,18 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-22.
   - T2 using the sense rule: case 9's telegraph half ("got TELEGRAPH"), plus the edge-pacing premise.
   - The lint pattern emptied: `light_query`'s three firing samples.
 - **Full run (Task 11):** `cd game && ./run_tests.sh` gave `== ALL GREEN (31 tests)`, 2120 `ok` (from 29 and 2005). `smoke_rooms`' guarantees are unchanged and green. `xvfb-run … screenshot.gd` renders both shots and the three Deck mocks with no error (the chain-10 light and the lurker's telegraph show). `tools/export.sh` gave **BUILD OK** `builds/20261122-6dacb7d-dirty` (uncommitted tree): web 11.0 MB gzip (raw 40.8 MB), PCK files 94 / 94 / 94 / 102, the Linux release boot clean, the web smoke 7 passed, 149 s.
-- **Status:** tests green; needs a look on the laptop (Task 12, HALT). The story stays `in-progress` until sonlm's answers are recorded.
+- **Laptop look (Task 12, 2026-11-25):** on a new server (10.5.5.193, reached through a jump server; toolchain reinstalled, re-run on the committed tree `8eaf14a`: `== ALL GREEN (31 tests)`, 2120 `ok`; `tools/export.sh` **BUILD OK** `builds/20261125-8eaf14a`, web 11.0 MB gzip, web smoke 7 passed, 93 s). sonlm looked at the web debug build (`?room=m1_shaft`, overlay 2) and the Windows release build. Answers, verbatim:
+  - Q1 (overlay 2 steady while falling), Q3 (lurkers feel the same in plain play), Q4 (anything unfair): "Everything else work".
+  - Q2 (`stir N` markers show for a lurker just above or below the view), after the marker was explained: "yes it shows".
+  - No failures, so no new ledger items. The 1.12 drift item ("Overlay 2 still drifts a little while falling") is closed.
+- **Code review (2026-11-25, `gds-code-review`):** 42 raw findings; 2 decisions (sonlm: keep chasing the flare off screen; confirm the three calls), 11 patches applied, 2 deferred (Story 1.27, Story 1.23), 13 dismissed. Details and probes are in Review Findings.
+  - Game code: `Lurker._hunt_pick()` (a decoy kept off screen), `_velocity` zeroed on entering TELEGRAPH (every hunt starts from rest), `LightSource.kind` with no default, the `light_kick` row in `Fx.EFFECTS`.
+  - Tests: `smoke_lurker` gained `test_identity`, `test_decoy_to_decoy` and `test_off_screen_decoy`, the exact telegraph floor (no one-tick allowance), `Spec.STIR_STEP`, the pogo's own `_on_pogo_hit()`, the from-rest and default-kind checks; lint `light_query` also fires on `is Player` / `as Player`.
+  - Red-checks (each broken once, `FAIL` seen, restored): velocity kept through the telegraph; the hunt pick ignoring the screen; a 44-tick telegraph (the three old floor checks and the three new ones); a 0.5 s stir step; the pogo without its kick; H3 comparing kinds; T4 restarting the timer; the default kind back to `player`.
+  - Build: `tools/export.sh` clears Godot's export cache before exporting (the stale `player.scn`, above). On this server Node 24 comes from nvm (`~/.nvm/versions/node/v24.22.3/bin` on `PATH`); a non-interactive shell otherwise finds the system Node 18 and the preflight stops.
+  - Full run: `== ALL GREEN (31 tests)`, 2142 `ok` (from 2120). `tools/export.sh` **BUILD OK** `builds/20261125-8eaf14a-dirty` (uncommitted tree): web 11.0 MB gzip, web smoke 7 passed, 95 s. `screenshot.gd` renders both shots and the three Deck mocks.
+  - Nothing a player can see changed with the lone player light (the M1 trace still matches tick for tick), so no new laptop look is needed; the decoy rules are felt first in Story 1.23.
+- **Status:** tests green, looked at on the laptop, reviewed; status `done`.
 
 ### File List
 
@@ -527,6 +567,8 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-22.
 - `game/scenes/actors/player.tscn`
 - `game/scripts/actors/player.gd`, `game/scripts/actors/lurker.gd`
 - `game/scripts/dev/overlays.gd`, `game/scripts/dev/perf_run.gd`
+- `game/scripts/core/fx.gd` (review)
+- `tools/export.sh`, `docs/build.md` (review)
 - `game/tests/spec.gd`, `game/tests/test_lint.gd`, `game/tests/test_light_budget.gd`, `game/tests/test_tuning.gd`, `game/tests/test_dev_args.gd`, `game/tests/smoke_rooms.gd`, `game/tests/smoke_health.gd`, `game/tests/smoke_world.gd`, `game/tests/smoke_dev_tools.gd`, `game/tests/smoke_perf.gd`, `game/tests/screenshot.gd`
 - `game/README.md`, `docs/component-inventory.md`, `docs/development-guide.md`, `docs/architecture.md`, `docs/source-tree-analysis.md`
 - `_bmad-output/game-architecture.md`, `_bmad-output/project-context.md`
@@ -537,3 +579,5 @@ Claude Opus 5.5 (`claude-opus-5-5`), gds-dev-story, 2026-11-22.
 
 - 2026-11-22: story created (`gds-create-story`), status ready-for-dev; Q1–Q3 answered by sonlm at creation (all three recommended options).
 - 2026-11-22: implemented (`gds-dev-story`), Tasks 1–11 done: `Sensing`, `LightSource` on the player, the lurker rewrite (D6, Q1–Q3), overlay 2 per light and per predator, lint `light_query`, `test_sensing` and `smoke_lurker` (the M1 trace fixture); 31 tests, 2120 ok; BUILD OK `20261122-6dacb7d-dirty`. HALT at Task 12 for sonlm's laptop look.
+- 2026-11-25: Task 12 laptop look passed (sonlm: Q1, Q3, Q4 "Everything else work"; Q2 "yes it shows"); overlay drift ledger item closed; status review.
+- 2026-11-25: code review (`gds-code-review`): 2 decisions (sonlm: a decoy is kept off screen; the three story-creation calls confirmed), 11 patches applied with 8 red-checks (hunt from rest after a retarget telegraph, `LightSource.kind` without a default, exact telegraph floor, `Spec.STIR_STEP`, new retarget cases, lint `light_query` on `is Player`, doc drift, `export.sh` clearing Godot's export cache), 2 deferred (Story 1.27, Story 1.23), 13 dismissed; 31 tests, 2142 ok; BUILD OK `20261125-8eaf14a-dirty`; status done.

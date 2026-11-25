@@ -54,7 +54,7 @@ const EFFECTS := {
 	&"chain_popup": {kind = Kind.ONCE, hz = 0.0, fn = "chain_popup", reduced = "reduced motion: as popup, which draws it"},
 	&"camera_shake": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "shake off: none (CameraRig asks shake_on())"},
 	&"light_kick": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
-			why = "one 18 px swell of the player's light, eased back, per pogo hit (player.gd): a change of radius, never an on/off flash"},
+			why = "one 18 px swell of the player's light, eased back, per pogo hit (LightSource.kick(), from player.gd): a change of radius, never an on/off flash"},
 	&"swing_arcs": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
 			why = "the slash and pogo arcs (player.gd) show for the 0.12 s or 0.22 s a swing can hit, once per Attack press: the player's own action at their own pace, not a flash the game plays at them (sonlm's laptop look, 2026-11-21: reads as a normal attack)"},
 	&"invuln_blink": {kind = Kind.BLINK, hz = INVULN_BLINK_HZ, fn = "blink_alpha", reduced = "reduce flashing: steady transparency (STEADY_ALPHA)"},

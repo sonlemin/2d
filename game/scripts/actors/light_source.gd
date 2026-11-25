@@ -14,7 +14,10 @@ extends Node2D
 const LIGHT_LERP := 10.0  ## 1/s easing of the shown light toward radius(); presentation (was player.gd LIGHT_LERP, M1 player.light_lerp).
 const GROUP := &"light_source"
 
-@export var kind: StringName = Sensing.KIND_PLAYER
+## One of Sensing.KINDS, set by the owner (player.tscn: `player`). No default: `player` is the one
+## kind that makes a hunt harmful (Lurker._harmful()), so a light that forgets its kind must never
+## be one. A debug build asserts in _ready(); a release build treats it as a harmless decoy.
+@export var kind: StringName = &""
 ## The rule radius, when set: the player sets it to chain.light_radius.
 var radius_fn := Callable()
 ## px, for a light with a set radius: a flare's pre-toss radius (1.23), the cache's Tuning value
@@ -29,7 +32,7 @@ var _out := false
 
 
 func _ready() -> void:
-	assert(kind in Sensing.KINDS, "LightSource: unknown kind '%s' (Sensing.KINDS)" % kind)
+	assert(kind in Sensing.KINDS, "LightSource: kind '%s' is not set or unknown (Sensing.KINDS)" % kind)
 	add_to_group(GROUP)
 	light = get_node_or_null(^"Light") as BudgetLight
 

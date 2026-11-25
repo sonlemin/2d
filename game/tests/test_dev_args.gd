@@ -205,8 +205,8 @@ func _test_clock_rows() -> void:
 ## light at or past NOTICE_MIN_RADIUS can be noticed. The base light is safe by the GDD (Spec).
 func _test_light_marks() -> void:
 	var m := Overlays.light_marks(Spec.BASE_LIGHT)
-	check(not m.noticeable and is_equal_approx(m.reach, Spec.BASE_LIGHT * Sensing.NOTICE_FACTOR),
-			"light_marks: the %d px base light can't be noticed, reach %d px (got %s)" % [Spec.BASE_LIGHT, Spec.BASE_LIGHT * Sensing.NOTICE_FACTOR, m])
+	check(not m.noticeable and is_equal_approx(m.reach, Spec.BASE_LIGHT * Spec.NOTICE_FACTOR),
+			"light_marks: the %d px base light can't be noticed, reach %d px (got %s)" % [Spec.BASE_LIGHT, Spec.BASE_LIGHT * Spec.NOTICE_FACTOR, m])
 	m = Overlays.light_marks(Sensing.NOTICE_MIN_RADIUS - 0.5)
 	check(not m.noticeable, "light_marks: half a pixel below the notice radius can't be noticed (got %s)" % [m])
 	m = Overlays.light_marks(Sensing.NOTICE_MIN_RADIUS)

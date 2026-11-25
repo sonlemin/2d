@@ -3,7 +3,7 @@ title: "The Unbroken Chain — Game Design Document"
 game_type: metroidvania (descent; action-platformer feel conventions)
 platforms: [PC Windows, PC Linux, web/itch.io for playtests]
 created: 2026-11-10
-updated: 2026-11-22
+updated: 2026-11-25
 status: final
 inputs:
   - _bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/
@@ -203,10 +203,10 @@ The room-exit row is a runtime backstop: level design places exits behind a land
 #### Predators: Lurker (M1)
 
 - **Wakes:** when your light radius is ≥ 80 px (4 links), it is within radius × 1.6 of you, and it is **on screen**.
-- **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), you hear a quiet stirring panned to that side. At the play-area edge, level with the lurker, a half-open eye appears and opens wider as it stirs, with a red glow that has a minimum strength. A faint glow alone is not enough (UX, 2026-11-11). It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*). The eye is half-open at once and fully open 0.35 s later, and it steps open or closed at most once per 0.35 s, so it never flickers past 3 changes a second (2026-11-22, Story 1.20 Q3; reviewed at the CP2 gate).
+- **Stirs (off screen):** if it would wake but sits just off screen (within 96 px of the edge), or on screen in the 8 px strip at the play-area edge where it can't yet wake, you hear a quiet stirring panned to that side. At the play-area edge, level with the lurker, a half-open eye appears and opens wider as it stirs, with a red glow that has a minimum strength. A faint glow alone is not enough (UX, 2026-11-11). It can't hunt until it is on screen and has telegraphed. You are warned, never ambushed (Pillar 2: *hear it before you see it*). The eye is half-open at once and fully open 0.35 s later, and it steps open or closed at most once per 0.35 s, so it never flickers past 3 changes a second (2026-11-22, Story 1.20 Q3; reviewed at the CP2 gate). A lurker on its way home stirs the same way as one at rest (2026-11-25, Story 1.20 review).
 - **Telegraph:** 0.9 s (never below 0.75 s). The lurker must stay on screen for every tick of it, or it gives up (2026-11-22, Story 1.20 Q1: the whole warning is seen). Its eyes open with an animation and pulse at 2 Hz, cast red light on the wall. Both HUD gutters show a pulsing red frame (≤ 2 Hz) and a small eye icon. HUD values are not recoloured (UX, 2026-11-11).
 - **Hunt:** 95 px/s straight at you, passing through walls. It **senses** you while your light radius is ≥ 80 px and you are within radius × 1.6. Once it can't sense you, it stops at once and is harmless, waits 0.6 s, then returns home. The hunt needs no screen test: once it has telegraphed, it keeps hunting off screen while your light reaches it (2026-11-22, Story 1.20 Q1). If it senses you again inside the 0.6 s wait, the hunt resumes with no new telegraph (2026-11-22, Story 1.20 Q2: M1 as built).
-- **Retargeting:** if a lurker hunting a flare or the Ember Cache switches to you, it telegraphs again from the start (≥ 0.75 s) before it can hurt you. Every hunt of the player is telegraphed (Pillar 2). Switching from you to a flare needs no telegraph.
+- **Retargeting:** if a lurker hunting a flare or the Ember Cache switches to you, it telegraphs again from the start (≥ 0.75 s) before it can hurt you. Every hunt of the player is telegraphed (Pillar 2). Switching from you to a flare needs no telegraph. A telegraph that switches from one decoy to another keeps its timer; only a switch onto you restarts it. Off screen, a lurker hunting a decoy stays on it even when your light becomes the brighter: it switches to you only once it is on screen, with the full telegraph (2026-11-25, Story 1.20 review). Every hunt starts from rest.
 
 ### Controls and Input
 

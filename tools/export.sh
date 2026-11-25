@@ -224,6 +224,13 @@ grep -qx 'PASS' "$LOGS/content_strings.log" || fail "content: test_strings print
 
 # --- 5. exports: absolute paths only (a relative one resolves against game/, not here) ---------
 step export
+# Godot keeps each converted scene in game/.godot/exported/, keyed on the scene file alone, and the
+# conversion drops every property equal to its script's default. So a scene converted before a
+# script's @export default changed is reused without the value it now needs (review of 1.20,
+# probed on 4.7.2: LightSource.kind's default went from `player` to none, and the cached
+# player.scn carried no kind; the debug web smoke caught the assert, a release build would have
+# shipped a player no lurker can hurt). Every build converts afresh (about 8 s).
+rm -rf "$ROOT/game/.godot/exported"
 export_one() {
 	local preset="$1" mode="$2" key="$3" file="$4"
 	godot_run "$LOGS/export_$key.log" 600 --headless --path "$ROOT/game" "$mode" "$preset" "$OUT/$key/$file"

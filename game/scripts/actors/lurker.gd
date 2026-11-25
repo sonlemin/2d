@@ -12,7 +12,8 @@ extends Area2D
 ##   shrink the light. Re-sensing inside the wait resumes the hunt with no telegraph (Q2, M1).
 ## - Retarget (FR16, FR21): it goes for the largest light it senses, a tie going to a non-player
 ##   light. Onto the player always costs a full telegraph; off the player onto a decoy costs none.
-##   Identity is the node, so a new life's light is a new target.
+##   Identity is the node, so a new life's light is a new target. A hunt switches onto a player light
+##   only where it notices it: off screen it stays on the decoy (_hunt_pick(); review of 1.20, sonlm).
 ## - Stir: a light it would sense while it sits off screen (or in the notice margin) raises `stir`,
 ##   which the edge cue (1.27) and the stirring sound (E3) read. A stirring lurker never hunts.
 ##
@@ -71,7 +72,7 @@ func force(next: State, source: LightSource = null) -> void:
 	_enter(next)
 
 
-# --- The rule, as the FSM asks it (tests and overlay 2 call these) ------------------------------
+# --- The rule, as the FSM asks it (tests call these too) ----------------------------------------
 # `source` is untyped: a freed LightSource passed to a typed (even Object) parameter is a script
 # error on 4.7.2 (probed), and each of these must answer false for it.
 
@@ -131,7 +132,7 @@ func _physics_process(delta: float) -> void:
 			_telegraph(_pick(lit, notices))
 		State.HUNT:
 			_eyes.modulate.a = 1.0
-			_hunt(_pick(lit, senses), delta)
+			_hunt(_hunt_pick(lit), delta)
 		State.RETURN:
 			var pick_n := _pick(lit, notices)  # before the step home, as M1 sensed at the top of the tick
 			var stirs := pick_n == null and lit.any(stirs_for)
@@ -179,7 +180,7 @@ func _hunt(pick_s: LightSource, delta: float) -> void:
 		_enter(State.RETURN)  # H1: a flare burnt out, the cache taken, a death (M1 D6): home at once
 		return
 	if pick_s != null and pick_s != target and pick_s.kind == Sensing.KIND_PLAYER:
-		target = pick_s  # H3 (FR21): every hunt of the player is telegraphed; a new life's light is a new node
+		target = pick_s  # H3 (FR21): every hunt of the player is telegraphed; a new life's light is a new node. _hunt_pick() gave it only because it is noticed
 		_enter(State.TELEGRAPH)
 		return
 	var sensed := pick_s != null
@@ -210,6 +211,22 @@ func _step_stir(delta: float) -> void:
 	if stir != goal and _stir_clock >= STIR_STEP_TIME - STIR_CLOCK_SLACK:
 		stir += signi(goal - stir)
 		_stir_clock = 0.0
+
+
+## The hunt's pick: the largest light it senses (Q1: no screen test), with one exception (row H3b;
+## review of 1.20, sonlm 2026-11-25). A player light it isn't hunting and doesn't notice (off screen,
+## or in the notice margin) can't be telegraphed at where the warning is seen (Pillar 2), so it is
+## left out and the hunt stays on the largest of its target and the decoys: a flare keeps working
+## off screen however bright the player grows. On screen the player light is picked as before (H3).
+func _hunt_pick(lit: Array[LightSource]) -> LightSource:
+	var pick_s := _pick(lit, senses)
+	if pick_s == null or pick_s == target or pick_s.kind != Sensing.KIND_PLAYER or notices(pick_s):
+		return pick_s
+	var rest: Array[LightSource] = []
+	for s in lit:
+		if s == target or s.kind != Sensing.KIND_PLAYER:
+			rest.append(s)
+	return _pick(rest, senses)
 
 
 ## Every lit LightSource, in group order (tree order), so a tie between two decoys keeps the earlier.
@@ -251,6 +268,9 @@ func _enter(next: State) -> void:
 	match next:
 		State.TELEGRAPH:
 			_timer = Game.tuning.f(&"lurker_telegraph_time")
+			# Every hunt starts from rest, as in M1, where a telegraph came only from IDLE or RETURN:
+			# a telegraph reached from a hunt (H3) must not hand the old hunt's speed to the new one.
+			_velocity = Vector2.ZERO
 		State.HUNT:
 			_unsensed = 0.0
 		State.RETURN:
