@@ -17,17 +17,21 @@ const Overlays := preload("overlays.gd")
 const PerfRun := preload("perf_run.gd")
 
 ## One row per arg (D4): name -> {help, apply (the method that applies its values), repeat (may be
-## given more than once)}. Rows apply in this order: log first, so the rest can log; set and room
-## at once; chain and hp on every spawn; glow before perf, so the run's summary knows it; perf last,
-## since it reads --chain. Later stories add one row each: difficulty (1.22).
+## given more than once), detach}. Rows apply in this order: log first, so the rest can log; set and
+## room at once; chain and hp on every spawn; glow before perf, so the run's summary knows it; perf
+## last, since it reads --chain. Later stories add one row each: difficulty (1.22, detach = true).
+## `detach` (Story 1.21 D12, sonlm 2026-11-25): an arg that changes the play itself. A session
+## that applied one loads no slot and saves none (`Game.detach_slot()`), so a dev room, chain or
+## HP never reaches the file a normal run reads, and `--room` always wins over a saved respawn
+## point. log, set and glow change only what is shown or logged: the slot loads and saves as usual.
 const ARGS := {
-	"log": {help = "--log=<cat>,<cat>: turn on Log categories", apply = &"_apply_log", repeat = true},
-	"set": {help = "--set=<key>:<value>: a setting for this session only; nothing is saved", apply = &"_apply_set", repeat = true},
-	"room": {help = "--room=<id>: start the dive in that room", apply = &"_apply_room", repeat = false},
-	"chain": {help = "--chain=<n>: every life takes off with that chain", apply = &"_apply_chain", repeat = false},
-	"hp": {help = "--hp=<n>: every life starts with n HP (1–4)", apply = &"_apply_hp", repeat = false},
-	"glow": {help = "--glow=on|off: engine glow (a WorldEnvironment) for the perf check; off unless given", apply = &"_apply_glow", repeat = false},
-	"perf": {help = "--perf[=<s>]: a timed perf run (default 60 s): the player locked on a fixed path, untouchable, holding --chain's n (default 20); the summary goes to the log and overlay 4", apply = &"_apply_perf", repeat = false},
+	"log": {help = "--log=<cat>,<cat>: turn on Log categories", apply = &"_apply_log", repeat = true, detach = false},
+	"set": {help = "--set=<key>:<value>: a setting for this session only; nothing is saved", apply = &"_apply_set", repeat = true, detach = false},
+	"room": {help = "--room=<id>: start the dive in that room; no slot is loaded or saved", apply = &"_apply_room", repeat = false, detach = true},
+	"chain": {help = "--chain=<n>: every life takes off with that chain; no slot is loaded or saved", apply = &"_apply_chain", repeat = false, detach = true},
+	"hp": {help = "--hp=<n>: every life starts with n HP (1–4); no slot is loaded or saved", apply = &"_apply_hp", repeat = false, detach = true},
+	"glow": {help = "--glow=on|off: engine glow (a WorldEnvironment) for the perf check; off unless given", apply = &"_apply_glow", repeat = false, detach = false},
+	"perf": {help = "--perf[=<s>]: a timed perf run (default 60 s): the player locked on a fixed path, untouchable, holding --chain's n (default 20); the summary goes to the log and overlay 4; no slot is loaded or saved", apply = &"_apply_perf", repeat = false, detach = true},
 }
 ## The entry `--room=` starts at, by preference: the `P`, else arriving from above, else from below
 ## (D5; Story 2.1's weaver_test has no `P` and is entered from the top).
@@ -310,11 +314,18 @@ func _apply(list: PackedStringArray) -> void:
 	for e: String in parsed.errors:
 		_warn(e)
 	var done := PackedStringArray()
+	var detach := false
 	for arg: String in ARGS:
 		if parsed.values.has(arg):
 			var summary: String = call(ARGS[arg].apply, parsed.values[arg])
 			if summary != "":
 				done.append(summary)
+				# Only an arg that was applied: a refused --room=typo leaves a normal session.
+				detach = detach or ARGS[arg].detach
+	if detach:
+		# Story 1.21 D12. Before Game.boot(): World adds this node first thing in its _ready().
+		Game.detach_slot()
+		done.append("no slot loaded or saved")
 	if not done.is_empty():
 		# AR55's category list is fixed (no DEV): the room category carries the one summary line.
 		Log.info(Log.ROOM, "dev: " + ", ".join(done))
@@ -356,7 +367,8 @@ func _apply_set(values: Array[String]) -> String:
 
 ## D5: checked before World builds anything, so a bad id or room never reaches RoomLoader's
 ## push_error or World's assert; the default start room loads instead. The respawn point is never
-## written (it is save data from 1.21).
+## written (it is save data), and none is loaded either: an applied --room detaches the slot
+## (Story 1.21 D12), so the start room always wins.
 func _apply_room(values: Array[String]) -> String:
 	var id: String = values[-1]
 	var r := room_entry(id, RoomLoader.inspect(StringName(id)), RoomLoader.room_ids())

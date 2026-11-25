@@ -9,6 +9,9 @@ extends Node2D
 ## World also polls hazards like exits (Story 1.19 D5) and tracks the life's safe ground: the last
 ## floor tick that touched no hazard, seeded below the entry at every build (D6). A spike returns the
 ## player there; the Ember Cache drops there (Story 1.22, last_safe_position()).
+## World also counts the slot's play time (real seconds, `_process`) and its depth record (the
+## player's screen row, each tick), and checks a loaded respawn point before the first build
+## (Story 1.21).
 
 ## Every (re)spawn, including the first: bind to `player.chain` / the player here, never once.
 signal player_spawned(player: Player)
@@ -18,8 +21,12 @@ signal room_entered(room_id: StringName)
 const PlayerScene := preload("res://scenes/actors/player.tscn")
 ## Applies the ≤ 6 light budget each physics tick, after the actors (Story 1.12 D5).
 const LightBudgetNode := preload("res://scripts/world/light_budget.gd")
-## The dive starts here until the slot's resume point replaces it (Stories 1.21 and 1.38).
+## The dive starts here unless the dive holds a respawn point: a loaded slot's resume point
+## (Story 1.21), from Story 1.24 an anchor or a station.
 const START_ROOM := &"m1_shaft"
+## s: the most one frame adds to the slot's play time (Story 1.21 D8): a stalled or backgrounded
+## frame is not play.
+const PLAY_TIME_STEP_MAX := 0.25
 ## s between a death and the respawn, the M1 value; the death card replaces this wait in 1.29.
 const RESPAWN_DELAY := 0.6
 ## Ambient brightness of the dark (CanvasModulate value). `Settings.brightness` picks the level;
@@ -38,6 +45,7 @@ var _player: Player
 var _swap_pending := false
 var _safe_pos := Vector2.ZERO  # room-local (the room and World both sit at the origin, so it is the player's `position`); see last_safe_position()
 var _last_white_frame := -1  # the retired Player's last_white_frame, for the next life (Q1)
+var _play_clock_usec := 0  # Time.get_ticks_usec() at the last frame counted as play; 0 = none since the start or a pause
 
 @onready var _darkness: CanvasModulate = $Darkness
 @onready var _room_holder: Node2D = $RoomHolder
@@ -59,6 +67,7 @@ func _ready() -> void:
 	_apply_ambient()
 	# A method, not a lambda: the connection drops when World is freed.
 	Game.settings.changed.connect(_on_setting_changed)
+	_check_respawn_point()
 	var point := _respawn_point()
 	# Not a physics callback, so the first room needn't wait for the end of the frame.
 	_swap_room(point[0], point[1], true)
@@ -97,15 +106,41 @@ func enter_room(room_id: StringName, entry: StringName) -> void:
 	_swap_room.call_deferred(room_id, entry, false)
 
 
+## Play time (Story 1.21 D8): real seconds while World processes, so it stops with
+## `SceneTree.paused` (World is pausable) and counts through the death wait. Wall time between
+## frames, never `delta / Engine.time_scale`: that misreads on the frame a Clock request lands (the
+## delta was scaled before the request), which is every pogo hit's hitstop. Probed on 4.7.2: 12
+## hits in 4.00 s counted 5.59 s. Bookkeeping only; nothing here moves.
+func _process(_delta: float) -> void:
+	var now := Time.get_ticks_usec()
+	if _play_clock_usec > 0:
+		_count_play_time((now - _play_clock_usec) / 1000000.0)
+	_play_clock_usec = now
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_UNPAUSED:
+		_play_clock_usec = 0  # the pause is not play: the first frame after it starts the clock again
+
+
+## One frame's real seconds onto the slot, capped at PLAY_TIME_STEP_MAX. Its own method so a test
+## can count a known step.
+func _count_play_time(real_seconds: float) -> void:
+	Game.slot.add_play_time(minf(real_seconds, PLAY_TIME_STEP_MAX))
+
+
 ## Exits are polled here, not overlapped (D2, as crawler contact is): the body centre past the
 ## floor or the ceiling crosses that side's exit. Then, on every tick that crossed nothing, the
-## safe-ground tracker and the hazard poll (Story 1.19). World runs before its children, so both
-## read the player's last tick.
+## depth record (Story 1.21), the safe-ground tracker and the hazard poll (Story 1.19). World runs
+## before its children, so all three read the player's last tick.
 func _physics_process(_delta: float) -> void:
 	if _swap_pending or not _player_alive():
 		return
 	if _poll_exits():
 		return
+	# D9: the deepest screen row reached, 0 = the top screen. The room's own row in E1 (the bottom
+	# loop adds none); E4 adds the room's `map=` row to it.
+	Game.slot.record_depth(maxi(floori(_player.position.y / Display.BASE.y), 0))
 	var hurt_rect := _player.hurt_rect()
 	var touching := _room.touches_hazard(hurt_rect)
 	if _player.is_on_floor() and not touching:
@@ -168,8 +203,9 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		if not respawn:
 			_player.die()  # outside the room with nowhere to go: never fall forever
 		elif room_id != start_room or entry != start_entry:
-			# A bad respawn point (save data from 1.21): the dive's start instead. DevTools checks
-			# --room= before it sets the start, so this never runs for a dev room.
+			# A respawn point that failed to build: the dive's start instead. A loaded point is
+			# checked before the first build (_check_respawn_point()), and DevTools checks --room=
+			# before it sets the start, so this is the backstop for a point set in play.
 			_swap_room(start_room, start_entry, true)
 		else:
 			assert(false, "World: the start room '%s' failed to load (errors above)" % start_room)
@@ -216,6 +252,24 @@ func _respawn_point() -> Array[StringName]:
 	var room_id := Game.dive.respawn_room if Game.dive.respawn_room != &"" else start_room
 	var entry := Game.dive.respawn_entry if Game.dive.respawn_entry != &"" else start_entry
 	return [room_id, entry]
+
+
+## Story 1.21 D13: a respawn point from a save that World can't use (a room that is gone or broken,
+## an entry the room doesn't list) is an environment error: one warning, and the dive starts and
+## respawns at the start room. Checked before the first build, so it never reaches RoomLoader's
+## or `_swap_room()`'s push_error. `inspect().entries` lists `spawn` and the exit sides today;
+## Story 1.24 adds anchor and station ids to it.
+func _check_respawn_point() -> void:
+	var room_id := Game.dive.respawn_room
+	var entry := Game.dive.respawn_entry
+	if room_id == &"" and entry == &"":
+		return
+	var info := RoomLoader.inspect(room_id)
+	if info.known and info.errors.is_empty() and entry in info.entries:
+		return
+	push_warning("World: the saved respawn point '%s' / '%s' can't be used (%s); starting in %s" % [room_id, entry,
+			"no such room" if not info.known else "the room is invalid" if not info.errors.is_empty() else "the room has no such entry", start_room])
+	Game.dive.set_respawn(&"", &"")
 
 
 ## The old Player leaves: out of groups `player` / `light_source` now, not at the end of the frame.

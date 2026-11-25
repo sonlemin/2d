@@ -51,7 +51,8 @@ func is_killed(room_id: StringName, cell: Vector2i) -> bool:
 	return _killed.has(room_id) and _killed[room_id].has(cell)
 
 
-## JSON-ready (D4), and the dive snapshot of Story 1.21's save. No killed enemies (decision 5).
+## JSON-ready (D4): the `dive` part of `user://slot_N.json` (Story 1.21), written whole by a resume
+## save and kept as it was by a progress save. No killed enemies (decision 5).
 func to_dict() -> Dictionary:
 	return {"carried": carried, "respawn_room": String(respawn_room), "respawn_entry": String(respawn_entry)}
 

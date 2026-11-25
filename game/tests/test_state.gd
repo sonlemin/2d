@@ -78,6 +78,10 @@ func run() -> void:
 	_test_slot_round_trips()
 	_test_slot_flags_sorted()
 	_test_slot_visits()
+	_test_slot_play_time()
+	_test_slot_depth()
+	_test_slot_resume()
+	_test_slot_meta()
 	_test_slot_fallbacks()
 	_test_slot_load_signals()
 	_test_slot_handler_sets_a_flag()
@@ -244,6 +248,9 @@ func _test_slot_defaults() -> void:
 	var s := SlotState.new()
 	check(s.best_chain == 0 and s.deaths == 0 and s.difficulty == &"normal", "SlotState: records 0 / 0 and difficulty normal by default (got %d / %d / %s)" % [s.best_chain, s.deaths, s.difficulty])
 	check(s.to_dict().flags == [] and not s.has_flag(&"anchor_m1_1"), "...and no flags")
+	check(s.play_time == 0 and typeof(s.play_time) == TYPE_INT and s.depth == 0 and typeof(s.depth) == TYPE_INT, "...play time 0 s and depth 0, both ints (Story 1.21; got %s / %s)" % [var_to_str(s.play_time), var_to_str(s.depth)])
+	check(s.resume_room == &"" and s.resume_entry == &"" and typeof(s.resume_room) == TYPE_STRING_NAME and typeof(s.resume_entry) == TYPE_STRING_NAME, "...and no resume point: two empty StringNames, the dive's start (1.21 D5)")
+	check(SlotState.RESUME_KEYS == ["resume_room", "resume_entry"], "RESUME_KEYS is resume_room, resume_entry: what a progress save must not move (R14; got %s)" % [SlotState.RESUME_KEYS])
 	check(SlotState.DIFFICULTIES == [&"easy", &"normal", &"hard"], "the difficulty ids are easy, normal, hard (D8)")
 
 
@@ -296,12 +303,26 @@ func _filled_slot() -> SlotState:
 	s.set_flag(&"met_glim")
 	s.visit(&"m1_shaft")
 	s.visit(&"a_side")
+	s.add_play_time(8040.5)
+	s.record_depth(4)
+	s.set_resume(&"m1_shaft", &"anchor_m1_1")
 	return s
 
 
 func _same_slot(a: SlotState, b: SlotState) -> bool:
 	return a.best_chain == b.best_chain and a.deaths == b.deaths and a.difficulty == b.difficulty \
-			and a.to_dict().flags == b.to_dict().flags and a.to_dict().visited == b.to_dict().visited
+			and a.to_dict().flags == b.to_dict().flags and a.to_dict().visited == b.to_dict().visited \
+			and a.play_time == b.play_time and a.depth == b.depth \
+			and a.resume_room == b.resume_room and a.resume_entry == b.resume_entry
+
+
+## A whole, clean slot dictionary as a save file gives it, with `over` laid on top: each fallback
+## case then has exactly one fault (a case missing other keys would be unclean whatever it tested).
+func _slot_dict(over := {}) -> Dictionary:
+	var d := {"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": [], "visited": [],
+			"play_time": 90, "depth": 3, "resume_room": "m1_shaft", "resume_entry": "anchor_m1_1"}
+	d.merge(over, true)
+	return d
 
 
 func _test_slot_round_trips() -> void:
@@ -315,8 +336,18 @@ func _test_slot_round_trips() -> void:
 	check(typeof(u.difficulty) == TYPE_STRING_NAME and u.has_flag(&"anchor_m1_1") and u.has_flag(&"met_glim"), "...a StringName difficulty, and flags that still answer has_flag()")
 	var keys := s.to_dict().keys()
 	keys.sort()
-	check(keys == ["best_chain", "deaths", "difficulty", "flags", "visited"], "to_dict() has exactly best_chain, deaths, difficulty, flags, visited (D4, 1.7 D7; got %s)" % [keys])
+	check(keys == ["best_chain", "deaths", "depth", "difficulty", "flags", "play_time", "resume_entry", "resume_room", "visited"], "to_dict() has exactly best_chain, deaths, depth, difficulty, flags, play_time, resume_entry, resume_room, visited (D4, 1.7 D7, Story 1.21; got %s)" % [keys])
 	check(u.has_visited(&"m1_shaft") and u.has_visited(&"a_side"), "...and visited rooms that still answer has_visited()")
+	# Story 1.21: the values written out, never read back from the object under test.
+	check(u.play_time == 8040 and typeof(u.play_time) == TYPE_INT and u.depth == 4 and typeof(u.depth) == TYPE_INT, "...play time 8040 s and depth 4 back as ints (got %s / %s)" % [var_to_str(u.play_time), var_to_str(u.depth)])
+	check(u.resume_room == &"m1_shaft" and u.resume_entry == &"anchor_m1_1" and typeof(u.resume_room) == TYPE_STRING_NAME and typeof(u.resume_entry) == TYPE_STRING_NAME, "...and the resume point m1_shaft / anchor_m1_1 as StringNames (got '%s' / '%s')" % [u.resume_room, u.resume_entry])
+	var d := s.to_dict()
+	check(typeof(d.play_time) == TYPE_INT and d.play_time == 8040 and typeof(d.resume_room) == TYPE_STRING and typeof(d.resume_entry) == TYPE_STRING, "to_dict() writes play_time as the whole seconds (8040 of 8040.5) and the resume point as Strings")
+	# The half second is not saved: a loaded slot needs a whole second more, not half of one.
+	var got := []
+	u.play_time_changed.connect(func(t: int) -> void: got.append(t))
+	u.add_play_time(0.75)
+	check(u.play_time == 8040 and got == [], "the fraction of a second is not saved: 0.75 s after the load adds no second (8040.5 + 0.75 would; got %d)" % u.play_time)
 
 
 ## D4: StringName sort order is not alphabetical, so the save sorts flag ids as Strings.
@@ -343,37 +374,126 @@ func _test_slot_visits() -> void:
 		s.visit(id)
 	check(s.to_dict().visited == ["beta", "m1_shaft", "zeta"], "to_dict().visited lists the ids sorted as Strings (got %s)" % [s.to_dict().visited])
 	var t := SlotState.new()
-	var clean := t.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": [], "visited": ["m1_shaft", 3, ""]})
+	check(SlotState.new().from_dict(_slot_dict()), "(control: the whole dictionary these fallback cases start from is clean)")
+	var clean := t.from_dict(_slot_dict({"visited": ["m1_shaft", 3, ""]}))
 	check(not clean and t.to_dict().visited == ["m1_shaft"], "a bad or empty visited entry is skipped and makes the data unclean (got %s)" % [t.to_dict().visited])
 	var u := SlotState.new()
-	check(not u.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": []}) and u.to_dict().visited == [], "a missing visited list is unclean and loads none")
+	var no_visits := _slot_dict()
+	no_visits.erase("visited")
+	check(not u.from_dict(no_visits) and u.to_dict().visited == [], "a missing visited list is unclean and loads none")
 	n.v = 0
 	s.reset()
 	check(s.to_dict().visited == [] and n.v == 1, "reset() clears the visits and emits visits_changed once (got %d)" % n.v)
 
 
+## Story 1.21 D8: whole seconds plus a private fraction, so the signal fires about once a second.
+func _test_slot_play_time() -> void:
+	var s := SlotState.new()
+	var got := []
+	s.play_time_changed.connect(func(t: int) -> void: got.append(t))
+	for i in 3:
+		s.add_play_time(0.25)
+	check(s.play_time == 0 and got == [], "add_play_time(0.25) three times: no whole second yet, no emit (got %d, %s)" % [s.play_time, got])
+	s.add_play_time(0.25)
+	check(s.play_time == 1 and got == [1], "...the fourth makes one second and emits play_time_changed(1) once (got %d, %s)" % [s.play_time, got])
+	s.add_play_time(0.0)
+	check(s.play_time == 1 and got == [1], "add_play_time(0.0) adds and emits nothing")
+	s.add_play_time(3.5)
+	check(s.play_time == 4 and got == [1, 4], "add_play_time(3.5) moves three seconds with one emit, not three (got %d, %s)" % [s.play_time, got])
+	s.add_play_time(0.5)
+	check(s.play_time == 5 and got == [1, 4, 5], "...and keeps the half second: 0.5 more makes the fifth (got %d, %s)" % [s.play_time, got])
+	s.add_play_time(0.75)
+	s.reset()
+	got.clear()
+	s.add_play_time(0.5)
+	check(s.play_time == 0 and got == [], "reset() drops the fraction too: 0.75 s before it and 0.5 s after make no second (got %d)" % s.play_time)
+	s.add_play_time(0.75)
+	s.from_dict(_slot_dict())
+	got.clear()
+	s.add_play_time(0.5)
+	check(s.play_time == 90 and got == [], "...and so does from_dict(): 90 s loaded, 0.5 s after it adds none (got %d)" % s.play_time)
+
+
+## Story 1.21 D9: a record like best_chain; it only rises.
+func _test_slot_depth() -> void:
+	var s := SlotState.new()
+	var n := {v = 0}
+	s.records_changed.connect(func() -> void: n.v += 1)
+	s.record_depth(0)
+	check(s.depth == 0 and n.v == 0, "record_depth(0) on a new slot is no record: nothing emitted")
+	s.record_depth(2)
+	check(s.depth == 2 and n.v == 1, "record_depth(2) raises the depth and emits records_changed once (got %d, %d emits)" % [s.depth, n.v])
+	s.record_depth(2)
+	s.record_depth(1)
+	check(s.depth == 2 and n.v == 1, "...and a row at or above the record changes and emits nothing (got %d, %d emits)" % [s.depth, n.v])
+	s.record_depth(6)
+	check(s.depth == 6 and n.v == 2, "record_depth(6) raises it again (got %d, %d emits)" % [s.depth, n.v])
+
+
+func _test_slot_resume() -> void:
+	var s := SlotState.new()
+	var got := []
+	s.resume_changed.connect(func(room: StringName, entry: StringName) -> void: got.append([room, entry]))
+	s.set_resume(&"m1_shaft", &"anchor_m1_1")
+	check(s.resume_room == &"m1_shaft" and s.resume_entry == &"anchor_m1_1" and got == [[&"m1_shaft", &"anchor_m1_1"]], "set_resume(m1_shaft, anchor_m1_1) sets the point and emits resume_changed once (got %s)" % [got])
+	s.set_resume(&"m1_shaft", &"anchor_m1_1")
+	check(got.size() == 1, "...and the same point again emits nothing (D2)")
+	s.set_resume(&"m1_shaft", &"anchor_m1_2")
+	check(got.size() == 2 and got[1] == [&"m1_shaft", &"anchor_m1_2"], "...a new entry in the same room emits (got %s)" % [got])
+	s.set_resume(&"", &"")
+	check(s.resume_room == &"" and s.resume_entry == &"" and got.size() == 3, "set_resume('', '') clears it: the dive's start again")
+
+
+## The slot picker's line (Story 1.38); Game adds saved_at when it writes the file.
+func _test_slot_meta() -> void:
+	var want := {"depth": 4, "best_chain": 12, "play_time": 8040, "difficulty": "easy"}
+	var m := _filled_slot().meta()
+	check(m == want, "meta() is depth, best_chain, play_time, difficulty: %s (got %s)" % [want, m])
+	check(typeof(m.difficulty) == TYPE_STRING and typeof(m.play_time) == TYPE_INT and m.keys().all(func(k: Variant) -> bool: return k is String), "...JSON-ready: String keys, a String difficulty, int counts")
+	check(m.size() == 4, "...and exactly those four keys (got %s)" % [m.keys()])
+
+
 func _test_slot_fallbacks() -> void:
+	# Each case is the whole clean dictionary with one fault, so the fault alone makes it unclean.
 	var cases := [
-		[{"best_chain": 4, "deaths": 2, "difficulty": "medium", "flags": [], "visited": []}, "an unknown difficulty", "difficulty"],
-		[{"best_chain": -1, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a negative record", "best_chain"],
-		[{"best_chain": 4, "deaths": "x", "difficulty": "hard", "flags": [], "visited": []}, "a record that isn't a number", "deaths"],
-		[{"best_chain": 4.5, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a fractional record", "best_chain"],
-		[{"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": "anchor_m1_1", "visited": []}, "flags that aren't an array", "flags"],
+		[{"difficulty": "medium"}, "an unknown difficulty", "difficulty"],
+		[{"best_chain": -1}, "a negative record", "best_chain"],
+		[{"deaths": "x"}, "a record that isn't a number", "deaths"],
+		[{"best_chain": 4.5}, "a fractional record", "best_chain"],
+		[{"flags": "anchor_m1_1"}, "flags that aren't an array", "flags"],
 		# 1e17 is whole and fits an int, so only the 2^53 limit turns it down, on every platform.
-		[{"best_chain": 1e17, "deaths": 2, "difficulty": "hard", "flags": [], "visited": []}, "a record too big for a JSON number to hold exactly", "best_chain"],
+		[{"best_chain": 1e17}, "a record too big for a JSON number to hold exactly", "best_chain"],
+		# Story 1.21: play time and depth are counts like the records.
+		[{"play_time": -5}, "a negative play time", "play_time"],
+		[{"play_time": 12.5}, "a fractional play time", "play_time"],
+		[{"play_time": "90"}, "a play time that isn't a number", "play_time"],
+		[{"depth": -1}, "a negative depth", "depth"],
+		[{"depth": null}, "a depth that isn't a number", "depth"],
 	]
-	var want := {"best_chain": 0, "deaths": 0, "difficulty": &"normal", "flags": [], "visited": []}
+	var want := {"best_chain": 0, "deaths": 0, "difficulty": &"normal", "flags": [], "visited": [], "play_time": 0, "depth": 0}
+	check(SlotState.new().from_dict(_slot_dict()), "(control: the dictionary the cases start from is clean, so each case's one fault is what makes it unclean)")
 	for c: Array in cases:
 		var s := _filled_slot()
-		var clean := s.from_dict(c[0])
+		var clean := s.from_dict(_slot_dict(c[0]))
 		var got: Variant = s.to_dict()[c[2]] if c[2] != "difficulty" else s.difficulty
 		check(not clean and got == want[c[2]], "SlotState: %s is unclean and gives the default %s (D3; got %s)" % [c[1], c[2], got])
+	# Story 1.21 D5: the resume point is one value, like the dive's respawn point: half never loads.
+	var halves := {"a resume room that isn't a string": {"resume_room": 12}, "a resume entry that isn't a string": {"resume_entry": false}}
+	for what: String in halves:
+		var h := _filled_slot()
+		var h_clean := h.from_dict(_slot_dict(halves[what]))
+		check(not h_clean and h.resume_room == &"" and h.resume_entry == &"", "SlotState: %s is unclean and clears the whole point (got '%s' / '%s')" % [what, h.resume_room, h.resume_entry])
+		check(h.best_chain == 4 and h.play_time == 90 and h.depth == 3, "...while the good fields still load (best chain 4, play time 90, depth 3)")
+	var no_entry := _slot_dict()
+	no_entry.erase("resume_entry")
+	var m := _filled_slot()
+	check(not m.from_dict(no_entry) and m.resume_room == &"" and m.resume_entry == &"", "...and so does a missing resume entry (got '%s' / '%s')" % [m.resume_room, m.resume_entry])
 	var s := SlotState.new()
-	var clean := s.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", 7, null], "visited": []})
+	var clean := s.from_dict(_slot_dict({"flags": ["met_glim", 7, null]}))
 	check(not clean and s.to_dict().flags == ["met_glim"], "a non-string flag entry is skipped and makes the data unclean (got %s)" % [s.to_dict().flags])
 	check(s.best_chain == 4 and s.deaths == 2 and s.difficulty == &"hard", "...while the good fields still load")
 	var blank := SlotState.new()
-	check(not blank.from_dict({"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": ["met_glim", ""], "visited": []}) and blank.to_dict().flags == ["met_glim"] and not blank.has_flag(&""), "an empty flag id is skipped and makes the data unclean (got %s)" % [blank.to_dict().flags])
+	check(not blank.from_dict(_slot_dict({"flags": ["met_glim", ""]})) and blank.to_dict().flags == ["met_glim"] and not blank.has_flag(&""), "an empty flag id is skipped and makes the data unclean (got %s)" % [blank.to_dict().flags])
 	var e := SlotState.new()
 	check(not e.from_dict({}) and _same_slot(e, SlotState.new()), "from_dict({}) is unclean and gives the defaults")
 
@@ -383,24 +503,41 @@ func _test_slot_load_signals() -> void:
 	var s := _filled_slot()
 	var flags := []
 	var n := {records = 0, tier = 0}
+	var played := []
+	var resume := []
 	s.flag_set.connect(func(id: StringName, value: bool) -> void: flags.append([id, value]))
 	s.records_changed.connect(func() -> void: n.records += 1)
 	s.difficulty_changed.connect(func(_tier: StringName) -> void: n.tier += 1)
+	s.play_time_changed.connect(func(t: int) -> void: played.append(t))
+	s.resume_changed.connect(func(room: StringName, entry: StringName) -> void: resume.append([room, entry]))
 	s.reset()
 	flags.sort_custom(func(a: Array, b: Array) -> bool: return String(a[0]) < String(b[0]))
 	check(flags == [[&"anchor_m1_1", false], [&"met_glim", false]], "reset() emits flag_set(id, false) for each flag it clears (got %s)" % [flags])
 	check(n.records == 1 and n.tier == 1, "...and records_changed and difficulty_changed once each (got %d / %d)" % [n.records, n.tier])
+	check(played == [0] and resume == [[&"", &""]], "...and play_time_changed(0) and resume_changed('', '') once each (Story 1.21; got %s, %s)" % [played, resume])
 	check(_same_slot(s, SlotState.new()), "...leaving the defaults on the same instance")
+	played.clear()
+	resume.clear()
+	s.reset()
+	check(played == [0] and resume == [[&"", &""]], "...and both again on a reset that changes nothing (D2; got %s, %s)" % [played, resume])
 	s.set_flag(&"met_glim")
 	flags.clear()
 	n.records = 0
 	n.tier = 0
-	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": ["anchor_m1_1", "met_glim"]})
+	s.from_dict(_slot_dict({"flags": ["anchor_m1_1", "met_glim"]}))
 	check(flags == [[&"anchor_m1_1", true]], "from_dict() emits flag_set(id, true) for each new flag, nothing for one it keeps (got %s)" % [flags])
 	check(n.records == 1 and n.tier == 1, "...and records_changed and difficulty_changed once each, even unchanged (got %d / %d)" % [n.records, n.tier])
+	played.clear()
+	resume.clear()
+	s.from_dict(_slot_dict())
+	check(played == [90] and resume == [[&"m1_shaft", &"anchor_m1_1"]], "from_dict() emits play_time_changed(90) and resume_changed(m1_shaft, anchor_m1_1) once each (got %s, %s)" % [played, resume])
+	played.clear()
+	resume.clear()
+	s.from_dict(_slot_dict())
+	check(played == [90] and resume == [[&"m1_shaft", &"anchor_m1_1"]], "...and again when the load changes neither (D2; got %s, %s)" % [played, resume])
 	var v := {n = 0}
 	s.visits_changed.connect(func() -> void: v.n += 1)
-	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": [], "visited": ["m1_shaft", "a_side"]})
+	s.from_dict(_slot_dict({"visited": ["m1_shaft", "a_side"]}))
 	check(v.n == 1 and s.has_visited(&"a_side"), "from_dict() emits visits_changed once for a whole list of rooms (got %d)" % v.n)
 
 
@@ -414,7 +551,7 @@ func _test_slot_handler_sets_a_flag() -> void:
 		if id == &"anchor_m1_1":
 			s.set_flag(&"derived")
 	s.flag_set.connect(handler)
-	s.from_dict({"best_chain": 0, "deaths": 0, "difficulty": "normal", "flags": ["anchor_m1_1"]})
+	s.from_dict(_slot_dict({"flags": ["anchor_m1_1"]}))
 	check(got == [[&"anchor_m1_1", true], [&"derived", true]], "a handler that sets a flag during a load: each flag_set fires once (got %s)" % [got])
 	check(s.has_flag(&"anchor_m1_1") and s.has_flag(&"derived"), "...and both flags are set")
 	# The handler holds `s` and `s` holds the handler: without this the pair leaks at exit, which

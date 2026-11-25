@@ -9,6 +9,8 @@ extends Node
 ## them could only write there.
 ## UX numbers (360, 60) are written out here, never read from CameraRig: the test checks the
 ## layout against the design, not against the code under test.
+## Story 1.21: play time, the depth record, and a saved respawn point World can't use. Slot saves
+## stay unarmed here too (nothing in this test loads a slot), so no slot file is ever written.
 
 const WorldScene := preload("res://scenes/world/world.tscn")
 const LurkerScene := preload("res://scenes/actors/lurker.tscn")
@@ -21,6 +23,29 @@ var _world: World
 var _spawned: Array[Player] = []
 var _spawned_at: Array[Vector2] = []
 var _warm_counts: Array[int] = []  # warm-up items under the room at each room_entered
+
+
+## Counts World's "saved respawn point" warnings, so "warns once" is checked and not only promised.
+## A push_warning's text arrives as `code` (probed on 4.7.2); the mutex as in tests/runner.gd.
+class RespawnWarnings extends Logger:
+	var _lock := Mutex.new()
+	var _count := 0
+
+	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != ERROR_TYPE_WARNING or not code.begins_with("World: the saved respawn point"):
+			return
+		_lock.lock()
+		_count += 1
+		_lock.unlock()
+
+	## How many arrived since the last take().
+	func take() -> int:
+		_lock.lock()
+		var n := _count
+		_count = 0
+		_lock.unlock()
+		return n
 
 
 func check(cond: bool, msg: String) -> void:
@@ -55,6 +80,10 @@ func run() -> void:
 	test_framing()
 	test_chain_and_bank()
 	test_brightness()
+	test_play_time()
+	test_play_time_pause()
+	await test_play_time_through_hitstop()
+	await test_depth()
 	test_popups_in_room()
 	await test_death_and_respawn()
 	await test_pogo_wire()
@@ -68,6 +97,8 @@ func run() -> void:
 	check(not FileAccess.file_exists(TMP.path_join("settings.json")), "nothing was written: settings writes are disarmed in a test")
 	_world.queue_free()
 	await frames(1)
+	await test_bad_respawn_point()
+	check(DirAccess.get_files_at(TMP).is_empty(), "...and no slot file either: slot saves are unarmed in a test (TMP holds %s)" % [DirAccess.get_files_at(TMP)])
 	Game.reset_for_tests()
 	DirAccess.remove_absolute(TMP.path_join("settings.json"))  # silent when missing
 	DirAccess.remove_absolute(TMP)
@@ -114,6 +145,8 @@ func _crawlers() -> Array:
 ## Story 1.4 D6: only the entry scene boots. A World that booted here would load the real settings.json.
 func test_no_boot() -> void:
 	check(not Game._booted and not Game._settings_armed, "a World added by hand is not the current scene: Game is not booted and writes are not armed")
+	# Story 1.21 D7: from 1.24 a rest calls Game.save_now() inside smoke tests like this one.
+	check(not Game._slot_armed and Game.save_now() == ERR_UNCONFIGURED and Game.save_progress() == ERR_UNCONFIGURED, "...and slot saves are unarmed: save_now() and save_progress() return ERR_UNCONFIGURED")
 
 
 func test_tree(scene_before: Node) -> void:
@@ -166,6 +199,116 @@ func test_brightness() -> void:
 		got.append(snappedf(darkness.color.r, 0.001))
 		want.append(snappedf(World.AMBIENT_LEVELS[level] * World.AMBIENT_TINT.r, 0.001))
 	check(got == want, "set_value(brightness, n) repaints the darkness at once, for every level (got %s, want %s)" % [got, want])
+
+
+## Story 1.21 D8: one frame's real seconds go onto the slot, capped at 0.25 s. No await between the
+## calls: the engine also runs World's _process every real frame, so only a difference taken
+## inside one frame is exact.
+func test_play_time() -> void:
+	check(World.PLAY_TIME_STEP_MAX == 0.25, "the play-time cap is 0.25 s a frame (D8; got %s)" % World.PLAY_TIME_STEP_MAX)
+	var before := Game.slot.play_time
+	for i in 8:
+		_world._count_play_time(0.25)
+	check(Game.slot.play_time - before == 2, "eight frames of 0.25 s raise the slot's play time by exactly 2 s (got %d)" % (Game.slot.play_time - before))
+	before = Game.slot.play_time
+	_world._count_play_time(5.0)
+	for i in 3:
+		_world._count_play_time(0.25)
+	check(Game.slot.play_time - before == 1, "one frame of 5 s and three of 0.25 s raise it by exactly 1 s: the long frame counted 0.25 s (got %d)" % (Game.slot.play_time - before))
+
+
+## World is pausable, so play time stops with the tree; and the pause itself is never counted on
+## the first frame after it.
+func test_play_time_pause() -> void:
+	check(_world.can_process(), "(World processes while the tree runs)")
+	_world._process(0.0)  # the clock holds this instant
+	get_tree().paused = true
+	check(not _world.can_process(), "with the tree paused World does not process: play time stops (D8)")
+	OS.delay_msec(300)  # a pause 0.3 s long
+	get_tree().paused = false
+	var played := Game.slot.play_time + Game.slot._play_fraction
+	_world._process(0.0)
+	var added: float = Game.slot.play_time + Game.slot._play_fraction - played
+	check(added == 0.0, "the first frame after the pause adds nothing: the 0.3 s paused is not play (added %.3f s)" % added)
+	OS.delay_msec(40)
+	_world._process(0.0)
+	added = Game.slot.play_time + Game.slot._play_fraction - played
+	check(added >= 0.04 and added < 0.25, "...and the frame after it counts its own wall time again (40 ms waited, %.3f s added)" % added)
+
+
+## D8: real seconds. Every pogo hit lands a hitstop, and the frame it lands on must count as one
+## frame, not as 0.25 s (`delta / Engine.time_scale` reads that frame 20 times too long). Twenty
+## hitstops over 2.4 s of wall time: by the wall clock 2 or 3 whole seconds; with that misread at
+## least 2.7 s more, so 5 or more.
+func test_play_time_through_hitstop() -> void:
+	var before := Game.slot.play_time
+	var t0 := Time.get_ticks_msec()
+	var next_hit := t0
+	var hits := 0
+	while Time.get_ticks_msec() - t0 < 2400:
+		await get_tree().process_frame
+		if Time.get_ticks_msec() >= next_hit and not Game.clock.is_active(&"hitstop"):
+			Game.clock.request(&"hitstop", 0.05, 0.075)  # the pogo hit's own request (FR4)
+			hits += 1
+			next_hit = Time.get_ticks_msec() + 120
+	Game.clock.clear()
+	var got := Game.slot.play_time - before
+	check(hits >= 15, "(%d hitstops landed in 2.4 s)" % hits)
+	check(got >= 1 and got <= 3, "2.4 s of real time through %d hitstops add 2 or 3 s of play time, never more: hitstop doesn't stretch it (got %d)" % [hits, got])
+	check(is_equal_approx(Engine.time_scale, 1.0), "...and the time scale is back at 1")
+
+
+## D9: the deepest screen row reached, 270 px a row, a record that only rises. Early in the run:
+## the bottom-loop case below takes the player to the last row.
+func test_depth() -> void:
+	var p := _player()
+	await frames(2)
+	check(Game.slot.depth == 0, "at P, in the top screen, the slot's depth is 0 (got %d)" % Game.slot.depth)
+	var spot := Vector2(56, 600)  # column 3, row 37 of m1_shaft: open, with open rows above and below
+	check(not _room().is_solid(Vector2i(3, 36)) and not _room().is_solid(Vector2i(3, 37)) and not _room().is_solid(Vector2i(3, 38)), "(the spot at (56, 600) is free)")
+	p.place_at(spot)
+	p.reset_physics_interpolation()
+	await frames(2)
+	check(Game.slot.depth == 2, "the player placed at y 600 gives depth 2 after a physics tick: 600 / 270 is row 2 (got %d)" % Game.slot.depth)
+	p.place_at(_room().entry_position(&"spawn"))
+	p.reset_physics_interpolation()
+	_camera().snap()
+	await frames(2)
+	check(Game.slot.depth == 2, "...and back near the top never lowers it: a record (got %d)" % Game.slot.depth)
+
+
+## Story 1.21 D13: a respawn point from a save that World can't use. It runs after the main World
+## is freed: each case adds its own World, as a load at boot would find the dive.
+func test_bad_respawn_point() -> void:
+	var warnings := RespawnWarnings.new()
+	OS.add_logger(warnings)
+	var cases := [
+		[&"no_such_room", &"spawn", "an unknown room"],
+		[&"m1_shaft", &"anchor_nowhere", "a known room with an unknown entry"],
+	]
+	for c: Array in cases:
+		Game.dive.set_respawn(c[0], c[1])
+		var w: World = WorldScene.instantiate()
+		add_child(w)
+		await frames(2)
+		check(w.current_room() != null and w.current_room().id == &"m1_shaft", "a saved respawn point with %s: World starts in m1_shaft" % c[2])
+		check(Game.dive.respawn_room == &"" and Game.dive.respawn_entry == &"", "...clears the point, so this dive respawns at the start too (got '%s' / '%s')" % [Game.dive.respawn_room, Game.dive.respawn_entry])
+		check(warnings.take() == 1, "...and warns once (no ERROR: the runner checks)")
+		var at_spawn := get_tree().get_first_node_in_group("player") as Player
+		check(at_spawn != null and at_spawn.position.distance_to(w.current_room().entry_position(&"spawn")) < 16.0, "...with the player at P")
+		w.queue_free()
+		await frames(1)
+	# Control: a point World can use is kept, with no warning, and the player wakes there.
+	Game.dive.set_respawn(&"m1_shaft", &"up")
+	var ok: World = WorldScene.instantiate()
+	add_child(ok)
+	await frames(1)
+	var p := get_tree().get_first_node_in_group("player") as Player
+	check(Game.dive.respawn_room == &"m1_shaft" and Game.dive.respawn_entry == &"up" and warnings.take() == 0, "(control) a respawn point the room lists is kept, with no warning")
+	check(p != null and p.position.distance_to(Vector2(56, 20)) < 16.0, "...and the player wakes at it: the top entry (56, 20), not P (got %s)" % (p.position if p != null else Vector2.INF))
+	ok.queue_free()
+	await frames(1)
+	OS.remove_logger(warnings)
 
 
 ## AC6: runtime spawns belong to the room, never to World.

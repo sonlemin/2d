@@ -38,6 +38,7 @@ class Warnings extends Logger:
 	var _lock := Mutex.new()
 	var _got: Array[String] = []
 	var _markers: Array[String] = []
+	var _summaries: Array[String] = []  # `[room] dev: …`, DevTools' one summary line per run
 	## Called as each marker prints, on the printing thread (the main thread: Log.info), so the
 	## test can look at World at that instant. Must not print.
 	var at_marker := Callable()
@@ -53,6 +54,11 @@ class Warnings extends Logger:
 	## The prefix, not "contains SMOKE": this logger also sees the test's own `ok …` lines and its
 	## final `SMOKE PASS`.
 	func _log_message(message: String, _error: bool) -> void:
+		if message.begins_with("[room] dev: "):
+			_lock.lock()
+			_summaries.append(message.trim_suffix("\n"))
+			_lock.unlock()
+			return
 		if not message.begins_with("[room] SMOKE "):
 			return
 		if at_marker.is_valid():
@@ -66,6 +72,14 @@ class Warnings extends Logger:
 		_lock.lock()
 		var out := _got.duplicate()
 		_got.clear()
+		_lock.unlock()
+		return out
+
+	## DevTools' summary lines since the last take_summaries().
+	func take_summaries() -> Array[String]:
+		_lock.lock()
+		var out := _summaries.duplicate()
+		_summaries.clear()
 		_lock.unlock()
 		return out
 
@@ -115,6 +129,7 @@ func run() -> void:
 	await test_smoke_marker()
 	await test_room()
 	await test_bad_room()
+	await test_detach()
 	await test_bad_args()
 	await test_chain_every_life()
 	await test_chain_falling_spawn()
@@ -134,6 +149,9 @@ func run() -> void:
 	await test_room_items()
 	test_actions()
 	OS.remove_logger(_warnings)
+	var left := Array(DirAccess.get_files_at(TMP))
+	left.erase("settings.json")  # the real-run cases boot, and a boot may write the default settings
+	check(left.is_empty(), "no slot file was written by any case (TMP also holds %s)" % [left])
 	DirAccess.remove_absolute(TMP.path_join("settings.json"))  # silent when missing
 	DirAccess.remove_absolute(TMP)
 	print("SMOKE %s" % ("PASS" if _fail == 0 else "FAILED (%d)" % _fail))
@@ -233,6 +251,7 @@ func test_no_tokens() -> void:
 			"...Log untouched: save, on before the build, is still the only category on (no Log.set_enabled() call)")
 	check(Game.clock.active().is_empty(), "...no Clock request")
 	check(Game.settings.brightness == 1 and Game._overrides.is_empty() and not Game._settings_armed, "...settings untouched: no override, writes not armed")
+	check(not Game._slot_detached and not Game._slot_armed, "...and the slot untouched: not detached, and saves not armed by a test World (Story 1.21)")
 	check(dev.overlays.mode == 0, "...and no overlay until the key is pressed")
 	var ui := _world.get_node("UI").get_children().map(func(c: Node) -> String: return String(c.name))
 	check(ui == ["Gutters", "ScreenRouter"], "UI's children are unchanged (got %s)" % [ui])
@@ -266,13 +285,29 @@ func test_real_tokens() -> void:
 	check(got == user_args and not user_args.is_empty(), "off the web, real_tokens() is the command line after -- (got %s)" % [got])
 	var runner := get_tree().current_scene
 	Game.store.dir = TMP
+	# Story 1.21: this is the process's one boot (the first World that is the current scene), so a
+	# slot planted here is what a real launch would find. Its respawn point is the top entry.
+	var slot_file := TMP.path_join("slot_1.json")
+	var planted := '{"version": 1, "meta": {}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "up", "respawn_room": "m1_shaft"}}'
+	var f := FileAccess.open(slot_file, FileAccess.WRITE)
+	f.store_string(planted)
+	f.close()
+	check(not Game._booted, "(this World's boot is the process's first)")
 	_spawned.clear()
+	_spawned_at.clear()
 	_world = WorldScene.instantiate()
 	_world.child_entered_tree.connect(_make_current)
+	_world.player_spawned.connect(_on_spawned)  # before add_child: the first spawn is inside it
 	get_tree().root.add_child(_world)  # the current scene must be a child of root
 	get_tree().current_scene = runner
 	var dev := _dev()
 	check(dev != null and dev.tokens == user_args, "a World that is the current scene reads them itself (got %s)" % [dev.tokens if dev else "no DevTools"])
+	check(Game._booted and not Game._slot_detached and Game._slot_armed, "...boots Game, and with no dev arg the slot stays attached and saves are armed (Story 1.21)")
+	check(Game.slot.best_chain == 7 and Game.slot.difficulty == &"hard" and Game.dive.carried == 5, "...the boot loaded slot 1 from the store's folder: best chain 7, hard, 5 carried (got %d, %s, %d)" % [Game.slot.best_chain, Game.slot.difficulty, Game.dive.carried])
+	check(_spawned_at == ([_room().entry_position(&"up")] as Array[Vector2]) and _spawned_at != ([_room().entry_position(&"spawn")] as Array[Vector2]),
+			"...and the player wakes at the saved respawn point, m1_shaft's top entry, not at P (got %s)" % [_spawned_at])
+	check(FileAccess.get_file_as_string(slot_file) == planted, "...the load left the file byte for byte as it was")
+	DirAccess.remove_absolute(slot_file)
 	check(_room().id == &"m1_shaft" and _warnings.take().is_empty(), "...and the runner's own args change nothing, with no warning")
 	var markers := _warnings.take_markers()
 	check(markers == (["[room] SMOKE boot ok"] as Array[String]), "...and, as a real run, prints the boot marker once (got %s)" % [markers])
@@ -382,6 +417,48 @@ func test_bad_room() -> void:
 	check(_room().id == &"m1_shaft" and _spawned.size() == 1, "--room=bad_edge_hole: m1_shaft loads (got %s)" % _room().id)
 	check(w.size() == 1 and w[0].contains("'bad_edge_hole' is invalid:") and w[0].contains("hole in the room's edge"),
 			"...with one warning giving its validation errors (got %s)" % [w])
+	await _teardown()
+
+
+## Story 1.21 AC7, D12 (sonlm, 2026-11-25): a session that applied --room, --chain, --hp or --perf
+## loads no slot and saves none; --log, --set and --glow leave the slot alone; an arg that was
+## refused detaches nothing. The summary line says so.
+func test_detach() -> void:
+	var cases := [
+		[["--room=t_swap_a"], true, "[room] dev: room t_swap_a@spawn, no slot loaded or saved"],
+		[["--chain=3"], true, "[room] dev: chain 3, no slot loaded or saved"],
+		[["--hp=2"], true, "[room] dev: hp 2, no slot loaded or saved"],
+		[["--log=save"], false, "[room] dev: log save"],
+		[["--set=brightness:0"], false, "[room] dev: set brightness=0"],
+		[["--glow=on"], false, "[room] dev: glow on"],
+		[["--log=save", "--room=t_swap_a", "--chain=3"], true, "[room] dev: log save, room t_swap_a@spawn, chain 3, no slot loaded or saved"],
+	]
+	for c: Array in cases:
+		_warnings.take_summaries()
+		_build(c[0])
+		var lines := _warnings.take_summaries()
+		check(Game._slot_detached == c[1], "%s %s the slot (detached: %s)" % [" ".join(c[0]), "detaches" if c[1] else "leaves", Game._slot_detached])
+		check(lines == ([c[2]] as Array[String]), "...and its summary line is '%s' (got %s)" % [c[2], lines])
+		if c[1]:
+			check(Game.load_slot(1) == SaveStore.Found.MISSING and not Game._slot_armed and Game.save_now() == ERR_UNCONFIGURED, "...so a load reads nothing and a save writes nothing for the rest of the session")
+		_warnings.take()
+		await _teardown()
+		check(not Game._slot_detached, "...and reset_for_tests() (the teardown) attaches the slot again")
+	# A --room with a bad value is a warning and is not applied: a normal session.
+	_warnings.take_summaries()
+	_build(["--room=nope"])
+	var w := _warnings.take()
+	check(w.size() == 1 and not Game._slot_detached and _warnings.take_summaries().is_empty(), "--room=nope (a warning, not applied) detaches nothing and prints no summary (warnings %d, detached %s)" % [w.size(), Game._slot_detached])
+	await _teardown()
+	_warnings.take_summaries()
+	_build(["--room=nope", "--chain=99", "--hp=9", "--log=save"])
+	w = _warnings.take()
+	check(w.size() == 3 and not Game._slot_detached and _warnings.take_summaries() == (["[room] dev: log save"] as Array[String]), "three refused args beside a good --log: still attached (warnings %d, detached %s)" % [w.size(), Game._slot_detached])
+	await _teardown()
+	# --perf detaches too; it locks the player on its path, so the World is freed at once.
+	_build(["--perf=1"])
+	check(Game._slot_detached, "--perf=1 detaches the slot")
+	_warnings.take()  # m1_shaft is not the perf room: the run warns that its path is blocked
 	await _teardown()
 
 

@@ -87,6 +87,13 @@ func _test_parse() -> void:
 		check(row.help is String and row.help != "" and row.repeat is bool and row.apply is StringName and String(row.apply) in methods,
 				"ARGS '%s' has help, repeat and an apply method that exists (%s)" % [arg, row.apply])
 	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "hp", "glow", "perf"], "ARGS apply in the order log, set, room, chain, hp, glow, perf (1.11 D4, 1.12 D1, 1.19 D8: hp after chain, before glow; got %s)" % [DevTools.ARGS.keys()])
+	# Story 1.21 D12 (sonlm, 2026-11-25): which args make a session load and save no slot. Written
+	# out here, so a new row must state its side and a flipped one fails.
+	var detaches := {"log": false, "set": false, "room": true, "chain": true, "hp": true, "glow": false, "perf": true}
+	for arg: String in DevTools.ARGS:
+		var d: Variant = DevTools.ARGS[arg].get("detach")
+		check(d is bool and detaches.has(arg) and d == detaches[arg], "ARGS '%s' has detach = %s: %s (got %s)" % [arg, detaches.get(arg),
+				"it changes the play, so the session loads and saves no slot" if detaches.get(arg) else "it changes only what is shown or logged", var_to_str(d)])
 	check(DevTools.ARGS["set"].repeat and DevTools.ARGS["log"].repeat and not DevTools.ARGS["room"].repeat and not DevTools.ARGS["chain"].repeat
 			and not DevTools.ARGS["glow"].repeat and not DevTools.ARGS["perf"].repeat,
 			"only set and log may repeat")

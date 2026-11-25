@@ -1,5 +1,5 @@
 # generated: 2026-11-12T12:16:27+07:00
-# last_updated: 2026-11-25T21:41:00+07:00
+# last_updated: 2026-11-25T23:10:50+07:00
 # project: pixel_art_game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   dependencies live there, not here). Re-run gds-sprint-planning after adding stories.
 
 generated: "2026-11-12T12:16:27+07:00"
-last_updated: "2026-11-25T21:41:00+07:00"
+last_updated: "2026-11-25T23:10:50+07:00"
 project: pixel_art_game
 project_key: NOKEY
 tracking_system: file-system
@@ -66,7 +66,7 @@ development_status:
   1-18-palette-tokens-contrast-and-the-deck-size-check: done
   1-19-health-4-hp-and-the-damage-table: done
   1-20-light-sensing-for-predators: done
-  1-21-save-store: backlog
+  1-21-save-store: review
   1-22-three-ember-stages-the-ember-cache-and-difficulty-tiers: backlog
   1-23-flare-toss: backlog
   1-24-interact-lantern-anchors-and-lift-station-rest: backlog

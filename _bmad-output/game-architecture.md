@@ -381,12 +381,36 @@ user://
 - **Version:** an integer `version`. Older saves go through `migrate_vN_to_vN1()` functions in order; a newer-than-known save is rejected and left untouched. A checked-in old-save fixture (`tests/fixtures/slot_v1.json`) is loaded by every later build's tests.
 - **Meta** (for the slot picker without a full load): depth, best chain, play time, difficulty, last saved.
 - **Triggers** (readiness R14, 2026-11-12): **resume saves** at a Lift Station rest, arriving home and quitting at a lit anchor. Anchor quit also writes `dive` (anchor id, carried embers); the Ember Cache is already in `slot`; killed enemies are not saved. **Progress saves** (`Game.save_progress()`) at progress moments (difficulty change, purchase, story flag, phase checkpoint, boss defeat) rewrite the slot's world progress but keep the last resume point and `dive` snapshot unchanged, so they never move where you wake or make carried embers safe.
-- **Failure:** the save call returns an `Error`; `Game` emits `save_failed` / `save_succeeded`; the UI shows the crossed icon and "Not saved", and the next rest retries. On web, `OS.is_userfs_persistent()` is checked at boot and before each save; if false, the failure state shows immediately.
+- **Failure:** the save call returns an `Error`; `Game` emits `save_failed(n, err)` / `save_succeeded(n)`; the UI shows the crossed icon and "Not saved", and the next rest retries. On web, `OS.is_userfs_persistent()` is checked at boot and before each save; if false, the failure state shows immediately.
 - **New Game** writes the slot immediately after the difficulty step (an overwrite takes effect at once).
 - **Retry:** a failed save retries at the next autosave trigger and on quit to title.
 - **Web limit:** verify-after-write proves integrity, not persistence (it reads the in-memory filesystem). Persistence is covered by `OS.is_userfs_persistent()` and the automated reload smoke test.
 - `settings.json` carries its own `version`; a corrupt or missing file falls back to defaults and is rewritten; a file that can't be opened, or that a newer build wrote, also falls back to defaults but is left untouched, and settings writes stay off for that session (Story 1.4 review, the same rule as a newer or damaged slot) (readiness R15: JSON instead of `ConfigFile`, because `ConfigFile.load()`/`parse()` and `JSON.parse_string()` print an engine `ERROR:` on bad input, which fails the test runner; all JSON is parsed with the silent `JSON.new().parse()`). `Game.boot()`, called once by the entry scene (`shaft.gd` until 1.6, then `world.gd`), loads it and arms its writes; a test never boots against the real folder, and points `Game.store.dir` at a temp folder before it tests the file. A DevTools `--set` session (Story 1.11) overrides values in memory through `Game.override_setting()` and writes no settings.json at all: not the override, not a load's rewrite, not a later change of another key. The overrides survive `boot()`'s load, and `reset_for_tests()` clears them (`user://` is shared by editor runs and exports, so a dev value must never reach the file the release builds read).
 - **Slot delete** removes `slot_N.json` and `.bak`.
+- **As built (Story 1.21):**
+  - **Write order** (`SaveStore.write_slot(n, data)`): (1) read the slot, and refuse one that is `CORRUPT`, `UNREADABLE` or `NEWER` (`ERR_FILE_CORRUPT`, `ERR_FILE_CANT_OPEN`, `ERR_FILE_UNRECOGNIZED`), touching nothing; (2) write `.tmp`; (3) read it back: the text must be what was written and parse as JSON (`verify_file()`), else `.tmp` is removed; (4) only when the main file itself read as usable (not on a first save, not when the slot loaded from `.bak`), copy it to `.bak` with `FileAccess`, never `DirAccess.copy_absolute()` (it prints an engine `ERROR:` on a file it can't open); (5) rename `.tmp` over the main file. A failed write changes nothing. On Windows the rename deletes the target and then moves, so a crash between the two leaves no main file, a whole `.bak` and a whole `.tmp`; the read below covers it. `settings.json` uses steps 2, 3 and 5, with no `.bak`.
+  - **Read** (`SaveStore.read_slot(n)` → `{found, from_bak, why, version, meta, slot, dive}`), each file judged alone and the version before the rest of the shape (a newer build may have changed the shape):
+
+    | Main file | `.bak` | Result |
+    |---|---|---|
+    | USABLE | (not read) | USABLE |
+    | NEWER | (not read) | NEWER |
+    | UNREADABLE | (not read) | UNREADABLE |
+    | MISSING or CORRUPT | USABLE | USABLE, `from_bak = true` |
+    | MISSING or CORRUPT | NEWER | NEWER |
+    | MISSING or CORRUPT | UNREADABLE | UNREADABLE |
+    | MISSING | MISSING | MISSING (an empty slot) |
+    | MISSING | CORRUPT | CORRUPT (damaged) |
+    | CORRUPT | MISSING or CORRUPT | CORRUPT (damaged) |
+
+    A missing or bad `meta` reads as `{}` and never costs a slot. The store prints nothing and pushes no warning; `Game` warns once from `why`. A partly bad slot still loads, with the default for each bad field and one warning.
+  - **Version and migrations:** `rules/migrations.gd` holds `VERSION` (1) and `steps()` (`{from_version: Callable}`, empty until Story 4.1). `migrate()` works on a deep copy of the whole file dictionary, so a step may move data between `slot`, `dive` and `meta`; a missing step, or one that doesn't bump the version, makes the file `CORRUPT`.
+  - **The resume point follows the dive's respawn point.** `Game.save_now()` sets `slot.resume_room` / `resume_entry` from `dive.respawn_room` / `respawn_entry` and writes `dive.to_dict()`; a load puts the dive back, so World wakes the player there. `"dive": null` means no resume save was ever made: a load then starts a fresh dive at the slot's resume point.
+  - **The snapshot.** `Game` keeps in memory what the last load or the last **successful** resume save held for `SlotState.RESUME_KEYS` (`resume_room`, `resume_entry`; Story 1.22 adds `cache`) and for the dive. `Game.save_progress()` writes the live slot with those values laid over it. It is not re-read from disk.
+  - **Arming.** `save_now()` and `save_progress()` return `ERR_UNCONFIGURED` and do nothing until `boot()`, `load_slot()` or `new_game()` ran in the process; `reset_for_tests()` disarms them. `Game.detach_slot()` (DevTools, for `--room`, `--chain`, `--hp`, `--perf`) turns every slot read and write off for the rest of the process.
+  - **Signals:** `save_succeeded(n)`, `save_failed(n, err)`, `settings_save_failed(err)`. `boot()` loads `active_slot` (1 until the slot picker, Story 1.38).
+  - **Play time** is counted by World from the wall clock between frames (capped at 0.25 s a frame, not while paused), never from `delta / Engine.time_scale`: that formula over-counts on every frame a hitstop starts (see Time Control).
+  - **A saved respawn point World can't use** (an unknown or invalid room, an entry the room doesn't list) is cleared with one warning before the first room is built.
 - Each death appends `{cause, room}` (a cause id, not text) to `SlotState.death_log` from E1, for the E7 Journal; the death card renders `DEATH_<CAUSE>_LINE` / `_TIP` from the cause id.
 
 ### Time Control
@@ -546,10 +570,12 @@ static func load_room(path: String) -> Room:
 	return null if not errors.is_empty() else _build(rows)
 
 # 3. Environment error — return Error, surface via signal
-var err := SaveStore.write(n, Game.slot.to_dict())
+var err := Game.store.write_slot(n, data)   # inside Game.save_now() / save_progress()
 if err != OK:
-	push_warning("save slot %d failed: %s" % [n, error_string(err)])
+	push_warning("Game: slot %d not saved to %s (%s)" % [n, Game.store.slot_path(n), error_string(err)])
 	Game.save_failed.emit(n, err)   # UI: crossed icon + "Not saved"; retry at next trigger
+else:
+	Game.save_succeeded.emit(n)     # UI: the autosave icon
 ```
 
 ### Logging

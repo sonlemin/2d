@@ -38,8 +38,9 @@ pixel_art_game/
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
 │   │   │   ├── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
 │   │   │   ├── settings.gd       # Settings: global settings (brightness so far), set_value() + changed
-│   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags
-│   │   │   └── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
+│   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags, play time, depth, the resume point
+│   │   │   ├── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
+│   │   │   └── migrations.gd     # Migrations: the slot format VERSION and its migration steps (pure)
 │   │   ├── world/
 │   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect(), light_rect(), the hazard poll and safe ground
 │   │   │   ├── light_budget.gd   # LightBudget: World's child that applies the ≤ 6 light budget each physics tick (priority 50); no class_name
@@ -62,7 +63,7 @@ pixel_art_game/
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
 │   │   │   ├── display.gd        # Display: the scale rule, the sub-×1 fit, the PC window; the only code touching the stretch or window (Story 1.14)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
-│   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json)
+│   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json, slot_N.json + .bak)
 │   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
 │   │   │   ├── palettes.gd       # Palettes: the one home for UI colours (zone tables, roles, glow floors); Game.palette is the active zone
 │   │   │   ├── text_style.gd     # TextStyle: font, sizes, line metrics, CAP_TOP, the play-area outline (play_text LabelSettings, cached)
@@ -81,6 +82,8 @@ pixel_art_game/
 │   │   ├── test_display.gd       # Display: the scale table, window_scale_for, project display settings, inert until start() (Story 1.14)
 │   │   ├── test_tuning.gd        # Tuning API, gear order, floors under every gear combination, the 44 M1 exports fixture
 │   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
+│   │   ├── test_migrations.gd    # Migrations.migrate() with fake steps; one step per version below VERSION
+│   │   ├── test_saves.gd         # Slot saves on a temp folder: .tmp/.bak, damaged/newer slots, resume vs progress saves
 │   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
 │   │   ├── test_room_sweep.gd    # The pure room sweeps on inline grids (fires + near-miss per rule)
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner

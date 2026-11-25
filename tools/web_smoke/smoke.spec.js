@@ -101,7 +101,9 @@ test.describe('Web debug', () => {
     const left = await boot(page, seen, '/web_debug/index.html?room=perf_worst');
     await expectMarker(page, seen, left);
     const dev = texts(seen).filter((t) => t.startsWith('[room] dev: '));
-    expect(dev, 'DevTools applied the query: one summary line, the room only').toEqual(['[room] dev: room perf_worst@spawn']);
+    // Story 1.21 D12: an applied --room detaches the slot, on the web too, and the line says so. So
+    // this run reads and writes no slot file in the browser's storage.
+    expect(dev, 'DevTools applied the query: one summary line, the room only, the slot detached').toEqual(['[room] dev: room perf_worst@spawn, no slot loaded or saved']);
     // AC6's literal check. A perf run logs its `[room] dev: perf …` line only when it ends, so this
     // can't fire this early; the summary line above is the proof, since a requested run shows in it.
     expect(texts(seen).filter((t) => t.startsWith('[room] dev: perf')), 'no perf run: it is the plain room').toEqual([]);
