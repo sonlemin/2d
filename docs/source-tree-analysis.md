@@ -108,6 +108,7 @@ pixel_art_game/
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
 │   │   ├── smoke_lurker.gd       # Light sensing on tests/rooms/sensing/: the M1 trace, LightSource, retargeting, stirring, Q1/Q2 (Story 1.20)
 │   │   ├── smoke_health.gd       # HP on world.tscn with tests/rooms/hazards/: contact, spikes, safe ground, bank-heal, death, flash, squash
+│   │   ├── smoke_dev_boot.gd     # A real boot with --room and a planted slot: DevTools applies before Game.boot() (own process)
 │   │   ├── smoke_dev_tools.gd    # DevTools in world.tscn: inert without args, the SMOKE boot marker, each arg, the overlay cycle, no F-key
 │   │   ├── smoke_a11y.gd         # The accessibility gate on m1_shaft: shake off, blink and steady variant, look-ahead on a pogo
 │   │   ├── smoke_palettes.gd     # The active zone in world.tscn on tests/rooms/zones/: boot, exit, respawn, same zone; gutters and popup

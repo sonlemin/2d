@@ -14,6 +14,11 @@ const VERSION := 1
 ## {from_version: Callable}: the step that turns a version-N file into N + 1. Each takes the whole
 ## file dictionary (`version`, `meta`, `slot`, `dive`), since a step may move data between its
 ## parts, and must leave `version == N + 1`. None yet; E4 adds `1: migrate_v1_to_v2` (Story 4.1).
+## Only `slot` is sure to be a Dictionary. `dive` is null (or missing) in every slot that never
+## rested, and `meta` is only the picker's copy, which may be missing: a step tests
+## `d.get("dive") is Dictionary` and `d.get("meta") is Dictionary` before it reads either. A step
+## that indexes a null there is a script error and no version bump, so the whole file would read
+## as damaged (1.21 review).
 static func steps() -> Dictionary:
 	return {}
 

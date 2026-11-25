@@ -11,8 +11,9 @@ extends RefCounted
 ## It never calls `DirAccess.copy_absolute()` either: that prints an engine `ERROR:` whenever the
 ## source or the destination can't be opened (probed on 4.7.2), so the `.bak` is copied with
 ## FileAccess.
-## A slot is three files (1.21 D4): `slot_N.json`, `slot_N.json.bak` (the file as it was before
-## the last write) and, only during a write, `slot_N.json.tmp`.
+## A slot is two files (1.21 D4): `slot_N.json` and `slot_N.json.bak` (the file as it was before
+## the last write). Two more exist only during a write: `slot_N.json.tmp`, and `slot_N.json.bak.tmp`
+## while the backup is made (1.21 review). Nothing reads either.
 
 ## What a read found, for settings and for each slot file. For settings, MISSING and CORRUPT are
 ## safe to replace. UNREADABLE (it exists but can't be opened) and NEWER (a later build wrote it)
@@ -86,7 +87,9 @@ func slot_path(n: int) -> String:
 ## `{found, from_bak, why, version, meta, slot, dive}`: slot `n` as its two files give it. `slot`
 ## and `meta` are Dictionaries (empty unless USABLE); `dive` is a Dictionary, or null when the file
 ## holds no dive snapshot. `meta` is only a copy for the slot picker: nothing loads state from it.
-## It prints nothing and pushes no warning: `why` says what was wrong, and the caller warns.
+## It pushes no warning and prints no `ERROR:` line: `why` says what was wrong, and the caller
+## warns. A file that is not valid UTF-8 reads CORRUPT like any other damage, but for it the engine
+## itself prints `Unicode parsing error` lines to stderr (probed on 4.7.2).
 ## The main file first, then `.bak` (1.21 D3):
 ## - a USABLE main file is the slot;
 ## - a NEWER or UNREADABLE main file may be whole, so it blocks the slot: never bypassed for an
@@ -115,10 +118,15 @@ func read_slot(n: int) -> Dictionary:
 
 
 ## Slot `n`, safely (1.21 D4): `.tmp` is written and read back before anything else is touched,
-## the current main file becomes `.bak` only when it is known good, and the rename comes last. So
-## a failed write changes nothing, and a whole main file or a whole `.bak` exists at every moment.
-## A slot that is CORRUPT, UNREADABLE or NEWER is never written over (D3): the caller starts a new
-## game through `delete_slot()` instead. Returns the first error; the caller warns and signals.
+## the current main file is copied to `.bak` only when it is known good, and the rename comes last.
+## So a whole main file or a whole `.bak` exists at every moment, and after a failed write the slot
+## still loads what it held: the main file is not touched before the last step, and a failed
+## backup leaves the old `.bak` as it was (`_backup()`). What a failure can cost is the older
+## generation: once the backup is made, `.bak` holds the save the main file holds.
+## A slot that reads CORRUPT, UNREADABLE or NEWER as a whole (`read_slot()`, both files judged) is
+## never written over (D3): the caller starts a new game through `delete_slot()` instead. A
+## corrupt main file beside a usable `.bak` is not such a slot: the next write replaces it.
+## Returns the first error; the caller warns and signals.
 func write_slot(n: int, data: Dictionary) -> Error:
 	var read := read_slot(n)
 	match read.found:
@@ -137,18 +145,25 @@ func write_slot(n: int, data: Dictionary) -> Error:
 	return err
 
 
-## Removes slot `n`'s three files; a missing one is no error. Returns the first real error.
+## Removes slot `n`'s files; a missing one is no error. The main file goes last and the first
+## error stops it (1.21 review): a delete that fails or dies part-way leaves the slot loading what
+## it held, never a deleted game that comes back from its `.bak`.
 ## `DirAccess.remove_absolute()` returns FAILED for a missing file, so each is checked first.
 func delete_slot(n: int) -> Error:
 	var path := slot_path(n)
-	var first := OK
-	for file: String in [path, path + ".bak", path + ".tmp"]:
+	for file: String in [path + ".bak.tmp", path + ".tmp", path + ".bak", path]:
 		if not FileAccess.file_exists(file):
 			continue
-		var err := DirAccess.remove_absolute(file)
-		if err != OK and first == OK:
-			first = err
-	return first
+		var err := _remove(file)
+		if err != OK:
+			return err
+	return OK
+
+
+## One file off the disk. Its own method so a test's store can refuse one (no permission on
+## Linux makes one file in a folder undeletable while its neighbours are not).
+func _remove(path: String) -> Error:
+	return DirAccess.remove_absolute(path)
 
 
 ## True when the file at `path` holds exactly `text` and that text parses as JSON: the read-back
@@ -168,8 +183,10 @@ static func verify_file(path: String, text: String) -> bool:
 ## (`verify_file()`), then renamed over `path`. With `backup`, the file now at `path` is copied to
 ## `path + ".bak"` between the two, after `.tmp` is known whole. On Linux the rename replaces the
 ## file in one step. On Windows the engine deletes the target, then moves (4.7 source): a crash
-## between the two leaves no main file, a whole `.bak` and a whole `.tmp`, which `read_slot()`
-## covers. Prints nothing on any failure (probed on 4.7.2).
+## between the two leaves no main file, a whole `.bak` and a whole `.tmp`, and `read_slot()` then
+## loads the `.bak`. A move that fails there is tried once more, since the target is already gone.
+## Every failure exit removes `.tmp`: nothing reads it. Prints nothing on any failure (probed on
+## 4.7.2).
 func _write(path: String, text: String, backup: bool) -> Error:
 	var tmp := path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
@@ -180,34 +197,53 @@ func _write(path: String, text: String, backup: bool) -> Error:
 	if not stored or not verify_file(tmp, text):
 		DirAccess.remove_absolute(tmp)
 		return ERR_FILE_CANT_WRITE
-	if backup:
-		var err := _copy(path, path + ".bak")
-		if err != OK:
-			DirAccess.remove_absolute(tmp)
-			return err
-	return DirAccess.rename_absolute(tmp, path)
+	var err := _backup(path) if backup else OK
+	if err == OK:
+		err = DirAccess.rename_absolute(tmp, path)
+		if err != OK and not FileAccess.file_exists(path):
+			err = DirAccess.rename_absolute(tmp, path)
+	if err != OK:
+		DirAccess.remove_absolute(tmp)
+	return err
 
 
-## `from`'s bytes into `to`, with FileAccess: `DirAccess.copy_absolute()` prints an engine
-## `ERROR:` when either file can't be opened.
-static func _copy(from: String, to: String) -> Error:
-	var src := FileAccess.open(from, FileAccess.READ)
+## The file at `path` copied to `path + ".bak"`, never written in place (1.21 review): opening the
+## old `.bak` for writing cuts it to nothing before the new bytes are known to land (probed on
+## 4.7.2), so a copy that failed there cost the last good backup. The bytes go to `.bak.tmp`, are
+## read back and compared, and only then renamed over `.bak`; any failure removes `.bak.tmp` and
+## leaves the old `.bak` as it was.
+## With FileAccess: `DirAccess.copy_absolute()` prints an engine `ERROR:` when either file can't
+## be opened.
+static func _backup(path: String) -> Error:
+	var src := FileAccess.open(path, FileAccess.READ)
 	if src == null:
 		return FileAccess.get_open_error()
-	var bytes := src.get_buffer(src.get_length())
+	var length := src.get_length()
+	var bytes := src.get_buffer(length)
 	src.close()
-	var dst := FileAccess.open(to, FileAccess.WRITE)
+	if bytes.size() != length:
+		return ERR_FILE_CANT_READ
+	var tmp := path + ".bak.tmp"
+	var dst := FileAccess.open(tmp, FileAccess.WRITE)
 	if dst == null:
 		return FileAccess.get_open_error()
 	var stored := dst.store_buffer(bytes)
 	dst.close()
-	return OK if stored else ERR_FILE_CANT_WRITE
+	var back := FileAccess.open(tmp, FileAccess.READ)
+	var whole := stored and back != null and back.get_buffer(back.get_length()) == bytes
+	if back != null:
+		back.close()
+	var err := DirAccess.rename_absolute(tmp, path + ".bak") if whole else ERR_FILE_CANT_WRITE
+	if err != OK:
+		DirAccess.remove_absolute(tmp)
+	return err
 
 
 ## One slot file, judged alone. The version is judged before the rest of the shape: a newer
 ## build may have changed the shape, and its file must read as NEWER (kept), never as CORRUPT.
-## Every version this build can read has `slot` (a Dictionary) and `dive` (a Dictionary or null)
-## at the top level, so a migration step may rely on both.
+## Every version this build can read has `slot`, a Dictionary, so a migration step may rely on it.
+## `dive` is a Dictionary, null or missing (a slot that never rested has none) and `meta` may be
+## missing or anything at all: a step tests both before it reads them (`Migrations`).
 func _read_slot_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):  # FileAccess.get_file_as_string() would print an error
 		return _slot_result(Found.MISSING, "")

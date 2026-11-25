@@ -18,15 +18,29 @@ extends Node
 ##   the last resume save (`_resume`, taken in memory at each load and each successful resume
 ##   save, D6). So it never moves the resume point and never makes carried embers safe.
 ## Slot saves are armed (D7), like settings writes: off until `boot()`, `load_slot()` or
-## `new_game()` ran, so a World added by a test can call a save and write nothing.
+## `new_game()` ran, so a World added by a test can call a save and write nothing. They are off
+## again while either of those replaces the state, and after the active slot is deleted.
+## A slot that could not be loaded, or whose old files a new game could not remove, is refused
+## (`_slot_refused`): every save fails without touching a file until `new_game()` or a load that
+## reads it. `Game` remembers that verdict itself: the files may read differently a moment later
+## (an unopenable file that opens again), and the store judging them afresh at each save would
+## then write the defaults over a whole save (1.21 review, probed).
 ## A failed save is an environment error: one warning and `save_failed`, never a crash or a pause.
 
 ## A slot file was written. The autosave icon binds to it (Story 1.25).
 signal save_succeeded(n: int)
-## A slot save failed; nothing on disk changed. The "Not saved" state binds to it (Story 1.39).
+## A slot save failed: the slot still loads what it held before. The "Not saved" state binds to it
+## (Story 1.39).
 signal save_failed(n: int, err: Error)
 ## A settings write failed (1.21 D11). Whether the UI shows it is Story 1.39's call.
 signal settings_save_failed(err: Error)
+
+## What a save returns for a slot whose load found it unusable; the store's own codes for the same.
+const _REFUSED := {
+	SaveStore.Found.CORRUPT: ERR_FILE_CORRUPT,
+	SaveStore.Found.UNREADABLE: ERR_FILE_CANT_OPEN,
+	SaveStore.Found.NEWER: ERR_FILE_UNRECOGNIZED,
+}
 
 var settings := Settings.new():  ## AR14: global, per machine; UI writes only these
 	set(_value):
@@ -66,6 +80,9 @@ var active_slot := 1
 var _booted := false
 var _slot_armed := false  # false until boot(), load_slot() or new_game(): until then a save does nothing (1.21 D7)
 var _slot_detached := false  # detach_slot(): a dev session reads and writes no slot file (1.21 D12)
+# Not OK: the error every save returns while the active slot's files must not be written. Set by a
+# load that found the slot damaged, unopenable or newer and by a new game whose delete failed.
+var _slot_refused: Error = OK
 # What the last load or successful resume save held for the keys a progress save must not move
 # (D6): {slot = {SlotState.RESUME_KEYS key: value}, dive = DiveState.to_dict() or null}.
 var _resume := _fresh_resume()
@@ -144,7 +161,9 @@ func override_setting(key: StringName, v: Variant) -> void:
 ##   the slot's resume point (D5).
 ## - MISSING: the defaults, silently: a first launch.
 ## - CORRUPT, UNREADABLE, NEWER: the defaults and one warning. The files are left as they are, and
-##   every save then fails (the store refuses to write over them) until `new_game()`.
+##   every save then fails (`_slot_refused`) until `new_game()` or a later load that can read them.
+## Saves are off while the state is replaced: `from_dict()` and `reset()` emit, and a handler that
+## saved there would write one slot's state into another's file (1.21 review, probed).
 ## Mid-session the caller rebuilds the room afterwards (Story 1.33, its first caller outside boot).
 func load_slot(n: int) -> SaveStore.Found:
 	if _slot_detached:
@@ -152,15 +171,19 @@ func load_slot(n: int) -> SaveStore.Found:
 		dive.reset()
 		_resume = _fresh_resume()
 		return SaveStore.Found.MISSING
+	_slot_armed = false
 	var read := store.read_slot(n)
-	active_slot = n
-	_slot_armed = true
 	var has_dive := false
 	if read.found == SaveStore.Found.USABLE:
 		var clean := slot.from_dict(read.slot)
 		if read.dive is Dictionary:
 			has_dive = true
 			clean = dive.from_dict(read.dive) and clean
+			# D5: the two points are equal in every file the game writes. A dive that lost its
+			# point (a damaged or hand-edited file) wakes at the slot's, as a null dive does;
+			# otherwise the next resume save would write the empty point into the slot as well.
+			if dive.respawn_room == &"" and dive.respawn_entry == &"":
+				dive.set_respawn(slot.resume_room, slot.resume_entry)
 		else:
 			dive.reset()
 			dive.set_respawn(slot.resume_room, slot.resume_entry)
@@ -176,17 +199,24 @@ func load_slot(n: int) -> SaveStore.Found:
 		if read.found != SaveStore.Found.MISSING:
 			push_warning("Game: slot %d can't be loaded (%s); playing from a new game and leaving the files as they are" % [n, read.why])
 	_resume = {slot = _resume_part(slot.to_dict()), dive = dive.to_dict() if has_dive else null}
+	active_slot = n
+	_slot_refused = _REFUSED.get(read.found, OK)
+	_slot_armed = true
 	return read.found
 
 
 ## The resume save (R14): a station rest, arriving home, a quit at a lit anchor (their callers
 ## arrive in Stories 1.24, 1.34 and E5). The slot's resume point follows the dive's respawn point
 ## (D5), and the dive is written whole, so a load wakes the player there with what they carried.
+## The slot's own resume point moves only once the file holds it (`_write_slot()`): a failed save
+## leaves memory, the snapshot and the file agreeing.
 func save_now() -> Error:
 	if not _slot_armed:
 		return ERR_UNCONFIGURED
-	slot.set_resume(dive.respawn_room, dive.respawn_entry)
-	return _write_slot(slot.to_dict(), dive.to_dict(), true)
+	var slot_part := slot.to_dict()
+	slot_part["resume_room"] = String(dive.respawn_room)
+	slot_part["resume_entry"] = String(dive.respawn_entry)
+	return _write_slot(slot_part, dive.to_dict(), true)
 
 
 ## The progress save (R14): a difficulty change, a purchase, a story flag, a phase checkpoint, a
@@ -213,7 +243,10 @@ func set_difficulty(tier: StringName) -> void:
 ## A new game in slot `n`, saved at once. It is the only way to write over a damaged or newer
 ## slot: the old files go first, so an overwritten game's `.bak` can never load later. Its callers
 ## arrive in Stories 1.33 / 1.38; mid-session they rebuild the room afterwards.
+## When the old files can't be removed the new game is played but refused (`_slot_refused`): no
+## later save may write it beside the old game's files, or that game's `.bak` could load again.
 func new_game(n: int, tier: StringName = SlotState.DEFAULT_DIFFICULTY) -> Error:
+	_slot_armed = false  # no save while the state is replaced, as in load_slot()
 	var err := OK if _slot_detached else store.delete_slot(n)
 	slot.reset()
 	dive.reset()
@@ -222,6 +255,7 @@ func new_game(n: int, tier: StringName = SlotState.DEFAULT_DIFFICULTY) -> Error:
 	if _slot_detached:
 		return ERR_UNCONFIGURED
 	active_slot = n
+	_slot_refused = err
 	_slot_armed = true
 	if err != OK:
 		# An old file is still there, so the new game is not what the slot holds: a failed save.
@@ -231,13 +265,19 @@ func new_game(n: int, tier: StringName = SlotState.DEFAULT_DIFFICULTY) -> Error:
 	return save_now()
 
 
-## Removes slot `n`'s files (the slot picker's delete, Story 1.38). Deleting the active slot also
-## drops what its last resume save held, so a later progress save can't bring it back.
+## Removes slot `n`'s files (the slot picker's delete, Story 1.38). A deleted active slot is gone
+## from memory too (1.21 review, sonlm 2026-11-25): `slot` and `dive` reset in place and saves go
+## off until `load_slot()` or `new_game()`, so no later save can write the deleted game back. A
+## delete that failed changes nothing here: the files it left still hold that game.
 func delete_slot(n: int) -> Error:
 	if _slot_detached:
 		return ERR_UNCONFIGURED
 	var err := store.delete_slot(n)
-	if n == active_slot:
+	if err == OK and n == active_slot and _slot_armed:
+		_slot_armed = false
+		_slot_refused = OK
+		slot.reset()
+		dive.reset()
 		_resume = _fresh_resume()
 	return err
 
@@ -246,12 +286,20 @@ func delete_slot(n: int) -> Error:
 ## 2026-11-25): DevTools calls it for `--room`, `--chain`, `--hp` and `--perf`, before `boot()`.
 ## The same rule as `override_setting()`: a dev value must never reach the file a normal run
 ## reads (`user://` is shared by editor runs and exports). `load_slot()` then gives the defaults
-## and `new_game()` only resets; neither arms, so `boot()` needs no branch.
+## and `new_game()` only resets; neither arms, so `boot()` needs no branch. A slot that was
+## already loaded (a caller that ran after `boot()`) leaves memory too, so the dev session never
+## plays on it.
 func detach_slot() -> void:
 	if _slot_detached:
 		return
 	_slot_detached = true
+	var loaded := _slot_armed
 	_slot_armed = false
+	_slot_refused = OK
+	if loaded:
+		slot.reset()
+		dive.reset()
+		_resume = _fresh_resume()
 	Log.info(Log.SAVE, "slot: detached for this session; no slot file is read or written")
 
 
@@ -265,6 +313,7 @@ func reset_for_tests() -> void:
 	_settings_armed = false
 	_slot_armed = false
 	_slot_detached = false
+	_slot_refused = OK
 	active_slot = 1
 	_overrides.clear()
 	settings.reset()
@@ -308,9 +357,11 @@ func _write_settings() -> void:
 ## Unix seconds; Story 1.38's "most recent slot" compares it). `resume`: a resume save, which on
 ## success becomes what later progress saves keep.
 func _write_slot(slot_part: Dictionary, dive_part: Variant, resume: bool) -> Error:
-	var meta := slot.meta()
-	meta["saved_at"] = int(Time.get_unix_time_from_system())
-	var err := store.write_slot(active_slot, {"version": Migrations.VERSION, "meta": meta, "slot": slot_part, "dive": dive_part})
+	var err := _slot_refused
+	if err == OK:
+		var meta := slot.meta()
+		meta["saved_at"] = int(Time.get_unix_time_from_system())
+		err = store.write_slot(active_slot, {"version": Migrations.VERSION, "meta": meta, "slot": slot_part, "dive": dive_part})
 	if err != OK:
 		# An environment error (Architecture → Error Handling): warn and play on, never crash or
 		# pause. A failed resume save leaves `_resume` alone: the file still holds the old one.
@@ -319,6 +370,7 @@ func _write_slot(slot_part: Dictionary, dive_part: Variant, resume: bool) -> Err
 		return err
 	if resume:
 		_resume = {slot = _resume_part(slot_part), dive = dive_part}
+		slot.set_resume(StringName(slot_part["resume_room"]), StringName(slot_part["resume_entry"]))
 	save_succeeded.emit(active_slot)
 	return OK
 

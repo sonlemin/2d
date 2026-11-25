@@ -22,6 +22,8 @@ const READ_KEYS := ["dive", "found", "from_bak", "meta", "slot", "version", "why
 var _fail := 0
 var _events := []  # ["ok", n] per save_succeeded, ["fail", n, err] per save_failed
 var _settings_fails := []  # err per settings_save_failed
+var _reentrant := []  # what a save called from inside a slot signal returned
+var _resume_moves := 0  # resume_changed emissions
 var _warnings := WarningCounter.new()
 
 
@@ -72,6 +74,15 @@ class SaveLines extends Logger:
 		return out
 
 
+## A store that can't remove the files whose name ends in `keep`: a delete that fails part-way.
+## No permission on Linux makes one file in a folder undeletable beside neighbours that are not.
+class StubbornStore extends SaveStore:
+	var keep := ""
+
+	func _remove(path: String) -> Error:
+		return FAILED if path.ends_with(keep) else super(path)
+
+
 func run() -> void:
 	var real := _real_files()
 	_wipe()  # leftovers from an aborted run
@@ -94,6 +105,8 @@ func run() -> void:
 	_test_progress_save()
 	_test_progress_save_without_resume()
 	_test_failed_resume_then_progress()
+	_test_dive_point()
+	_test_no_save_while_replacing()
 	_test_failure_signal()
 	_test_read_only()
 	_test_verify_file()
@@ -133,13 +146,22 @@ func _on_settings_save_failed(err: Error) -> void:
 	_settings_fails.append(err)
 
 
+## A subscriber that saves on a slot signal: a story flag is a progress-save moment.
+func _on_flag_saves(_id: StringName, _value: bool) -> void:
+	_reentrant.append(Game.save_progress())
+
+
+func _on_resume_changed(_room_id: StringName, _entry: StringName) -> void:
+	_resume_moves += 1
+
+
 # --- helpers ---
 
 ## {path: [exists, text, modified time]} for every file of the player's that a save could reach.
 func _real_files() -> Dictionary:
 	var paths := ["user://settings.json"]
 	for n in range(1, 4):
-		for suffix: String in ["", ".bak", ".tmp"]:
+		for suffix: String in ["", ".bak", ".tmp", ".bak.tmp"]:
 			paths.append("user://slot_%d.json%s" % [n, suffix])
 	var out := {}
 	for path: String in paths:
@@ -176,12 +198,18 @@ func _parsed(path: String) -> Dictionary:
 	return j.get_data()
 
 
-## Every file out of TMP (and its two sub-folders), then the folders: silent when missing.
+## Every file out of TMP and of its sub-folders (the read-only folder, and the folders some cases
+## put where a file belongs), then the folders: silent when missing.
 func _wipe() -> void:
-	for sub: String in ["ro", "missing", ""]:
-		var folder := TMP.path_join(sub) if sub != "" else TMP
-		if not DirAccess.dir_exists_absolute(folder):
-			continue
+	if not DirAccess.dir_exists_absolute(TMP):
+		return
+	if OS.get_name() != "Windows":
+		FileAccess.set_unix_permissions(TMP, 493)
+	var folders: Array[String] = []
+	for sub in DirAccess.get_directories_at(TMP):
+		folders.append(TMP.path_join(sub))
+	folders.append(TMP)
+	for folder in folders:
 		if OS.get_name() != "Windows":
 			FileAccess.set_unix_permissions(folder, 493)  # rwxr-xr-x: an aborted run may have left it read-only
 		for file in DirAccess.get_files_at(folder):
@@ -303,12 +331,14 @@ func _test_bak() -> void:
 	Game.slot.record_chain(2)
 	Game.save_now()
 	var second := _text(_slot())
-	check(second.contains("\"best_chain\": 2,") and second != first, "second save: the file holds best chain 2")
+	var second_file := _parsed(_slot())
+	check(second_file.get("slot", {}).get("best_chain") == 2.0 and second_file.get("meta", {}).get("best_chain") == 2.0 and second != first, "second save: the file holds best chain 2, in its slot part and in meta")
 	check(_has(_slot() + ".bak") and _text(_slot() + ".bak") == first, "...and .bak is the first file, byte for byte")
 	check(not _has(_slot() + ".tmp"), "...and no .tmp is left")
 	Game.slot.record_chain(3)
 	Game.save_now()
-	check(_text(_slot() + ".bak") == second and _text(_slot()).contains("\"best_chain\": 3,"), "third save: .bak is now the second file: always the file as it was before the last write")
+	check(_text(_slot() + ".bak") == second and _parsed(_slot()).get("slot", {}).get("best_chain") == 3.0, "third save: .bak is now the second file: always the file as it was before the last write")
+	check(not _has(_slot() + ".bak.tmp") and not _has(_slot() + ".tmp"), "...and neither .bak.tmp nor .tmp is left: the backup is written beside the .bak and renamed over it")
 	check(_events == [["ok", 1], ["ok", 1], ["ok", 1]] and _warnings.take() == 0, "...three saves, three save_succeeded(1), no warning (got %s)" % [_events])
 
 
@@ -431,6 +461,18 @@ func _test_shapes() -> void:
 		_put(_slot(), corrupt[what])
 		var read := Game.store.read_slot(1)
 		check(read.found == SaveStore.Found.CORRUPT and read.why != "" and read.slot == {} and read.dive == null, "%s is CORRUPT, with a why (got %s, '%s')" % [what, read.found, read.why])
+	# Damage is more often binary than tidy text. The engine prints `Unicode parsing error` lines to
+	# stderr for the first (probed on 4.7.2): not `ERROR:` lines, so the runner stays green.
+	var binary := {
+		"bytes that are not UTF-8": PackedByteArray([0xff, 0xfe, 0x00, 0x7b, 0xc3]),
+		"a file of NUL bytes": PackedByteArray([0, 0, 0, 0, 0, 0, 0, 0]),
+	}
+	for what: String in binary:
+		var raw := FileAccess.open(_slot(), FileAccess.WRITE)
+		raw.store_buffer(binary[what])
+		raw.close()
+		var read := Game.store.read_slot(1)
+		check(read.found == SaveStore.Found.CORRUPT and read.why != "" and read.slot == {}, "%s is CORRUPT, with a why (got %s, '%s')" % [what, read.found, read.why])
 	var usable := {
 		"a missing meta": '{"version": 1, "slot": {"best_chain": 2}, "dive": null}',
 		"a meta that is not an object": '{"version": 1, "meta": 5, "slot": {"best_chain": 2}, "dive": null}',
@@ -486,6 +528,14 @@ func _test_read_table() -> void:
 		check(err == ERR_FILE_CANT_OPEN and _events == [["fail", 1, ERR_FILE_CANT_OPEN]] and _warnings.take() == 2, "...load_slot() warns once and gives the defaults; save_now() returns ERR_FILE_CANT_OPEN, emits save_failed once and warns once (got %s, %s)" % [error_string(err), _events])
 		_unlock(_slot())
 		check(_text(_slot()) == GOOD and _text(_slot() + ".bak") == before and not _has(_slot() + ".tmp"), "...and both files are byte for byte as they were")
+		# 1.21 review: the file opens again, but memory holds the defaults. Game remembers what the
+		# load found; the store alone would now read USABLE and write the defaults over the save.
+		for save: Callable in [Game.save_now, Game.save_progress]:
+			_events.clear()
+			err = save.call()
+			check(err == ERR_FILE_CANT_OPEN and _events == [["fail", 1, ERR_FILE_CANT_OPEN]] and _warnings.take() == 1, "the file opens again: %s() is still refused with ERR_FILE_CANT_OPEN, save_failed once and one warning (got %s, %s)" % [save.get_method(), error_string(err), _events])
+		check(_text(_slot()) == GOOD and _text(_slot() + ".bak") == before and not _has(_slot() + ".tmp"), "...and both files are still byte for byte as they were: the defaults never replace a save that didn't load")
+		check(Game.load_slot(1) == SaveStore.Found.USABLE and Game.slot.best_chain == 7 and Game.save_now() == OK, "...a load that reads the slot lifts the refusal: best chain 7, and it saves")
 		for main: String in ["MISSING", "CORRUPT"]:
 			_fresh()
 			if files[main] != null:
@@ -645,14 +695,57 @@ func _test_failed_resume_then_progress() -> void:
 	Game.dive.add_carried(20)
 	Game.store.dir = TMP.path_join("missing")
 	_events.clear()
+	_resume_moves = 0
+	Game.slot.resume_changed.connect(_on_resume_changed)
 	var err := Game.save_now()
+	Game.slot.resume_changed.disconnect(_on_resume_changed)
 	Game.store.dir = TMP
 	check(err != OK and _events.size() == 1 and _events[0][0] == "fail" and _warnings.take() == 1, "(setup) a resume save into a missing folder fails (got %s)" % error_string(err))
+	check(Game.slot.resume_entry == &"spawn" and _resume_moves == 0, "...and the slot's resume point in memory stays at spawn, with no resume_changed: it moves only once the file holds it (got '%s', %d emitted)" % [Game.slot.resume_entry, _resume_moves])
 	Game.slot.record_chain(8)
 	check(Game.save_progress() == OK, "a progress save after it succeeds")
 	var d := _parsed(_slot())
 	check(d.get("slot", {}).get("best_chain") == 8.0, "...with the live progress (best chain 8)")
 	check(d.get("slot", {}).get("resume_entry") == "spawn" and d.get("dive") == {"carried": 5.0, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}, "...and the old resume point and the old dive: the failed resume save moved neither (got %s, %s)" % [d.get("slot", {}).get("resume_entry"), d.get("dive")])
+
+
+## D5 (1.21 review): the dive's respawn point and the slot's resume point are equal in every file
+## the game writes. A dive that lost its point wakes at the slot's, as a null dive does.
+func _test_dive_point() -> void:
+	var slot_part := '"slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": []}'
+	_fresh()
+	_put(_slot(), '{"version": 1, "meta": {}, %s, "dive": {"carried": 5, "respawn_entry": "", "respawn_room": ""}}' % slot_part)
+	check(Game.load_slot(1) == SaveStore.Found.USABLE and _warnings.take() == 0, "a dive with an empty respawn point beside a slot resume point loads clean")
+	check(Game.dive.carried == 5 and Game.dive.respawn_room == &"m1_shaft" and Game.dive.respawn_entry == &"up", "...with 5 carried, and the dive wakes at the slot's resume point, m1_shaft / up (got '%s' / '%s')" % [Game.dive.respawn_room, Game.dive.respawn_entry])
+	check(Game.save_now() == OK and _parsed(_slot()).get("slot", {}).get("resume_entry") == "up", "...so the next resume save keeps the slot's point instead of writing the empty one over it")
+	_fresh()
+	_put(_slot(), '{"version": 1, "meta": {}, %s, "dive": {}}' % slot_part)
+	check(Game.load_slot(1) == SaveStore.Found.USABLE and _warnings.take() == 1, "an empty dive object loads with one warning (its fields are missing)")
+	check(Game.dive.carried == 0 and Game.dive.respawn_room == &"m1_shaft" and Game.dive.respawn_entry == &"up", "...and wakes at the slot's resume point too (got '%s' / '%s')" % [Game.dive.respawn_room, Game.dive.respawn_entry])
+
+
+## 1.21 review: `from_dict()` and `reset()` emit, so a subscriber that saves on a slot signal runs
+## in the middle of a load or a new game. Saves are off until the state, the snapshot and the
+## active slot all belong to the same slot.
+func _test_no_save_while_replacing() -> void:
+	_fresh()
+	var other := GOOD.replace("met_glim", "lit_anchor").replace('"carried": 5', '"carried": 50')
+	_put(_slot(1), GOOD)
+	_put(_slot(2), other)
+	Game.load_slot(1)
+	Game.slot.flag_set.connect(_on_flag_saves)
+	_reentrant.clear()
+	_events.clear()
+	Game.load_slot(2)  # flag_set(met_glim, false) and flag_set(lit_anchor, true)
+	check(_reentrant == [ERR_UNCONFIGURED, ERR_UNCONFIGURED], "a save called from flag_set during load_slot(2) is refused as unarmed, both times (got %s)" % [_reentrant])
+	check(_text(_slot(1)) == GOOD and _text(_slot(2)) == other and DirAccess.get_files_at(TMP) == PackedStringArray(["slot_1.json", "slot_2.json"]) and _events.is_empty(), "...and neither slot's file changed: no .bak, no signal (TMP holds %s)" % [DirAccess.get_files_at(TMP)])
+	check(Game.active_slot == 2 and Game.dive.carried == 50, "...the load itself finished: slot 2 active, 50 carried")
+	_reentrant.clear()
+	var made := Game.new_game(3)  # reset() emits flag_set(lit_anchor, false)
+	check(_reentrant == [ERR_UNCONFIGURED] and made == OK and _events == [["ok", 3]], "a save called from flag_set during new_game(3) is refused too; the new game then saves once, into slot 3 (got %s, %s)" % [_reentrant, _events])
+	check(_text(_slot(1)) == GOOD and _text(_slot(2)) == other, "...and slots 1 and 2 are byte for byte as they were: the blank state never reached the slot that was active")
+	Game.slot.flag_set.disconnect(_on_flag_saves)
+	check(Game.save_progress() == OK, "...and saves are armed again once the new game is in place")
 
 
 func _test_failure_signal() -> void:
@@ -698,7 +791,34 @@ func _test_read_only() -> void:
 	FileAccess.set_unix_permissions(ro, 493)
 	check(_text(ro.path_join("slot_1.json")) == GOOD and DirAccess.get_files_at(ro) == PackedStringArray(["slot_1.json"]), "...and the existing slot file is byte for byte as it was, alone in the folder (got %s)" % [DirAccess.get_files_at(ro)])
 
-	# The backup step fails after .tmp was written and verified: .tmp is removed, nothing else moves.
+	# 1.21 review: a new game whose old files can't be removed is played but never saved beside
+	# them, even once the folder can be written again.
+	FileAccess.set_unix_permissions(ro, 365)
+	_events.clear()
+	var made := Game.new_game(1, &"easy")
+	check(made != OK and _events == [["fail", 1, made]] and _warnings.take() == 1, "new_game(1) in a read-only folder returns the delete's error, emits save_failed(1, err) once and never save_succeeded, and warns once (got %s, %s)" % [error_string(made), _events])
+	check(Game.slot.best_chain == 0 and Game.slot.difficulty == &"easy", "...the new game is what is in memory (best chain 0, easy)")
+	FileAccess.set_unix_permissions(ro, 493)
+	_events.clear()
+	Game.set_difficulty(&"hard")
+	var again := Game.save_now()
+	check(again == made and _events == [["fail", 1, made], ["fail", 1, made]] and _warnings.take() == 2, "with the folder writable again, a progress save and a resume save are still refused with that error (got %s, %s)" % [error_string(again), _events])
+	check(_text(ro.path_join("slot_1.json")) == GOOD and DirAccess.get_files_at(ro) == PackedStringArray(["slot_1.json"]), "...and the old game's file is byte for byte as it was, alone: the new game never lands beside it (got %s)" % [DirAccess.get_files_at(ro)])
+	_events.clear()
+	check(Game.new_game(1) == OK and _events == [["ok", 1]] and _parsed(ro.path_join("slot_1.json")).get("slot", {}).get("best_chain") == 0.0 and not _has(ro.path_join("slot_1.json.bak")), "...new_game(1) again, now that the old file can go, writes the new game with no .bak")
+
+	# A delete of the active slot that fails changes nothing in memory: the file still holds the game.
+	_put(ro.path_join("slot_1.json"), GOOD)
+	Game.load_slot(1)
+	FileAccess.set_unix_permissions(ro, 365)
+	var gone := Game.delete_slot(1)
+	FileAccess.set_unix_permissions(ro, 493)
+	check(gone != OK and Game.slot.best_chain == 7 and Game.dive.carried == 5, "delete_slot(1) in a read-only folder returns an error and leaves the game in memory (got %s, best chain %d)" % [error_string(gone), Game.slot.best_chain])
+	check(Game.save_progress() == OK and _parsed(ro.path_join("slot_1.json")).get("dive") == {"carried": 5.0, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}, "...and its resume snapshot: the next progress save still writes 5 carried at spawn, not \"dive\": null")
+	_warnings.take()
+
+	# The backup is never written in place (1.21 review). A .bak that can't be opened for writing
+	# is replaced by the rename, so it no longer fails the save.
 	_fresh()
 	_put(_slot(), GOOD)
 	_put(_slot() + ".bak", "older backup")
@@ -706,9 +826,39 @@ func _test_read_only() -> void:
 	Game.load_slot(1)
 	Game.slot.record_chain(30)
 	err = Game.save_now()
-	check(err != OK and _events == [["fail", 1, err]] and _warnings.take() == 1, "a .bak that can't be written: the save returns an error, emits save_failed once and warns once (got %s)" % error_string(err))
-	check(_text(_slot()) == GOOD and _text(_slot() + ".bak") == "older backup" and not _has(_slot() + ".tmp"), "...the main file and the .bak are byte for byte as they were, and the .tmp is removed")
-	_unlock(_slot() + ".bak")
+	check(err == OK and _text(_slot() + ".bak") == GOOD and _parsed(_slot()).get("slot", {}).get("best_chain") == 30.0, "a read-only .bak doesn't stop the save: the new backup is renamed over it (got %s)" % error_string(err))
+	check(not _has(_slot() + ".bak.tmp") and not _has(_slot() + ".tmp") and _warnings.take() == 0, "...leaving no .bak.tmp and no .tmp, with no warning")
+
+	# The backup step fails after .tmp was written and verified: both temp files go, nothing else
+	# moves. First the copy itself (a folder sits where .bak.tmp is written), then its rename (a
+	# folder that isn't empty sits at .bak).
+	_fresh()
+	_put(_slot(), GOOD)
+	_put(_slot() + ".bak", "older backup")
+	DirAccess.make_dir_recursive_absolute(_slot() + ".bak.tmp")
+	Game.load_slot(1)
+	Game.slot.record_chain(30)
+	err = Game.save_now()
+	check(err != OK and _events == [["fail", 1, err]] and _warnings.take() == 1, "a backup that can't be written: the save returns an error, emits save_failed once and warns once (got %s)" % error_string(err))
+	check(_text(_slot()) == GOOD and _text(_slot() + ".bak") == "older backup" and not _has(_slot() + ".tmp"), "...the main file and the old .bak are byte for byte as they were, and the .tmp is removed: a failed backup never cuts the last good one")
+	_fresh()
+	_put(_slot(), GOOD)
+	DirAccess.make_dir_recursive_absolute(_slot() + ".bak")
+	_put((_slot() + ".bak").path_join("x"), "x")
+	Game.load_slot(1)
+	Game.slot.record_chain(30)
+	err = Game.save_now()
+	check(err != OK and _events == [["fail", 1, err]] and _warnings.take() == 1, "a backup that can't be renamed into place fails the save the same way (got %s)" % error_string(err))
+	check(_text(_slot()) == GOOD and DirAccess.get_files_at(TMP) == PackedStringArray(["slot_1.json"]), "...the main file is byte for byte as it was, and neither .bak.tmp nor .tmp is left (TMP holds %s)" % [DirAccess.get_files_at(TMP)])
+
+	# The last step fails: a folder that isn't empty sits where the main file goes. No .tmp is left.
+	_fresh()
+	DirAccess.make_dir_recursive_absolute(_slot())
+	_put(_slot().path_join("x"), "x")
+	check(Game.load_slot(1) == SaveStore.Found.MISSING, "(setup) a folder at the slot's path reads as an empty slot")
+	err = Game.save_now()
+	check(err != OK and _events == [["fail", 1, err]] and _warnings.take() == 1, "a rename that fails: the save returns an error, emits save_failed once and warns once (got %s)" % error_string(err))
+	check(DirAccess.get_files_at(TMP).is_empty(), "...and removes its .tmp: no failure exit of the write leaves one (TMP holds %s)" % [DirAccess.get_files_at(TMP)])
 
 
 func _test_verify_file() -> void:
@@ -745,29 +895,45 @@ func _test_unarmed() -> void:
 
 func _test_delete_slot() -> void:
 	_fresh()
-	for suffix: String in ["", ".bak", ".tmp"]:
+	for suffix: String in ["", ".bak", ".tmp", ".bak.tmp"]:
 		_put(_slot() + suffix, GOOD)
 	_put(_slot(2), GOOD)
 	check(Game.delete_slot(1) == OK, "delete_slot(1) returns OK")
-	check(not _has(_slot()) and not _has(_slot() + ".bak") and not _has(_slot() + ".tmp"), "...and removes the slot's three files")
+	check(DirAccess.get_files_at(TMP) == PackedStringArray(["slot_2.json"]), "...and removes the slot's files: the main file, .bak, .tmp and .bak.tmp (TMP holds %s)" % [DirAccess.get_files_at(TMP)])
 	check(_text(_slot(2)) == GOOD, "...leaving slot 2 alone")
 	check(Game.delete_slot(1) == OK and Game.store.delete_slot(3) == OK, "...on an empty slot it returns OK: a missing file is no error")
 	check(_warnings.take() == 0 and _events.is_empty(), "...with no warning and no signal")
-	# Deleting the active slot drops what its last resume save held.
+	# 1.21 review: the main file goes last and the first error stops the delete, so a delete that
+	# fails part-way leaves the slot loading what it held.
+	var stubborn := StubbornStore.new()
+	stubborn.dir = TMP
+	for suffix: String in ["", ".bak", ".tmp"]:
+		_put(_slot() + suffix, GOOD)
+	stubborn.keep = ".bak"
+	check(stubborn.delete_slot(1) == FAILED, "a delete whose .bak can't be removed returns that error")
+	check(_text(_slot()) == GOOD and _has(_slot() + ".bak") and not _has(_slot() + ".tmp"), "...and stops there: the main file is still whole (only the .tmp went), so the slot loads as it did")
+	check(stubborn.read_slot(1).found == SaveStore.Found.USABLE and stubborn.read_slot(1).from_bak == false, "...USABLE from its main file, not a deleted game back from its .bak")
+	stubborn.keep = "slot_1.json"
+	check(stubborn.delete_slot(1) == FAILED and _text(_slot()) == GOOD and not _has(_slot() + ".bak"), "a delete whose main file can't be removed fails with the main file left, after the .bak went")
+	stubborn.keep = "nothing"
+	check(stubborn.delete_slot(1) == OK and not _has(_slot()), "(control) the same store deletes the slot when nothing is refused")
+	# Deleting the active slot takes its game out of memory and turns saves off (sonlm 2026-11-25).
 	_fresh()
 	_put(_slot(), GOOD)
 	Game.load_slot(1)
-	Game.delete_slot(1)
-	Game.save_progress()
-	var d := _parsed(_slot())
-	check(d.has("dive") and d["dive"] == null and d.get("slot", {}).get("resume_room") == "", "deleting the active slot drops its resume snapshot: the next progress save writes \"dive\": null and no resume point")
+	check(Game.delete_slot(1) == OK and not _has(_slot()), "delete_slot(1) on the active slot removes its file")
+	check(Game.slot.best_chain == 0 and Game.slot.resume_room == &"" and not Game.slot.has_flag(&"met_glim") and Game.dive.carried == 0, "...and the deleted game leaves memory: best chain 0, no flag, no resume point, 0 carried")
+	var after_progress := Game.save_progress()
+	var after_resume := Game.save_now()
+	check(after_progress == ERR_UNCONFIGURED and after_resume == ERR_UNCONFIGURED and DirAccess.get_files_at(TMP).is_empty() and _events.is_empty(), "...and saves are off: neither kind writes the slot back (got %s, %s; TMP holds %s)" % [error_string(after_progress), error_string(after_resume), DirAccess.get_files_at(TMP)])
+	check(Game.new_game(1) == OK and _has(_slot()), "...until a new game (or a load) arms them again")
 	_fresh()
 	_put(_slot(), GOOD)
 	_put(_slot(2), GOOD)
 	Game.load_slot(1)
 	Game.delete_slot(2)
 	Game.save_progress()
-	check(_parsed(_slot()).get("dive") == {"carried": 5.0, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}, "...deleting another slot keeps the active slot's snapshot (5 carried at spawn)")
+	check(Game.slot.best_chain == 7 and _parsed(_slot()).get("dive") == {"carried": 5.0, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}, "deleting another slot leaves the active one alone: best chain 7, and its snapshot (5 carried at spawn)")
 
 
 ## AC7, D12: a dev session reads and writes no slot file.
@@ -781,12 +947,14 @@ func _test_detached() -> void:
 	Game.detach_slot()
 	OS.remove_logger(lines)
 	check(lines.take() == PackedStringArray(["[save] slot: detached for this session; no slot file is read or written"]), "detach_slot() logs once, however often it is called")
+	check(Game.slot.best_chain == 0 and Game.dive.carried == 0 and Game.dive.respawn_room == &"", "...and a slot that was already loaded leaves memory: a dev session never plays on it")
 	Game.slot.record_chain(40)
 	for save: Callable in [Game.save_now, Game.save_progress]:
 		var err: Error = save.call()
 		check(err == ERR_UNCONFIGURED, "detached: %s() returns ERR_UNCONFIGURED (got %s)" % [save.get_method(), error_string(err)])
 	check(_text(_slot()) == GOOD and DirAccess.get_files_at(TMP) == PackedStringArray(["slot_1.json"]), "...and the file is byte for byte as it was, alone in the folder")
 	check(Game.load_slot(1) == SaveStore.Found.MISSING, "detached: load_slot(1) returns MISSING, though the file is there")
+	check(Game.load_slot(2) == SaveStore.Found.MISSING and Game.active_slot == 1, "...and load_slot(2) leaves the active slot at 1 (got %d)" % Game.active_slot)
 	check(Game.slot.best_chain == 0 and Game.dive.carried == 0 and Game.dive.respawn_room == &"", "...leaves the defaults in memory")
 	check(Game.save_now() == ERR_UNCONFIGURED, "...and stays unarmed")
 	var made := Game.new_game(1, &"hard")

@@ -36,11 +36,17 @@ func _v1_to_v2(d: Dictionary) -> void:
 
 ## v2 → v3: moves a value from the dive into the slot (a step may change any part, D10). It reads
 ## the key v1 → v2 made, so it fails if the steps ran out of order.
+## The model a real step is copied from, so it tests `dive` and `meta` before it reads them (1.21
+## review): a slot that never rested has "dive": null, and meta may be missing.
 func _v2_to_v3(d: Dictionary) -> void:
 	_ran.append("2>3")
-	d.slot["banked"] = d.dive["carried"] + d.slot["best_chain"]
-	d.dive.erase("carried")
-	d.meta["note"] = "v3"
+	var carried := 0
+	if d.get("dive") is Dictionary:
+		carried = d.dive.get("carried", 0)
+		d.dive.erase("carried")
+	d.slot["banked"] = carried + d.slot["best_chain"]
+	if d.get("meta") is Dictionary:
+		d.meta["note"] = "v3"
 	d["version"] = 3
 
 
@@ -61,6 +67,10 @@ func _test_two_steps_in_order() -> void:
 	_ran.clear()
 	var one := Migrations.migrate(src, 2, {1: _v1_to_v2, 2: _v2_to_v3})
 	check(_ran == ["1>2"] and one.get("version") == 2 and one.slot == {"best_chain": 9, "flags": ["met_glim"]}, "v1 → v2 runs only the first step, even with a later one in the table (ran %s)" % [_ran])
+	# A slot that never rested: "dive": null and, here, no meta at all. The steps must still run.
+	_ran.clear()
+	var bare := Migrations.migrate({"version": 1, "slot": {"best": 9}, "dive": null}, 3, {1: _v1_to_v2, 2: _v2_to_v3})
+	check(_ran == ["1>2", "2>3"] and bare == {"version": 3, "slot": {"best_chain": 9, "banked": 9}, "dive": null}, "a file with \"dive\": null and no meta migrates too: both steps run and neither part is invented (got %s)" % [bare])
 
 
 func _test_missing_step() -> void:

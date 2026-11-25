@@ -59,9 +59,10 @@ func _ready() -> void:
 	var budget := LightBudgetNode.new()
 	budget.world = self
 	add_child(budget)
-	# The entry scene boots Game once: it loads settings.json and arms its writes (Story 1.4 D6).
-	# A test adds World by hand and is never the current scene, so tests can't touch the real
-	# settings.json even through World.
+	# The entry scene boots Game once: it loads settings.json and the active slot and arms their
+	# writes (Stories 1.4 D6, 1.21). A test adds World by hand and is never the current scene, so
+	# tests can't touch the player's real files even through World. After DevTools above: an arg
+	# that detaches the slot must be applied before the boot loads one (1.21 D12).
 	if get_tree().current_scene == self:
 		Game.boot()
 	_apply_ambient()
@@ -205,7 +206,9 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		elif room_id != start_room or entry != start_entry:
 			# A respawn point that failed to build: the dive's start instead. A loaded point is
 			# checked before the first build (_check_respawn_point()), and DevTools checks --room=
-			# before it sets the start, so this is the backstop for a point set in play.
+			# before it sets the start, so this is the backstop for a point set in play. The point
+			# is cleared, or every later death would try the same room and push the same error.
+			Game.dive.set_respawn(&"", &"")
 			_swap_room(start_room, start_entry, true)
 		else:
 			assert(false, "World: the start room '%s' failed to load (errors above)" % start_room)

@@ -233,13 +233,16 @@ func test_play_time_pause() -> void:
 	OS.delay_msec(40)
 	_world._process(0.0)
 	added = Game.slot.play_time + Game.slot._play_fraction - played
-	check(added >= 0.04 and added < 0.25, "...and the frame after it counts its own wall time again (40 ms waited, %.3f s added)" % added)
+	# Up to the cap, not below it: on a stalled machine the 40 ms wait can take longer than
+	# PLAY_TIME_STEP_MAX, and that frame then counts as exactly the cap (1.21 review).
+	check(added >= 0.04 and added <= World.PLAY_TIME_STEP_MAX, "...and the frame after it counts its own wall time again, up to the cap (40 ms waited, %.3f s added)" % added)
 
 
 ## D8: real seconds. Every pogo hit lands a hitstop, and the frame it lands on must count as one
 ## frame, not as 0.25 s (`delta / Engine.time_scale` reads that frame 20 times too long). Twenty
-## hitstops over 2.4 s of wall time: by the wall clock 2 or 3 whole seconds; with that misread at
-## least 2.7 s more, so 5 or more.
+## hitstops over 2.4 s of wall time: by the wall clock 2 whole seconds, and 1 to 3 pass (a frame
+## over 0.25 s counts as 0.25 s, so a stalled machine reads low, and the fraction left by earlier
+## cases can carry one more); with that misread at least 2.7 s more, so 5 or more.
 func test_play_time_through_hitstop() -> void:
 	var before := Game.slot.play_time
 	var t0 := Time.get_ticks_msec()
@@ -254,7 +257,7 @@ func test_play_time_through_hitstop() -> void:
 	Game.clock.clear()
 	var got := Game.slot.play_time - before
 	check(hits >= 15, "(%d hitstops landed in 2.4 s)" % hits)
-	check(got >= 1 and got <= 3, "2.4 s of real time through %d hitstops add 2 or 3 s of play time, never more: hitstop doesn't stretch it (got %d)" % [hits, got])
+	check(got >= 1 and got <= 3, "2.4 s of real time through %d hitstops add 1 to 3 s of play time, never the 5 or more a stretched frame gives: hitstop doesn't stretch it (got %d)" % [hits, got])
 	check(is_equal_approx(Engine.time_scale, 1.0), "...and the time scale is back at 1")
 
 
@@ -282,9 +285,15 @@ func test_depth() -> void:
 func test_bad_respawn_point() -> void:
 	var warnings := RespawnWarnings.new()
 	OS.add_logger(warnings)
+	# The third case needs a room the index knows and the validator refuses (a hole in its wall).
+	# The whole test tree, once: its sub-folders would index the same files twice.
+	RoomLoader.add_root("res://tests/rooms")
+	var broken := RoomLoader.inspect(&"bad_edge_hole")
+	check(broken.known and not broken.errors.is_empty(), "(setup) bad_edge_hole is a room the index knows and the validator refuses")
 	var cases := [
 		[&"no_such_room", &"spawn", "an unknown room"],
 		[&"m1_shaft", &"anchor_nowhere", "a known room with an unknown entry"],
+		[&"bad_edge_hole", &"spawn", "a room that fails validation"],
 	]
 	for c: Array in cases:
 		Game.dive.set_respawn(c[0], c[1])
