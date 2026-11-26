@@ -5,7 +5,7 @@
 - **engine glow, go or no-go** (glow on must hold 60 FPS and pass the look check);
 - whether **≤ 6 `PointLight2D` on screen** holds 60 FPS on every target (confirm the budget, or tighten it and re-run);
 - **Compatibility glow parity on web** (it renders the same in Chrome and Firefox as on desktop);
-- a **flare-cap recommendation** for Story 1.23.
+- a **flare-cap recommendation** for Story 1.23 (answered there: `Tuning` `flare_max` 5, the oldest goes out; with the player's light that is the budget).
 
 The agent records no numbers. sonlm takes the measurements in Story 1.15 (a human gate: the server is headless).
 
@@ -17,7 +17,7 @@ The agent records no numbers. sonlm takes the measurements in Story 1.15 (a huma
 
 - input locked, `Hurtbox` masked off (nothing can kill or knock it), chain held at `--chain`'s n, or 20 without it;
 - moved every physics tick down the room's centre and back at 100 px/s, from a tick counter, so every run sees the same states in the same order (one pass of `perf_worst` is 992 px, about 9.9 s; a 60 s run makes about six passes);
-- **two lights ride along on purpose:** a flare stand-in (ALWAYS, at the player's light radius, 138.4 px at chain 20) 112 px to the left and an Ember Cache 112 px to the right. A real flare sticks and a real cache lies still; riding along keeps both on screen for the whole run, which is the worst case the budget must hold. The flare stand-in is a light only and wakes no lurker (1.23 makes it the real flare). Since Story 1.22 the cache is the real one (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`, 80 px to start): a `LightSource`, so it wakes lurkers in `perf_worst`, who hunt it harmlessly. Runs before 1.22 had a plain 80 px CACHE stand-in that woke nothing.
+- **two lights ride along on purpose:** a flare (ALWAYS, at the player's light radius, 138.4 px at chain 20) 112 px to the left and an Ember Cache 112 px to the right. In play a flare sticks where it lands and a cache lies still; riding along keeps both on screen for the whole run, which is the worst case the budget must hold. Since Story 1.23 the flare is the real one (`actors/flare.tscn`, stuck and carried along): it is made once the chain is held, burns out every `flare_burn` seconds (4 s) and is made again on that tick, before the light budget's pass, so its one-second fade and a new instance every 4 s are inside the measured window, as in play. It is a `LightSource` of kind `flare` that ties the player's light at chain 20, and a tie goes to the flare: lurkers in reach leave their walls and hunt it, harmlessly. Runs before 1.23 had a plain ALWAYS light that woke nothing. After a chain break (`breaks` above 0) the next flare burns at whatever the light is then, so re-run. Since Story 1.22 the cache is the real one (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`, 80 px to start): a `LightSource`, so it wakes lurkers in `perf_worst`, who hunt it harmlessly. Runs before 1.22 had a plain 80 px CACHE stand-in that woke nothing.
 
 Each pass wakes the lurkers as their screen comes into reach. Hunting lurkers (95 px/s) trail the 100 px/s path and fall away rather than pile up. Screen 1's four push the lights past the budget whenever the path passes the top (player + flare + cache + 4 glows = 7), so the sprite fallback is exercised on every pass.
 
@@ -74,7 +74,7 @@ perf 60 s: <frames> frames, avg <x> fps, min <n> fps, worst <y> ms at <t> s, <k>
 At each brightness (`--set=brightness:0` … `3`, added to the run's args), compare glow off and on:
 
 - **the darkness:** a 2026-11-19 probe on a software renderer saw glow *darken* the dark ambient (0.039 → 0.016). Check on the laptop's GPU whether the darkness stays readable with glow on (Pillar 2: tension, never confusion);
-- **the halo:** the player's light, the lurker glows and the flare stand-in;
+- **the halo:** the player's light, the lurker glows and the flare;
 - **sprite beside lit:** a sprite glow next to a lit lurker glow must not read as a different thing.
 
 ## Decision guide for 1.15
@@ -114,6 +114,15 @@ The cache stand-in became the real cache, which now wakes lurkers. One headless 
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-11-26 | 20261126-0596143 `web_debug` | sonlm's laptop, Chrome, WebKit WebGL | 4358x6762 | — | off | (43.5) | (0) | (8901.1 at 13.9 s) | (532) | 6/6 / 7 / 0 | 0 / 0 | **frame times void:** an 8.9 s frame at 13.9 s is a hidden or covered tab. The other 2612 frames took 51.1 s (about 51 fps) and 532 were over 20 ms, but no valid Chrome run exists to hold that against (the 1.16 Chrome run was void too), so it says nothing about the cache. The light counts are valid and match 1.15's. Run again |
 | 2026-11-26 | 20261126-0596143 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | 60 Hz | off | 59.2 | 13 | 791.0 (0.0 s) | 80 | 6/6 / 7 / 0 | 0 / 0 | valid; the first run with the real cache (lurkers hunt it for the whole run). Beside 1.16's run on the same browser and adapter (59.4 / 24 / 634.0 at 0.0 s / 30): the average holds, the first-frame stall is still the load, and the slow frames went from 30 to 80. One run, so the cache's share can't be told from noise (→ 7.13) |
+
+## Results (Story 1.23: the real flare)
+
+The flare stand-in became a real `Flare`, which lurkers now sense and hunt; the light budget also holds a relit light back 0.35 s (the relight hold). One headless run on the server (2026-11-26, `timeout 45 godot --headless --path game -- --room=perf_worst --perf=20`; the run never quits by itself): **lights max 6/6, sprites max 5, over 0**, breaks 0, deaths 0. Beside 1.22's (6/6, 7, 0) the lit count and `over` are the same; fewer glows stand in the view at once (5, not 7), since lurkers in reach now leave their walls for the flare (probed the same day: with the riding flare at 60 px, which no lurker senses, the run gives 7 again; with the relight hold off and the real flare it still gives 5, so the hold is not the cause). A headless run draws nothing, so its frame times say nothing about the GPU; the laptop run is the story's Task 12 (sonlm), and its row goes in the table below.
+
+| Date | Build / commit | Machine and adapter | Window and scale | Refresh | Glow | Avg FPS | Min FPS | Worst ms (at s) | Over 20 ms | Lights / sprites / over max | Breaks / deaths | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-26 | 20261126-749753c-dirty `web_debug` | sonlm's laptop, Chrome, WebKit WebGL | 4358x6762 | — | off | 41.9 | 23 | 222.1 (1.0 s) | 1408 | 6/6 / 5 / 0 | 0 / 0 | the first Chrome run with no hidden-tab frame (worst 222 ms), so its frame times are real, but nothing to hold them against: both earlier Chrome runs were void, and this canvas is 4358x6762 (29 megapixels, about eight times Firefox's 3330x1087). It says Chrome at this size runs under 60; it does not say what the flare costs. The light counts match the headless run. The comparable run is Firefox on the Intel iGPU (1.22: 59.2 / 13 / 791.0 at 0.0 s / 80) |
+| 2026-11-26 | 20261126-749753c-dirty `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | 60 Hz | off | 59.3 | 17 | 726.0 (0.0 s) | 3 | 6/6 / 5 / 0 | 0 / 0 | valid; the first run with the real flare and the relight hold, on the weakest target. Beside 1.22's run on the same browser and adapter (59.2 / 13 / 791.0 at 0.0 s / 80): the average holds, the first-frame stall is still the load (→ 7.13), and the frames over 20 ms went from 80 to 3. One run each, so the drop is not explained here; the flare costs nothing that shows |
 
 **Runs not made at CP1 (sonlm's choice, 2026-11-21):** glow on everywhere (glow was a no-go, so its cost no longer decides anything), the laptop desktop on the Intel iGPU, and Chrome. No separate HD 620 machine was available; the laptop's Intel iGPU, through Firefox, stood in for the low-end target. The full pass is Story 7.13.
 

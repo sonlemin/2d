@@ -68,6 +68,10 @@ const EFFECTS := {
 			why = "the sprite stretches to (0.75, 1.3) on a pogo hit and eases back on the physics tick, one tick = 1/60 s of real time, so it shows through the hitstop (player.gd, Story 1.19): hit feedback on the player's own action; reduced motion covers UI easing and popups (UX-DR127)"},
 	&"hit_flash": {kind = Kind.ONCE, hz = 0.0, fn = "hit_flash", reduced = "reduce flashing: a 100 ms dim to 60% (self_modulate) instead of the white (UX-DR126 \"a short dim\")",
 			why = "a white flash starts at most once per HIT_FLASH_GAP_TICKS (60): with the 2.5 Hz blink, hits back to back at the 0.6 s invulnerability would reach 4 flashes per second (Q1, sonlm 2026-11-22; NFR8)"},
+	&"flare_fade": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
+			why = "a flare's light and sprite fall in a straight line over its last 1.0 s and never rise (flare.gd, Flare.FADE_TIME); one per flare, and a fade is not a flash, so reduce flashing leaves it (GDD Flare Toss \"fades out smoothly, with no flashing\")"},
+	&"flare_light": {kind = Kind.ONCE, hz = 0.0, fn = "", reduced = "",
+			why = "a toss adds one steady light at the pre-toss radius where the player's own light already is, while the player's eases down to the new chain (flare.gd, player.gd): brightness steps once and never blinks; the cap's swap removes one light as it adds one, and a toss needs a Light tap and 2 links, so four taps from a full chain are the most before the next pogo"},
 }
 
 static var _unshaded_material: CanvasItemMaterial

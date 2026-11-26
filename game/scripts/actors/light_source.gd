@@ -1,7 +1,7 @@
 class_name LightSource
 extends Node2D
-## A light predators can sense (AR28): the player's Chain-Light and the Ember Cache (Story 1.22);
-## flares (1.23) next. Predators find it through group `light_source` and judge it with Sensing,
+## A light predators can sense (AR28): the player's Chain-Light, the Ember Cache (Story 1.22) and
+## a tossed Flare (Story 1.23). Predators find it through group `light_source` and judge it with Sensing,
 ## never through group `player` (AR29; lint light_query).
 ## radius() is the rule value predators read. The shown radius, eased and kicked, is presentation
 ## only (a pogo's flare must never wake a lurker the chain itself wouldn't).
@@ -20,8 +20,9 @@ const GROUP := &"light_source"
 @export var kind: StringName = &""
 ## The rule radius, when set: the player sets it to chain.light_radius.
 var radius_fn := Callable()
-## px, for a light with a set radius: a flare's pre-toss radius (1.23), a test's stand-in. (The
-## Ember Cache sets radius_fn instead, so its Tuning value is read on every call.)
+## px, for a light with a set radius: a Flare sets its pre-toss radius here in its _ready() and it
+## holds for the whole burn (Story 1.23 D8); a test's stand-in. (The Ember Cache sets radius_fn
+## instead, so its Tuning value is read on every call.)
 var fixed_radius := 0.0
 ## The child BudgetLight it sizes, or null (a test stand-in has none).
 var light: BudgetLight

@@ -4,11 +4,18 @@ extends Node
 ## compared. On every spawn it takes the player: input locked, hurtbox masked off (no contact can
 ## hurt it or break the chain), the chain paid through DevTools' --chain take-off arming (never
 ## pinned: 1.11 D6), and moved every physics tick along a vertical ping-pong down the room's centre,
-## driven by a tick counter, never the wall clock. Two lights ride along: a stand-in flare (a plain
-## BudgetLight of rank ALWAYS at the player's light radius, FR15; a light only, never a LightSource,
-## so it wakes no lurker; 1.23 replaces it with the real flare) and, since Story 1.22, a real Ember
-## Cache (objects/ember_cache.tscn: rank CACHE, Tuning's cache_radius, FR24). The cache is a
-## LightSource, so it wakes lurkers in perf_worst as a real one would; they hunt it harmlessly.
+## driven by a tick counter, never the wall clock. Two lights ride along, both the real things: a
+## Flare (actors/flare.tscn, Story 1.23: rank ALWAYS, stuck, burning at the player's light radius of
+## the tick it was made, FR15) and an Ember Cache (objects/ember_cache.tscn, Story 1.22: rank CACHE,
+## Tuning's cache_radius, FR24). Both are LightSources, so they wake lurkers in perf_worst as real
+## ones would, harmlessly: at chain 20 the flare ties the player's 138.4 px, and a tie goes to the
+## non-player light, so lurkers in reach hunt the flare (or the cache), never the autopilot.
+## The flare burns out every flare_burn seconds and is made again on the tick it is missing (never
+## spawned, burnt out, freed with the room), so its fade and a new instance every 4 s are inside the
+## measured window, as in play. It is not made until this life's chain has been seen held, so in a
+## clean run every flare burns at the held chain's radius; after a break (a blocked path, as in
+## m1_shaft) the chain is gone for good and the next flare burns at whatever the light is then
+## (40 px): the summary's `breaks` already marks that run.
 ## It measures wall time between frames (Time.get_ticks_usec(), never delta, which the time scale
 ## bends), samples the light budget every tick, and at the end freezes one summary, logs it once and
 ## hands it to overlay 4. The autopilot keeps going after that, so the load stays while it is read.
@@ -16,11 +23,13 @@ extends Node
 
 const PATH_SPEED := 100.0  ## px/s up and down the room; just above a hunting lurker's 95 px/s, so hunters trail and fall away rather than pile up (since Story 1.20 a hunt keeps sensing off screen, so they drop when they fall out of reach, not at the screen edge)
 const PATH_MARGIN := 3  ## tiles kept clear of the room's top and bottom edges
-const FLARE_OFFSET := Vector2(-112, -32)  ## px from the player: on screen for the whole run, the worst case the budget must hold (a real flare sticks)
+const FLARE_OFFSET := Vector2(-112, -32)  ## px from the player: on screen for the whole run, the worst case the budget must hold (in play a flare sticks where it lands; this one is stuck and carried along)
 const CACHE_OFFSET := Vector2(112, 40)  ## px from the player, likewise (a real cache lies still)
 const EmberCacheScene := preload("res://scenes/objects/ember_cache.tscn")
+const FlareScene := preload("res://scenes/actors/flare.tscn")
 const SLOW_FRAME_USEC := 20_000  ## NFR1: "no frame over 20 ms"
 const PRIORITY := 100  ## after the player (0), the light budget (50) and DevTools' chain payment (100, earlier in the tree)
+const KEEPER_PRIORITY := 25  ## the flare is remade after the actors (0: a flare burns out in its own tick) and before the light budget (50), as a real toss lands before it: made after the budget, the new always-light would stand beside a glow the budget had just relit, 7 lit for a tick
 
 var seconds := 60  ## the run's length; set by DevTools before add_child
 var hold_chain := ChainState.MAX_CHAIN  ## the chain held for the run: --chain's n, else 20
@@ -29,12 +38,13 @@ var world: World  ## set by DevTools before add_child
 
 var done := false  ## the summary is frozen
 var result := {}  ## the summary, once done
-var stand_ins: Array[BudgetLight] = []  ## the flare stand-in (until 1.23); rebuilt on every spawn
+var flare: Flare  ## the real flare riding along, re-made whenever it is missing; only read behind is_instance_valid()
 var cache: EmberCache  ## the real Ember Cache riding along, re-made on every spawn; only read behind is_instance_valid()
 var deaths := 0  ## spawns after the first (expected 0)
 var breaks := 0  ## chain banks after the run started (expected 0)
 
 var _player: Player  # only read behind is_instance_valid()
+var _chain_held := false  # this life's chain has been seen at hold_chain: the flare may be made (cleared on every spawn)
 var _spawn_frame := 0
 var _spawns := 0
 var _tick := 0  # ticks the player has run on the path since its spawn
@@ -56,8 +66,23 @@ func _init() -> void:
 	process_physics_priority = PRIORITY
 
 
+## Ticks between the actors and the light budget, for the flare's upkeep (KEEPER_PRIORITY).
+class FlareKeeper extends Node:
+	var keep := Callable()
+
+	func _init() -> void:
+		name = "FlareKeeper"
+		process_physics_priority = KEEPER_PRIORITY
+
+	func _physics_process(_delta: float) -> void:
+		keep.call()
+
+
 func _ready() -> void:
 	world.player_spawned.connect(_on_player_spawned)  # a method: dropped with World
+	var keeper := FlareKeeper.new()
+	keeper.keep = _keep_flare
+	add_child(keeper)
 
 
 func _on_player_spawned(player: Player) -> void:
@@ -67,6 +92,7 @@ func _on_player_spawned(player: Player) -> void:
 	_player = player
 	_spawn_frame = Engine.get_physics_frames()
 	_tick = 0
+	_chain_held = false
 	player.input.lock()
 	# Untouchable: no predator or crawler contact can hurt or break the chain (the player's poll reads
 	# the Hurtbox's overlaps, Story 1.19). Not monitoring = false: get_overlapping_bodies() then
@@ -91,7 +117,10 @@ func _on_player_spawned(player: Player) -> void:
 	if not _path_checked:
 		_path_checked = true
 		_check_path(room, player)
-	_build_stand_ins(room, player)
+	# AR23: a child of the room, through room.spawn() like World's; the respawn's rebuild frees it
+	# with the room (a death that changes the slot's cache frees it sooner, through cache_changed).
+	cache = room.spawn(EmberCacheScene, _inside(player.global_position + CACHE_OFFSET)) as EmberCache
+	cache.reset_physics_interpolation()
 
 
 ## Ticks the player has run, never the wall clock, so every run sees the same states in order.
@@ -103,7 +132,9 @@ func _physics_process(_delta: float) -> void:
 		return
 	_tick += 1
 	_place(_tick)
-	if not _measuring and not done and _player.chain.count == hold_chain:
+	if _player.chain.count == hold_chain:
+		_chain_held = true  # the keeper makes the flare from the next tick
+	if not _measuring and not done and _chain_held:
 		_measuring = true  # the clock starts in this frame's _process: the room build is never measured
 	if _measuring and not done:
 		var c := BudgetLight.counts(get_tree().get_nodes_in_group(BudgetLight.GROUP), world.light_rect())
@@ -144,44 +175,35 @@ func _place(tick: int) -> void:
 	var p := path_point(tick, _top, _bottom, PATH_SPEED, Engine.physics_ticks_per_second)
 	_player.global_position = Vector2(_x, p.x)
 	_player.velocity = Vector2(0.0, p.y)  # the rig leads on the way down, as in a real dive
-	if stand_ins.size() == 1 and is_instance_valid(stand_ins[0]):
-		stand_ins[0].global_position = _inside(_player.global_position + FLARE_OFFSET)
-		stand_ins[0].texture_scale = _scale_for(stand_ins[0], _player.light_radius())  # FR15: the flare burns at the pre-toss radius
+	if _flare_burning():
+		flare.global_position = _inside(_player.global_position + FLARE_OFFSET)
 	if is_instance_valid(cache):
 		cache.global_position = _inside(_player.global_position + CACHE_OFFSET)
 
 
-## One tile inside the room, so a stand-in never sits in the edge wall.
+## Whether the flare is there to ride along: not freed, not burnt out (queued), not gone with a
+## room World took out of the tree.
+func _flare_burning() -> bool:
+	return is_instance_valid(flare) and not flare.is_queued_for_deletion() and flare.is_inside_tree()
+
+
+## The flare's upkeep, from FlareKeeper's tick. Made on any tick it is missing, once this life's
+## chain has been seen held, at the player's light radius of that tick (FR15: the pre-toss radius);
+## stuck at once (Flare.stick(), the seam for this), and carried along by _place().
+func _keep_flare() -> void:
+	if get_tree().paused or not _chain_held or _flare_burning():
+		return
+	if not is_instance_valid(_player) or _player.is_dead:
+		return
+	flare = world.current_room().spawn(FlareScene, _inside(_player.global_position + FLARE_OFFSET), {radius = _player.light_radius()}) as Flare
+	flare.stick()
+	flare.reset_physics_interpolation()  # AR6: its first placement is a teleport
+
+
+## One tile inside the room, so a riding light never sits in the edge wall.
 func _inside(p: Vector2) -> Vector2:
 	var t := float(Room.TILE)
 	return Vector2(clampf(p.x, _room_rect.position.x + t, _room_rect.end.x - t), clampf(p.y, _room_rect.position.y + t, _room_rect.end.y - t))
-
-
-## Children of the room (AR23): it owns and frees them on a rebuild, and the next spawn builds new
-## ones. The flare's texture, colour and energy come from the player's Light, never typed in; all set
-## before add_child (BudgetLight's _ready() reads its rank). The cache spawns through room.spawn(),
-## like World's; the respawn's rebuild frees it with the room (a death that changes the slot's cache
-## frees it sooner, through cache_changed), and the next spawn makes a new one.
-func _build_stand_ins(room: Room, player: Player) -> void:
-	var source := player.get_node(^"LightSource/Light") as PointLight2D
-	stand_ins.clear()
-	var flare := BudgetLight.new()
-	flare.name = "PerfFlare"
-	flare.rank = BudgetLight.Rank.ALWAYS
-	flare.texture = source.texture
-	flare.color = source.color
-	flare.energy = source.energy
-	flare.texture_scale = _scale_for(flare, player.light_radius())
-	flare.position = _inside(player.global_position + FLARE_OFFSET)
-	stand_ins.append(flare)
-	room.add_child(flare)
-	flare.reset_physics_interpolation()  # AR6: its first placement is a teleport
-	cache = room.spawn(EmberCacheScene, _inside(player.global_position + CACHE_OFFSET)) as EmberCache
-	cache.reset_physics_interpolation()
-
-
-static func _scale_for(light: PointLight2D, radius: float) -> float:
-	return radius / (light.texture.get_width() / 2.0)
 
 
 ## D1: warns once when a solid cell lies under the player's body anywhere on the path; the run

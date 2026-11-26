@@ -29,12 +29,13 @@ pixel_art_game/
 │   │   └── actors/
 │   │       ├── player.tscn       # Player prefab: body, LightSource/Light, slash/pogo/hurt areas
 │   │       ├── crawler.tscn      # Crawler prefab (CharacterBody2D + edge ray)
+│   │       ├── flare.tscn        # Flare prefab (CharacterBody2D on layer 0 + unshaded sprite + LightSource/Light, rank ALWAYS; Story 1.23)
 │   │       └── lurker.tscn       # Lurker prefab (Area2D + eyes + red glow light)
 │   │   └── objects/
 │   │       └── ember_cache.tscn  # Ember Cache prefab (Area2D + unshaded sprite + LightSource/Light, rank CACHE; Story 1.22)
 │   ├── scripts/
 │   │   ├── rules/
-│   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
+│   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants; toss_flare() (Story 1.23)
 │   │   │   ├── health.gd         # ★ Health: per-life HP, the damage table, the cause registry, invulnerability, bank-heal (Story 1.19)
 │   │   │   ├── sensing.gd        # ★ Sensing: the one light-sensing rule for every predator: notice, sense, stir, pick_target (Story 1.20)
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
@@ -55,9 +56,10 @@ pixel_art_game/
 │   │   │   ├── screen_router.gd  # ScreenRouter: one full-screen UI screen at a time
 │   │   │   └── theme_builder.gd  # ThemeBuilder: the one Theme in code (font, size 8, Label variations), play_text for UI over the play area
 │   │   ├── actors/
-│   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, hurt() (the one damage path), the contact poll and death
+│   │   │   ├── player.gd         # Movement, cling, attack/pogo, hitstop, light, Flare Toss on a Light tap, hurt() (the one damage path), the contact poll and death
 │   │   │   ├── player_input.gd   # PlayerInput: the only Input reader; intents, Light tap/hold, real-time buffers, lock()
 │   │   │   ├── light_source.gd   # LightSource: a light predators sense (group light_source); radius() is the rule value; sizes its BudgetLight (Story 1.20)
+│   │   │   ├── flare.gd          # Flare: a tossed light that flies, sticks to the first surface, burns flare_burn and fades; the cap's trim() (Story 1.23)
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN, through LightSource + Sensing; retargets; stirs off screen
 │   │   ├── objects/
@@ -68,14 +70,14 @@ pixel_art_game/
 │   │   │   ├── display.gd        # Display: the scale rule, the sub-×1 fit, the PC window; the only code touching the stretch or window (Story 1.14)
 │   │   │   ├── log.gd            # Static Log: `[category] message`, silent in release
 │   │   │   ├── save_store.gd     # SaveStore: the only reader/writer of the player's files (settings.json, slot_N.json + .bak)
-│   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the sprite fallback
+│   │   │   ├── budget_light.gd   # BudgetLight: every PointLight2D (rank ALWAYS/CACHE/GLOW), the budget rule, the relight hold (1.23), the sprite fallback
 │   │   │   ├── palettes.gd       # Palettes: the one home for UI colours (zone tables, roles, glow floors); Game.palette is the active zone
 │   │   │   ├── text_style.gd     # TextStyle: font, sizes, line metrics, CAP_TOP, the play-area outline (play_text LabelSettings, cached)
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
 │   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; the release presets exclude it (export.sh checks)
 │   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --hp, --difficulty, --log, --set, --glow, --perf; ?… on web), the overlay key
 │   │   │   ├── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/light budget/frames/perf/Clock); no class_name
-│   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, a flare stand-in and a real Ember Cache, frame stats and summary (docs/perf.md); no class_name
+│   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, a real Flare (1.23) and a real Ember Cache riding along, frame stats and summary (docs/perf.md); no class_name
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
 │   │   ├── runner.gd / runner.tscn # Runs one test as a scene; fails on no PASS, a timeout or any engine error
@@ -111,6 +113,7 @@ pixel_art_game/
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
 │   │   ├── smoke_embers.gd       # The Ember Cache on world.tscn: drop, rebuild, recovery, drop spots, tiers, saves, a harmless hunt
+│   │   ├── smoke_flare.gd        # Flare Toss with a real tap and a real flare: toss, flight, burn, lure, cling toss, cap, a real World (Story 1.23)
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
 │   │   ├── smoke_lurker.gd       # Light sensing on tests/rooms/sensing/: the M1 trace, LightSource, retargeting, stirring, Q1/Q2 (Story 1.20)
 │   │   ├── smoke_health.gd       # HP on world.tscn with tests/rooms/hazards/: contact, spikes, safe ground, bank-heal, death, flash, squash

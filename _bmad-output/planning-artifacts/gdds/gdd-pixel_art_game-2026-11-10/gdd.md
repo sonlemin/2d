@@ -168,15 +168,18 @@ The room-exit row is a runtime backstop: level design places exits behind a land
 #### Flare Toss (M2)
 
 - **Input:** tap Light (released inside the Light tap window, the Snuff threshold). The window is a player setting: 0.12 s (default), 0.2 s or 0.3 s (UX, 2026-11-11).
-- **Requirement:** at least 2 links.
+- **Requirement:** at least 2 links. With fewer, a tap does nothing.
+  - While snuffed there is no toss: a Snuff breaks the chain and a snuffed hit adds no link, so the chain is 0 for as long as the Snuff lasts (Story 1.23).
 - **Cost:** half the chain, rounded up. Example: 8 → 4, 5 → 2.
-  - Held embers move to carried in proportion to the links spent.
-  - The remaining chain keeps going.
-- **Throw:** an arc in the facing direction, 180 px/s forward and −160 px/s up, under normal gravity. It sticks to the first surface it hits.
-- **The flare:** burns for **4.0 s** with a radius equal to your light radius *before* the toss.
-  - Predators that can sense the flare treat it as the player: lurkers telegraph and hunt it.
+  - Held embers move to carried in proportion to the links spent (whole embers, rounded down; the rest stays held).
+  - The remaining chain keeps going. A toss never ends a chain (2 → 1), so it never bank-heals; the chain that is left banks as usual when it ends.
+- **Throw:** an arc in the facing direction, 180 px/s forward and −160 px/s up (`Tuning` `flare_throw_x` / `flare_throw_y`), under normal gravity: the full 900 px/s² (never the player's ×0.6 fall float), capped at the terminal fall of 210 px/s, so a flare lands 0–275 px below the throw and falls level with a diving player (Story 1.23, sonlm 2026-11-26). It sticks to the first surface it hits: a wall, a floor, a ceiling or a ledge's side. It passes through creatures and spikes, and deals no damage.
+  - **From a wall cling:** a toss works, thrown away from the wall, and the cling goes on: the flare burns at the chain's own radius (the cling only shields your light), your light stays at 40 px, and the cling's grace is neither refilled nor reset (Story 1.23, sonlm 2026-11-26).
+- **The flare:** burns for **4.0 s** (`Tuning` `flare_burn`), counted from the throw, with a radius equal to your light radius *before* the toss (the chain's own light: 8 links → 102 px).
+  - Predators that can sense the flare treat it as the player: lurkers telegraph and hunt it. A toss at 2 or 3 links burns under the 80 px a lurker needs, so it lures no lurker.
   - **Exception:** the light-shy Weaver is *repelled* by a flare and flees from it (see Combat System).
-  - In its last 1.0 s it fades out smoothly, with no flashing.
+  - In its last 1.0 s it fades out smoothly, with no flashing. The fade is what you see: the light predators sense keeps its full radius until the flare is out, so the fade is your one-second warning (Story 1.23).
+- **Cap:** at most 5 flares burn at once (`Tuning` `flare_max`): with your own light that is the 6-light budget. At the cap a new toss puts out the flare with the least time left; a toss is never refused for the cap (Story 1.23, sonlm 2026-11-26).
 
 #### Swing (M2, unlocked by Weaver Silk)
 
@@ -786,7 +789,7 @@ Not blocking M2 architecture; each is decided by the epic or pass named.
 | Respawn point for a phase-2 death (the landing station is broken until victory) | E6 |
 | Hub and Layer 2 landing palettes | E5 / E6 |
 | Lighting and bloom under the Compatibility renderer (the brief wants bloom within the flash limits). *Architecture, 2026-11-11:* bloom stays off until the E1 worst-case perf scene holds 60 FPS on web and the HD 620 target; otherwise it is faked with unshaded sprites. **Decided (CP1 gate, 2026-11-21, sonlm): engine glow no-go; bloom = unshaded additive sprites** | E1 perf scene (decided) |
-| A cap on simultaneous flares. The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs, so repeated tosses could crowd it (architecture, 2026-11-11). **CP1 gate, 2026-11-21, sonlm: no cap needed** (perf_worst held at 6/6 lights with a flare on screen, desktop and Firefox on the Intel iGPU); Story 1.23 makes the cap a `Tuning` value and re-checks it with real flares | Story 1.23 |
+| A cap on simultaneous flares. The light budget is ≤ 6 `PointLight2D` on screen and flares always keep theirs, so repeated tosses could crowd it (architecture, 2026-11-11). **CP1 gate, 2026-11-21, sonlm: no cap needed** (perf_worst held at 6/6 lights with a flare on screen, desktop and Firefox on the Intel iGPU); Story 1.23 makes the cap a `Tuning` value and re-checks it with real flares. **Answered, Story 1.23 (sonlm, 2026-11-26): the cap is `flare_max` 5**, and at the cap a new toss puts out the flare with the least time left; with the player's light that is exactly the budget, so always-lights alone never exceed it (see Flare Toss) | answered: Story 1.23 |
 | Ways to fail: Hard Landing and Grip Gives Out are dropped by M1 tuning (slow max fall, cling without stamina); Running Dry needs crafting (parked); Prey (a capture becomes an escape) | a later layer |
 | Peak moments: The Speck, Riding the Giant, Felling the Canopy, The Curious Companion | their layers |
 

@@ -25,3 +25,7 @@ const MAX_HP := 4  ## GDD Health and damage (M2): "Health: 4 HP"; the respawn's 
 const DAMAGE := {&"crawler": 1, &"boss": 1, &"lurker": 2, &"hazard": 1}  ## GDD Health and damage (M2) table: crawler contact 1, boss attack 1, hunting lurker 2, spikes and hazards 1 (FR10).
 const INVULN_S := 0.6  ## GDD Health and damage (M2): crawler contact "0.6 s invulnerable (blinking at 2.5 Hz)"; every hit gives the same (FR10).
 const BANK_HEAL_MIN := 10  ## GDD Health and damage (M2): Healing "+1 HP when you bank a chain of 10 or more" (FR12; [ASSUMPTION: playtest]).
+const FLARE_MIN_LINKS := 2  ## GDD Flare Toss (M2): "Requirement: at least 2 links" (FR14); under it a tap does nothing.
+const FLARE_BURN := 4.0  ## GDD Flare Toss (M2): "The flare: burns for 4.0 s" (FR15), counted from the throw.
+const FLARE_FADE := 1.0  ## GDD Flare Toss (M2): "In its last 1.0 s it fades out smoothly, with no flashing"; s of the fade, and the floor every gear keeps the burn above.
+const FLARE_THROW := Vector2(180.0, -160.0)  ## GDD Flare Toss (M2): "Throw: an arc in the facing direction, 180 px/s forward and −160 px/s up" (FR14).

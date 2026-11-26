@@ -154,7 +154,7 @@ func test_wall_cling() -> void:
 	await seconds(0.3)
 
 
-## From smoke_shaft's test_snuff_needs_hold: smoke_player_input covers "a tap keeps the chain" and
+## From smoke_shaft's test_snuff_needs_hold: smoke_player_input covers "a tap never Snuffs" (a tap is a Flare Toss, Story 1.23) and
 ## "a hold Snuffs and breaks it" at every window (D1), but not that the Snuff ends on release.
 func test_snuff_release() -> void:
 	place(_hovers()[0].global_position + Vector2(40, -60))

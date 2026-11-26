@@ -373,7 +373,7 @@ func _draw_light_marks(marks: Node2D) -> void:
 	var source := holder as LightSource
 	var m := light_marks(source.radius())
 	marks.draw_arc(Vector2.ZERO, m.radius, 0.0, TAU, 48, CYAN, 1.0)
-	_text(marks, Vector2(8, 4), "%s %d px" % [source.kind, m.radius], CYAN)
+	_text(marks, Vector2(8, 4), light_label(source.kind, m.radius), CYAN)
 	if not m.noticeable:
 		_dashed_circle(marks, Vector2.ZERO, m.reach, DIM)
 		_text(marks, Vector2(8, 14), "reach %d px: below notice (< %d px)" % [m.reach, Sensing.NOTICE_MIN_RADIUS], DIM)
@@ -403,6 +403,12 @@ func _draw_predator_marks(marks: Node2D) -> void:
 	_text(marks, Vector2(x, -10), s, MAGENTA)
 	if engaged:
 		marks.draw_line(Vector2.ZERO, _blended(lurker.target) - _blended(p), MAGENTA, 1.0)
+
+
+## A light's mode-2 label: its kind and its rule radius, "player 84 px", "flare 102 px", "cache 80 px".
+## Public and pure, for tests.
+static func light_label(kind: StringName, radius: float) -> String:
+	return "%s %d px" % [kind, radius]
 
 
 ## A predator's mode-2 label: "IDLE", "TELEGRAPH flare", "HUNT player", plus " stir N" while its eye

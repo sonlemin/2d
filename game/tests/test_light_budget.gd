@@ -1,8 +1,10 @@
 extends Node
 ## The light budget (AR46, Story 1.12 D3, D4, D11, D12): BudgetLight's pure rule choose(), apply() on
-## real nodes (demotion, the sprite fallback, recovery, what takes a slot), the per-light on-screen
-## rule moved from 1.11's overlay, and the scene audit (every PointLight2D in a scene is a
+## real nodes (demotion, the sprite fallback, recovery, what takes a slot), the relight hold (Story
+## 1.23 D13: a demoted light waits RELIGHT_HOLD_TICKS before it may be relit), the per-light
+## on-screen rule moved from 1.11's overlay, and the scene audit (every PointLight2D in a scene is a
 ## BudgetLight that shares light.png).
+## apply() is given its tick (`now`) by hand: the cases apply several times inside one physics frame.
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/test_light_budget.gd
 ## Budget results compare against Spec.LIGHTS_ON_SCREEN_MAX, never BudgetLight.MAX_ON_SCREEN; the one
 ## check that names MAX_ON_SCREEN pins it at or under the Spec ceiling.
@@ -25,7 +27,9 @@ func run() -> void:
 	_test_spec()
 	_test_choose()
 	_test_jitter()
+	_test_relight_rule()
 	await _test_nodes()
+	await _test_edge_crossing()
 	await _test_sprite_sync()
 	await _test_no_slot()
 	await _test_lit_on_screen()
@@ -113,6 +117,61 @@ func _test_jitter() -> void:
 	check(changes.max() <= 1, "jitter: over 120 passes with the GLOWs' distances swapping, no entry changes state more than once (got %s)" % [changes])
 
 
+# --- The relight hold (Story 1.23 D13) ----------------------------------------------------------------
+
+## The pure rule, at the tick before and the tick of the hold's end, and the hold against the cap.
+func _test_relight_rule() -> void:
+	var hold := BudgetLight.RELIGHT_HOLD_TICKS
+	check(not BudgetLight.may_relight(100, 100 + hold - 1), "may_relight(): %d ticks after the demotion, not yet (the near-miss)" % (hold - 1))
+	check(BudgetLight.may_relight(100, 100 + hold), "...and at %d ticks it may" % hold)
+	check(not BudgetLight.may_relight(100, 100), "...never on the tick of the demotion itself")
+	var cycles := float(Engine.physics_ticks_per_second) / hold
+	check(cycles < Spec.FLASH_HZ_MAX, "a light ↔ sprite cycle takes at least %d ticks: %.2f a second, under Spec.FLASH_HZ_MAX (%.0f)" % [hold, cycles, Spec.FLASH_HZ_MAX])
+
+
+## NFR8 at the view's edge (the ledger's "no hysteresis" item): the budget is full of ALWAYS lights
+## but one slot, which a GLOW holds; one more ALWAYS light's rect crosses the view's edge on every
+## tick (a flare at the gutter's edge while the view bobs). Without the hold the GLOW swapped
+## between light and sprite every tick; with it, it is relit at most Spec.FLASH_HZ_MAX times in any
+## second, the demotions stay instant, and the lit count never passes the budget.
+func _test_edge_crossing() -> void:
+	var h := _holder()
+	var lights: Array = []
+	for i in Spec.LIGHTS_ON_SCREEN_MAX - 1:
+		lights.append(_light(h, A, Vector2(100 + 40 * i, 135)))
+	var near := _light(h, G, Vector2(240, 150))
+	var far := _light(h, G, Vector2(240, 250))
+	var crosser := _light(h, A, Vector2(-500, 135))
+	lights.append_array([near, far, crosser])
+	var tps := Engine.physics_ticks_per_second
+	var relit := {near: [], far: []}  # ticks each GLOW went from sprite to light
+	var demotions := 0
+	var worst_lit := 0
+	var late := 0  # ticks the crosser was in the view with a GLOW still lit
+	for tick in range(1000, 1000 + 2 * tps):
+		crosser.position.x = 240.0 if tick % 2 == 1 else -500.0
+		var was := {near: near.demoted, far: far.demoted}
+		var r := _apply(lights, tick)
+		worst_lit = maxi(worst_lit, r.lit)
+		for g: BudgetLight in [near, far]:
+			if was[g] and not g.demoted:
+				relit[g].append(tick)
+			elif not was[g] and g.demoted:
+				demotions += 1
+		if tick % 2 == 1 and not (near.demoted and far.demoted):
+			late += 1
+	var most := 0
+	for g: BudgetLight in [near, far]:
+		var at: Array = relit[g]
+		for i in at.size():
+			most = maxi(most, at.filter(func(t: int) -> bool: return t >= at[i] and t - at[i] < tps).size())
+	check(relit[near].size() >= 2 and demotions >= 3, "(premise) the edge was exercised: the nearer GLOW was relit %d times and demoted again over %d ticks" % [relit[near].size(), 2 * tps])
+	check(most <= int(Spec.FLASH_HZ_MAX), "an ALWAYS light crossing the view's edge every tick: no GLOW is relit more than %d times in any %d ticks (got %d; relit at %s)" % [int(Spec.FLASH_HZ_MAX), tps, most, relit[near]])
+	check(worst_lit <= Spec.LIGHTS_ON_SCREEN_MAX and late == 0, "...the lit count never passes %d (worst %d), and a demotion is never delayed (%d ticks late)" % [Spec.LIGHTS_ON_SCREEN_MAX, worst_lit, late])
+	h.queue_free()
+	await get_tree().process_frame
+
+
 # --- apply() on nodes (D3, D12) ---------------------------------------------------------------------
 
 ## A BudgetLight under `parent`, rank and texture set before add_child (its _ready builds the sprite).
@@ -129,9 +188,9 @@ func _light(parent: Node, rank: int, pos: Vector2, energy := 1.0, scale := 0.2) 
 
 
 ## apply() returns nothing (it runs every tick); the cases read counts() right after it, as the
-## overlay and the perf run do.
-func _apply(lights: Array) -> Dictionary:
-	BudgetLight.apply(lights, VIEW)
+## overlay and the perf run do. `now` is the case's own tick (the relight hold counts from it).
+func _apply(lights: Array, now: int) -> Dictionary:
+	BudgetLight.apply(lights, VIEW, Spec.LIGHTS_ON_SCREEN_MAX, now)
 	return BudgetLight.counts(lights, VIEW)
 
 
@@ -155,7 +214,7 @@ func _test_nodes() -> void:
 		var s := l.get_node_or_null(^"Fallback") as Sprite2D
 		return (s == null) if l.rank == A else (s != null and s.material == Fx.additive() and not s.visible))
 	check(fallbacks_ok, "(premise) each CACHE and GLOW has a hidden Fallback sprite drawn with Fx.additive(); ALWAYS lights have none")
-	var r := _apply(all)
+	var r := _apply(all, 100)
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 2 and r.over == 0,
 			"8 light sources on screen: %d stay lit, 2 show sprites, over 0 (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, r])
 	check(glows[2].demoted and glows[3].demoted and not glows[2].enabled and not glows[3].enabled,
@@ -167,12 +226,17 @@ func _test_nodes() -> void:
 	var fb := func(l: BudgetLight) -> Sprite2D: return l.get_node(^"Fallback") as Sprite2D
 	check(fb.call(glows[2]).visible and fb.call(glows[3]).visible and not fb.call(glows[0]).visible and not fb.call(cache).visible,
 			"...and after a frame the demoted GLOWs show their sprites, the lit ones don't")
-	r = _apply(all)
+	r = _apply(all, 101)
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 2 and glows[2].demoted and glows[3].demoted, "a second apply with nothing changed changes nothing (got %s)" % [r])
-	# Recovery: the 60 px GLOW leaves the view; the nearest demoted one (100 px) is relit.
+	check(glows[2].demoted_at == 100 and glows[3].demoted_at == 100, "...and each demoted GLOW recorded the tick of its demotion, 100 (got %d, %d)" % [glows[2].demoted_at, glows[3].demoted_at])
+	# Recovery: the 60 px GLOW leaves the view; the nearest demoted one (100 px) is relit, but not
+	# before the relight hold has run from its demotion at tick 100 (Story 1.23 D13).
 	glows[0].position = Vector2(2000, 2000)
-	r = _apply(all)
-	check(not glows[2].demoted and glows[2].enabled and glows[3].demoted, "a lit GLOW leaves the view: the nearest demoted GLOW is relit, the farthest stays a sprite")
+	r = _apply(all, 100 + BudgetLight.RELIGHT_HOLD_TICKS - 1)
+	check(glows[2].demoted and not glows[2].enabled and r.lit == Spec.LIGHTS_ON_SCREEN_MAX - 1 and r.sprites == 2,
+			"a lit GLOW leaves the view %d ticks after the demotion: the freed slot stays empty, the demoted GLOWs stay sprites (the near-miss; got %s)" % [BudgetLight.RELIGHT_HOLD_TICKS - 1, r])
+	r = _apply(all, 100 + BudgetLight.RELIGHT_HOLD_TICKS)
+	check(not glows[2].demoted and glows[2].enabled and glows[3].demoted, "...and one tick later the nearest demoted GLOW is relit, the farthest stays a sprite")
 	check(not glows[0].demoted and glows[0].enabled, "...and the one that left keeps its state (off screen: left as it is)")
 	check(r.lit == Spec.LIGHTS_ON_SCREEN_MAX and r.sprites == 1, "...lit %d, sprites 1 (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, r])
 	h.queue_free()
@@ -182,7 +246,7 @@ func _test_nodes() -> void:
 	for i in 7:
 		always.append(_light(h, A, Vector2(100 + 40 * i, 135)))
 	var glow := _light(h, G, Vector2(240, 140))
-	r = _apply(always + [glow])
+	r = _apply(always + [glow], 100)
 	check(r.lit == 7 and r.over == 1 and r.sprites == 1, "the player and 6 flares plus a glow: all 7 always-lights stay lit, over 1 (got %s)" % [r])
 	check(glow.demoted and always.all(func(l: BudgetLight) -> bool: return l.enabled and not l.demoted), "...the glow still drops, and no ALWAYS light is disabled")
 	h.queue_free()
@@ -233,7 +297,7 @@ func _test_no_slot() -> void:
 	var hidden := _light(h, G, Vector2(240, 130))
 	hidden.visible = false
 	var dark := _light(h, G, Vector2(240, 131), 0.0)
-	var r := _apply(lights + [hidden, dark])
+	var r := _apply(lights + [hidden, dark], 100)
 	var demoted := (lights + [hidden, dark]).filter(func(l: BudgetLight) -> bool: return l.demoted)
 	check(demoted.is_empty() and r.lit == 6, "6 wanting plus 1 hidden and 1 at energy 0: none demoted, 6 lit (got %s, %d demoted)" % [r, demoted.size()])
 	check(not hidden.wants_light() and not dark.wants_light() and lights[1].wants_light(), "wants_light(): shown, energy > 0 and textured")
@@ -290,8 +354,8 @@ func _test_lit_on_screen() -> void:
 ## SceneState without instancing. .tscn files are never linted, which is why this exists.
 func _test_scene_audit() -> void:
 	var paths := _tscn_files(SCENES)
-	var seen := ["actors/player.tscn", "actors/lurker.tscn", "world/world.tscn", "objects/ember_cache.tscn"].all(func(f: String) -> bool: return SCENES.path_join(f) in paths)
-	check(seen, "(premise) the walk sees player, lurker, world and ember_cache (objects/, Story 1.22) under %s, nested folders included (%d scenes)" % [SCENES, paths.size()])
+	var seen := ["actors/player.tscn", "actors/lurker.tscn", "actors/flare.tscn", "world/world.tscn", "objects/ember_cache.tscn"].all(func(f: String) -> bool: return SCENES.path_join(f) in paths)
+	check(seen, "(premise) the walk sees player, lurker, flare (Story 1.23), world and ember_cache (objects/, Story 1.22) under %s, nested folders included (%d scenes)" % [SCENES, paths.size()])
 	var lights := 0
 	for path in paths:
 		var state := (load(path) as PackedScene).get_state()
@@ -307,7 +371,7 @@ func _test_scene_audit() -> void:
 			check(script is Script and (script as Script).resource_path == SCRIPT_PATH, "%s is a BudgetLight (script %s)" % [where, script])
 			var tex: Variant = props.get("texture")
 			check(tex is Texture2D and (tex as Texture2D).resource_path == TEXTURE_PATH, "%s uses light.png (texture %s)" % [where, tex])
-	check(lights >= 3, "(sentinel) the audit found the player's, the lurker's and the Ember Cache's lights (%d)" % lights)
+	check(lights >= 4, "(sentinel) the audit found the player's, the lurker's, the flare's and the Ember Cache's lights (%d)" % lights)
 
 
 func _tscn_files(dir: String) -> Array[String]:
@@ -344,3 +408,12 @@ func _test_scene_ranks() -> void:
 	if cache_light is BudgetLight:
 		check(cache_light.rank == C, "...of rank CACHE: kept over a lurker's glow, never over the player's light")
 	cache.queue_free()
+	# Story 1.23: a flare keeps its PointLight2D (AR46), and it is a decoy, never a player light.
+	var flare := (load("res://scenes/actors/flare.tscn") as PackedScene).instantiate()
+	var flare_light := flare.get_node_or_null(^"LightSource/Light")
+	check(flare_light is BudgetLight, "flare.tscn's LightSource/Light is a BudgetLight")
+	if flare_light is BudgetLight:
+		check(flare_light.rank == A, "...of rank ALWAYS: a flare's light is never demoted")
+	var flare_source := flare.get_node_or_null(^"LightSource") as LightSource
+	check(flare_source != null and flare_source.kind == Sensing.KIND_FLARE, "...under a LightSource of kind flare: hunting it never hurts")
+	flare.queue_free()

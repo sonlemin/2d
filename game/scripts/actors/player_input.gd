@@ -39,7 +39,9 @@ var jump_pressed := false
 ## An Attack press waiting for the cooldown: kept ATTACK_BUFFER of real time.
 var attack_pressed := false
 ## Edges, true for the one sample they happened in: an air-only dash pressed on the ground is lost,
-## as in M1; Flare Toss (1.23) and stations (1.24) decide what a tap or an interact does.
+## as in M1. A Light tap is a Flare Toss (Story 1.23: Player._handle_flare() reads the edge on the
+## tick it happens, with no buffer: real ticks run through a hitstop); stations (1.24) decide what an
+## interact does.
 var dash_pressed := false
 var light_tap := false
 var interact := false

@@ -69,6 +69,12 @@ const LURKER_RETURN_SPEED := 40.0  ## px/s; the slow drift back home after a hun
 # --- Economy (GDD Economy, FR24) ---
 const CACHE_RADIUS := 80.0  ## px; the Ember Cache's glow and the light predators sense, so at ≥ 80 px (the notice floor) it wakes lurkers like the player's light does (GDD Economy "Ember Cache glow", FR24; [ASSUMPTION: tuned at the CP2 gate, 1.30]). GDD Economy; new in M2.
 
+# --- Flare Toss (GDD Flare Toss (M2), FR14–FR15) ---
+const FLARE_BURN := 4.0  ## s a flare burns from the throw (not from the stick), fading over its last second; long enough to pull a hunt off you and dive on (GDD Flare Toss "burns for 4.0 s", FR15). Long Wick sets 6 (E5). GDD Flare Toss; new in M2.
+const FLARE_THROW_X := 180.0  ## px/s forward, in the facing direction (away from the wall in a cling); with FLARE_THROW_Y an arc that lands a few tiles ahead (GDD Flare Toss "180 px/s forward", FR14). GDD Flare Toss; new in M2.
+const FLARE_THROW_Y := -160.0  ## px/s; the upward part of the throw: an apex about 14 px above the hand under GRAVITY, then a fall capped at MAX_FALL (GDD Flare Toss "−160 px/s up", FR14; Story 1.23 Q3). GDD Flare Toss; new in M2.
+const FLARE_MAX := 5.0  ## flares burning at once; with the player's light that is the 6-light budget, so always-lights alone never exceed it; at the cap a new toss puts the oldest out (GDD Flare Toss "at most 5 flares burn at once"; Story 1.23 Q2, sonlm 2026-11-26). GDD Flare Toss; new in M2.
+
 ## Every key `f()` knows, with its base value.
 const BASE := {
 	&"run_speed": RUN_SPEED,
@@ -107,6 +113,10 @@ const BASE := {
 	&"lurker_hunt_accel": LURKER_HUNT_ACCEL,
 	&"lurker_return_speed": LURKER_RETURN_SPEED,
 	&"cache_radius": CACHE_RADIUS,
+	&"flare_burn": FLARE_BURN,
+	&"flare_throw_x": FLARE_THROW_X,
+	&"flare_throw_y": FLARE_THROW_Y,
+	&"flare_max": FLARE_MAX,
 }
 
 ## Rule switches gear can turn on (AR16). Quick Wick's instant Snuff is read from E5/E6.

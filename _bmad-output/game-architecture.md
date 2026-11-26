@@ -438,14 +438,14 @@ user://
 
 ### Light Sensing
 
-- `LightSource` node (group `light_source`) on the player, a thrown flare and the Ember Cache. It exposes `radius()`, `kind` (`player`, `flare`, `cache`) and `global_position`.
+- `LightSource` node (group `light_source`) on the player, a thrown flare and the Ember Cache. It exposes `radius()`, `kind` (`player`, `flare`, `cache`) and `global_position`. As built (Story 1.23): `actors/flare.gd` (`Flare`, a `CharacterBody2D` on collision layer 0 with mask 1, so nothing can touch it and it meets only the world) carries `LightSource` (kind `flare`, `fixed_radius` the pre-toss radius for the whole burn) with a `BudgetLight` of rank ALWAYS. It flies by `move_and_collide()` under `Tuning` `gravity` capped at `max_fall`, sticks to the first surface (`State { FLYING, STUCK }`), burns `Tuning` `flare_burn` from the throw, fades its energy and sprite over the last second (the sensed radius does not fade), and `burn_out()` extinguishes, hides and frees it. `Flare.trim(tree, keep)` is the cap. The player spawns it with `room.spawn()` from `_handle_flare()` on `PlayerInput.light_tap`.
 - `Sensing` is a node-free helper with the pure maths: notice (radius ≥ 80 px, distance ≤ radius × 1.6, inside the play rect), sense, and target choice. It is unit-tested.
 - Lurkers query `light_source` each physics tick and hunt the chosen target; the damages-only-while-`monitorable` rule is unchanged. A flare is sensed like the player; the cache's glow radius is a tuning value (E1 playtest).
 - The Weaver uses the same query and flees the brightest burning flare whose radius × 1.5 reaches it, with no 80 px notice minimum (readiness R20); a flare cancels a bite in telegraph (R19). It ignores Ember Caches; its bright/dark bands read the player's radius directly.
 
 ### Gameplay Rules and Tuning
 
-- Pure rules classes: `ChainState` (+ Flare halving, any hit → carried), `Health` (4 HP, damage table, 0.6 s invulnerability, bank-heal; as built in Story 1.19: `DAMAGE` keyed by the GDD's rows, the `CAUSES` registry of cause ids (save data from 1.29, never renamed) mapped onto them, `hit(cause, invuln_s)` emitting `damaged(amount, cause)` then `changed(hp)`, `bank_heal(links, min)`; `Player.hurt(cause, from)` is the one damage path, lethal first so a lethal hit loses held embers, else `chain.break_by_hit()`; the bank-heal runs on `ChainState.ended(links, by_hit)` when not `by_hit`, with `Tuning` `bank_heal_min`), ember-stage rules on `DiveState`/`SlotState` (bank, deposit, death cost per difficulty). **At most one Ember Cache:** a new death replaces it (no cache if carried is 0).
+- Pure rules classes: `ChainState` (+ Flare halving, any hit → carried; as built in Story 1.23: `toss_flare()` spends `flare_cost(count)` links (half, rounded up; nothing under `FLARE_MIN_LINKS` 2), banks the same share of the held embers floored to whole embers, returns the radius the flare burns at (`radius_for()` of the count before, never the cling's shielded light), and emits `banked` then `changed` and never `ended`: a toss is a partial bank, so it can't bank-heal, and `banked` with no `ended` is how a reader tells a toss's share from a chain's end), `Health` (4 HP, damage table, 0.6 s invulnerability, bank-heal; as built in Story 1.19: `DAMAGE` keyed by the GDD's rows, the `CAUSES` registry of cause ids (save data from 1.29, never renamed) mapped onto them, `hit(cause, invuln_s)` emitting `damaged(amount, cause)` then `changed(hp)`, `bank_heal(links, min)`; `Player.hurt(cause, from)` is the one damage path, lethal first so a lethal hit loses held embers, else `chain.break_by_hit()`; the bank-heal runs on `ChainState.ended(links, by_hit)` when not `by_hit`, with `Tuning` `bank_heal_min`), ember-stage rules on `DiveState`/`SlotState` (bank, deposit, death cost per difficulty). **At most one Ember Cache:** a new death replaces it (no cache if carried is 0).
 - **`Tuning`**: base values (with their `##` unit/intent comments and GDD history) plus active modifiers from gear → effective values. Actors read `tuning.get(&"cling_slide")`; they never check `has_gear`. Gear entries are data: `{id, stat, op, value}` (e.g. Long Wick: `flare_burn`, `set`, 6.0).
 - Changing a base value still means updating the matching GDD table.
 
@@ -473,10 +473,10 @@ user://
 ### Lighting
 
 - Budget: **≤ 6 `PointLight2D` on screen** (player, flare, lurker glows), all sharing `light.png` via `texture_scale`.
-- **Priority over budget:** the player and flares always keep a `PointLight2D`; lurker wall glow falls back to a sprite glow first. Flare cap: none needed (CP1 gate, 2026-11-21, sonlm); Story 1.23 makes it a `Tuning` value and re-checks it with real flares.
+- **Priority over budget:** the player and flares always keep a `PointLight2D`; lurker wall glow falls back to a sprite glow first. Flare cap (Story 1.23, sonlm 2026-11-26): `Tuning` `flare_max` 5, so the player's light and every flare are at most the 6-light budget and always-lights alone never exceed it; at the cap a new toss burns out the flare with the least time left (`Flare.trim()`), and a toss is never refused. The CP1 gate (2026-11-21) had found no cap was needed for speed; halving alone does not bound the count.
 - Small glows (lurker eye cores, cache core, embers, ledge rims) are unshaded sprites.
 - **Engine glow: no-go (CP1, 2026-11-21); bloom = unshaded additive sprites.** `--glow` stays a DevTools-only option. The budget of 6 is confirmed: `perf_worst` held on the laptop desktop and in Firefox on the laptop's Intel iGPU (`docs/perf.md` → Results).
-- **`BudgetLight`** (`scripts/core/budget_light.gd`, Story 1.12): every `PointLight2D` is one (lint `raw_light`; the scenes are audited by `test_light_budget`), with a `rank`: ALWAYS (the player, flares), CACHE (the Ember Cache), GLOW (lurker glows and anything else; the default, so a light that forgets its rank is demoted first). World's `LightBudget` child applies the budget once per physics tick at priority 50, after every actor has moved and set its light and before DevTools (100), so a glow that wakes on a tick is never drawn past the budget. The rule: a light *wants* light when it is shown, has energy and a texture; on-screen lights that want light keep their `PointLight2D` up to `MAX_ON_SCREEN` (6, ≤ `Spec.LIGHTS_ON_SCREEN_MAX`): ALWAYS first, never demoted even past the budget (that excess is reported as `over`), then CACHE, then GLOW; within a rank an already-lit light keeps its slot (sticky, so nothing flickers: ≤ 3 flashes/s), then the light nearest the centre. Off-screen lights are left as they are (the engine culls them, and a light at the edge can't toggle as it crosses). A demoted light's `PointLight2D` is disabled and its additive, unshaded `Fallback` sprite (`Fx.additive()`, same texture, colour and size, alpha following energy) shows instead. Only the budget writes `enabled`.
+- **`BudgetLight`** (`scripts/core/budget_light.gd`, Story 1.12): every `PointLight2D` is one (lint `raw_light`; the scenes are audited by `test_light_budget`), with a `rank`: ALWAYS (the player, flares), CACHE (the Ember Cache), GLOW (lurker glows and anything else; the default, so a light that forgets its rank is demoted first). World's `LightBudget` child applies the budget once per physics tick at priority 50, after every actor has moved and set its light and before DevTools (100), so a glow that wakes on a tick is never drawn past the budget. The rule: a light *wants* light when it is shown, has energy and a texture; on-screen lights that want light keep their `PointLight2D` up to `MAX_ON_SCREEN` (6, ≤ `Spec.LIGHTS_ON_SCREEN_MAX`): ALWAYS first, never demoted even past the budget (that excess is reported as `over`), then CACHE, then GLOW; within a rank an already-lit light keeps its slot (sticky, so nothing flickers: ≤ 3 flashes/s), then the light nearest the centre. Off-screen lights are left as they are (the engine culls them, and a light at the edge can't toggle as it crosses). A demoted light's `PointLight2D` is disabled and its additive, unshaded `Fallback` sprite (`Fx.additive()`, same texture, colour and size, alpha following energy) shows instead. Only the budget writes `enabled`. **The relight hold** (Story 1.23): a demotion is instant, but a demoted light stays a sprite for `RELIGHT_HOLD_TICKS` (21 ticks, 0.35 s) before `apply()` may relight it (`may_relight()`; `set_demoted()` records the tick), keeping the slot `choose()` gave it meanwhile. So when an always-light's rect crosses the view's edge again and again (a stuck flare while the view bobs), a glow swaps light ↔ sprite at most 2.86 times a second (NFR8). A hold in time, not a band at the edge: a band only moves the edge.
 - **The budget's "on screen" is the whole view** (`World.light_rect()` = `CameraRig.view_rect()`, 480 × 270, gutters included; decided by sonlm, 2026-11-19): the budget is a cost rule, and the engine draws and culls lights against the whole viewport, so a light under an opaque gutter still costs a lit pass. AR20's "on screen" (notice, stir, edge cues, the guarantees) stays `play_rect()`. The two differ only in rooms wider than 360 px (`perf_worst`, the Weaver arena, the hub).
 
 ### Scripted Moments
@@ -669,7 +669,7 @@ func _on_exit_reached(target: StringName) -> void:
 
 **Arg phases:** the hook is the first statement of `World._ready()`, so DevTools applies `--log`, then `--set`, then `--room` at once, before `Game.boot()` and the first room (which is why `--set` must survive `boot()`'s load). `--chain` arms on every `player_spawned` and is paid as n `ChainState.add_hit()` calls on the first physics tick that ends with that player off the floor; it then breaks and banks like any chain, never pinned. `--room` sets `World.start_room` / `start_entry` (the `P`, else the up entry, else down) and never writes `Game.dive`'s respawn point.
 
-**Perf run** (Story 1.12, decided by sonlm 2026-11-19: the autopilot): `--perf[=<s>]` (60 s by default, 1–600; `?perf` on web) adds `dev/perf_run.gd` under DevTools. On every spawn it locks the player's input, masks its `Hurtbox` off, holds `--chain`'s n (else 20) paid through `--chain`'s take-off arming (never pinned), and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s from a tick counter (repeatable across machines and browsers). Two lights ride along under the room: a stand-in flare (a plain `BudgetLight` of rank ALWAYS, at the player's light radius; the real flare replaces it in 1.23) and, since Story 1.22, a real Ember Cache (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`), a `LightSource` that wakes lurkers in `perf_worst`, who hunt it harmlessly. It measures wall-clock frame times (`Time.get_ticks_usec()`, never `delta`) and samples `BudgetLight.counts()` every tick, then freezes one summary (frames, avg/min FPS, the worst frame and when, frames over 20 ms, max lights/sprites/over, breaks and deaths, glow, window, adapter), logs it once and shows it in overlay 4. The scene is `rooms/dev/perf_worst.txt`; the procedure, `docs/perf.md`, is run in Story 1.15.
+**Perf run** (Story 1.12, decided by sonlm 2026-11-19: the autopilot): `--perf[=<s>]` (60 s by default, 1–600; `?perf` on web) adds `dev/perf_run.gd` under DevTools. On every spawn it locks the player's input, masks its `Hurtbox` off, holds `--chain`'s n (else 20) paid through `--chain`'s take-off arming (never pinned), and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s from a tick counter (repeatable across machines and browsers). Two lights ride along under the room, both the real things: since Story 1.23 a real `Flare` (rank ALWAYS, stuck through `Flare.stick()` and carried along, burning at the player's light radius of the tick it was made; not made until this life's chain has been seen held, and made again on the tick it burns out by a child node at priority 25, after the actors and before the light budget, as a real toss lands) and, since Story 1.22, a real Ember Cache (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`). Both are `LightSource`s that wake lurkers in `perf_worst`, who hunt them harmlessly: at chain 20 the flare ties the player's 138.4 px and a tie goes to the non-player light. It measures wall-clock frame times (`Time.get_ticks_usec()`, never `delta`) and samples `BudgetLight.counts()` every tick, then freezes one summary (frames, avg/min FPS, the worst frame and when, frames over 20 ms, max lights/sprites/over, breaks and deaths, glow, window, adapter), logs it once and shows it in overlay 4. The scene is `rooms/dev/perf_worst.txt`; the procedure, `docs/perf.md`, is run in Story 1.15.
 
 **Activation:** `World` adds a `DevTools` node only when `OS.is_debug_build()` is true (editor runs and debug exports). Release exports never contain it. The overlay toggle is a dev-only input action, `dev_overlay`, on the backquote key (`` ` ``, physical keycode 96); DevTools is `PROCESS_MODE_ALWAYS`, so it cycles while paused. **No function keys.**
 
@@ -771,7 +771,7 @@ pixel_art_game/
 │   │   │   ├── player.gd
 │   │   │   ├── player_input.gd        # intents, Light tap/hold, toggles, buffers, lock()
 │   │   │   ├── light_source.gd
-│   │   │   ├── flare.gd
+│   │   │   ├── flare.gd               # Flare: a tossed light that sticks, burns flare_burn and fades; the cap's trim() (1.23)
 │   │   │   ├── crawler.gd
 │   │   │   ├── lurker.gd
 │   │   │   ├── spiderling.gd          # E2
@@ -808,7 +808,7 @@ pixel_art_game/
 │   │   └── dev/                       # debug builds only; nothing depends on dev/
 │   │       ├── dev_tools.gd           # entry args (CLI / URL query), smoke markers
 │   │       ├── overlays.gd            # play rect, light rings, exits/ids, perf
-│   │       └── perf_run.gd            # --perf: the autopilot perf run, a flare stand-in and a real Ember Cache (1.22), frame stats, summary (1.12)
+│   │       └── perf_run.gd            # --perf: the autopilot perf run, a real Flare (1.23) and a real Ember Cache (1.22), frame stats, summary (1.12)
 │   ├── scenes/                        # mirrors scripts/ domains; thin prefabs
 │   │   ├── world/world.tscn
 │   │   ├── actors/                    # player.tscn, crawler.tscn, lurker.tscn, flare.tscn, weaver/
@@ -953,6 +953,7 @@ These patterns ensure consistent implementation across all AI agents.
 | Component | Location | Responsibility |
 |---|---|---|
 | `LightSource` (Node2D) | `actors/light_source.gd` | group `light_source`; `kind` (`&"player"`, `&"flare"`, `&"cache"`); `radius() -> float` (the rule value); drives its child `BudgetLight`'s size (`texture_scale`, eased; the budget's sprite glow copies it), never its `enabled` (the light budget's, AR46; as built in Story 1.20) |
+| `Flare` (CharacterBody2D) | `actors/flare.gd` | a tossed light (Story 1.23): flies, sticks to the first surface, burns `flare_burn` from the throw; carries a `LightSource` of kind `flare` whose radius is the pre-toss one, whole until it is out (the fade is presentation); collision layer 0, so it deals and takes nothing; at most `flare_max` burn (`trim()`) |
 | `Sensing` (static) | `rules/sensing.gd` | pure maths: `can_sense()`, `notice_rect()`, `can_notice()`, `can_stir()`, `pick_target()`; unit-tested |
 | `World.play_rect()` | `world/world.gd` | visible play area inside the gutters, world coordinates |
 | Lurker / Weaver | `actors/` | query lights each physics tick, apply their own response |
@@ -961,7 +962,7 @@ These patterns ensure consistent implementation across all AI agents.
 
 ```
 Player.chain.light_radius() ─┐
-Flare.radius (pre-toss, 4 s) ─┼─> LightSource.radius()
+Flare.radius (pre-toss, whole for the 4 s burn) ─┼─> LightSource.radius()
 Cache glow radius (tuning) ───┘          │
                                          ▼
 Lurker: lights = get_tree().get_nodes_in_group("light_source")
@@ -1041,7 +1042,7 @@ signal changed
 
 const CLING_SLIDE := 18.0   ## px/s slide while clinging (M1). Steady Grip → 10.
 const CLING_GRACE := 1.0    ## s of paused chain per cling; a pogo hit refills it (M1). Silk Grip +0.25.
-const FLARE_BURN := 4.0     ## s a flare burns (GDD Flare Toss). Long Wick → 6.
+const FLARE_BURN := 4.0     ## s a flare burns from the throw (GDD Flare Toss). Long Wick → 6.
 
 const BASE := {
 	&"cling_slide": CLING_SLIDE,

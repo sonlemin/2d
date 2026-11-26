@@ -16,6 +16,7 @@ const WorldScene := preload("res://scenes/world/world.tscn")
 const PlayerScene := preload("res://scenes/actors/player.tscn")
 const Overlays := preload("res://scripts/dev/overlays.gd")
 const LightTexture := preload("res://art/light.png")
+const FlareScene := preload("res://scenes/actors/flare.tscn")
 const TMP := "user://smoke_dev_tools_tmp"
 
 var _fail := 0
@@ -144,6 +145,7 @@ func run() -> void:
 	await test_overlay_cycle()
 	await test_overlay_play_rect_steady()
 	await test_overlay_light()
+	await test_overlay_flare()
 	test_overlay_light_pure()
 	await test_overlay_light_respawn()
 	await test_clock_rows()
@@ -891,8 +893,46 @@ func test_overlay_light() -> void:
 	await _teardown()
 
 
+## Story 1.23: a real flare needs no overlay change. Mode 2 marks its LightSource like any lit light
+## (group light_source), labelled by its kind and its rule radius; mode 4's count includes its light
+## (group budget_light). The flare is spawned stuck beside the player, as the perf run rides one.
+func test_overlay_flare() -> void:
+	_build([])
+	await frames(2)
+	var p := _spawned[0]
+	var ov := _dev().overlays
+	ov.mode = 4
+	await _await_refresh()
+	check(ov.light_count == 1, "(premise) m1_shaft at spawn: 1 light on screen, the player's (got %d)" % ov.light_count)
+	var flare := _room().spawn(FlareScene, p.global_position + Vector2(40, -20), {radius = ChainState.radius_for(8)}) as Flare
+	flare.stick()
+	await _await_refresh()
+	var rows := Array(ov.readout)
+	check(ov.light_count == 2 and rows.any(func(r: String) -> bool: return r.begins_with("lights 2/6")),
+			"overlay 4 counts a burning flare's light: lights 2/6 (got %d, %s)" % [ov.light_count, rows])
+	_draws = {}
+	ov.mode = 2
+	await get_tree().process_frame
+	var fm := flare.light_source.get_node_or_null(^"DevLightMarks") as Node2D
+	check(fm != null and fm.position == Vector2.ZERO, "overlay 2 puts DevLightMarks on the flare's LightSource (got %s)" % fm)
+	if fm != null:
+		fm.draw.connect(_on_draw.bind("flare"))
+	await frames(2)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(_draws.get("flare", 0) > 0 and Overlays.light_label(flare.light_source.kind, flare.light_source.radius()) == "flare 102 px",
+			"...and draws its rings and its label, 'flare 102 px', with no error (draws %s, label '%s')" % [_draws, Overlays.light_label(flare.light_source.kind, flare.light_source.radius())])
+	flare.burn_out()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(not is_instance_valid(fm) and ov.mark_nodes().all(func(x: Variant) -> bool: return is_instance_valid(x)), "...and a flare that burns out takes its marks with it")
+	await _teardown()
+
+
 ## The pure pieces of mode 2: a predator's label and where its stir marker goes.
 func test_overlay_light_pure() -> void:
+	check(Overlays.light_label(&"player", 84.0) == "player 84 px" and Overlays.light_label(&"flare", 102.2) == "flare 102 px" and Overlays.light_label(&"cache", 80.0) == "cache 80 px",
+			"light labels: the kind and the rule radius in whole px")
 	check(Overlays.predator_label("IDLE", &"", 0) == "IDLE" and Overlays.predator_label("TELEGRAPH", &"flare", 0) == "TELEGRAPH flare"
 			and Overlays.predator_label("HUNT", &"player", 0) == "HUNT player" and Overlays.predator_label("IDLE", &"", 2) == "IDLE stir 2",
 			"predator labels: IDLE, TELEGRAPH flare, HUNT player, IDLE stir 2")

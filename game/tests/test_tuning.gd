@@ -28,8 +28,9 @@ const ACTORS := {
 ## default, never a Tuning key). A `local` row whose const moved to another script names it in
 ## `home` (Story 1.6: the camera consts moved to world/camera_rig.gd; Story 1.16: the eye pulse to core/fx.gd;
 ## Story 1.20: the light easing to actors/light_source.gd, the sensing consts to rules/sensing.gd).
-## BASE keys new in M2, with no M1 export behind them (Story 1.19: bank_heal_min, GDD Health).
-const M2_KEYS: Array[StringName] = [&"bank_heal_min", &"cache_radius"]
+## BASE keys new in M2, with no M1 export behind them (Story 1.19: bank_heal_min, GDD Health;
+## 1.22: cache_radius; 1.23: the four flare keys, GDD Flare Toss).
+const M2_KEYS: Array[StringName] = [&"bank_heal_min", &"cache_radius", &"flare_burn", &"flare_throw_x", &"flare_throw_y", &"flare_max"]
 const M1: Array[Dictionary] = [
 	{m1 = "player.run_speed", value = 110.0, keys = [&"run_speed"]},
 	{m1 = "player.run_accel", value = 900.0, keys = [&"run_accel"]},
@@ -115,11 +116,16 @@ func _moved(t: Tuning) -> Array:
 
 
 func _test_base() -> void:
-	check(Tuning.BASE.size() == 36, "BASE has 36 keys: the 34 from the M1 exports, bank_heal_min and cache_radius, new in M2 (Stories 1.19, 1.22; got %d)" % Tuning.BASE.size())
+	check(Tuning.BASE.size() == 40, "BASE has 40 keys: the 34 from the M1 exports, and bank_heal_min, cache_radius, flare_burn, flare_throw_x, flare_throw_y and flare_max, new in M2 (Stories 1.19, 1.22, 1.23; got %d)" % Tuning.BASE.size())
 	check(Tuning.BANK_HEAL_MIN == Spec.BANK_HEAL_MIN, "Tuning.BANK_HEAL_MIN is Spec.BANK_HEAL_MIN, %d links (GDD Health; got %s)" % [Spec.BANK_HEAL_MIN, Tuning.BANK_HEAL_MIN])
 	# FR24, GDD Economy "Ember Cache glow": the cache lures, so its radius is never under the notice
 	# floor. smoke_lurker's cache case overrides the radius, so only this holds the shipped value.
 	check(Tuning.CACHE_RADIUS >= Spec.NOTICE_MIN_RADIUS, "Tuning.CACHE_RADIUS is at least Spec.NOTICE_MIN_RADIUS, %.0f px: the shipped cache wakes lurkers (FR24; got %s)" % [Spec.NOTICE_MIN_RADIUS, Tuning.CACHE_RADIUS])
+	# Story 1.23, GDD Flare Toss: the burn, the throw and the cap against the GDD's numbers.
+	check(Tuning.FLARE_BURN == Spec.FLARE_BURN, "Tuning.FLARE_BURN is Spec.FLARE_BURN, %.1f s (GDD Flare Toss; got %s)" % [Spec.FLARE_BURN, Tuning.FLARE_BURN])
+	check(Vector2(Tuning.FLARE_THROW_X, Tuning.FLARE_THROW_Y) == Spec.FLARE_THROW, "the throw is Spec.FLARE_THROW, %s px/s (GDD Flare Toss; got %s, %s)" % [Spec.FLARE_THROW, Tuning.FLARE_THROW_X, Tuning.FLARE_THROW_Y])
+	check(Tuning.FLARE_MAX >= 1.0 and Tuning.FLARE_MAX + 1.0 <= Spec.LIGHTS_ON_SCREEN_MAX and Tuning.FLARE_MAX == floorf(Tuning.FLARE_MAX),
+			"Tuning.FLARE_MAX is a whole number, and with the player's light every flare fits the %d-light budget (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, Tuning.FLARE_MAX])
 	var t := Tuning.new()
 	check(_moved(t).is_empty(), "a fresh Tuning returns every BASE value (moved: %s)" % [_moved(t)])
 
@@ -249,6 +255,13 @@ func _test_gear_floors() -> void:
 	var flat: Array[Dictionary] = [{id = &"probe_flat", stat = &"crawler_hover_period", op = &"mul", value = 0.0}]
 	caught = stat_floor_errors(flat, &"crawler_hover_period", 0.0, false)
 	check(caught.size() == 1, "...and a probe gear zeroing it is caught (%s)" % [caught])
+	# Story 1.23: a flare fades over its last Spec.FLARE_FADE seconds, so a burn at or under that
+	# would be a flare that is never at full light (Long Wick, E5, only lengthens it).
+	real = stat_floor_errors(Gear.TABLE, &"flare_burn", Spec.FLARE_FADE, false)
+	check(real.is_empty(), "the flare's burn stays above Spec.FLARE_FADE under every combination of Gear.TABLE rows (%s)" % [real])
+	var stub: Array[Dictionary] = [{id = &"probe_stub_wick", stat = &"flare_burn", op = &"set", value = 1.0}]
+	caught = stat_floor_errors(stub, &"flare_burn", Spec.FLARE_FADE, false)
+	check(caught.size() == 1, "...and a probe gear setting it to the fade's 1.0 s is caught (%s)" % [caught])
 
 
 ## Story 1.3 traded compile-checked export names for key literals, so a typo or a key no code reads
@@ -327,6 +340,7 @@ func _test_m1_fixture() -> void:
 ## depth (GDD Attack, pogo and chain (M1)). The GDD rounds the curve, hence the tolerances.
 func _test_fr_values() -> void:
 	check(ChainState.MAX_CHAIN == 20, "the chain caps at 20 links (got %d)" % ChainState.MAX_CHAIN)
+	check(ChainState.FLARE_MIN_LINKS == Spec.FLARE_MIN_LINKS, "a Flare Toss needs Spec.FLARE_MIN_LINKS, %d links (GDD Flare Toss; got %d)" % [Spec.FLARE_MIN_LINKS, ChainState.FLARE_MIN_LINKS])
 	check(ChainState.BASE_RADIUS == 40.0 and ChainState.SNUFF_RADIUS == 12.0, "light is 40 px with no chain, 12 px snuffed (got %s / %s)" % [ChainState.BASE_RADIUS, ChainState.SNUFF_RADIUS])
 	var want_radius := {0: 40.0, 4: 84.0, 10: 110.0, 20: 138.0}
 	for links: int in want_radius:

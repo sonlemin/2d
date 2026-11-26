@@ -2,7 +2,7 @@
 title: "The Unbroken Chain — EXPERIENCE"
 status: final
 created: 2026-11-10
-updated: 2026-11-12
+updated: 2026-11-26
 sources:
   - ../../gdds/gdd-pixel_art_game-2026-11-10/gdd.md
   - ../../gdds/gdd-pixel_art_game-2026-11-10/epics.md
@@ -104,7 +104,7 @@ The [HUD mock](mockups/key-hud.html) draws these states.
 | Alert frame + alert eye | Both gutters; eye in the right gutter | Lurker telegraph in progress | No |
 | Cling cue | By the player | Cling grace while clinging | Semi (follows player) |
 | Off-screen edge cue | Play-area edge, level with the lurker | Half-open eye that opens as it stirs + red glow on the lurker's side (GDD Lurker) | No |
-| Flare burn | World | The flare dims over its 4 s | Yes |
+| Flare burn | World | The flare burns 4 s and fades over its last 1 s | Yes |
 | Chain gate count | World | Glow and rising tone (GDD Ability-Gating) | Yes |
 | Weaver health | World | Segments fray and fall off, threads sag (GDD weakened-strand visuals). No bar. | Yes |
 | Glyph prompt | Above the object | Key/button to interact | Semi |
@@ -228,7 +228,7 @@ Behaviour and copy only. DESIGN.md Components gives the visual spec under the sa
 | Invulnerability | Hit taken | Pips blink for 0.6 s (Game Feel & Juice); steady transparency under reduce flashing. |
 | Cling | Holding Jump at a wall while falling | Links stay lit; the grace bar and the cling cue drain; at empty the chain breaks and banks. Light drops per GDD. |
 | Flare ready | Chain ≥2 | The meter has reached the notch at segment 2. |
-| Flare thrown | Tap Light inside the tap window | Half the chain goes (GDD Flare Toss); the meter drops; the flare dims in the world over 4 s. |
+| Flare thrown | Tap Light inside the tap window | Half the chain goes (GDD Flare Toss); the meter drops; the flare burns in the world for 4 s and fades over its last 1 s. |
 | Chain bank | Landing / Snuff / cling timeout | Held → carried with popup and chord; the meter empties. |
 | Chain break | Chain lost | Meter segments fall away and dim. No flashing. The number returns to 0. |
 | Chain 0 | No links | The number shows 0 in the empty colour; all segments are outlines; the notch stays visible. |
@@ -386,7 +386,7 @@ Failure path: Son dies before the station. The death card names the cause, and S
 2. A small half-open red eye appears at the left play-area edge, with a red glow and a panned growl. It opens wider as the lurker stirs. With visual sound cues on, an edge marker shows too.
 3. Son clings to a wall. The light drops. The links stay lit, and the grace bar and the cling cue start to drain.
 4. The lurker telegraphs: its eyes open, the gutter frame pulses red and the alert eye shows for 0.9 s.
-5. **Climax:** Son taps V for Flare Toss. The meter is past the notch, so the toss is allowed. The hatched top half of the lit stack goes, and the flare draws the lurker while it dims over 4 s.
+5. **Climax:** Son taps V for Flare Toss. The meter is past the notch, so the toss is allowed. The hatched top half of the lit stack goes, and the flare draws the lurker while it burns its 4 s, fading over the last one.
 6. Son pogoes to a ledge. The chain banks and the music resolves on a chord.
 
 Failure path: the bite lands. An HP pip cracks and becomes an outline, the pips blink, and the chain breaks (segments fall away and dim).

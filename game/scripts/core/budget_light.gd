@@ -7,11 +7,15 @@ extends PointLight2D
 ## art/light.png, so a demoted light's sprite is the same picture at the same size.
 ## Only the budget writes `enabled` on a BudgetLight, through set_demoted(); owners set energy,
 ## colour, texture_scale and visible, as they did on a plain PointLight2D.
+## A demotion is instant (the budget is a cost rule); a relight waits RELIGHT_HOLD_TICKS from the
+## demotion (Story 1.23 D13), so however often an always-light crosses the view's edge, a glow
+## swaps between light and sprite under 3 times a second (NFR8).
 ## Depends only on core/ (Fx): world/ calls it, never the other way round.
 
 enum Rank { ALWAYS, CACHE, GLOW }  ## slots go in this order; GLOW (lurker wall glow) is demoted first
 const GROUP := &"budget_light"
 const MAX_ON_SCREEN := 6  ## AR46 budget, confirmed at the CP1 gate (1.15, sonlm, 2026-11-21: perf_worst held on desktop and in Firefox on the Intel iGPU); the guarantee is Spec.LIGHTS_ON_SCREEN_MAX
+const RELIGHT_HOLD_TICKS := 21  ## physics ticks (0.35 s) a demoted light stays a sprite before the budget may relight it, so one light ↔ sprite cycle takes at least 0.35 s: 2.86 a second, under NFR8's 3 flashes/s, however often an ALWAYS light's rect crosses the view's edge (a flare, the player's light at the gutter). A hold in time, not a band at the edge: a view that bobs further than a band still swaps at the bob's rate (Story 1.23 D13; the stir step's reasoning, Lurker.STIR_STEP_TIME).
 const SPRITE_ALPHA := 0.35  ## additive sprite alpha per unit of energy: about a dark wall's share of the light it replaces; presentation, judged by eye in 1.15
 
 ## A light that forgets its rank is demoted first, never kept over budget. Set before add_child
@@ -21,6 +25,7 @@ const SPRITE_ALPHA := 0.35  ## additive sprite alpha per unit of energy: about a
 		assert(not is_node_ready(), "BudgetLight: rank is set before add_child; _ready() built the fallback from the old one")
 		rank = value
 var demoted := false  ## read-only outside; set through set_demoted()
+var demoted_at := 0  ## the physics tick (apply()'s `now`) of the last demotion; the relight hold counts from it
 
 var _sprite: Sprite2D  # the fallback glow; ALWAYS lights have none
 
@@ -48,9 +53,11 @@ func wants_light() -> bool:
 
 
 ## Only the budget calls this. The light and its sprite swap in the same call, so no frame shows
-## both or neither.
-func set_demoted(on: bool) -> void:
+## both or neither. `now` is the tick apply() was given: a demotion records it for the relight hold.
+func set_demoted(on: bool, now := Engine.get_physics_frames()) -> void:
 	assert(not on or rank != Rank.ALWAYS, "BudgetLight: an ALWAYS light is never demoted (AR46)")
+	if on:
+		demoted_at = now
 	demoted = on
 	enabled = not on
 	set_process(on and _sprite != null)
@@ -133,10 +140,19 @@ static func _before(x: Dictionary, y: Dictionary, xi: int, yi: int) -> bool:
 	return xi < yi
 
 
+## The relight hold (D13): a light demoted at tick `demoted_at` may be relit from RELIGHT_HOLD_TICKS
+## later. Pure; apply() asks it for every light choose() would relight.
+static func may_relight(demoted_at: int, now: int) -> bool:
+	return now - demoted_at >= RELIGHT_HOLD_TICKS
+
+
 ## Applies the budget to `lights` (group budget_light) against `rect` (World.light_rect()): each
 ## BudgetLight that wants light is an entry; those whose state changes are demoted or relit.
+## A demotion is never delayed; a relight waits for may_relight(), and until then the light keeps
+## the slot choose() gave it as a sprite, so the lit count only ever runs under the budget meanwhile.
+## `now` is the physics tick; tests pass their own, since they apply several times inside one.
 ## Returns nothing: it runs every tick, and only the overlay and the perf run need counts().
-static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN) -> void:
+static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN, now := Engine.get_physics_frames()) -> void:
 	var wanting: Array[BudgetLight] = []
 	var entries: Array[Dictionary] = []
 	var centre := rect.get_center()
@@ -153,8 +169,12 @@ static func apply(lights: Array, rect: Rect2, budget := MAX_ON_SCREEN) -> void:
 		entries.append({rank = l.rank, on_screen = r.intersects(rect), lit = not l.demoted, dist = r.get_center().distance_to(centre)})
 	var keep := choose(entries, budget)
 	for i in wanting.size():
-		if wanting[i].demoted == keep[i]:  # kept but demoted, or dropped but lit
-			wanting[i].set_demoted(not keep[i])
+		var light := wanting[i]
+		if light.demoted != keep[i]:
+			continue  # already as chosen
+		if keep[i] and not may_relight(light.demoted_at, now):
+			continue  # kept but demoted too recently: it stays a sprite a little longer
+		light.set_demoted(not keep[i], now)  # relit, or dropped
 
 
 ## {lit, sprites, over} for `rect`: the BudgetLights lit on screen; the demoted ones that want light

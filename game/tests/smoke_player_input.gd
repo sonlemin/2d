@@ -254,6 +254,17 @@ func _airborne_with_chain() -> void:
 		_player.chain.add_hit()
 
 
+## Every burning flare (Story 1.23: a tap with 2 or more links throws one).
+func _flares() -> Array[Node]:
+	return get_tree().get_nodes_in_group(Flare.GROUP).filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+
+
+## Story 1.23 D14: a flare burns 4 s, so a case that threw one puts it out before the next case.
+func _burn_flares() -> void:
+	get_tree().call_group(Flare.GROUP, &"burn_out")
+	await frames(1)
+
+
 ## Holds Light for `ticks` (the latency is the same for the press and the release, so the player
 ## sees it held for exactly that many ticks), then watches 5 more. Returns what was seen.
 func _hold_light(ticks: int) -> Dictionary:
@@ -270,13 +281,15 @@ func _hold_light(ticks: int) -> Dictionary:
 		if _player.input.light_tap:
 			seen.taps += 1
 	seen.count = _player.chain.count
+	seen.flares = _flares().size()
+	await _burn_flares()
 	await _wait_floor()
 	await frames(2)
 	return seen
 
 
-## FR9, UX-DR119: a release inside the window is a tap (Flare Toss in 1.23) and never Snuffs;
-## held past it is Snuff. Each window Snuffs on held tick ⌈w × 60⌉ (8, 12 and 18 ticks), so each
+## FR9, UX-DR119: a release inside the window is a tap, which is a Flare Toss (Story 1.23: the GDD's
+## 5 → 2, one flare thrown) and never Snuffs; held past it is Snuff, which throws nothing. Each window Snuffs on held tick ⌈w × 60⌉ (8, 12 and 18 ticks), so each
 ## is held for one tick short of that and for exactly that, plus 6 and 21 ticks (0.10 / 0.35 s).
 func test_light_windows() -> void:
 	var holds := {0.12: [6, 7, 8, 21], 0.2: [6, 11, 12, 21], 0.3: [6, 17, 18, 21]}
@@ -287,9 +300,9 @@ func test_light_windows() -> void:
 			var tap := ticks < roundi(ceilf(w * 60.0 - 0.001))
 			var seen := await _hold_light(ticks)
 			if tap:
-				check(seen.taps == 1 and not seen.snuff and seen.count == 5, "window %.2f s: a %d-tick press is one light_tap, never Snuff, chain kept (taps %d, snuff %s, chain %d)" % [w, ticks, seen.taps, seen.snuff, seen.count])
+				check(seen.taps == 1 and not seen.snuff and seen.count == 2 and seen.flares == 1, "window %.2f s: a %d-tick press is one light_tap, never Snuff: a Flare Toss, chain 5 → 2, one flare thrown (taps %d, snuff %s, chain %d, flares %d)" % [w, ticks, seen.taps, seen.snuff, seen.count, seen.flares])
 			else:
-				check(seen.snuff and seen.taps == 0 and seen.count == 0, "window %.2f s: a %d-tick hold Snuffs and breaks the chain, no tap on release (taps %d, snuff %s, chain %d)" % [w, ticks, seen.taps, seen.snuff, seen.count])
+				check(seen.snuff and seen.taps == 0 and seen.count == 0 and seen.flares == 0, "window %.2f s: a %d-tick hold Snuffs and breaks the chain, no tap on release and no flare (taps %d, snuff %s, chain %d, flares %d)" % [w, ticks, seen.taps, seen.snuff, seen.count, seen.flares])
 	Game.settings.set_value(&"light_tap_window", 0.12)
 
 
@@ -362,8 +375,9 @@ func test_light_across_hitstop() -> void:
 	check(in_hitstop, "the Light press was first seen during the hitstop")
 	check(first_down >= 0 and first_snuff - first_down == 7, "held across a 75 ms hitstop, Light Snuffs on its 8th held tick, on real time (down at %d, Snuff at %d)" % [first_down, first_snuff])
 	await frames(3)
-	# A tap released inside the hitstop is still a tap. 0.15 s, so the release (seen on tick 4)
-	# is well inside it.
+	# A tap released inside the hitstop is still a tap, and it tosses on that tick: no buffer is
+	# needed, the edge is sampled on real ticks (Story 1.23 D5). 0.15 s, so the release (seen on
+	# tick 4) is well inside it.
 	_player.chain.break_chain()
 	for i in 5:
 		_player.chain.add_hit()
@@ -374,14 +388,18 @@ func test_light_across_hitstop() -> void:
 	var taps := 0
 	var snuff := false
 	var tap_in_hitstop := false
+	var tossed_on_tap := false
 	for i in 5:
 		await frames(1)
 		if _player.input.light_tap:
 			taps += 1
 			tap_in_hitstop = Game.clock.is_active(&"hitstop")
+			tossed_on_tap = _flares().size() == 1 and _player.chain.count == 2
 		snuff = snuff or _player.input.snuff_active
-	check(taps == 1 and tap_in_hitstop and not snuff and _player.chain.count == 5, "a Light tap released inside a hitstop is one light_tap and keeps the chain (taps %d, in hitstop %s, chain %d)" % [taps, tap_in_hitstop, _player.chain.count])
+	check(taps == 1 and tap_in_hitstop and not snuff and tossed_on_tap and _player.chain.count == 2 and _flares().size() == 1,
+			"a Light tap released inside a hitstop is one light_tap and tosses on that tick: chain 5 → 2, one flare, no Snuff (taps %d, in hitstop %s, on the tap tick %s, chain %d, flares %d)" % [taps, tap_in_hitstop, tossed_on_tap, _player.chain.count, _flares().size()])
 	Game.clock.clear()
+	await _burn_flares()
 	await _wait_floor()
 	await frames(2)
 

@@ -3,9 +3,11 @@ extends CharacterBody2D
 ## The descender. Runs, jumps, dashes, slashes on the ground and pogos (Attack in the air).
 ## Pogo hits feed the ChainState, which drives Blade Bloom (hitbox scale) and Chain-Light: the light
 ## radius its LightSource child reports to predators and shows through its BudgetLight (Story 1.20).
-## Landing or holding Light past the tap window (Snuff) breaks the chain. A hit costs HP (Health, per
-## life); a predator hurts only while monitorable. hurt() is the one damage path, for every source
-## (Story 1.19 D2): World's spike poll calls it, and so does the contact poll here.
+## Landing or holding Light past the tap window (Snuff) breaks the chain. A Light tap with 2 or more
+## links is a Flare Toss (Story 1.23): half the chain becomes a thrown light that lures predators,
+## and the chain goes on at what is left. A hit costs HP (Health, per life); a predator hurts only
+## while monitorable. hurt() is the one damage path, for every source (Story 1.19 D2): World's spike
+## poll calls it, and so does the contact poll here.
 ## Reads only its PlayerInput's intents, never Input (AR34, Story 1.8).
 
 signal died
@@ -17,6 +19,7 @@ signal pogo_hit
 # These stay local because no system bends them (Story 1.3 D1).
 const LIGHT_KICK := 18.0  ## px the visible light flares on a pogo hit; presentation: sensing reads LightSource.radius() (the chain's), never this (M1 player.light_kick).
 const HITSTOP_SCALE := 0.05  ## time scale during a pogo hitstop: it only makes the freeze a freeze; its length is Tuning hitstop (Story 1.3 D3).
+const FlareScene := preload("res://scenes/actors/flare.tscn")
 
 var chain := ChainState.new()
 var health := Health.new()  ## per-life (AR12): a respawn is a new Player, so full HP (FR13)
@@ -83,6 +86,7 @@ func _physics_process(delta: float) -> void:
 	input.sample()  # first, so every read this tick sees this tick's input (Story 1.8 D1)
 	_tick_timers(delta)
 	_handle_snuff()
+	_handle_flare()
 	if not _handle_cling(delta):
 		_handle_horizontal(delta)
 		_handle_vertical(delta)
@@ -118,10 +122,41 @@ func _tick_timers(delta: float) -> void:
 	_sprite.modulate.a = Fx.blink_alpha(health.invuln)
 
 
-## Held past the tap window = Snuff; PlayerInput times it on real time (FR9). A tap is Flare Toss (1.23).
+## Held past the tap window = Snuff; PlayerInput times it on real time (FR9). A tap is a Flare Toss
+## (_handle_flare()): a hold that became a Snuff releases with no tap, so one press is never both.
 func _handle_snuff() -> void:
 	if input.snuff_active != chain.snuffed:
 		chain.set_snuffed(input.snuff_active)
+
+
+## Flare Toss (FR14, Story 1.23): a Light tap spends half the chain (ChainState.toss_flare(), which
+## refuses under 2 links: on the ground and while snuffed the chain is 0, so neither needs a check)
+## and throws a flare burning at the chain's light before the toss. The share of the held embers it
+## banks reaches the dive and the "+N banked" popup through `banked`, like any bank.
+## No buffer and no cooldown (D5): light_tap is an edge sampled on real ticks, so a tap released in a
+## hitstop tosses on that tick, and every toss after the fourth from a full chain needs a pogo.
+## The room first: a toss with nowhere to put the flare must not spend the links.
+func _handle_flare() -> void:
+	if not input.light_tap:
+		return
+	var room := _fx_parent() as Room
+	if room == null:
+		return
+	var radius := chain.toss_flare()
+	if radius <= 0.0:
+		return
+	var t := Game.tuning
+	# Q2 (sonlm, 2026-11-26): at the cap the flare with the least time left goes out and this one
+	# takes its place; the toss is never refused, the chain is already spent. With flare_max 5 the
+	# player's light and every flare are at most the 6-light budget (AR46).
+	Flare.trim(get_tree(), maxi(int(t.f(&"flare_max")) - 1, 0))
+	# From a cling (Q1): away from the wall, or it would stick beside you. `_clinging` is last
+	# tick's: this runs before _handle_cling().
+	var dir := -_cling_side if _clinging else _facing
+	# From the body's centre, never a point ahead of it: the body's own space is always open air,
+	# so a flare thrown while hugging a wall starts outside the wall and sticks on its first tick.
+	room.spawn(FlareScene, room.to_local(global_position),
+			{radius = radius, velocity = Vector2(dir * t.f(&"flare_throw_x"), t.f(&"flare_throw_y"))})
 
 
 ## Wall cling (hold Jump at a wall while falling): the chain pauses and its light hides.

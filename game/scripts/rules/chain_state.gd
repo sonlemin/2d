@@ -9,6 +9,11 @@ extends RefCounted
 ## Embers (M1 reward test): every hit adds ember_value(link) to a HELD pile.
 ## Breaking the chain safely (landing, Snuff, a cling timeout, a room exit) BANKS the pile, and any
 ## hit banks it too, through break_by_hit() (GDD: "pain costs health, not embers"); dying LOSES it.
+##
+## Flare Toss (Story 1.23, FR14): toss_flare() spends half the links, rounded up, and banks that
+## share of the held embers (whole embers; the rest stays held). The chain goes on at what is left,
+## never under 1 link, and the flare burns at the radius the chain had before the toss. A toss is a
+## partial bank, not a chain end: `banked` fires and `ended` never does, so it can't bank-heal.
 
 signal changed(count: int)
 signal banked(amount: int)
@@ -24,6 +29,7 @@ const RADIUS_GAIN := 22.0        ## px per sqrt(link)
 const SNUFF_RADIUS := 12.0       ## px of light while snuffed
 const BASE_BLOOM := 1.0          ## slash scale with no chain
 const BLOOM_GAIN := 0.18         ## scale per sqrt(link)
+const FLARE_MIN_LINKS := 2       ## links a Flare Toss needs (GDD Flare Toss "Requirement: at least 2 links")
 
 var count: int = 0
 var snuffed: bool = false
@@ -63,6 +69,38 @@ func _end(by_hit: bool) -> void:
 	_reset_count()
 	if links > 0:
 		ended.emit(links, by_hit)
+
+
+## The links a Flare Toss spends at `links`: half, rounded up (GDD Flare Toss: 8 -> 4 left, 5 -> 2
+## left); 0 under FLARE_MIN_LINKS, where no toss happens. The cost hatch reads it (Story 1.27).
+static func flare_cost(links: int) -> int:
+	if links < FLARE_MIN_LINKS:
+		return 0
+	@warning_ignore("integer_division")
+	return (links + 1) / 2
+
+
+## Flare Toss (FR14): spends flare_cost(count) links and banks the same share of the held embers,
+## floored to whole embers. Returns the radius the flare burns at: the chain's own light before the
+## toss (radius_for(), never light_radius(): a cling shields the light, it doesn't shrink the chain;
+## Story 1.23 D3). Under FLARE_MIN_LINKS it returns 0.0 and changes nothing. That also refuses a
+## snuffed toss with no check here: a Snuff breaks the chain and a snuffed hit adds no link, so the
+## count is 0 for as long as it lasts (D4).
+## A partial bank, never an end: it emits `banked` (when the share is > 0) and `changed`, both after
+## every field is set, and never `ended`, so a toss can't bank-heal (FR12).
+func toss_flare() -> float:
+	if count < FLARE_MIN_LINKS:
+		return 0.0
+	var radius := radius_for(count)
+	var spent := flare_cost(count)
+	@warning_ignore("integer_division")
+	var share := held * spent / count
+	held -= share
+	count -= spent
+	if share > 0:
+		banked.emit(share)
+	changed.emit(count)
+	return radius
 
 
 ## Death: the held embers are gone. Returns how many were lost.
