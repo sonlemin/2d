@@ -402,7 +402,44 @@ func _test_floor_spot() -> void:
 	for c: Array in cases:
 		var got: Vector2 = room.floor_spot(c[0])
 		check(got == c[1], "floor_spot(%s): %s (want %s, got %s)" % [c[0], c[2], c[1], got])
+	# Review of Story 1.22 (probed): far outside the room the squared distance is inf in 32 bits,
+	# and inf is never nearer than anything; floor_spot() measures from the room's edge instead.
+	var far: Vector2 = room.floor_spot(Vector2(1e25, 84))
+	check(far == Vector2(104, 84), "floor_spot((1e25, 84)): a spot far beyond the room still moves to the nearest clean floor, (104, 84) (got %s)" % far)
 	room.queue_free()
 	DirAccess.remove_absolute(path)
+	# Headroom (review of Story 1.22, probed): the body is 20 px tall, so a one-tile gap under a slab
+	# is no place a cache can be touched. Row 4, between the slab (row 3) and the floor (row 5), is
+	# such a gap (firing); the slab's top under the ceiling is two tiles high (near-miss).
+	var gap_path := dir.path_join("t_floor_gap.txt")
+	f = FileAccess.open(gap_path, FileAccess.WRITE)
+	f.store_string("id=t_floor_gap\nzone=dusk\nexits=up:t_floor_gap@x6, down:t_floor_gap@x4\n---\n######.##\n#.......#\n#.......#\n#.####..#\n#.......#\n#.####..#\n#.......#\n#.......#\n####.####\n")
+	f.close()
+	errors = _errors_of(gap_path)
+	var gap_room := RoomLoader.load_room_from_path(gap_path) if errors.is_empty() else null
+	check(gap_room != null, "t_floor_gap validates and builds (got %s)" % [errors])
+	if gap_room != null:
+		add_child(gap_room)
+		var in_gap := Vector2(56, 68)
+		check(not gap_room.is_solid(Vector2i(3, 4)) and gap_room.is_solid(Vector2i(3, 5)) and gap_room.is_solid(Vector2i(3, 3)), "(firing premise) cell (3, 4) is open with floor below and a slab right above")
+		check(gap_room.floor_spot(in_gap) == Vector2(56, 36), "floor_spot(%s): a one-tile gap under a slab has no headroom, so the spot moves to the nearest cell that has, the slab's top (56, 36) (got %s)" % [in_gap, gap_room.floor_spot(in_gap)])
+		check(gap_room.is_solid(Vector2i(2, 0)) and not gap_room.is_solid(Vector2i(2, 1)), "(near-miss premise) above the slab's top at (2, 2) are one open cell and then the ceiling")
+		check(gap_room.floor_spot(Vector2(40, 36)) == Vector2(40, 36), "floor_spot((40, 36)): a two-tile gap has headroom: the spot is kept (got %s)" % gap_room.floor_spot(Vector2(40, 36)))
+		gap_room.queue_free()
+	DirAccess.remove_absolute(gap_path)
+	# AC6: a room with no clean standing cell returns pos. validate() lets none through (P needs a
+	# floor, a down exit a clean stand cell), so this one is an up-only room floored with spikes.
+	var none_path := dir.path_join("t_floor_none.txt")
+	f = FileAccess.open(none_path, FileAccess.WRITE)
+	f.store_string("id=t_floor_none\nzone=dusk\nexits=up:t_floor_none@x2\n---\n##.##\n#...#\n#^^^#\n#####\n")
+	f.close()
+	errors = _errors_of(none_path)
+	var none_room := RoomLoader.load_room_from_path(none_path) if errors.is_empty() else null
+	check(none_room != null, "t_floor_none validates and builds (got %s)" % [errors])
+	if none_room != null:
+		add_child(none_room)
+		check(none_room.floor_spot(Vector2(40, 20)) == Vector2(40, 20), "floor_spot() in a room with no clean standing cell returns the spot it was given (got %s)" % none_room.floor_spot(Vector2(40, 20)))
+		none_room.queue_free()
+	DirAccess.remove_absolute(none_path)
 	DirAccess.remove_absolute(dir)
 	await get_tree().process_frame

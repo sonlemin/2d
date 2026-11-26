@@ -234,7 +234,7 @@ Behaviour and copy only. DESIGN.md Components gives the visual spec under the sa
 | Chain 0 | No links | The number shows 0 in the empty colour; all segments are outlines; the notch stays visible. |
 | Chain at cap | 20 links | Meter full; hits still pay (GDD). [OPEN] Any extra cue at cap. |
 | Death | HP 0 | Short fade, then the death card: the play area dims, the death line is centred, ember losses show in the left gutter, and the tier line follows (DESIGN Components; [mock](mockups/key-death-card.html)). Buttons held at the moment of death are ignored. A fresh press skips only after 0.6 s. The card auto-advances after about 3 s. Respawn at the last lit anchor or station (GDD Respawn); for the Weaver, see J5. Every line is also kept for the Journal death log. |
-| Cache lost | Normal only: die again before recovery | The death card says the cache is gone, in a line after the tier line. |
+| Cache lost | Any death before recovery, on every tier (GDD Economy; sonlm, 2026-11-26, Story 1.22 Q1). A cache is only ever dropped on Normal, so this happens on Easy or Hard only after the tier was changed while a cache was out | The death card says the cache is gone, in a line after the tier line. |
 | Rest | ↓ at Lift Station | One press: heal, embers fly into the bank with a count-up, autosave icon, then the station menu ([mock](mockups/key-station-menu.html)). |
 | Autosave | Station rest, hub, quit at a lit anchor (GDD) | Autosave icon. |
 | Save failed | A save does not complete (web storage blocked or full, disk error) | Crossed autosave icon and the field note "Not saved"; retries at the next rest; the Pause note explains the fix, e.g. "Saves are blocked. Allow site storage for this page, then rest again." (log 2026-11-11; copy [ASSUMPTION]) |

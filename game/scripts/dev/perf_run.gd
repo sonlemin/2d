@@ -160,7 +160,8 @@ func _inside(p: Vector2) -> Vector2:
 ## Children of the room (AR23): it owns and frees them on a rebuild, and the next spawn builds new
 ## ones. The flare's texture, colour and energy come from the player's Light, never typed in; all set
 ## before add_child (BudgetLight's _ready() reads its rank). The cache spawns through room.spawn(),
-## like World's; a Normal death also frees it (cache_changed), and the next spawn makes a new one.
+## like World's; the respawn's rebuild frees it with the room (a death that changes the slot's cache
+## frees it sooner, through cache_changed), and the next spawn makes a new one.
 func _build_stand_ins(room: Room, player: Player) -> void:
 	var source := player.get_node(^"LightSource/Light") as PointLight2D
 	stand_ins.clear()

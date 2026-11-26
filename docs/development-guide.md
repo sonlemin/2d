@@ -104,6 +104,8 @@ godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_health
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_dev_tools.gd       # DevTools in World: inert without args, the real command line, the SMOKE boot marker, each arg and bad arg, the overlay modes, light count, Clock rows, no function key
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_a11y.gd            # the accessibility gate on m1_shaft: shake off, the blink and its steady variant, the look-ahead on a pogo
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_palettes.gd        # the active zone in world.tscn: boot, exit, respawn and same-zone swaps; gutters, clear colour, popup outline
+godot --headless --path game res://tests/runner.tscn -- res://tests/test_embers.gd           # the ember stages, pure: take_carried(), deposit_from(), apply_death() per tier, recover_cache(), the emit order, the cache's save shape, FR25 by source
+godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_embers.gd          # the Ember Cache in World: the drop spot (ground, mid-air, hazard, the up fallback), Easy and Hard, a second death, saves, a cache in an unknown room, a cache hunt
 godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_perf.gd            # the perf kit in World: --perf=3 in perf_worst holds the chain and the budget every tick, the summary; --glow, bad --perf, the view rect, m1_shaft unchanged
 ```
 

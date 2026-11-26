@@ -3,8 +3,9 @@ extends Node
 ## carried embers as a cache where the player last stood on clean floor, the respawn's rebuild
 ## spawns it through the swap path, a touch carries them again. Then where it drops (a ground, a
 ## mid-air and a hazard death; the `up` arrival's mid-air fallback and its near-miss), Easy and
-## Hard (no cache; the popup), a second death before recovery, the save, the cache's light, and a
-## lurker hunting a cache over a ticking player (harmless).
+## Hard (no cache; the popup), a second death before recovery, the save (both halves of the
+## progress-save rule), a cache in a room that is gone, the cache's light, and a lurker hunting a
+## cache over a ticking player (harmless, and home at once when the cache is recovered).
 ## Run: godot --headless --path game res://tests/runner.tscn -- res://tests/smoke_embers.gd
 ## Each case builds its own World and frees it with reset_for_tests(), so no case meets another's
 ## cache (D9). Lurkers are held still (physics off) except where a case drives one. Slot saves stay
@@ -24,6 +25,29 @@ const SPOT_B := Vector2(24, 900)
 const SPIKES_P := Vector2(40, 68)
 const SPIKES_STAND_Y := 196.0
 const SPIKES_LEFT := 96.0
+
+## Counts World's "saved Ember Cache" warnings, as smoke_world counts the respawn point's. A
+## push_warning's text arrives as `code` (probed on 4.7.2); the mutex as in tests/runner.gd.
+class CacheWarnings extends Logger:
+	var _lock := Mutex.new()
+	var _count := 0
+
+	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != ERROR_TYPE_WARNING or not code.begins_with("World: the saved Ember Cache"):
+			return
+		_lock.lock()
+		_count += 1
+		_lock.unlock()
+
+	## How many arrived since the last take().
+	func take() -> int:
+		_lock.lock()
+		var n := _count
+		_count = 0
+		_lock.unlock()
+		return n
+
 
 var _fail := 0
 var _world: World
@@ -49,6 +73,10 @@ func seconds(s: float) -> void:
 
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute(TMP)
+	# A run killed before its cleanup leaves the save case's slot here, and the next run would load
+	# it (review of Story 1.22, probed: 3 false FAILs).
+	for f in DirAccess.get_files_at(TMP):
+		DirAccess.remove_absolute(TMP.path_join(f))
 	RoomLoader.add_root("res://tests/rooms/hazards")
 	RoomLoader.add_root("res://tests/rooms/embers")
 	await test_epic_smoke()
@@ -60,6 +88,7 @@ func run() -> void:
 	await test_easy_and_hard()
 	await test_second_death()
 	await test_saves()
+	await test_unknown_room()
 	await test_cache_hunt_harmless()
 	Game.reset_for_tests()
 	for f in DirAccess.get_files_at(TMP):
@@ -119,6 +148,23 @@ func _popups(text: String) -> int:
 	return _room().get_children().filter(func(n: Node) -> bool: return n is Label and n.text == text).size()
 
 
+## The room's "-N lost" popups, whatever N is: the text around POPUP_LOST's number.
+func _lost_popups() -> int:
+	var parts := tr("POPUP_LOST").split("%d")
+	return _room().get_children().filter(func(n: Node) -> bool:
+		return n is Label and n.text.begins_with(parts[0]) and n.text.ends_with(parts[1]) and n.text.length() > parts[0].length() + parts[1].length()).size()
+
+
+## Clean floor by the room's own cells, never by floor_spot(), which is the thing under test: the
+## feet's cell is open and no hazard, the cell below is solid, the cell above open, and the feet are
+## within 1 px of that floor's top.
+func _on_clean_floor(c: Vector2) -> bool:
+	var room := _room()
+	var feet := Vector2i(floori(c.x / Room.TILE), floori((c.y + 11.5) / Room.TILE))
+	return not room.is_solid(feet) and not room.hazards.has(feet) and room.is_solid(feet + Vector2i.DOWN) \
+			and not room.is_solid(feet + Vector2i.UP) and absf(c.y + 12.0 - (feet.y + 1) * Room.TILE) <= 1.0
+
+
 ## Places the player on the floor at `spot` and waits until World records it as safe ground.
 func _stand_at(spot: Vector2) -> void:
 	_p().place_at(spot)
@@ -160,12 +206,15 @@ func test_epic_smoke() -> void:
 	check(carried > 0 and held > 0, "(premise) a banked chain: %d carried, %d held" % [carried, held])
 	var old_room := _room()
 	var entered := []
-	_world.room_entered.connect(func(id: StringName) -> void: entered.append(id), CONNECT_ONE_SHOT)
+	_world.room_entered.connect(func(id: StringName) -> void: entered.append(id))  # every one: a double announce must show
 	_p().die()
 	check(Game.dive.carried == 0 and _p().chain.held == 0, "a Normal death takes the carried embers and loses the held ones (carried %d)" % Game.dive.carried)
 	check(Game.slot.has_cache() and Game.slot.cache_room == &"m1_shaft" and Game.slot.cache_pos == SPOT_A and Game.slot.cache_amount == carried,
 			"...the slot holds the cache: %d in m1_shaft at %s (got %d at %s)" % [carried, SPOT_A, Game.slot.cache_amount, Game.slot.cache_pos])
-	check(_popups(tr("POPUP_LOST") % held) == 1, "...and the popup shows only the held loss, -%d lost (the carried went to the cache)" % held)
+	check(_popups(tr("POPUP_LOST") % held) == 1 and _lost_popups() == 1, "...and the one popup shows only the held loss, -%d lost (the carried went to the cache)" % held)
+	var cost := _world.last_death_cost()
+	cost.held_lost = -1
+	check(_world.last_death_cost().get("held_lost") == held, "...and last_death_cost() hands out a copy: a reader can't change World's record (D2; got %s)" % [_world.last_death_cost()])
 	await _await_respawn()
 	check(_room() != old_room and entered == [&"m1_shaft"], "the respawn rebuilt the room through the swap path (a new Room, room_entered %s)" % [entered])
 	var caches := _caches()
@@ -219,7 +268,7 @@ func test_mid_air_death() -> void:
 	check(airborne and _p().position.y < SPIKES_STAND_Y, "(premise) off the ledge, falling, not yet landed (at %s)" % _p().position)
 	_p().die()
 	var c := Game.slot.cache_pos
-	check(absf(c.y - SPIKES_P.y) <= 1.0 and c.x < 64.0 and _room().floor_spot(c) == c, "a mid-air death drops it on the ledge it left, on clean floor (got %s)" % c)
+	check(absf(c.y - SPIKES_P.y) <= 1.0 and c.x < 64.0 and _on_clean_floor(c), "a mid-air death drops it on the ledge it left, on clean floor (got %s)" % c)
 	await _free_world()
 
 
@@ -249,9 +298,8 @@ func test_hazard_death() -> void:
 	Input.action_release("move_right")
 	check(_p().is_dead and _p().death_cause == &"spikes", "(premise) the spikes killed (cause '%s')" % _p().death_cause)
 	var c := Game.slot.cache_pos
-	var feet := Vector2i(floori(c.x / Room.TILE), floori((c.y + 11.5) / Room.TILE))
 	# A floor tick's y drifts under a pixel (195.93 seen): floor_spot() keeps such a spot as it is.
-	check(absf(c.y - SPIKES_STAND_Y) <= 1.0 and c.x < SPIKES_LEFT and not _room().hazards.has(feet) and _room().floor_spot(c) == c,
+	check(absf(c.y - SPIKES_STAND_Y) <= 1.0 and c.x < SPIKES_LEFT and _on_clean_floor(c),
 			"a hazard death drops it on clean floor before the spikes, never over a ^ (got %s)" % c)
 	await _free_world()
 
@@ -270,7 +318,7 @@ func test_up_fallback() -> void:
 	await frames(1)
 	_p().die()
 	var c := Game.slot.cache_pos
-	check(c != entry and c == Vector2(72, 116) and room.floor_spot(c) == c, "a death on the first tick drops the cache on the nearest clean floor, (72, 116), not at the entry (got %s)" % c)
+	check(c != entry and c == Vector2(72, 116) and _on_clean_floor(c), "a death on the first tick drops the cache on the nearest clean floor, (72, 116), not at the entry (got %s)" % c)
 	await _free_world()
 
 
@@ -302,11 +350,10 @@ func test_easy_and_hard() -> void:
 		check(not Game.slot.has_cache(), "%s: a death drops no cache" % tier)
 		if tier == &"easy":
 			check(Game.dive.carried == 20 + held, "Easy: the held %d are carried and the 20 kept (carried %d)" % [held, Game.dive.carried])
-			var any_lost := [held, 20, held + 20].any(func(n: int) -> bool: return _popups(tr("POPUP_LOST") % n) > 0)
-			check(not any_lost, "Easy: no -N lost popup")
+			check(_lost_popups() == 0, "Easy: no -N lost popup, whatever N (got %d)" % _lost_popups())
 		else:
 			check(Game.dive.carried == 0, "Hard: the carried 20 are lost too (carried %d)" % Game.dive.carried)
-			check(_popups(tr("POPUP_LOST") % (held + 20)) == 1, "Hard: the popup shows -%d lost, held and carried" % (held + 20))
+			check(_popups(tr("POPUP_LOST") % (held + 20)) == 1 and _lost_popups() == 1, "Hard: the one popup shows -%d lost, held and carried" % (held + 20))
 		await _free_world()
 
 
@@ -358,18 +405,66 @@ func test_saves() -> void:
 	# R14 (D5): a progress save after a recovery writes the last resume save's cache.
 	Game.slot.recover_cache(Game.dive)
 	Game.set_difficulty(&"hard")
-	var j := JSON.new()
-	var err := j.parse(FileAccess.get_file_as_string(TMP.path_join("slot_1.json")))
-	var slot: Dictionary = j.get_data().get("slot", {}) if err == OK and j.get_data() is Dictionary else {}
+	var file := _slot_file()
+	var slot: Dictionary = file.get("slot", {})
 	check(slot.get("difficulty") == "hard" and slot.get("cache") == {"room": "m1_shaft", "x": SPOT_A.x, "y": SPOT_A.y, "amount": 12.0},
 			"a progress save (the tier change) after a recovery writes the last resume save's cache (got %s)" % [slot.get("cache")])
+	check(file.get("dive", {}).get("carried") == 0.0, "...and that save's dive, nothing carried: the 12 are in the file once, in the cache (got %s)" % [file.get("dive")])
+	# The other half (D5): a cache dropped since the last resume save is never kept by a progress
+	# save. The resume save now holds no cache and the 12 carried.
+	Game.set_difficulty(&"normal")
+	check(Game.save_now() == OK and Game.dive.carried == 12 and not Game.slot.has_cache(), "(premise) a resume save with no cache and 12 carried")
+	Game.slot.apply_death(Game.dive, 0, &"m1_shaft", SPOT_B)
+	check(Game.slot.cache_amount == 12 and Game.dive.carried == 0, "(premise) a death since then: the 12 lie in a new cache at %s" % SPOT_B)
+	Game.set_difficulty(&"easy")
+	file = _slot_file()
+	check(file.get("slot", {}).get("difficulty") == "easy" and file.get("slot", {}).has("cache") and file.get("slot", {}).get("cache") == null,
+			"a progress save after a drop never keeps the cache dropped since the resume save: cache null (got %s)" % [file.get("slot", {}).get("cache")])
+	check(file.get("dive", {}).get("carried") == 12.0, "...and writes that resume save's dive, 12 carried: the embers are in the file once (got %s)" % [file.get("dive")])
+	await _free_world()
+	Game.store.dir = TMP
+	Game.load_slot(1)
+	check(not Game.slot.has_cache() and Game.dive.carried == 12, "...and a load of it holds the 12 once, carried, with no cache (got cache %d, carried %d)" % [Game.slot.cache_amount, Game.dive.carried])
+	Game.reset_for_tests()
+
+
+## The slot file as written, {} when it doesn't parse.
+func _slot_file() -> Dictionary:
+	var j := JSON.new()
+	var err := j.parse(FileAccess.get_file_as_string(TMP.path_join("slot_1.json")))
+	return j.get_data() if err == OK and j.get_data() is Dictionary else {}
+
+
+# --- A cache in a room that is gone ---------------------------------------------------------------
+
+## Review of Story 1.22 (probed): a saved cache whose room RoomLoader doesn't know never spawns, so
+## World says so once at its start. The cache stays in the slot. Control: a cache in a known room
+## that is not the one built warns nothing.
+func test_unknown_room() -> void:
+	var warnings := CacheWarnings.new()
+	OS.add_logger(warnings)
+	Game.dive.add_carried(33)
+	Game.slot.apply_death(Game.dive, 0, &"room_that_is_gone", SPIKES_P)
+	_boot(&"t_spikes")
+	await frames(2)
+	check(warnings.take() == 1, "a saved cache in a room RoomLoader doesn't know: World warns once (no ERROR: the runner checks)")
+	check(_caches().is_empty() and Game.slot.cache_room == &"room_that_is_gone" and Game.slot.cache_amount == 33, "...spawns nothing and leaves the cache in the slot (got %s %d)" % [Game.slot.cache_room, Game.slot.cache_amount])
+	await _free_world()
+	Game.dive.add_carried(33)
+	Game.slot.apply_death(Game.dive, 0, &"m1_shaft", SPOT_A)
+	_boot(&"t_spikes")
+	await frames(2)
+	check(warnings.take() == 0 and _caches().is_empty(), "(control) a cache in m1_shaft while t_spikes is built: no warning, and no cache in this room")
+	OS.remove_logger(warnings)
 	await _free_world()
 
 
 # --- A cache hunt over a ticking player -----------------------------------------------------------
 
 ## The harness player in smoke_lurker never polls contact, so this is the check with a ticking one:
-## a lurker hunting a cache, sitting on the player for 30 ticks, deals no damage (1.20 D7).
+## a lurker hunting a cache, sitting on the player for 30 ticks, deals no damage (1.20 D7). Then H1
+## with a real cache (AC7): the cache is the slot's own, so recovering it puts its light out, and
+## the lurker hunting it heads home at once.
 func test_cache_hunt_harmless() -> void:
 	_lurkers_on = true
 	_boot(&"t_spikes")
@@ -378,12 +473,18 @@ func test_cache_hunt_harmless() -> void:
 	var hits := []
 	p.health.damaged.connect(func(amount: int, cause: StringName) -> void: hits.append([amount, cause]))
 	await _stand_at(SPIKES_P)
+	Game.dive.add_carried(9)
+	Game.slot.apply_death(Game.dive, 0, &"t_spikes", Vector2(24, 68))  # the slot's cache, so a recovery reaches the node
 	var cache: EmberCache = _room().spawn(EmberCacheScene, Vector2(24, 68))  # P's ledge, beside the player
 	var source: LightSource = cache.get_node(^"LightSource")
-	var l: Lurker = null
-	for n in _room().get_children():
-		if n is Lurker:
-			l = n
+	# By position (row, then column), never by child order: t_spikes has one lurker today.
+	var lurkers := _room().get_children().filter(func(n: Node) -> bool: return n is Lurker)
+	lurkers.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.position.y < b.position.y or (a.position.y == b.position.y and a.position.x < b.position.x))
+	check(not lurkers.is_empty(), "(premise) t_spikes has a lurker")
+	if lurkers.is_empty():
+		await _free_world()
+		return
+	var l: Lurker = lurkers[0]
 	await frames(1)
 	l.force(Lurker.State.HUNT, source)
 	var premise := true
@@ -394,4 +495,11 @@ func test_cache_hunt_harmless() -> void:
 				and l.global_position.distance_to(p.global_position) < 7.0
 	check(premise, "(premise) the lurker hunts the cache from on top of the player, never monitorable, for 30 ticks (state %s)" % Lurker.State.keys()[l.state])
 	check(hits.is_empty() and p.health.hp == Spec.MAX_HP and not p.is_dead, "...and deals no damage (got %s, HP %d)" % [hits, p.health.hp])
+	# H1: the hunted cache is recovered (here by the rule; the node hears cache_changed).
+	var back := Game.slot.recover_cache(Game.dive)
+	check(back == 9 and not source.is_lit() and cache.is_queued_for_deletion(), "recovering the hunted cache puts its light out and frees the node at once (got %d back)" % back)
+	await frames(2)
+	check(l.state == Lurker.State.RETURN and not l.monitorable, "...and the lurker that hunted it heads home at once, still harmless (H1; state %s)" % Lurker.State.keys()[l.state])
+	await frames(30)
+	check(hits.is_empty() and l.state != Lurker.State.HUNT, "...with no damage and no new hunt in the 30 ticks after (got %s, state %s)" % [hits, Lurker.State.keys()[l.state]])
 	await _free_world()

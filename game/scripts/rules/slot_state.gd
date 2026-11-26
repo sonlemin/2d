@@ -184,10 +184,12 @@ func apply_death(dive: DiveState, held: int, room_id: StringName, pos: Vector2) 
 		report.held_lost = held
 	if cost.carried == &"cache" and dive.carried > 0:
 		assert(room_id != &"", "SlotState.apply_death(): a cache needs a room")
-		cache_amount = dive.take_carried()
+		# The fields first, then the dive's own signal (D2, as _assign() does): a carried_changed
+		# listener that looks here finds the embers in the cache, never nowhere.
+		cache_amount = dive.carried
 		cache_room = room_id
 		cache_pos = pos
-		report.carried_cached = cache_amount
+		report.carried_cached = dive.take_carried()
 		cache_moved = true
 	elif cost.carried == &"lose":
 		report.carried_lost = dive.take_carried()
@@ -197,7 +199,8 @@ func apply_death(dive: DiveState, held: int, room_id: StringName, pos: Vector2) 
 
 
 ## The player touched the cache (FR24): its embers are carried again, at risk until a rest. Returns
-## the amount; with no cache, 0 and no signal.
+## the amount; with no cache, 0 and no signal. Both objects change before cache_changed goes out
+## (D2), so its listeners find the embers carried, never nowhere.
 func recover_cache(dive: DiveState) -> int:
 	if not has_cache():
 		return 0
@@ -205,8 +208,8 @@ func recover_cache(dive: DiveState) -> int:
 	cache_room = &""
 	cache_pos = Vector2.ZERO
 	cache_amount = 0
-	cache_changed.emit(&"", 0)
 	dive.add_carried(n)
+	cache_changed.emit(&"", 0)
 	return n
 
 
@@ -311,7 +314,8 @@ func _assign(best: int, died: int, tier: StringName, flags: Array[StringName],
 ## Reads a saved cache into `into` ({room, pos, amount}); true when it is clean. null is no cache,
 ## clean. Anything else that isn't a whole cache (a wrong type, a missing field, an empty room, a
 ## coordinate that isn't a finite number, an amount under 1) is no cache and unclean: half a cache
-## never loads.
+## never loads. The position is judged as the Vector2 it becomes: a JSON double beyond the 32-bit
+## range is finite as read and inf once stored (review of Story 1.22, probed).
 static func _read_cache(v: Variant, into: Dictionary) -> bool:
 	if v == null:
 		return true
@@ -324,8 +328,11 @@ static func _read_cache(v: Variant, into: Dictionary) -> bool:
 	if not (room is String or room is StringName) or String(room).is_empty() or n < 1 \
 			or not _finite_number(x) or not _finite_number(y):
 		return false
+	var pos := Vector2(float(x), float(y))
+	if not pos.is_finite():
+		return false
 	into.room = StringName(room)
-	into.pos = Vector2(float(x), float(y))
+	into.pos = pos
 	into.amount = n
 	return true
 

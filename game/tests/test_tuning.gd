@@ -117,6 +117,9 @@ func _moved(t: Tuning) -> Array:
 func _test_base() -> void:
 	check(Tuning.BASE.size() == 36, "BASE has 36 keys: the 34 from the M1 exports, bank_heal_min and cache_radius, new in M2 (Stories 1.19, 1.22; got %d)" % Tuning.BASE.size())
 	check(Tuning.BANK_HEAL_MIN == Spec.BANK_HEAL_MIN, "Tuning.BANK_HEAL_MIN is Spec.BANK_HEAL_MIN, %d links (GDD Health; got %s)" % [Spec.BANK_HEAL_MIN, Tuning.BANK_HEAL_MIN])
+	# FR24, GDD Economy "Ember Cache glow": the cache lures, so its radius is never under the notice
+	# floor. smoke_lurker's cache case overrides the radius, so only this holds the shipped value.
+	check(Tuning.CACHE_RADIUS >= Spec.NOTICE_MIN_RADIUS, "Tuning.CACHE_RADIUS is at least Spec.NOTICE_MIN_RADIUS, %.0f px: the shipped cache wakes lurkers (FR24; got %s)" % [Spec.NOTICE_MIN_RADIUS, Tuning.CACHE_RADIUS])
 	var t := Tuning.new()
 	check(_moved(t).is_empty(), "a fresh Tuning returns every BASE value (moved: %s)" % [_moved(t)])
 

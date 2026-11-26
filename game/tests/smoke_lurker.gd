@@ -247,7 +247,19 @@ func test_light_source() -> void:
 	check(ls.radius() == _p.chain.light_radius() and ls.radius() == Spec.BASE_LIGHT,
 			"clinging, radius() is the chain's base %.0f px (got %.1f)" % [Spec.BASE_LIGHT, ls.radius()])
 	_p.chain.set_clinging(false)
+	# Story 1.22 AC5: the death cost is World's. Without World (this harness) a death moves no
+	# carried ember, drops no cache and shows no popup; the held embers are only handed over.
+	Game.dive.add_carried(5)
+	_p.chain.add_hit()
+	var held := _p.chain.held
 	_p.die()
+	# The harness's stand-in World hands out its room, so a popup would land there; the player's
+	# parent is where one lands with no World at all. Neither may hold one.
+	var lost_text := tr("POPUP_LOST") % held
+	var popups := (_room.get_children() + _p.get_parent().get_children()).filter(func(n: Node) -> bool: return n is Label and n.text == lost_text).size()
+	check(held > 0 and _p.held_at_death == held and Game.dive.carried == 5 and not Game.slot.has_cache() and popups == 0,
+			"a death without World costs nothing: held_at_death %d, the 5 carried kept, no cache, no -N lost popup (got %d, %d, cache %d, %d popups)" % [held, _p.held_at_death, Game.dive.carried, Game.slot.cache_amount, popups])
+	Game.dive.take_carried()
 	check(not ls.is_in_group(&"light_source") and not ls.is_lit() and not LightSource.live(ls),
 			"after die(), the light is out of group light_source and not lit (D5)")
 	var shown := ls.shown_radius()

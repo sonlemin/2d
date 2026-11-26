@@ -27,6 +27,7 @@ func run() -> void:
 	_test_death_per_tier()
 	_test_normal_with_nothing_carried()
 	_test_recover()
+	_test_emit_order()
 	_test_rest_keeps_the_cache()
 	_test_round_trips()
 	_test_fallbacks()
@@ -154,6 +155,28 @@ func _test_recover() -> void:
 	check(n == 0 and d.carried == 7 + CARRIED and caches.size() == 1, "a second recover_cache() returns 0 and emits nothing (got %d, %s)" % [n, caches])
 
 
+## D2, review of Story 1.22: both objects hold their new values before either signal goes out, so a
+## listener that reads the other object never finds the embers nowhere. Each entry: [signal, its
+## value, what the other object held at that moment].
+func _test_emit_order() -> void:
+	var s := SlotState.new()
+	var d := _dive(CARRIED)
+	var seen := []
+	var on_carried := func(c: int) -> void: seen.append(["carried", c, s.cache_amount])
+	var on_cache := func(_room: StringName, amount: int) -> void: seen.append(["cache", amount, d.carried])
+	d.carried_changed.connect(on_carried)
+	s.cache_changed.connect(on_cache)
+	s.apply_death(d, 0, ROOM, SPOT)
+	check(seen == [["carried", 0, CARRIED], ["cache", CARRIED, 0]], "apply_death(): carried_changed(0) already finds the 40 in the cache, cache_changed(40) finds 0 carried (got %s)" % [seen])
+	seen.clear()
+	s.recover_cache(d)
+	check(seen == [["carried", CARRIED, 0], ["cache", 0, CARRIED]], "recover_cache(): carried_changed(40) finds no cache left, cache_changed(0) finds the 40 carried (got %s)" % [seen])
+	# Each handler holds the other object: disconnect, or the two RefCounteds keep each other alive
+	# and Godot reports the leak as an ERROR: line at exit.
+	d.carried_changed.disconnect(on_carried)
+	s.cache_changed.disconnect(on_cache)
+
+
 func _test_rest_keeps_the_cache() -> void:
 	var s := _slot_with_cache(&"normal")
 	var d := _dive(CARRIED)
@@ -212,6 +235,7 @@ func _test_fallbacks() -> void:
 		"a missing room": _without(good, "room"),
 		"an x that isn't a number": _over(good, {"x": "56"}),
 		"an infinite y": _over(good, {"y": INF}),
+		"an x beyond the 32-bit range, finite as a JSON double and inf in a Vector2": _over(good, {"x": 1e39}),
 		"a NaN x": _over(good, {"x": NAN}),
 		"a missing y": _without(good, "y"),
 		"amount 0": _over(good, {"amount": 0}),
@@ -274,30 +298,50 @@ func _test_load_signals() -> void:
 
 ## FR25: difficulty changes only what a death costs, so nothing but SlotState reads the tier. Code
 ## only (comments dropped by test_lint's strip()): a comment may say why something is not a tier.
+## Every folder under scripts/ is scanned, so a new one (moments/, audio/) is covered the day it
+## appears (review of Story 1.22); FR25_MAY_NAME_IT lists who may name the tier, and why.
+const FR25_MAY_NAME_IT := {
+	"res://scripts/rules/slot_state.gd": "holds the tier and the death cost",
+	"res://scripts/core/game.gd": "the set_difficulty() command, which saves progress",
+	"res://scripts/dev/": "DevTools' --difficulty",
+	"res://scripts/ui/": "Options and the slot picker show and set it (Stories 1.36, 1.38)",
+}
+
+
 func _test_fr25_by_source() -> void:
 	var hits := []
-	for dir in ["res://scripts/actors/", "res://scripts/world/", "res://scripts/objects/", "res://scripts/rules/"]:
-		for path in _gd_files(dir):
-			if path == "res://scripts/rules/slot_state.gd":
-				continue
-			var open := ""
-			var n := 0
-			for line in FileAccess.get_file_as_string(path).split("\n"):
-				n += 1
-				var s: Dictionary = Lint.strip(line, open)
-				open = s.open
-				if s.code.to_lower().contains("difficulty"):
-					hits.append("%s:%d" % [path, n])
-	check(hits.is_empty(), "FR25: 'difficulty' appears in no code under actors/, world/, objects/, nor under rules/ outside slot_state.gd (got %s)" % [hits])
-	check(DirAccess.dir_exists_absolute("res://scripts/objects/"), "...and objects/ exists, so the scan reached it")
+	var scanned := 0
+	for path in _gd_files("res://scripts/"):
+		if FR25_MAY_NAME_IT.keys().any(func(allowed: String) -> bool: return path.begins_with(allowed)):
+			continue
+		scanned += 1
+		hits.append_array(_difficulty_lines(path))
+	check(hits.is_empty(), "FR25: 'difficulty' appears in no code under scripts/ outside %s (got %s)" % [FR25_MAY_NAME_IT.keys(), hits])
+	for dir in ["actors", "world", "objects", "rules", "core"]:
+		check(not _gd_files("res://scripts/%s/" % dir).is_empty(), "...and scripts/%s/ holds scripts, so the scan reached it" % dir)
+	check(scanned > 20 and not _difficulty_lines("res://scripts/rules/slot_state.gd").is_empty(), "...and the scan can fire: it finds the word in slot_state.gd (%d files scanned)" % scanned)
 	var keys := Tuning.BASE.keys().filter(func(k: StringName) -> bool: return String(k).contains("difficulty"))
 	check(keys.is_empty(), "...and no Tuning key names it: difficulty is never a modifier (got %s)" % [keys])
+
+
+## "path:line" for every line of code in `path` that names the tier.
+func _difficulty_lines(path: String) -> Array:
+	var out := []
+	var open := ""
+	var n := 0
+	for line in FileAccess.get_file_as_string(path).split("\n"):
+		n += 1
+		var s: Dictionary = Lint.strip(line, open)
+		open = s.open
+		if s.code.to_lower().contains("difficulty"):
+			out.append("%s:%d" % [path, n])
+	return out
 
 
 func _gd_files(dir: String) -> Array[String]:
 	var out: Array[String] = []
 	if not DirAccess.dir_exists_absolute(dir):
-		return out  # the exists check above reports it; get_files_at() would print an engine ERROR
+		return out  # the caller's "holds scripts" check reports it; get_files_at() would print an engine ERROR
 	for f in DirAccess.get_files_at(dir):
 		if f.ends_with(".gd"):
 			out.append(dir + f)

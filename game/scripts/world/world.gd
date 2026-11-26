@@ -74,6 +74,7 @@ func _ready() -> void:
 	# A method, not a lambda: the connection drops when World is freed.
 	Game.settings.changed.connect(_on_setting_changed)
 	_check_respawn_point()
+	_check_cache_room()
 	var point := _respawn_point()
 	# Not a physics callback, so the first room needn't wait for the end of the frame.
 	_swap_room(point[0], point[1], true)
@@ -105,7 +106,7 @@ func last_safe_position() -> Vector2:
 ## The last death's cost, SlotState.apply_death()'s report ({} before any death this session): the
 ## death card reads what was lost, dropped or destroyed (Story 1.29).
 func last_death_cost() -> Dictionary:
-	return _last_death
+	return _last_death.duplicate()  # a copy: no reader changes World's record (D2)
 
 
 ## AR24: the one way into another room for an exit (and later a station or a scripted moment).
@@ -291,6 +292,14 @@ func _check_respawn_point() -> void:
 	Game.dive.set_respawn(&"", &"")
 
 
+## A saved Ember Cache in a room RoomLoader doesn't know (a hand-edited save, a room removed since
+## the save) never spawns: say so once, instead of nothing (review of Story 1.22, probed). The cache
+## stays in the slot, like any other the player doesn't reach: the next death destroys it (D4).
+func _check_cache_room() -> void:
+	if Game.slot.has_cache() and not RoomLoader.inspect(Game.slot.cache_room).known:
+		push_warning("World: the saved Ember Cache lies in '%s', which is no known room; it can't be reached" % Game.slot.cache_room)
+
+
 ## The old Player leaves: out of groups `player` / `light_source` now, not at the end of the frame.
 ## Its last white hit flash goes to the next life, so "white at most once per second" (Q1) holds
 ## across a death: per life, a lethal white and a hit just after the respawn were 37 ticks apart
@@ -325,7 +334,10 @@ func _on_player_died() -> void:
 	_last_death = Game.slot.apply_death(Game.dive, _player.held_at_death, _room.id, _room.floor_spot(_safe_pos))
 	var lost: int = _last_death.held_lost + _last_death.carried_lost
 	if lost > 0:
-		_player.popup_lost(lost)  # Easy loses nothing; Normal's carried went to the cache, not lost
+		# Easy loses no held or carried embers; Normal's carried went to the cache, not lost. An
+		# earlier cache this death destroyed (any tier, D4) is the death card's line (Story 1.29,
+		# from cache_destroyed), not this popup's.
+		_player.popup_lost(lost)
 	Game.slot.record_death()
 	# Pauses with the tree (AR36) and ignores the time scale. A method, not an await, so the
 	# connection dies with World if a test frees it first.

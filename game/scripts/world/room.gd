@@ -93,12 +93,17 @@ func ground_below(entry: StringName) -> Vector2:
 ## scan order). It covers every way a drop spot goes bad: ground_below()'s fallback to a mid-air
 ## entry, a centre hanging past a ledge's edge, a hand-edited save, a room edited since the save.
 ## A room with no clean standing cell returns `pos` (validate() makes every real room have one).
+## The distance is measured from `pos` clamped to the room: far outside it (a hand-edited save) the
+## squared distance overflows a 32-bit float to inf, which is never nearer than anything (review of
+## Story 1.22, probed). Nearest is by straight distance, through walls: the ledger's E4 item adds
+## the per-room rule that every such cell can be reached.
 func floor_spot(pos: Vector2) -> Vector2:
 	# The feet sit on a tile edge: half a pixel up finds the standing row without float drift
 	# moving a good spot into the floor's own row.
 	var feet := Vector2i(floori(pos.x / TILE), floori((pos.y + 12.0 - 0.5) / TILE))
 	if _stands_on_clean_floor(feet) and absf(pos.y + 12.0 - (feet.y + 1) * TILE) <= 1.0:
 		return pos
+	var from := pos.clamp(Vector2.ZERO, bounds().size)
 	var best := pos
 	var best_d := INF
 	for y in size_cells.y:
@@ -107,18 +112,22 @@ func floor_spot(pos: Vector2) -> Vector2:
 			if not _stands_on_clean_floor(cell):
 				continue
 			var spot := Vector2(x * TILE + TILE / 2.0, (y + 1) * TILE - 12)
-			var d := spot.distance_squared_to(pos)
+			var d := spot.distance_squared_to(from)
 			if d < best_d:  # strictly smaller: the first in scan order wins a tie
 				best_d = d
 				best = spot
 	return best
 
 
-## A cell a body can stand in: inside the room, open, no hazard, with solid floor right below.
+## A cell a body can stand in: inside the room, open, no hazard, with solid floor right below and
+## the cell above open too: the body is 20 px tall and reaches about 6 px into it (the stand rule of
+## RoomLoader.down_entry_cell()). Without the headroom the scan could pick a one-tile gap under a
+## slab, where the player can never touch the cache (review of Story 1.22, probed).
 func _stands_on_clean_floor(cell: Vector2i) -> bool:
-	if cell.x < 0 or cell.y < 0 or cell.x >= size_cells.x or cell.y + 1 >= size_cells.y:
+	if cell.x < 0 or cell.y < 1 or cell.x >= size_cells.x or cell.y + 1 >= size_cells.y:
 		return false
-	return not is_solid(cell) and not hazards.has(cell) and is_solid(cell + Vector2i.DOWN)
+	return not is_solid(cell) and not hazards.has(cell) and is_solid(cell + Vector2i.DOWN) \
+			and not is_solid(cell + Vector2i.UP)
 
 
 func is_solid(cell: Vector2i) -> bool:
