@@ -92,6 +92,7 @@ func run() -> void:
 	await test_lure_telegraph()
 	await test_lure_floor()
 	await test_cling_toss()
+	await test_wall_toss()
 	await test_cap()
 	await test_world()
 	_release_all()
@@ -297,16 +298,19 @@ func test_no_toss() -> void:
 		var seen := await _tap()
 		check(seen.taps == 1 and _flares().is_empty() and _p.chain.count == links and _p.chain.held == held and banked.is_empty() and not seen.snuff,
 				"a tap in the air at chain %d does nothing: no flare, chain and held untouched, nothing banked (flares %d, chain %d, held %d, banked %s)" % [links, _flares().size(), _p.chain.count, _p.chain.held, banked])
-	_release_all()
-	place(_room.entry_position(&"spawn"))
+	# The ground, reached with a chain worth tossing: the landing is what leaves no chain there
+	# (no floor check is written in _handle_flare(); this is the case that would miss one).
+	await _air(8, _room.entry_position(&"spawn") + Vector2(0, -8))
+	check(_p.chain.count == 8 and not _p.is_on_floor(), "(premise) just over the floor with a chain of 8, still in the air (chain %d, on floor %s)" % [_p.chain.count, _p.is_on_floor()])
 	for i in 30:
 		if _p.is_on_floor():
 			break
 		await frames(1)
 	await frames(2)
+	banked.clear()
 	var on_ground := await _tap()
-	check(_p.is_on_floor() and on_ground.taps == 1 and _flares().is_empty() and _p.chain.count == 0,
-			"a tap on the ground does nothing: the chain there is always 0 (on floor %s, taps %d, flares %d)" % [_p.is_on_floor(), on_ground.taps, _flares().size()])
+	check(_p.is_on_floor() and on_ground.taps == 1 and _flares().is_empty() and _p.chain.count == 0 and banked.is_empty(),
+			"a tap on the ground after landing that chain does nothing: the landing ended it, so no flare and no bank (on floor %s, taps %d, flares %d, chain %d, banked %s)" % [_p.is_on_floor(), on_ground.taps, _flares().size(), _p.chain.count, banked])
 	# Snuff is unchanged: held past the window with chain 5.
 	await _air(5)
 	ends.clear()
@@ -539,24 +543,31 @@ func test_no_damage() -> void:
 
 ## FR12, Story 1.19: links spent by a Flare Toss never bank-heal. At 3 HP with a chain of 20 a toss
 ## leaves 10 and heals nothing; landing those 10 is a real bank of Spec.BANK_HEAL_MIN, and heals.
+## The near-miss, one link fewer: 19 leaves 9, and neither the toss nor the landing heals. What
+## heals is the chain that lands, never the chain as it was before the toss.
 func test_no_bank_heal() -> void:
 	await _build()
-	_p.health.hit(&"crawler_walker", 0.0)
-	check(_p.health.hp == Spec.MAX_HP - 1, "(premise) one hit down: %d HP" % _p.health.hp)
-	await _air(2 * Spec.BANK_HEAL_MIN)
-	var seen := await _tap()
-	var hp_at_toss := _p.health.hp
-	await frames(5)
-	check(seen.taps == 1 and _p.chain.count == Spec.BANK_HEAL_MIN and hp_at_toss == Spec.MAX_HP - 1 and _p.health.hp == Spec.MAX_HP - 1,
-			"a toss at chain %d spends %d links and heals nothing (chain %d, HP %d then %d)" % [2 * Spec.BANK_HEAL_MIN, Spec.BANK_HEAL_MIN, _p.chain.count, hp_at_toss, _p.health.hp])
-	place(_room.entry_position(&"spawn") + Vector2(0, -4))
-	for i in 30:
-		if _p.is_on_floor():
-			break
-		await frames(1)
-	check(_p.is_on_floor() and _p.chain.count == 0 and _p.health.hp == Spec.MAX_HP,
-			"...and landing the %d links left is a bank of its own: +1 HP (on floor %s, HP %d)" % [Spec.BANK_HEAL_MIN, _p.is_on_floor(), _p.health.hp])
-	await _burn_all()
+	for row: Array in [[2 * Spec.BANK_HEAL_MIN, Spec.BANK_HEAL_MIN, 1], [2 * Spec.BANK_HEAL_MIN - 1, Spec.BANK_HEAL_MIN - 1, 0]]:
+		var links: int = row[0]
+		var left: int = row[1]
+		var healed: int = row[2]
+		_p.health.hit(&"crawler_walker", 0.0)
+		check(_p.health.hp == Spec.MAX_HP - 1, "(premise) one hit down: %d HP" % _p.health.hp)
+		await _air(links)
+		var seen := await _tap()
+		var hp_at_toss := _p.health.hp
+		await frames(5)
+		check(seen.taps == 1 and _p.chain.count == left and hp_at_toss == Spec.MAX_HP - 1 and _p.health.hp == Spec.MAX_HP - 1,
+				"a toss at chain %d spends %d links and heals nothing (chain %d, HP %d then %d)" % [links, links - left, _p.chain.count, hp_at_toss, _p.health.hp])
+		place(_room.entry_position(&"spawn") + Vector2(0, -4))
+		for i in 30:
+			if _p.is_on_floor():
+				break
+			await frames(1)
+		await frames(2)
+		check(_p.is_on_floor() and _p.chain.count == 0 and _p.health.hp == Spec.MAX_HP - 1 + healed,
+				"...and landing the %d links left is a bank of its own: %s (Spec.BANK_HEAL_MIN %d; on floor %s, HP %d)" % [left, "+1 HP" if healed == 1 else "under the floor, so no heal", Spec.BANK_HEAL_MIN, _p.is_on_floor(), _p.health.hp])
+		await _burn_all()
 	await _free()
 
 
@@ -711,13 +722,15 @@ func test_lure_floor() -> void:
 		else:
 			check(flare.radius >= Spec.NOTICE_MIN_RADIUS, "(premise) a flare tossed at chain 4 burns at %.1f px, at or over Spec.NOTICE_MIN_RADIUS (%.0f)" % [flare.radius, Spec.NOTICE_MIN_RADIUS])
 			var hunted := false
+			var telegraphed := 0
 			for i in 120:
 				await frames(1)
 				harmless = harmless and not _l.monitorable
+				telegraphed += int(_l.state == Lurker.State.TELEGRAPH and _l.target == source)
 				if _l.state == Lurker.State.HUNT and _l.target == source:
 					hunted = true
 					break
-			check(hunted and harmless, "...and the lurker telegraphs and hunts it, harmless (state %s)" % _name(_l.state))
+			check(hunted and telegraphed > 0 and harmless, "...and the lurker telegraphs at it, then hunts it, harmless throughout (%d TELEGRAPH ticks at the flare first; state %s)" % [telegraphed, _name(_l.state)])
 		await _burn_all()
 		await _free()
 
@@ -788,6 +801,86 @@ func test_cling_toss() -> void:
 	check(tossed.clinging_after and tossed.light_after == Spec.BASE_LIGHT and tossed.still_clinging,
 			"...the cling goes on: still clinging on the next tick and to the end, the light still %.0f px (clinging %s, light %.1f)" % [Spec.BASE_LIGHT, tossed.clinging_after, tossed.light_after])
 	check(tossed.ticks == plain.ticks, "...and its grace is neither refilled nor reset: the chain banks %d ticks into the cling, as without the toss (%d)" % [tossed.ticks, plain.ticks])
+	await _free()
+
+
+## Two throws at a wall by the player's own toss (Story 1.23 review), both hugging t_input's right
+## wall and facing it with a chain of 6.
+## - No cling: the flare flies at the wall from the body's centre and sticks at once, in the open
+##   cell, never inside the wall (the flight case's hand-placed flare, now through _handle_flare()).
+## - The tick the cling starts: Jump goes down and Light comes up on the same tick. The throw is
+##   away from the wall (Q1), as on every later tick of the cling: `_clinging` is still last tick's
+##   when the toss runs, and it threw into the wall, 4 px from the player (probed at the review).
+## - Jump and Down both held: a cling that starts ends on the same tick, on every tick, so the
+##   player never clings and the throw follows the facing, as it did before the cling-start rule.
+func test_wall_toss() -> void:
+	await _build(&"t_input")
+	var hug := Vector2(Room.TILE * 21 - 6.0, 56)
+	# No cling.
+	_release_all()
+	_p.chain.break_chain()
+	place(hug)
+	await frames(6)
+	for i in 6:
+		_p.chain.add_hit()
+	check(_p._facing == 1 and not _p._clinging and not _p.is_on_floor() and _p._wall_side() == 1, "(premise) falling beside the right wall, facing it, no cling (facing %d, wall side %d)" % [_p._facing, _p._wall_side()])
+	var seen := await _tap()
+	var thrown := _flares()
+	check(seen.taps == 1 and thrown.size() == 1 and _p.chain.count == 3, "a tap while hugging a wall, facing it, throws: chain 3 (taps %d, flares %d, chain %d)" % [seen.taps, thrown.size(), _p.chain.count])
+	if thrown.size() == 1:
+		var at_wall := thrown[0]
+		check(at_wall.velocity.x == Spec.FLARE_THROW.x and not _any_solid(_rect(at_wall)), "...toward the wall, starting in open air at the body's centre (velocity.x %.0f, at %s)" % [at_wall.velocity.x, at_wall.position])
+		await frames(3)
+		check(at_wall.state == Flare.State.STUCK and _rests_on_surface(at_wall), "...and within 3 ticks it is STUCK on the wall's face, in the open cell (state %d at %s)" % [at_wall.state, at_wall.position])
+	await _burn_all()
+	# The tick the cling starts.
+	_release_all()
+	_p.chain.break_chain()
+	place(hug)
+	await frames(6)
+	for i in 6:
+		_p.chain.add_hit()
+	Input.action_press("light")
+	await frames(2)
+	var before := _p._clinging
+	Input.action_press("jump")
+	Input.action_release("light")
+	await frames(1)
+	check(not before and _p._clinging and _p._cling_side == 1 and _p.input.light_tap, "(premise) the tap is sampled on the tick the cling starts on the right wall (clinging %s then %s, tap %s)" % [before, _p._clinging, _p.input.light_tap])
+	var first := _flares()
+	check(first.size() == 1 and _p.chain.count == 3, "a tap on the tick a cling starts throws: chain 3 (flares %d, chain %d)" % [first.size(), _p.chain.count])
+	if first.size() == 1:
+		var away := first[0]
+		check(away.velocity.x == -Spec.FLARE_THROW.x, "...away from the wall, as on every later tick of the cling (Q1; velocity.x %.0f)" % away.velocity.x)
+		await frames(3)
+		check(away.state == Flare.State.FLYING and away.position.x < hug.x - 2.0 * Spec.FLARE_THROW.x / Engine.physics_ticks_per_second,
+				"...and three ticks on it is still flying, clear of the wall (state %d, x %.1f from the throw at %.0f)" % [away.state, away.position.x, hug.x])
+	await _burn_all()
+	# Jump and Down both held: no cling ever holds. The release above kicked the player off the wall,
+	# facing away, so it is turned back to the wall first (past the kick's lock).
+	_release_all()
+	_p.chain.break_chain()
+	await frames(1)
+	place(hug)
+	Input.action_press("move_right")
+	await frames(Engine.physics_ticks_per_second / 2)
+	Input.action_release("move_right")
+	place(hug)
+	await frames(6)
+	for i in 6:
+		_p.chain.add_hit()
+	Input.action_press("jump")
+	Input.action_press("move_down")
+	var clung := 0
+	for i in 4:
+		await frames(1)
+		clung += int(_p._clinging)
+	check(clung == 0 and _p._facing == 1 and _p._wall_side() == 1 and _p.chain.count == 6, "(premise) Jump and Down held beside the right wall, facing it: never clinging, the chain still 6 (clinging ticks %d, chain %d)" % [clung, _p.chain.count])
+	var down_seen := await _tap()
+	var dropped := _flares()
+	check(down_seen.taps == 1 and dropped.size() == 1 and not _p._clinging and dropped[0].velocity.x == Spec.FLARE_THROW.x,
+			"a tap there follows the facing, toward the wall: no cling, so nothing to throw away from (taps %d, flares %d, velocity.x %.0f)" % [down_seen.taps, dropped.size(), dropped[0].velocity.x if dropped.size() == 1 else NAN])
+	await _burn_all()
 	await _free()
 
 
@@ -887,8 +980,8 @@ func test_world() -> void:
 	var lights := get_tree().get_nodes_in_group(BudgetLight.GROUP)
 	var c := BudgetLight.counts(lights, _world.light_rect())
 	var light := flare.light_source.light
-	check(BudgetLight.lit_on_screen(light, _world.light_rect()) and not light.demoted and c.lit >= 2 and c.over == 0,
-			"the budget counts its light, lit and never demoted, beside the player's (counts %s)" % [c])
+	check(BudgetLight.lit_on_screen(light, _world.light_rect()) and light.enabled and c.lit >= 2 and c.over == 0,
+			"the budget counts its light, lit and switched on, beside the player's (enabled %s, counts %s)" % [light.enabled, c])
 	# A lurker hunting the flare when the player dies: the rebuild frees both with the room.
 	var lurkers := _lurkers()
 	lurkers.sort_custom(func(a: Lurker, b: Lurker) -> bool: return a.global_position.distance_squared_to(flare.global_position) < b.global_position.distance_squared_to(flare.global_position))

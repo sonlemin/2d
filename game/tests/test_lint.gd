@@ -424,8 +424,8 @@ const SAMPLES: Array = [
 	[&"dev_ref", "world/world.gd", "\tif OS.is_debug_build():\n\t\tpass\n\t\tadd_child(load(\"res://scripts/dev/dev_tools.gd\").new())", true],
 	[&"dev_ref", "world/world.gd", "\tvar t: DevThing", true],
 	[&"dev_ref", "world/world.gd", "\tvar s := \"DevThing\"", false],
-	# Story 1.12 D11: raw lights, anywhere but BudgetLight itself; dev/ too (the perf run's stand-ins
-	# are BudgetLights).
+	# Story 1.12 D11: raw lights, anywhere but BudgetLight itself; dev/ too (the perf run makes no
+	# light of its own since Story 1.23: its flare is a real Flare).
 	[&"raw_light", "actors/flare.gd", "\tvar l := PointLight2D.new()", true],
 	[&"raw_light", "objects/ember_cache.gd", "extends PointLight2D", true],
 	[&"raw_light", "dev/perf_run.gd", "\tvar l := PointLight2D.new()", true],

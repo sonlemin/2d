@@ -229,6 +229,37 @@ static func stat_floor_errors(table: Array[Dictionary], stat: StringName, min_va
 	return errors
 
 
+## The flare cap under gear (Story 1.23 review): one message per combination of `table` rows where
+## `flare_max` is not a whole number from 1 to `most`. Above `most` the always-lights alone pass the
+## light budget, which never demotes them (probed: 7.0 gives 8 lit, over 2); under 1 the toss still
+## throws one; a fraction is cut down by the player's int(). Pure, like stat_floor_errors().
+static func flare_cap_errors(table: Array[Dictionary], most: int) -> Array[String]:
+	var rows: Array[Dictionary] = []
+	var ids: Array[StringName] = []
+	for row in table:
+		if StringName(row.stat) != &"flare_max":
+			continue
+		rows.append(row)
+		if not StringName(row.id) in ids:
+			ids.append(StringName(row.id))
+	assert(ids.size() <= 12, "flare_cap_errors: %d gear bend flare_max; 2^n sets is too many" % ids.size())
+	var errors: Array[String] = []
+	for mask in 1 << ids.size():
+		var owned: Array[StringName] = []
+		for b in ids.size():
+			if mask & (1 << b):
+				owned.append(ids[b])
+		if rows.filter(func(r: Dictionary) -> bool: return StringName(r.id) in owned and StringName(r.op) == &"set").size() > 1:
+			errors.append("gear %s: two rows set flare_max (Tuning refuses two)" % [owned])
+			continue
+		var t := Tuning.new()
+		t.apply_gear(owned, rows)
+		var v := t.f(&"flare_max")
+		if v != floorf(v) or v < 1.0 or v > most:
+			errors.append("gear %s: flare_max %.2f, not a whole number from 1 to %d" % [owned, v, most])
+	return errors
+
+
 func _test_gear_floors() -> void:
 	# Pillar 2: the lurker telegraph never drops under Spec.TELEGRAPH_MIN, whatever gear is owned.
 	var real := stat_floor_errors(Gear.TABLE, &"lurker_telegraph_time", Spec.TELEGRAPH_MIN, true)
@@ -262,6 +293,15 @@ func _test_gear_floors() -> void:
 	var stub: Array[Dictionary] = [{id = &"probe_stub_wick", stat = &"flare_burn", op = &"set", value = 1.0}]
 	caught = stat_floor_errors(stub, &"flare_burn", Spec.FLARE_FADE, false)
 	check(caught.size() == 1, "...and a probe gear setting it to the fade's 1.0 s is caught (%s)" % [caught])
+	# Story 1.23 review: the cap is a ceiling as well. With the player's light, every flare must fit
+	# the light budget under any gear, since the budget never demotes an always-light (AR46).
+	var cap_most := Spec.LIGHTS_ON_SCREEN_MAX - 1
+	real = flare_cap_errors(Gear.TABLE, cap_most)
+	check(real.is_empty(), "flare_max stays a whole number from 1 to %d under every combination of Gear.TABLE rows (%s)" % [cap_most, real])
+	for cap_case: Array in [[float(cap_most + 1), 1, "one over the budget's room"], [0.0, 1, "none"], [2.5, 1, "a fraction"], [float(cap_most), 0, "the most that fits (the near-miss)"], [1.0, 0, "one (the near-miss)"]]:
+		var cap_row: Array[Dictionary] = [{id = &"probe_cap", stat = &"flare_max", op = &"set", value = cap_case[0]}]
+		caught = flare_cap_errors(cap_row, cap_most)
+		check(caught.size() == cap_case[1], "...a probe gear setting flare_max to %s, %s, is %s (%s)" % [cap_case[0], cap_case[2], "caught" if cap_case[1] == 1 else "passed", caught])
 
 
 ## Story 1.3 traded compile-checked export names for key literals, so a typo or a key no code reads

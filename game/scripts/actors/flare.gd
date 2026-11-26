@@ -30,6 +30,7 @@ var _full_energy := 0.0  # the scene's energy: the fade scales it
 
 
 func _ready() -> void:
+	assert(radius > 0.0, "Flare: radius is set by room.spawn() args before add_child; without it the light has no size and still holds a cap slot")
 	add_to_group(GROUP)
 	# Shared and already drawn by Fx.warm_up() (AR46): it reads in the dark like every small glow.
 	_sprite.material = Fx.unshaded()
@@ -63,8 +64,10 @@ func _physics_process(delta: float) -> void:
 
 ## The arc (Q3, sonlm 2026-11-26): the throw's sideways speed never changes; the fall is the full
 ## gravity, never the player's floaty fall, capped at the terminal fall so a flare thrown in a dive
-## stays level with the diver. move_and_collide() sweeps the shape, so a fast flare can't tunnel a
-## 16 px wall, and the first collision is the first surface (D6).
+## never falls away from the diver: it reaches the diver's speed 25 ticks on, about 73 px above
+## (probed at the 1.23 review; the throw does not add the thrower's own speed).
+## move_and_collide() sweeps the shape, so a fast flare can't tunnel a 16 px wall, and the first
+## collision is the first surface (D6).
 func _fly(delta: float) -> void:
 	var t := Game.tuning
 	velocity.y = minf(velocity.y + t.f(&"gravity") * delta, t.f(&"max_fall"))

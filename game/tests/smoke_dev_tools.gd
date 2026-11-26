@@ -842,8 +842,8 @@ func test_overlay_light() -> void:
 	for r: float in [Sensing.NOTICE_MIN_RADIUS - 0.1, Sensing.NOTICE_MIN_RADIUS]:
 		check(Overlays.light_marks(r).noticeable == Sensing.can_sense(o, r, o) and Overlays.light_marks(r).reach == r * Sensing.NOTICE_FACTOR,
 				"light_marks(%.1f) agrees with Sensing: noticeable %s, reach radius × NOTICE_FACTOR" % [r, Sensing.can_sense(o, r, o)])
-	# A decoy beside the player, a child of the room (AR23): its own marks, as the cache's and the
-	# flare's will have (1.22, 1.23).
+	# A decoy beside the player, a child of the room (AR23): its own marks, as the cache's and a
+	# real flare's have (Stories 1.22, 1.23; test_overlay_flare).
 	var flare := LightSource.new()
 	flare.kind = Sensing.KIND_FLARE
 	flare.fixed_radius = 60.0  # under the notice radius: the lurker keeps the player
@@ -920,8 +920,11 @@ func test_overlay_flare() -> void:
 	await frames(2)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(_draws.get("flare", 0) > 0 and Overlays.light_label(flare.light_source.kind, flare.light_source.radius()) == "flare 102 px",
-			"...and draws its rings and its label, 'flare 102 px', with no error (draws %s, label '%s')" % [_draws, Overlays.light_label(flare.light_source.kind, flare.light_source.radius())])
+	# The draw is counted, not read back: a canvas item keeps no text. The label's words are the
+	# pure light_label()'s, which _draw_light_marks() calls with the same kind and rule radius.
+	check(_draws.get("flare", 0) > 0, "...and its marks draw (the rings and the label), with no error (draws %s)" % [_draws])
+	check(Overlays.light_label(flare.light_source.kind, Overlays.light_marks(flare.light_source.radius()).radius) == "flare 102 px",
+			"...the label for its kind and rule radius reads 'flare 102 px' (got '%s')" % Overlays.light_label(flare.light_source.kind, Overlays.light_marks(flare.light_source.radius()).radius))
 	flare.burn_out()
 	await get_tree().process_frame
 	await get_tree().process_frame

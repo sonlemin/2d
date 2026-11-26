@@ -213,7 +213,9 @@ func test_perf_run() -> void:
 		bad.dead += int(p.is_dead)
 		bad.x += int(p.global_position.x != 240.0)
 		bad.lit += int(c.lit > Spec.LIGHTS_ON_SCREEN_MAX)
-		bad.always += int(player_light.demoted or flare_light.demoted)
+		# An ALWAYS light can't be demoted (set_demoted() asserts), so `demoted` would never show a
+		# fault: what can go wrong is the light switched off, or not counted lit in the view.
+		bad.always += int(not player_light.enabled or not flare_light.enabled)
 		if first_wake_lit < 0 and _screen1_glows().any(func(l: BudgetLight) -> bool: return l.wants_light()):
 			first_wake_lit = c.lit
 		if c.sprites >= 1:
@@ -227,11 +229,13 @@ func test_perf_run() -> void:
 	check(bad.dead == 0, "...the player is never dead (%d ticks)" % bad.dead)
 	check(bad.x == 0, "...it stays on the centre line, x 240 (%d ticks off)" % bad.x)
 	check(bad.lit == 0, "...at most %d lights are lit in the view (%d ticks over; worst %d)" % [Spec.LIGHTS_ON_SCREEN_MAX, bad.lit, worst_lit])
-	check(bad.always == 0, "...and the player's light and the flare are never demoted (%d ticks)" % bad.always)
+	check(bad.always == 0, "...and the player's light and the flare's are switched on throughout (%d ticks off)" % bad.always)
 	check(first_wake_lit >= 0 and first_wake_lit <= Spec.LIGHTS_ON_SCREEN_MAX,
 			"(premise for D5) at the tick screen 1's glows first wake, the sample already shows ≤ %d lit (got %d): the budget ran after the actors" % [Spec.LIGHTS_ON_SCREEN_MAX, first_wake_lit])
 	check(exercised and sprites_not_glow == 0, "(premise) the budget was exercised: some tick showed a sprite glow, and every demoted light was a GLOW (%d not)" % sprites_not_glow)
 	check(absf(y_after_60 - y_first - PerfRun.PATH_SPEED) <= 4.0, "60 ticks in, the player has moved %.1f px down the path (%.0f px/s, ± 4)" % [y_after_60 - y_first, PerfRun.PATH_SPEED])
+	# The 3 s run is shorter than the burn (Spec.FLARE_BURN), so the first flare is still the one.
+	check(is_instance_valid(flare), "(premise) the flare made at the start still burns at the end of the 3 s run")
 	if is_instance_valid(flare):
 		check(absf(flare_light.texture_scale * flare_light.texture.get_width() / 2.0 - p.light_radius()) < 0.01 and flare.global_position == perf._inside(p.global_position + PerfRun.FLARE_OFFSET),
 				"the flare's light is drawn at that radius, %.1f px, and it rides at FLARE_OFFSET from the player" % p.light_radius())
@@ -352,13 +356,12 @@ func test_flare_remade() -> void:
 			"a flare that burns out is made again within a tick: a new Flare in the room, stuck, at the player's light radius")
 	check(c.lit <= Spec.LIGHTS_ON_SCREEN_MAX and c.over == 0, "...made before the budget's pass: that tick shows at most %d lit, over 0 (got %s)" % [Spec.LIGHTS_ON_SCREEN_MAX, c])
 	var over_ticks := 0
-	var demoted := 0
+	var dark := 0
 	for i in 30:
 		await get_tree().physics_frame
 		over_ticks += int(_counts().lit > Spec.LIGHTS_ON_SCREEN_MAX)
-		if is_instance_valid(perf.flare):
-			demoted += int(perf.flare.light_source.light.demoted)
-	check(over_ticks == 0 and demoted == 0 and is_instance_valid(again), "...and over the next 30 ticks the budget holds and the new flare is never demoted (%d ticks over, %d demoted)" % [over_ticks, demoted])
+		dark += int(not is_instance_valid(perf.flare) or not perf.flare.light_source.light.enabled)
+	check(over_ticks == 0 and dark == 0 and is_instance_valid(again), "...and over the next 30 ticks the budget holds and the new flare's light stays switched on (%d ticks over, %d dark)" % [over_ticks, dark])
 	_warnings.take()
 	await _teardown()
 

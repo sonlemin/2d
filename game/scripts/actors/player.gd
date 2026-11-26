@@ -151,8 +151,14 @@ func _handle_flare() -> void:
 	# player's light and every flare are at most the 6-light budget (AR46).
 	Flare.trim(get_tree(), maxi(int(t.f(&"flare_max")) - 1, 0))
 	# From a cling (Q1): away from the wall, or it would stick beside you. `_clinging` is last
-	# tick's: this runs before _handle_cling().
-	var dir := -_cling_side if _clinging else _facing
+	# tick's (this runs before _handle_cling()), so the tick a cling starts asks the cling's own
+	# start rule: a tap released on that tick threw into the wall, 4 px away (Story 1.23 review).
+	# Not with Down held: that cling ends on the tick it starts, every tick, so there is no cling
+	# to throw away from and the throw follows the facing, as it does off a wall.
+	var wall := _cling_side
+	if not _clinging:
+		wall = 0 if input.down_held else _cling_start_side()
+	var dir := -wall if wall != 0 else _facing
 	# From the body's centre, never a point ahead of it: the body's own space is always open air,
 	# so a flare thrown while hugging a wall starts outside the wall and sticks on its first tick.
 	room.spawn(FlareScene, room.to_local(global_position),
@@ -165,11 +171,10 @@ func _handle_flare() -> void:
 func _handle_cling(delta: float) -> bool:
 	var t := Game.tuning
 	if not _clinging:
-		if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not input.cling_held:
+		var side := _cling_start_side()
+		if side == 0:
 			return false
-		_cling_side = _wall_side()
-		if _cling_side == 0:
-			return false
+		_cling_side = side
 		_clinging = true
 		chain.set_clinging(true)
 	# Jump is held all through a cling, so the only press that can be waiting is the one that
@@ -197,6 +202,15 @@ func _end_cling() -> void:
 	if _clinging:
 		_clinging = false
 		chain.set_clinging(false)
+
+
+## The wall a cling starts on this tick (-1 left, 1 right), or 0 when none does: falling, Jump held,
+## no dash, a wall right beside the body. One rule for _handle_cling() and for the toss that runs
+## before it, so both read the same tick the same way.
+func _cling_start_side() -> int:
+	if is_on_floor() or velocity.y < 0.0 or _dash_left > 0.0 or not input.cling_held:
+		return 0
+	return _wall_side()
 
 
 ## Which side (-1 left, 1 right) has a wall right next to the body, or 0.

@@ -9,7 +9,7 @@ extends PointLight2D
 ## colour, texture_scale and visible, as they did on a plain PointLight2D.
 ## A demotion is instant (the budget is a cost rule); a relight waits RELIGHT_HOLD_TICKS from the
 ## demotion (Story 1.23 D13), so however often an always-light crosses the view's edge, a glow
-## swaps between light and sprite under 3 times a second (NFR8).
+## swaps between light and sprite at most 3 times in any second (NFR8).
 ## Depends only on core/ (Fx): world/ calls it, never the other way round.
 
 enum Rank { ALWAYS, CACHE, GLOW }  ## slots go in this order; GLOW (lurker wall glow) is demoted first

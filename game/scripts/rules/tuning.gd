@@ -73,7 +73,7 @@ const CACHE_RADIUS := 80.0  ## px; the Ember Cache's glow and the light predator
 const FLARE_BURN := 4.0  ## s a flare burns from the throw (not from the stick), fading over its last second; long enough to pull a hunt off you and dive on (GDD Flare Toss "burns for 4.0 s", FR15). Long Wick sets 6 (E5). GDD Flare Toss; new in M2.
 const FLARE_THROW_X := 180.0  ## px/s forward, in the facing direction (away from the wall in a cling); with FLARE_THROW_Y an arc that lands a few tiles ahead (GDD Flare Toss "180 px/s forward", FR14). GDD Flare Toss; new in M2.
 const FLARE_THROW_Y := -160.0  ## px/s; the upward part of the throw: an apex about 14 px above the hand under GRAVITY, then a fall capped at MAX_FALL (GDD Flare Toss "−160 px/s up", FR14; Story 1.23 Q3). GDD Flare Toss; new in M2.
-const FLARE_MAX := 5.0  ## flares burning at once; with the player's light that is the 6-light budget, so always-lights alone never exceed it; at the cap a new toss puts the oldest out (GDD Flare Toss "at most 5 flares burn at once"; Story 1.23 Q2, sonlm 2026-11-26). GDD Flare Toss; new in M2.
+const FLARE_MAX := 5.0  ## flares burning at once; with the player's light that is the 6-light budget, so always-lights alone never exceed it; at the cap a new toss puts out the flare with the least time left (GDD Flare Toss "at most 5 flares burn at once"; Story 1.23 Q2, sonlm 2026-11-26). GDD Flare Toss; new in M2.
 
 ## Every key `f()` knows, with its base value.
 const BASE := {

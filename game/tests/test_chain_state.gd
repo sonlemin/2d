@@ -258,10 +258,11 @@ func test_flare_cost() -> void:
 ## The GDD's examples by literal, then the small and the capped chain. A toss never ends a chain.
 func test_toss_links() -> void:
 	for pair: Array in [[8, 4], [5, 2], [2, 1], [3, 1], [20, 10]]:
-		var c = _chain_of(pair[0], [])
+		var seen := []
+		var c = _chain_of(pair[0], seen)
 		var r: float = c.toss_flare()
 		check(c.count == pair[1] and r > 0.0, "a toss at chain %d leaves %d (got %d, radius %.1f)" % [pair[0], pair[1], c.count, r])
-		check(c.count >= 1, "...and never ends the chain (count %d)" % c.count)
+		check(c.count >= 1 and not seen.any(func(s: Array) -> bool: return s[0] == "ended"), "...and never ends the chain: at least 1 link left, no `ended` (count %d, signals %s)" % [c.count, seen])
 
 
 ## Under 2 links: 0.0, no signal, count and held untouched.
