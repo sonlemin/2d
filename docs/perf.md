@@ -112,6 +112,8 @@ The cache stand-in became the real cache, which now wakes lurkers. One headless 
 
 | Date | Build / commit | Machine and adapter | Window and scale | Refresh | Glow | Avg FPS | Min FPS | Worst ms (at s) | Over 20 ms | Lights / sprites / over max | Breaks / deaths | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-26 | 20261126-0596143 `web_debug` | sonlm's laptop, Chrome, WebKit WebGL | 4358x6762 | — | off | (43.5) | (0) | (8901.1 at 13.9 s) | (532) | 6/6 / 7 / 0 | 0 / 0 | **frame times void:** an 8.9 s frame at 13.9 s is a hidden or covered tab. The other 2612 frames took 51.1 s (about 51 fps) and 532 were over 20 ms, but no valid Chrome run exists to hold that against (the 1.16 Chrome run was void too), so it says nothing about the cache. The light counts are valid and match 1.15's. Run again |
+| 2026-11-26 | 20261126-0596143 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | 60 Hz | off | 59.2 | 13 | 791.0 (0.0 s) | 80 | 6/6 / 7 / 0 | 0 / 0 | valid; the first run with the real cache (lurkers hunt it for the whole run). Beside 1.16's run on the same browser and adapter (59.4 / 24 / 634.0 at 0.0 s / 30): the average holds, the first-frame stall is still the load, and the slow frames went from 30 to 80. One run, so the cache's share can't be told from noise (→ 7.13) |
 
 **Runs not made at CP1 (sonlm's choice, 2026-11-21):** glow on everywhere (glow was a no-go, so its cost no longer decides anything), the laptop desktop on the Intel iGPU, and Chrome. No separate HD 620 machine was available; the laptop's Intel iGPU, through Firefox, stood in for the low-end target. The full pass is Story 7.13.
 
