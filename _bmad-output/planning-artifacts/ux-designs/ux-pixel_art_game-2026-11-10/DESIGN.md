@@ -477,7 +477,7 @@ Two colours carry meaning everywhere: amber is the player and red is a predator.
 
 The ember cursor counts as the player's lantern, so amber is allowed in menus (log 2026-11-10; [NOTE FOR GDD] in EXPERIENCE.md). Carried embers use the zone HP colour, so held and carried look different (theme C). The M1 code uses `#ff594d` for the alert.
 
-In the world, amber also marks the player's own light out in the abyss (narrative design, 2026-11-12; GDD Art Style): a **lit** lantern anchor burns amber (it holds your spark), lit lanterns in the hub burn amber, and the sparks of a hit creature start in its own tint and turn amber as they fade (you take its light). Unlit anchors and the old lamps in the layers are dead or a cold tint, never amber. Nothing else in the world is amber. It must move to `{colors.predator-red}`.
+In the world, amber also marks the player's own light out in the abyss (narrative design, 2026-11-12; GDD Art Style): a **lit** lantern anchor burns amber (it holds your spark), lit lanterns in the hub burn amber, and the sparks of a hit creature start in its own tint and turn amber as they fade (you take its light). Unlit anchors and the old lamps in the layers are dead or a cold tint, never amber. The Ember Cache burns amber too, steady, because it holds your embers (sonlm, 2026-11-26, Story 1.22 Q2; GDD Economy). Nothing else in the world is amber. It must move to `{colors.predator-red}`.
 
 ### Layer 1 zones
 

@@ -17,7 +17,7 @@ The agent records no numbers. sonlm takes the measurements in Story 1.15 (a huma
 
 - input locked, `Hurtbox` masked off (nothing can kill or knock it), chain held at `--chain`'s n, or 20 without it;
 - moved every physics tick down the room's centre and back at 100 px/s, from a tick counter, so every run sees the same states in the same order (one pass of `perf_worst` is 992 px, about 9.9 s; a 60 s run makes about six passes);
-- **two stand-in lights ride along on purpose:** a flare (ALWAYS, at the player's light radius, 138.4 px at chain 20) 112 px to the left and an Ember Cache (CACHE, 80 px) 112 px to the right. A real flare sticks and a real cache lies still; riding along keeps both on screen for the whole run, which is the worst case the budget must hold. They are lights only and wake no lurker.
+- **two lights ride along on purpose:** a flare stand-in (ALWAYS, at the player's light radius, 138.4 px at chain 20) 112 px to the left and an Ember Cache 112 px to the right. A real flare sticks and a real cache lies still; riding along keeps both on screen for the whole run, which is the worst case the budget must hold. The flare stand-in is a light only and wakes no lurker (1.23 makes it the real flare). Since Story 1.22 the cache is the real one (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`, 80 px to start): a `LightSource`, so it wakes lurkers in `perf_worst`, who hunt it harmlessly. Runs before 1.22 had a plain 80 px CACHE stand-in that woke nothing.
 
 Each pass wakes the lurkers as their screen comes into reach. Hunting lurkers (95 px/s) trail the 100 px/s path and fall away rather than pile up. Screen 1's four push the lights past the budget whenever the path passes the top (player + flare + cache + 4 glows = 7), so the sprite fallback is exercised on every pass.
 
@@ -105,6 +105,13 @@ Copied from the summary lines sonlm ran and pasted (2026-11-21). The Firefox lin
 | 2026-11-21 | 20261121-22fa2af `web_debug` | sonlm's laptop, Chrome, WebKit WebGL | 4358x6762 | — | off | (4.1) | (0) | (159886.3 at 46.8 s) | (160) | 6/6 / 5 / 0 | 0 / 0 | **void:** a 160 s frame is a hidden tab (see below), not the GPU |
 | 2026-11-21 | 20261121-af07203 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | — | off | (2.5) | (0) | (95438.0 at 48.3 s) | (15) | 6/6 / 5 / 0 | 0 / 0 | **void:** the re-run on the patched warm-up (code review); a 95 s frame is a hidden or covered tab, so the first-frame figure can't be read from it. Run again below |
 | 2026-11-21 | 20261121-af07203 `web_debug` | sonlm's laptop, Firefox, ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0) | 3330x1087 | 60 Hz | off | 59.4 | 24 | 634.0 (0.0 s) | 30 | 6/6 / 7 / 0 | 0 / 0 | the patched warm-up (frees after three frames, so it is drawn): the first-frame stall is still there. 30 frames over 20 ms against 5 (1.15) and 2 (first 1.16 run): nothing in the patch runs after the third frame, so not explained by it; one run (→ 7.13) |
+
+## Results (Story 1.22: the real Ember Cache)
+
+The cache stand-in became the real cache, which now wakes lurkers. One headless run on the server (2026-11-26, `godot --headless --path game -- --room=perf_worst --perf=20`): **lights max 6/6, sprites max 7, over 0**, breaks 0, deaths 0, the same light counts as 1.15's laptop run. A headless run draws nothing, so its frame times say nothing about the GPU; the laptop run is the story's Task 11 (sonlm), and its row goes in the table below.
+
+| Date | Build / commit | Machine and adapter | Window and scale | Refresh | Glow | Avg FPS | Min FPS | Worst ms (at s) | Over 20 ms | Lights / sprites / over max | Breaks / deaths | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 **Runs not made at CP1 (sonlm's choice, 2026-11-21):** glow on everywhere (glow was a no-go, so its cost no longer decides anything), the laptop desktop on the Intel iGPU, and Chrome. No separate HD 620 machine was available; the laptop's Intel iGPU, through Firefox, stood in for the low-end target. The full pass is Story 7.13.
 

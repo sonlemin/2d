@@ -155,9 +155,15 @@ func test_perf_run() -> void:
 	var hurtbox := p.get_node_or_null(^"Hurtbox") as Area2D
 	check(p.input.is_locked() and hurtbox != null and hurtbox.collision_mask == 0,
 			"(premise) the run took the player: input locked, Hurtbox mask 0 (got locked %s, mask %s)" % [p.input.is_locked(), hurtbox.collision_mask if hurtbox else -1])
-	check(perf.stand_ins.size() == 2 and perf.stand_ins[0].rank == BudgetLight.Rank.ALWAYS and perf.stand_ins[1].rank == BudgetLight.Rank.CACHE,
-			"two stand-ins ride along: a flare of rank ALWAYS, then a cache of rank CACHE")
-	check(perf.stand_ins.all(func(l: BudgetLight) -> bool: return l.get_parent() == room), "...both children of the current room (AR23: the room owns them)")
+	check(perf.stand_ins.size() == 1 and perf.stand_ins[0].rank == BudgetLight.Rank.ALWAYS and perf.stand_ins[0].get_parent() == room,
+			"a flare stand-in of rank ALWAYS rides along, a child of the current room (AR23: the room owns it)")
+	# Story 1.22: the cache is the real one, a LightSource predators sense, its light rank CACHE.
+	var cache: EmberCache = perf.cache
+	var cache_source := cache.get_node(^"LightSource") as LightSource if is_instance_valid(cache) else null
+	var cache_light := cache.get_node(^"LightSource/Light") as BudgetLight if is_instance_valid(cache) else null
+	check(cache_source != null and cache.get_parent() == room and cache_source.kind == &"cache" and cache_source.is_in_group(&"light_source")
+			and cache_light != null and cache_light.rank == BudgetLight.Rank.CACHE,
+			"...and a real EmberCache: a child of the room, kind cache, in group light_source, its Light rank CACHE")
 	var player_light := p.get_node(^"LightSource/Light") as BudgetLight
 	var flare: BudgetLight = perf.stand_ins[0]
 	var to_twenty := -1
@@ -278,8 +284,9 @@ func test_death_mid_run() -> void:
 	if q != null:
 		var room := _world.current_room()
 		check(q.input.is_locked() and (q.get_node(^"Hurtbox") as Area2D).collision_mask == 0, "...the run takes the new player: locked, Hurtbox mask 0")
-		check(perf.stand_ins.size() == 2 and perf.stand_ins.all(func(l: BudgetLight) -> bool: return l.is_inside_tree() and l.get_parent() == room),
-				"...and rides two new stand-ins in the rebuilt room")
+		check(perf.stand_ins.size() == 1 and perf.stand_ins[0].is_inside_tree() and perf.stand_ins[0].get_parent() == room
+				and is_instance_valid(perf.cache) and perf.cache.is_inside_tree() and perf.cache.get_parent() == room,
+				"...and rides a new flare stand-in and a new cache in the rebuilt room")
 	_warnings.take()
 	await _teardown()
 

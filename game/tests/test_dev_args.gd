@@ -20,6 +20,7 @@ func run() -> void:
 	_test_parse()
 	_test_chain_values()
 	_test_hp_values()
+	_test_difficulty_values()
 	_test_log_names()
 	_test_set_values()
 	_test_room_entry()
@@ -66,7 +67,7 @@ func _test_parse() -> void:
 	var r := DevTools.parse(PackedStringArray(["res://tests/x.gd", "out.png", "--room=a"]), reg)
 	check(r.values == {"room": ["a"]} and r.errors.is_empty(), "parse: tokens without -- are skipped, the runner's test path too (got %s)" % [r])
 	r = DevTools.parse(PackedStringArray(["--foo=1"]))
-	check(r.errors == ["unknown arg --foo (known: chain, glow, hp, log, perf, room, set)"] and r.values.is_empty(),
+	check(r.errors == ["unknown arg --foo (known: chain, difficulty, glow, hp, log, perf, room, set)"] and r.values.is_empty(),
 			"parse: an unknown arg on ARGS is one error listing the known ones alphabetically (got %s)" % [r.errors])
 	r = DevTools.parse(PackedStringArray(["--room=a=b"]), reg)
 	check(r.values["room"] == ["a=b"], "parse: --room=a=b splits on the first = only (got %s)" % [r.values])
@@ -86,16 +87,16 @@ func _test_parse() -> void:
 		var row: Dictionary = DevTools.ARGS[arg]
 		check(row.help is String and row.help != "" and row.repeat is bool and row.apply is StringName and String(row.apply) in methods,
 				"ARGS '%s' has help, repeat and an apply method that exists (%s)" % [arg, row.apply])
-	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "hp", "glow", "perf"], "ARGS apply in the order log, set, room, chain, hp, glow, perf (1.11 D4, 1.12 D1, 1.19 D8: hp after chain, before glow; got %s)" % [DevTools.ARGS.keys()])
+	check(DevTools.ARGS.keys() == ["log", "set", "room", "chain", "hp", "difficulty", "glow", "perf"], "ARGS apply in the order log, set, room, chain, hp, difficulty, glow, perf (1.11 D4, 1.12 D1, 1.19 D8: hp after chain, before glow; 1.22: difficulty after hp; got %s)" % [DevTools.ARGS.keys()])
 	# Story 1.21 D12 (sonlm, 2026-11-25): which args make a session load and save no slot. Written
 	# out here, so a new row must state its side and a flipped one fails.
-	var detaches := {"log": false, "set": false, "room": true, "chain": true, "hp": true, "glow": false, "perf": true}
+	var detaches := {"log": false, "set": false, "room": true, "chain": true, "hp": true, "difficulty": true, "glow": false, "perf": true}
 	for arg: String in DevTools.ARGS:
 		var d: Variant = DevTools.ARGS[arg].get("detach")
 		check(d is bool and detaches.has(arg) and d == detaches[arg], "ARGS '%s' has detach = %s: %s (got %s)" % [arg, detaches.get(arg),
 				"it changes the play, so the session loads and saves no slot" if detaches.get(arg) else "it changes only what is shown or logged", var_to_str(d)])
 	check(DevTools.ARGS["set"].repeat and DevTools.ARGS["log"].repeat and not DevTools.ARGS["room"].repeat and not DevTools.ARGS["chain"].repeat
-			and not DevTools.ARGS["glow"].repeat and not DevTools.ARGS["perf"].repeat,
+			and not DevTools.ARGS["glow"].repeat and not DevTools.ARGS["perf"].repeat and not DevTools.ARGS["difficulty"].repeat,
 			"only set and log may repeat")
 
 
@@ -120,6 +121,16 @@ func _test_hp_values() -> void:
 		check(r[1] != "" and r[0] == 0, "--hp=%s is an error (%s)" % [bad, r[1]])
 	check(Overlays.hp_text(3, 0.0) == "hp 3/%d" % Spec.MAX_HP, "overlay 2's HP line: hp 3/%d (got '%s')" % [Spec.MAX_HP, Overlays.hp_text(3, 0.0)])
 	check(Overlays.hp_text(2, 0.4234) == "hp 2/%d  inv 0.42 s" % Spec.MAX_HP, "...plus the invulnerability left while it lasts (got '%s')" % Overlays.hp_text(2, 0.4234))
+
+
+## Story 1.22 D10: a SlotState tier id, exact and lower case.
+func _test_difficulty_values() -> void:
+	for ok_text in ["easy", "normal", "hard"]:
+		var r := DevTools.difficulty_value(ok_text)
+		check(r[1] == "" and r[0] == StringName(ok_text) and typeof(r[0]) == TYPE_STRING_NAME, "--difficulty=%s is the tier &\"%s\"" % [ok_text, ok_text])
+	for bad in ["Easy", "HARD", "medium", "", " normal", "1"]:
+		var r := DevTools.difficulty_value(bad)
+		check(r[1] != "" and r[0] == &"", "--difficulty=%s is an error (%s)" % [bad, r[1]])
 
 
 func _test_log_names() -> void:

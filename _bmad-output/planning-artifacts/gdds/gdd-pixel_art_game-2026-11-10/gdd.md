@@ -3,7 +3,7 @@ title: "The Unbroken Chain — Game Design Document"
 game_type: metroidvania (descent; action-platformer feel conventions)
 platforms: [PC Windows, PC Linux, web/itch.io for playtests]
 created: 2026-11-10
-updated: 2026-11-25
+updated: 2026-11-26
 status: final
 inputs:
   - _bmad-output/planning-artifacts/briefs/brief-pixel_art_game-2026-11-08/
@@ -478,7 +478,7 @@ Three tracks, none of them XP (Pillar 3):
 | Stage | How embers get here | On death |
 |---|---|---|
 | **Held** | Pogo hits on the current chain | **Lost** |
-| **Carried** | The chain ends safely (landing, Snuff, cling timeout, a crawler knock) | **Dropped** as an Ember Cache where you died. Touch it to recover it. If you die again before then, the cache is gone. The cache glows amber and **draws nearby lurkers**, so recovering it is a risk (Pillar 1). |
+| **Carried** | The chain ends safely (landing, Snuff, cling timeout, a crawler knock) | **Dropped** as an Ember Cache where you died: on the last clean floor you stood on in that room, never in mid-air or over a hazard (Story 1.22). Touch it to recover it. If you die again before then, the cache is gone. The cache glows amber and **draws nearby lurkers**, so recovering it is a risk (Pillar 1). |
 | **Deposited** | Rest at a Lift Station, or return to the hub | **Safe forever** |
 
 *Why three stages:* held embers make "one more hit" costly (Pillar 1). Carried embers make "can I reach the next station?" a real choice between stations (the session loop). A death always leaves a way back (Pillar 2).
@@ -490,6 +490,8 @@ Three tracks, none of them XP (Pillar 3):
 | Easy | moved to carried (nothing lost) | kept |
 | Normal | lost | dropped (recoverable once) |
 | Hard | lost | lost |
+
+Any death destroys an Ember Cache you have not recovered, on every tier, so there is never more than one (sonlm, 2026-11-26, Story 1.22 Q1: the tier can change while a cache is out, from Options in Story 1.36). The tier changes only what a death costs (FR25).
 
 **Sinks** (all at the hub, one NPC per sink):
 
@@ -512,7 +514,7 @@ Three tracks, none of them XP (Pillar 3):
 
 [ASSUMPTION: a Layer 1 dive between stations earns about 100–250 embers for a competent player. M2 playtests set the real prices.]
 
-**Ember Cache glow** (decided in UX, 2026-11-10; was a designer note). The dropped cache glows like a small light and draws nearby lurkers, so recovering it is itself a daring move (Pillar 1). The cache wakes lurkers by the same rule as your light: its glow radius must be **≥ 80 px**, and the lurker must be within radius × 1.6 and on screen (architecture, 2026-11-11). [ASSUMPTION: the glow radius itself is tuned in the E1 playtest; below 80 px the cache draws nothing.]
+**Ember Cache glow** (decided in UX, 2026-11-10; was a designer note). The dropped cache glows like a small light and draws nearby lurkers, so recovering it is itself a daring move (Pillar 1). The cache wakes lurkers by the same rule as your light: its glow radius must be **≥ 80 px**, and the lurker must be within radius × 1.6 and on screen (architecture, 2026-11-11). [ASSUMPTION: the glow radius itself is tuned in the E1 playtest; below 80 px the cache draws nothing.] The radius is `Tuning` `cache_radius`, **80 px** to start, so it lures from the first build; the CP2 gate (Story 1.30) tunes it (Story 1.22). It burns amber, like your Chain-Light, because it holds your embers (sonlm, 2026-11-26, Story 1.22 Q2), and it is steady: no flicker, no pulse.
 
 ---
 

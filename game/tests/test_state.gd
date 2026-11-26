@@ -250,7 +250,8 @@ func _test_slot_defaults() -> void:
 	check(s.to_dict().flags == [] and not s.has_flag(&"anchor_m1_1"), "...and no flags")
 	check(s.play_time == 0 and typeof(s.play_time) == TYPE_INT and s.depth == 0 and typeof(s.depth) == TYPE_INT, "...play time 0 s and depth 0, both ints (Story 1.21; got %s / %s)" % [var_to_str(s.play_time), var_to_str(s.depth)])
 	check(s.resume_room == &"" and s.resume_entry == &"" and typeof(s.resume_room) == TYPE_STRING_NAME and typeof(s.resume_entry) == TYPE_STRING_NAME, "...and no resume point: two empty StringNames, the dive's start (1.21 D5)")
-	check(SlotState.RESUME_KEYS == ["resume_room", "resume_entry"], "RESUME_KEYS is resume_room, resume_entry: what a progress save must not move (R14; got %s)" % [SlotState.RESUME_KEYS])
+	check(SlotState.RESUME_KEYS == ["resume_room", "resume_entry", "cache"], "RESUME_KEYS is resume_room, resume_entry, cache: what a progress save must not move (R14, Story 1.22 D5; got %s)" % [SlotState.RESUME_KEYS])
+	check(s.deposited == 0 and not s.has_cache() and s.cache_room == &"" and s.cache_amount == 0, "...no deposited embers and no Ember Cache (Story 1.22)")
 	check(SlotState.DIFFICULTIES == [&"easy", &"normal", &"hard"], "the difficulty ids are easy, normal, hard (D8)")
 
 
@@ -298,6 +299,12 @@ func _filled_slot() -> SlotState:
 	s.record_death()
 	s.record_death()
 	s.record_death()
+	# Story 1.22: 15 deposited and a cache of 25, dropped on Normal before the tier changes.
+	var dive := DiveState.new()
+	dive.add_carried(15)
+	s.deposit_from(dive)
+	dive.add_carried(25)
+	s.apply_death(dive, 0, &"m1_shaft", Vector2(40, 120))
 	s.set_difficulty(&"easy")
 	s.set_flag(&"anchor_m1_1")
 	s.set_flag(&"met_glim")
@@ -313,14 +320,17 @@ func _same_slot(a: SlotState, b: SlotState) -> bool:
 	return a.best_chain == b.best_chain and a.deaths == b.deaths and a.difficulty == b.difficulty \
 			and a.to_dict().flags == b.to_dict().flags and a.to_dict().visited == b.to_dict().visited \
 			and a.play_time == b.play_time and a.depth == b.depth \
-			and a.resume_room == b.resume_room and a.resume_entry == b.resume_entry
+			and a.resume_room == b.resume_room and a.resume_entry == b.resume_entry \
+			and a.deposited == b.deposited and a.cache_room == b.cache_room and a.cache_pos == b.cache_pos \
+			and a.cache_amount == b.cache_amount
 
 
 ## A whole, clean slot dictionary as a save file gives it, with `over` laid on top: each fallback
 ## case then has exactly one fault (a case missing other keys would be unclean whatever it tested).
 func _slot_dict(over := {}) -> Dictionary:
 	var d := {"best_chain": 4, "deaths": 2, "difficulty": "hard", "flags": [], "visited": [],
-			"play_time": 90, "depth": 3, "resume_room": "m1_shaft", "resume_entry": "anchor_m1_1"}
+			"play_time": 90, "depth": 3, "resume_room": "m1_shaft", "resume_entry": "anchor_m1_1",
+			"deposited": 0, "cache": null}
 	d.merge(over, true)
 	return d
 
@@ -336,7 +346,7 @@ func _test_slot_round_trips() -> void:
 	check(typeof(u.difficulty) == TYPE_STRING_NAME and u.has_flag(&"anchor_m1_1") and u.has_flag(&"met_glim"), "...a StringName difficulty, and flags that still answer has_flag()")
 	var keys := s.to_dict().keys()
 	keys.sort()
-	check(keys == ["best_chain", "deaths", "depth", "difficulty", "flags", "play_time", "resume_entry", "resume_room", "visited"], "to_dict() has exactly best_chain, deaths, depth, difficulty, flags, play_time, resume_entry, resume_room, visited (D4, 1.7 D7, Story 1.21; got %s)" % [keys])
+	check(keys == ["best_chain", "cache", "deaths", "deposited", "depth", "difficulty", "flags", "play_time", "resume_entry", "resume_room", "visited"], "to_dict() has exactly best_chain, cache, deaths, deposited, depth, difficulty, flags, play_time, resume_entry, resume_room, visited (D4, 1.7 D7, Stories 1.21, 1.22; got %s)" % [keys])
 	check(u.has_visited(&"m1_shaft") and u.has_visited(&"a_side"), "...and visited rooms that still answer has_visited()")
 	# Story 1.21: the values written out, never read back from the object under test.
 	check(u.play_time == 8040 and typeof(u.play_time) == TYPE_INT and u.depth == 4 and typeof(u.depth) == TYPE_INT, "...play time 8040 s and depth 4 back as ints (got %s / %s)" % [var_to_str(u.play_time), var_to_str(u.depth)])

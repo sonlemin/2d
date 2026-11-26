@@ -289,3 +289,12 @@ Source: `implementation-artifacts/1-20-light-sensing-for-predators.md` (Review F
 - **A lurker hunting a decoy off screen when the player's light becomes the brighter (sonlm, (a)):** it stays on the decoy. It switches to the player only once it is on screen and can telegraph, so a flare keeps working however long the chain gets, and no telegraph ever runs where it can't be seen. As first built it entered the telegraph for one unseen tick and went home. Updated: Predators: Lurker (Retargeting).
 - **Also fixed at the review, no rule change:** a hunt that follows a retarget telegraph starts from rest, as every hunt did in M1 (it kept the old hunt's 95 px/s).
 - **Status:** stays `final`; `updated: 2026-11-25`.
+
+## 2026-11-26 — Story 1.22 decisions (three ember stages, the Ember Cache and difficulty tiers)
+
+Source: `implementation-artifacts/1-22-three-ember-stages-the-ember-cache-and-difficulty-tiers.md` (Q1, Q2; answered by sonlm at story creation, the default each time).
+
+- **Q1 Does an Easy or Hard death destroy an unrecovered cache? (sonlm: yes, every tier):** any death destroys an Ember Cache not yet recovered, on every tier, so at most one cache ever exists. **Why:** "die again before you recover it and it's gone" is the cache's own rule; the case arises only when the tier changes while a cache is out (Options, Story 1.36), and the death report's `cache_destroyed` lets the death card (1.29) say so on every tier. Updated: Economy (Difficulty tiers).
+- **Q2 The cache burns amber (sonlm: amber):** the Ember Cache glows amber, steady (no flicker or pulse), because it holds your embers, as a lit anchor holds your spark. DESIGN.md's "nothing else in the world is amber" gains the cache. Updated: Economy (Ember Cache glow); DESIGN.md.
+- **Also recorded:** the cache's glow radius is the `Tuning` key `cache_radius`, 80 px to start (the notice floor, so it lures from the first build), tuned at the CP2 gate (1.30); the cache lies on the last clean floor the player stood on in that room, never in mid-air or over a hazard (`Room.floor_spot()`). Updated: Economy (the Carried row, Ember Cache glow).
+- **Status:** stays `final`; `updated: 2026-11-26`.

@@ -290,8 +290,8 @@ func _test_lit_on_screen() -> void:
 ## SceneState without instancing. .tscn files are never linted, which is why this exists.
 func _test_scene_audit() -> void:
 	var paths := _tscn_files(SCENES)
-	var seen := ["actors/player.tscn", "actors/lurker.tscn", "world/world.tscn"].all(func(f: String) -> bool: return SCENES.path_join(f) in paths)
-	check(seen, "(premise) the walk sees player, lurker and world under %s, nested folders included (%d scenes)" % [SCENES, paths.size()])
+	var seen := ["actors/player.tscn", "actors/lurker.tscn", "world/world.tscn", "objects/ember_cache.tscn"].all(func(f: String) -> bool: return SCENES.path_join(f) in paths)
+	check(seen, "(premise) the walk sees player, lurker, world and ember_cache (objects/, Story 1.22) under %s, nested folders included (%d scenes)" % [SCENES, paths.size()])
 	var lights := 0
 	for path in paths:
 		var state := (load(path) as PackedScene).get_state()
@@ -307,7 +307,7 @@ func _test_scene_audit() -> void:
 			check(script is Script and (script as Script).resource_path == SCRIPT_PATH, "%s is a BudgetLight (script %s)" % [where, script])
 			var tex: Variant = props.get("texture")
 			check(tex is Texture2D and (tex as Texture2D).resource_path == TEXTURE_PATH, "%s uses light.png (texture %s)" % [where, tex])
-	check(lights >= 2, "(sentinel) the audit found the player's and the lurker's lights (%d)" % lights)
+	check(lights >= 3, "(sentinel) the audit found the player's, the lurker's and the Ember Cache's lights (%d)" % lights)
 
 
 func _tscn_files(dir: String) -> Array[String]:
@@ -320,7 +320,7 @@ func _tscn_files(dir: String) -> Array[String]:
 	return out
 
 
-## The two scenes with lights, instanced but never added to the tree (no _ready, no side effects).
+## The scenes with lights, instanced but never added to the tree (no _ready, no side effects).
 func _test_scene_ranks() -> void:
 	var player := (load("res://scenes/actors/player.tscn") as PackedScene).instantiate()
 	var light := player.get_node_or_null(^"LightSource/Light")
@@ -337,3 +337,10 @@ func _test_scene_ranks() -> void:
 	var m := eyes.material as CanvasItemMaterial if eyes != null else null
 	check(m != null and m.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED, "the lurker's Eyes stay an unshaded sprite: small glows are never lights")
 	lurker.queue_free()
+	# Story 1.22: the Ember Cache's glow is the light predators sense, demoted after a lurker's.
+	var cache := (load("res://scenes/objects/ember_cache.tscn") as PackedScene).instantiate()
+	var cache_light := cache.get_node_or_null(^"LightSource/Light")
+	check(cache_light is BudgetLight, "ember_cache.tscn's LightSource/Light is a BudgetLight")
+	if cache_light is BudgetLight:
+		check(cache_light.rank == C, "...of rank CACHE: kept over a lurker's glow, never over the player's light")
+	cache.queue_free()

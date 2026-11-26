@@ -4,10 +4,11 @@ extends Node
 ## compared. On every spawn it takes the player: input locked, hurtbox masked off (no contact can
 ## hurt it or break the chain), the chain paid through DevTools' --chain take-off arming (never
 ## pinned: 1.11 D6), and moved every physics tick along a vertical ping-pong down the room's centre,
-## driven by a tick counter, never the wall clock. Two stand-in BudgetLights ride along: a flare
-## (ALWAYS, at the player's light radius, FR15) and an Ember Cache (CACHE, 80 px, FR24). They are
-## lights only, plain BudgetLights, never LightSources, so they wake no lurker; 1.22 and 1.23 replace
-## them with the real cache and flare, which are LightSources (Story 1.20 D13).
+## driven by a tick counter, never the wall clock. Two lights ride along: a stand-in flare (a plain
+## BudgetLight of rank ALWAYS at the player's light radius, FR15; a light only, never a LightSource,
+## so it wakes no lurker; 1.23 replaces it with the real flare) and, since Story 1.22, a real Ember
+## Cache (objects/ember_cache.tscn: rank CACHE, Tuning's cache_radius, FR24). The cache is a
+## LightSource, so it wakes lurkers in perf_worst as a real one would; they hunt it harmlessly.
 ## It measures wall time between frames (Time.get_ticks_usec(), never delta, which the time scale
 ## bends), samples the light budget every tick, and at the end freezes one summary, logs it once and
 ## hands it to overlay 4. The autopilot keeps going after that, so the load stays while it is read.
@@ -17,7 +18,7 @@ const PATH_SPEED := 100.0  ## px/s up and down the room; just above a hunting lu
 const PATH_MARGIN := 3  ## tiles kept clear of the room's top and bottom edges
 const FLARE_OFFSET := Vector2(-112, -32)  ## px from the player: on screen for the whole run, the worst case the budget must hold (a real flare sticks)
 const CACHE_OFFSET := Vector2(112, 40)  ## px from the player, likewise (a real cache lies still)
-const CACHE_RADIUS := 80.0  ## px: FR24's floor and 1.22's starting value (ledger: 1.22 matches it from Tuning)
+const EmberCacheScene := preload("res://scenes/objects/ember_cache.tscn")
 const SLOW_FRAME_USEC := 20_000  ## NFR1: "no frame over 20 ms"
 const PRIORITY := 100  ## after the player (0), the light budget (50) and DevTools' chain payment (100, earlier in the tree)
 
@@ -28,7 +29,8 @@ var world: World  ## set by DevTools before add_child
 
 var done := false  ## the summary is frozen
 var result := {}  ## the summary, once done
-var stand_ins: Array[BudgetLight] = []  ## the flare first, then the cache; rebuilt on every spawn
+var stand_ins: Array[BudgetLight] = []  ## the flare stand-in (until 1.23); rebuilt on every spawn
+var cache: EmberCache  ## the real Ember Cache riding along, re-made on every spawn; only read behind is_instance_valid()
 var deaths := 0  ## spawns after the first (expected 0)
 var breaks := 0  ## chain banks after the run started (expected 0)
 
@@ -142,10 +144,11 @@ func _place(tick: int) -> void:
 	var p := path_point(tick, _top, _bottom, PATH_SPEED, Engine.physics_ticks_per_second)
 	_player.global_position = Vector2(_x, p.x)
 	_player.velocity = Vector2(0.0, p.y)  # the rig leads on the way down, as in a real dive
-	if stand_ins.size() == 2 and is_instance_valid(stand_ins[0]) and is_instance_valid(stand_ins[1]):
+	if stand_ins.size() == 1 and is_instance_valid(stand_ins[0]):
 		stand_ins[0].global_position = _inside(_player.global_position + FLARE_OFFSET)
-		stand_ins[1].global_position = _inside(_player.global_position + CACHE_OFFSET)
 		stand_ins[0].texture_scale = _scale_for(stand_ins[0], _player.light_radius())  # FR15: the flare burns at the pre-toss radius
+	if is_instance_valid(cache):
+		cache.global_position = _inside(_player.global_position + CACHE_OFFSET)
 
 
 ## One tile inside the room, so a stand-in never sits in the edge wall.
@@ -155,26 +158,25 @@ func _inside(p: Vector2) -> Vector2:
 
 
 ## Children of the room (AR23): it owns and frees them on a rebuild, and the next spawn builds new
-## ones. Texture, colour and energy come from the player's Light, never typed in; everything is set
-## before add_child, because _ready() builds the cache's sprite from it.
+## ones. The flare's texture, colour and energy come from the player's Light, never typed in; all set
+## before add_child (BudgetLight's _ready() reads its rank). The cache spawns through room.spawn(),
+## like World's; a Normal death also frees it (cache_changed), and the next spawn makes a new one.
 func _build_stand_ins(room: Room, player: Player) -> void:
 	var source := player.get_node(^"LightSource/Light") as PointLight2D
 	stand_ins.clear()
-	for rank: BudgetLight.Rank in [BudgetLight.Rank.ALWAYS, BudgetLight.Rank.CACHE]:
-		var l := BudgetLight.new()
-		l.name = "PerfFlare" if rank == BudgetLight.Rank.ALWAYS else "PerfCache"
-		l.rank = rank
-		l.texture = source.texture
-		l.color = source.color
-		l.energy = source.energy
-		stand_ins.append(l)
-	stand_ins[0].texture_scale = _scale_for(stand_ins[0], player.light_radius())
-	stand_ins[1].texture_scale = _scale_for(stand_ins[1], CACHE_RADIUS)
-	stand_ins[0].position = _inside(player.global_position + FLARE_OFFSET)
-	stand_ins[1].position = _inside(player.global_position + CACHE_OFFSET)
-	for l in stand_ins:
-		room.add_child(l)
-		l.reset_physics_interpolation()  # AR6: their first placement is a teleport
+	var flare := BudgetLight.new()
+	flare.name = "PerfFlare"
+	flare.rank = BudgetLight.Rank.ALWAYS
+	flare.texture = source.texture
+	flare.color = source.color
+	flare.energy = source.energy
+	flare.texture_scale = _scale_for(flare, player.light_radius())
+	flare.position = _inside(player.global_position + FLARE_OFFSET)
+	stand_ins.append(flare)
+	room.add_child(flare)
+	flare.reset_physics_interpolation()  # AR6: its first placement is a teleport
+	cache = room.spawn(EmberCacheScene, _inside(player.global_position + CACHE_OFFSET)) as EmberCache
+	cache.reset_physics_interpolation()
 
 
 static func _scale_for(light: PointLight2D, radius: float) -> float:

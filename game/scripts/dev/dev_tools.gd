@@ -18,11 +18,11 @@ const PerfRun := preload("perf_run.gd")
 
 ## One row per arg (D4): name -> {help, apply (the method that applies its values), repeat (may be
 ## given more than once), detach}. Rows apply in this order: log first, so the rest can log; set and
-## room at once; chain and hp on every spawn; glow before perf, so the run's summary knows it; perf
-## last, since it reads --chain. Later stories add one row each: difficulty (1.22, detach = true).
+## room at once; chain, hp and difficulty on every spawn; glow before perf, so the run's summary
+## knows it; perf last, since it reads --chain. Later stories add one row each.
 ## `detach` (Story 1.21 D12, sonlm 2026-11-25): an arg that changes the play itself. A session
 ## that applied one loads no slot and saves none (`Game.detach_slot()`), so a dev room, chain or
-## HP never reaches the file a normal run reads, and `--room` always wins over a saved respawn
+## HP or tier never reaches the file a normal run reads, and `--room` always wins over a saved respawn
 ## point. log, set and glow change only what is shown or logged: the slot loads and saves as usual.
 const ARGS := {
 	"log": {help = "--log=<cat>,<cat>: turn on Log categories", apply = &"_apply_log", repeat = true, detach = false},
@@ -30,6 +30,7 @@ const ARGS := {
 	"room": {help = "--room=<id>: start the dive in that room; no slot is loaded or saved", apply = &"_apply_room", repeat = false, detach = true},
 	"chain": {help = "--chain=<n>: every life takes off with that chain; no slot is loaded or saved", apply = &"_apply_chain", repeat = false, detach = true},
 	"hp": {help = "--hp=<n>: every life starts with n HP (1–4); no slot is loaded or saved", apply = &"_apply_hp", repeat = false, detach = true},
+	"difficulty": {help = "--difficulty=easy|normal|hard: the tier for this session; no slot is loaded or saved", apply = &"_apply_difficulty", repeat = false, detach = true},
 	"glow": {help = "--glow=on|off: engine glow (a WorldEnvironment) for the perf check; off unless given", apply = &"_apply_glow", repeat = false, detach = false},
 	"perf": {help = "--perf[=<s>]: a timed perf run (default 60 s): the player locked on a fixed path, untouchable, holding --chain's n (default 20); the summary goes to the log and overlay 4; no slot is loaded or saved", apply = &"_apply_perf", repeat = false, detach = true},
 }
@@ -57,6 +58,7 @@ var _chain_given := false  # a valid --chain was accepted: 0 alone can't tell it
 var _armed: Player  # the player still owed the chain; only read behind is_instance_valid()
 var _armed_frame := 0  # Engine.get_physics_frames() when _armed spawned
 var _hp := 0  # --hp's n, applied on every spawn (Story 1.19 D8); 0 when not given
+var _difficulty: StringName = &""  # --difficulty's tier, set on every spawn (Story 1.22 D10); &"" when not given
 
 
 func _init() -> void:
@@ -186,6 +188,13 @@ static func hp_value(text: String) -> Array:
 	if n < 1 or n > Health.MAX:
 		return [0, "--hp=%s is outside 1..%d" % [text, Health.MAX]]
 	return [n, ""]
+
+
+## [tier, error] for `--difficulty=`: a SlotState.DIFFICULTIES id, exact and lower case (Story 1.22).
+static func difficulty_value(text: String) -> Array:
+	if StringName(text) in SlotState.DIFFICULTIES:
+		return [StringName(text), ""]
+	return [&"", "--difficulty=%s is not one of %s" % [text, ", ".join(SlotState.DIFFICULTIES.map(func(t: StringName) -> String: return String(t)))]]
 
 
 ## [on, error] for `--glow=`: only `on` or `off`, lowercase (1.12 D7).
@@ -405,6 +414,19 @@ func _apply_hp(values: Array[String]) -> String:
 	return "hp %d" % _hp
 
 
+## Story 1.22 D10: the tier is set on every spawn, never here. This runs before Game.boot(), and a
+## detached boot's load_slot() resets the slot, tier included; the first spawn runs inside World's
+## _ready(), after the boot. No save: the session is detached (Game.set_difficulty() would save).
+func _apply_difficulty(values: Array[String]) -> String:
+	var r := difficulty_value(values[-1])
+	if r[1] != "":
+		_warn(r[1])
+		return ""
+	_difficulty = r[0]
+	_world.player_spawned.connect(_on_player_spawned_difficulty)  # a method: dropped with World
+	return "difficulty %s" % _difficulty
+
+
 ## D7: `on` adds a WorldEnvironment (one per viewport; a later story that puts one in World
 ## removes this one); `off` adds none. Game code gets no glow until 1.15's verdict.
 func _apply_glow(values: Array[String]) -> String:
@@ -450,6 +472,10 @@ func _on_player_spawned(player: Player) -> void:
 
 func _on_player_spawned_hp(player: Player) -> void:
 	player.health.reset(_hp)
+
+
+func _on_player_spawned_difficulty(_player: Player) -> void:
+	Game.slot.set_difficulty(_difficulty)
 
 
 ## D9: World emits room_entered after the room is built and the player spawned, so a broken room

@@ -18,6 +18,7 @@ const RoomHarness := preload("res://tests/room_harness.gd")
 const Spec := preload("res://tests/spec.gd")
 const LightTexture := preload("res://art/light.png")
 const PlayerScene := preload("res://scenes/actors/player.tscn")
+const EmberCacheScene := preload("res://scenes/objects/ember_cache.tscn")
 const TRACE := "res://tests/fixtures/lurker_trace_m1.json"
 ## The fixture room's lurker, written out (cell (0, 12) of 16 px tiles, its centre).
 const LURKER_AT := Vector2(8, 200)
@@ -67,6 +68,7 @@ func run() -> void:
 	await test_identity()
 	await test_decoy_to_decoy()
 	await test_off_screen_decoy()
+	await test_cache_lure()
 	await test_light_out()
 	await test_stirring()
 	await test_stir_pacing_light()
@@ -453,6 +455,48 @@ func test_decoy_to_decoy() -> void:
 		await _free()
 	check(lengths[0] == lengths[1] and lengths[0] >= _floor_ticks(),
 			"the switch kept the timer: %d ticks with it, %d without (row T4)" % [lengths[1], lengths[0]])
+
+
+## Story 1.22 (AC7, AC9): the Ember Cache wakes lurkers only by the shared rule (AR29): at a radius
+## of Spec.NOTICE_MIN_RADIUS - 1 it never does, at NOTICE_MIN_RADIUS it telegraphs and hunts the
+## cache, harmlessly (not monitorable) throughout. The player stands BESIDE with chain 0, whose 40 px
+## light is never sensed, so the cache is the only light the lurker can pick. The radius comes
+## through Tuning's gear seam (AR15: read on every call), never by writing the cache.
+func test_cache_lure() -> void:
+	await _build()
+	_chain(0)
+	place(BESIDE)
+	_cache_radius(Spec.NOTICE_MIN_RADIUS - 1.0)
+	var cache: EmberCache = _room.spawn(EmberCacheScene, DECOY_AT)
+	var source: LightSource = cache.get_node(^"LightSource")
+	check(source.kind == Sensing.KIND_CACHE and source.radius() == Spec.NOTICE_MIN_RADIUS - 1.0 and not _l.senses(_p.light_source),
+			"(premise) a cache of kind cache at %.0f px, and the player's light is never sensed" % source.radius())
+	var idle := true
+	for i in _floor_ticks() + 30:
+		await frames(1)
+		idle = idle and _l.state == Lurker.State.IDLE and not _l.monitorable
+	check(idle, "a %.0f px cache leaves the lurker IDLE for a full telegraph time and more (state %s)" % [Spec.NOTICE_MIN_RADIUS - 1.0, _name(_l.state)])
+	_cache_radius(Spec.NOTICE_MIN_RADIUS)
+	await frames(1)
+	check(_l.state == Lurker.State.TELEGRAPH and _l.target == source and not _l.monitorable,
+			"at %.0f px it telegraphs at the cache on the next tick (state %s, target %s)" % [Spec.NOTICE_MIN_RADIUS, _name(_l.state), _kind(_l)])
+	var harmless := not _l.monitorable
+	var ticks := 0
+	while _l.state != Lurker.State.HUNT and ticks < 300:
+		await frames(1)
+		ticks += 1
+		harmless = harmless and not _l.monitorable
+	for i in 30:
+		await frames(1)
+		harmless = harmless and not _l.monitorable
+	check(_l.state == Lurker.State.HUNT and _l.target == source, "...then hunts it (state %s, target %s)" % [_name(_l.state), _kind(_l)])
+	check(harmless, "...and is never monitorable through the telegraph and the hunt: a cache hunt is harmless (1.20 D7)")
+	Game.tuning.apply_gear([])
+	await _free()
+
+
+func _cache_radius(px: float) -> void:
+	Game.tuning.apply_gear([&"t_cache"], [{id = &"t_cache", stat = &"cache_radius", op = &"set", value = px}])
 
 
 ## Review of 1.20 (sonlm, 2026-11-25): off screen, a lurker hunting a decoy stays on it when the

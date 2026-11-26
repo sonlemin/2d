@@ -4,7 +4,7 @@ baseline_commit: c73eeda
 
 # Story 1.22: Three ember stages, the Ember Cache and difficulty tiers
 
-Status: ready-for-dev
+Status: review
 
 **Type:** dev, with a laptop look (Task 11): the cache is the first new thing on screen since 1.19's spikes · **Epic:** 1, Kit v2: Fair Deaths, Full Move Set · **Checkpoint:** CP2 Kit (1.16–1.30) · **Branch:** `feat/m2-e1`
 
@@ -139,29 +139,29 @@ so that "one more hit" and "can I reach the station?" are both real choices.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Stage rules on `DiveState` / `SlotState`** (AC1–AC4)
-  - [ ] `DiveState.take_carried()`; the assert message.
-  - [ ] `SlotState`: `deposited`, the cache fields, `has_cache()`, the two signals, `deposit_from()`, `DEATH_COST`, `apply_death()`, `recover_cache()`; `to_dict()` / `from_dict()` / `_assign()` / `reset()`; `RESUME_KEYS`. Header comments: drop "deposited embers and the Ember Cache (1.22)" from the "Not here yet" list; DiveState's "the death cost and the deposit arrive in Story 1.22" becomes what is true.
-  - [ ] `tests/test_embers.gd` (AC9, pure); `test_state.gd` key list and helpers (AC10). Run both alone.
-- [ ] **Task 2: `Room.floor_spot()`** (AC6)
-  - [ ] The method; its cases in `test_room_loader.gd`.
-- [ ] **Task 3: The death flow** (AC5)
-  - [ ] `Player.held_at_death`, `popup_banked()`, `popup_lost()`; `die()` stops popping.
-  - [ ] `World._on_player_died()`: the cost, `_last_death` / `last_death_cost()`, the popup.
-- [ ] **Task 4: The Ember Cache** (AC7)
-  - [ ] `Tuning.CACHE_RADIUS` / `cache_radius`; GDD Economy names the key (AC13, "change a value → update the GDD").
-  - [ ] `tools/sprites/ember_cache.txt` → `python3 tools/build_sprites.py` → `godot --headless --path game --import`; commit `art/ember_cache.png` + `.import`.
-  - [ ] `scripts/objects/ember_cache.gd`, `scenes/objects/ember_cache.tscn` (+ `.gd.uid`).
-- [ ] **Task 5: World spawns it** (AC8)
-- [ ] **Task 6: Smokes** (AC9, AC10)
-  - [ ] First: the grep in AC10 over `game/tests/`; list every hit in the Debug Log and fix each.
-  - [ ] `tests/rooms/embers/t_cache_drop.txt` (validate it: exits link, the `up` entry cell is no hazard).
-  - [ ] `tests/smoke_embers.gd`; the cache case in `smoke_lurker.gd`; `test_light_budget.gd`.
-  - [ ] `smoke_world.gd`, `smoke_health.gd`, the planted JSON strings; red-check: with `apply_death()`'s Normal branch keeping carried, `smoke_embers` and `test_embers` fail; with World not spawning the cache, the epic's smoke fails.
-- [ ] **Task 7: DevTools `--difficulty`** (AC11)
-- [ ] **Task 8: Perf run** (AC12)
-- [ ] **Task 9: Docs, ledger, project-context** (AC13)
-- [ ] **Task 10: Verify** (AC14): `./run_tests.sh` → `== ALL GREEN`; `tools/export.sh` → `BUILD OK`.
+- [x] **Task 1: Stage rules on `DiveState` / `SlotState`** (AC1–AC4)
+  - [x] `DiveState.take_carried()`; the assert message.
+  - [x] `SlotState`: `deposited`, the cache fields, `has_cache()`, the two signals, `deposit_from()`, `DEATH_COST`, `apply_death()`, `recover_cache()`; `to_dict()` / `from_dict()` / `_assign()` / `reset()`; `RESUME_KEYS`. Header comments: drop "deposited embers and the Ember Cache (1.22)" from the "Not here yet" list; DiveState's "the death cost and the deposit arrive in Story 1.22" becomes what is true.
+  - [x] `tests/test_embers.gd` (AC9, pure); `test_state.gd` key list and helpers (AC10). Run both alone.
+- [x] **Task 2: `Room.floor_spot()`** (AC6)
+  - [x] The method; its cases in `test_room_loader.gd`.
+- [x] **Task 3: The death flow** (AC5)
+  - [x] `Player.held_at_death`, `popup_banked()`, `popup_lost()`; `die()` stops popping.
+  - [x] `World._on_player_died()`: the cost, `_last_death` / `last_death_cost()`, the popup.
+- [x] **Task 4: The Ember Cache** (AC7)
+  - [x] `Tuning.CACHE_RADIUS` / `cache_radius`; GDD Economy names the key (AC13, "change a value → update the GDD").
+  - [x] `tools/sprites/ember_cache.txt` → `python3 tools/build_sprites.py` → `godot --headless --path game --import`; commit `art/ember_cache.png` + `.import`.
+  - [x] `scripts/objects/ember_cache.gd`, `scenes/objects/ember_cache.tscn` (+ `.gd.uid`).
+- [x] **Task 5: World spawns it** (AC8)
+- [x] **Task 6: Smokes** (AC9, AC10)
+  - [x] First: the grep in AC10 over `game/tests/`; list every hit in the Debug Log and fix each.
+  - [x] `tests/rooms/embers/t_cache_drop.txt` (validate it: exits link, the `up` entry cell is no hazard).
+  - [x] `tests/smoke_embers.gd`; the cache case in `smoke_lurker.gd`; `test_light_budget.gd`.
+  - [x] `smoke_world.gd`, `smoke_health.gd`, the planted JSON strings; red-check: with `apply_death()`'s Normal branch keeping carried, `smoke_embers` and `test_embers` fail; with World not spawning the cache, the epic's smoke fails.
+- [x] **Task 7: DevTools `--difficulty`** (AC11)
+- [x] **Task 8: Perf run** (AC12)
+- [x] **Task 9: Docs, ledger, project-context** (AC13)
+- [x] **Task 10: Verify** (AC14): `./run_tests.sh` → `== ALL GREEN`; `tools/export.sh` → `BUILD OK`.
 - [ ] **Task 11: Laptop look (sonlm)** — a debug build:
   - [ ] Normal: bank a chain, die away from the top, respawn: the cache reads as yours (amber, steady) where you died, on the floor; lurkers near it stir or wake; touch it: "+N banked" and the glow goes.
   - [ ] A second death before recovering: the old glow goes at once.
@@ -264,10 +264,71 @@ Story-author decisions; sonlm can veto any before dev. Q1 and Q2 below were answ
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), gds-dev-story, 2026-11-26.
+
 ### Debug Log References
+
+- **AC10 grep** (`.die(`, lethal `hurt(`, `--hp=1`, `stand_ins`, `PerfCache`, `CACHE_RADIUS` over `game/tests/`), every hit:
+  - `smoke_world.gd` 349 (`test_death_and_respawn`) and 478 (`test_hunt_over_death`): real World on Normal with carried > 0. Fixed: the first asserts carried → the cache (7), the report, the cache at the drop spot in the rebuilt room (P's own: the player last stood on P, so the respawn at P took it on its first tick, D7) and the carried back; both end with `_recover_cache()` (D9).
+  - `smoke_health.gd` (the walker's lethal hit in `test_death_and_respawn`, carried 216): fixed (held lost via the report, carried → the cache, recovered at the end). No other death there.
+  - `smoke_dev_tools.gd` 354, 382, 490, 537, 881 (`.die()`), 482–486 (`--hp=1`): real World, but each case tears the World down with `reset_for_tests()`; nothing reads carried after a death. No change beyond the planted JSON and the new `--difficulty` cases.
+  - `smoke_palettes.gd` 130, `smoke_room_swap.gd` 200, 236: real World, no carried assertion after the death; each process ends with a reset. No change.
+  - `smoke_lurker.gd` 248, 526, `test_clock.gd` 142: RoomHarness / no World, so no cost (AC5). No change.
+  - `test_health.gd` 51: a comment. No change.
+  - `smoke_perf.gd` 158–162, 281 (`stand_ins`): updated to the flare stand-in plus the real cache.
+  - `PerfCache` / `CACHE_RADIUS`: only in `scripts/dev/perf_run.gd`; removed.
+- **Planted JSON:** the `"slot": {` literals that load as a slot gained `"cache": null, "deposited": 0` (`test_saves.gd` GOOD and the strings at 569, 576, 682, 715; `smoke_dev_boot.gd` PLANTED; `smoke_dev_tools.gd` planted); `want_slot` gained both. A first blanket sed also hit two `read_slot()` literals that compare the slot part exactly (`{"best_chain": 2}`) and two version-2 files that never load; those four were put back.
+- **FR25 by source:** `rules/health.gd` mentions "difficulty" in a comment (why the damage table is not Tuning). The check reads code with comments dropped (`test_lint.gd`'s `strip()`), so a comment may say why something is not a tier.
+- **`floor_spot()` tolerance was needed in practice:** a floor tick beside the spikes sat at y 195.93, not 196, so the 1 px tolerance (Risks) keeps such a spot as it is; `smoke_embers` compares that y with the same tolerance.
+- **Red-checks:** `apply_death()`'s Normal branch keeping carried → `test_embers` 21 FAIL, `smoke_embers` 12 FAIL; World not spawning the cache → `smoke_embers` 3 FAIL (the epic's smoke, the second death's premise, the save's World). `--difficulty` applied in `_apply()` instead of on spawn → `smoke_dev_boot` FAIL (tier `normal`; `smoke_dev_tools` stays green, the Risks' trap). All restored.
+- **Perf (AC12):** headless `godot --headless --path game -- --room=perf_worst --perf=20` with the real cache: `perf 20 s: 2901 frames, avg 145.0 fps, min 144 fps, worst 13.2 ms at 15.6 s, 0 over 20 ms; lights max 6/6, sprites max 7, over 0; chain 20, breaks 0, deaths 0; glow off; window 64x64; Linux`. Beside 1.15's laptop run (6/6 / 7 / 0) the light counts are the same. Headless frame times mean nothing for the GPU; the laptop run is Task 11.
+- **Stale-comment sweep (D11):** `light_source.gd` (header; `fixed_radius` no longer names the cache, which sets `radius_fn`), `lurker.gd` header, `room_loader.gd` (its "1.22: spawn the Ember Cache here" note now says World spawns it, D7), the architecture's Debug Tools row and detach lists, and every docs list of detaching args / the perf run's lights.
+- **Full run:** `./run_tests.sh` → `== ALL GREEN (36 tests)`, 2737 `ok` (1.21's review: 2541). `tools/export.sh` (Node 24.22.3 from nvm) → `== BUILD OK builds/20261126-537a8a6-dirty, web download 11.0 MB (gzip; raw 40.8 MB), licences in 4 folders, PCK files windows 102 / linux 102 / web 102 / web_debug 110, 98 s`; web smoke 7 passed.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created
+- **Rules (AC1–AC4):** `DiveState.take_carried()`; `SlotState` gained `deposited` / `deposited_changed` / `deposit_from()`, the cache as three value fields with `has_cache()`, `cache_changed`, `recover_cache()`, and `DEATH_COST` + `apply_death()` returning `{tier, held_lost, held_carried, carried_cached, carried_lost, cache_destroyed}` (StringName keys, as the code's `{a = …}` literals make them). Any earlier cache is destroyed first on every tier (D4); Easy goes through `dive.add_carried(held)`, never `break_chain()`. The save writes `"deposited"` and `"cache"` (`null` or `{room, x, y, amount}`), a bad cache loads as none and unclean, `"cache"` is a `RESUME_KEYS` key, `Migrations.VERSION` stays 1.
+- **`Room.floor_spot()` (AC6):** `pos` when the feet's cell is open, in the room, no hazard, solid below, and the feet within 1 px of that floor; else the nearest clean standing spot by distance in scan order (strictly smaller wins, so ties go to the lower row index, then the lower column). Closes the 1.19 ledger item.
+- **Death flow (AC5):** `Player.die()` stores `held_at_death` and no longer pops; `popup_banked()` / `popup_lost()` are public; World's `_on_player_died()` applies the cost at `floor_spot(_safe_pos)`, keeps `last_death_cost()`, and pops `-N lost` for held + carried lost only.
+- **EmberCache (AC7, AC8):** `objects/ember_cache.gd` + `.tscn` (Area2D, mask 2, not monitorable; `Shape` 12 × 10 and `Sprite` with their bottoms at y + 12; `LightSource` kind `cache` at the sprite's centre, `Light` a CACHE `BudgetLight`, amber, energy 1, no flicker); polled pickup at most once per node; frees itself and extinguishes on any `cache_changed`. `Tuning` `cache_radius` 80 (new Economy section, `BASE` 36). Sprite `tools/sprites/ember_cache.txt` (12 × 10, `L` embers in a stone ring; placeholder until 4.6) → `art/ember_cache.png`, import settings identical to the spike's. World spawns it right after the new room enters the tree, before the palette and the warm-up.
+- **DevTools (AC11):** `--difficulty=easy|normal|hard` (detach), set on every `player_spawned`; `difficulty_value()` is exact and lower case.
+- **Perf (AC12):** the `PerfCache` stand-in is a real `EmberCache` (`perf.cache`, re-made on every spawn through `room.spawn()`); `stand_ins` holds the flare only; `CACHE_RADIUS` is gone.
+- **Tests (AC9, AC10):** new `test_embers.gd` (pure, 90+ checks) and `smoke_embers.gd` (52 checks: the epic's smoke, ground / mid-air / hazard drops, the `up` fallback on the new `tests/rooms/embers/t_cache_drop.txt` and its `t_spikes` near-miss, Easy and Hard with their popups, a second death, saves and the progress save, the cache's light, a cache hunt over a ticking player); `smoke_lurker` `test_cache_lure` (79 px: IDLE through a full telegraph and 30 ticks more; 80 px: TELEGRAPH at the cache on the next tick, then HUNT, never monitorable); `test_room_loader` floor_spot cases; `test_light_budget` audits `objects/`; `test_state`, `test_saves`, `test_tuning`, `test_dev_args`, `smoke_dev_tools`, `smoke_dev_boot`, `smoke_perf`, `smoke_world`, `smoke_health` follow.
+- **Docs (AC13):** the GDD decision log (`decision-log.md`, a 2026-11-26 Story 1.22 entry with Q1, Q2 and the radius / drop-spot notes), GDD Economy (the drop spot, Q1 on every tier, `cache_radius` 80, Q2 amber and steady; `updated` 2026-11-26), `game-architecture.md` (the Event System example, the data flow's spawn and death, the Perf run, the transient-entities note), DESIGN's amber line, `docs/` (component inventory, architecture, development guide, source tree, perf.md with a 1.22 results section), project-context (Current State + date), the ledger (two 1.22 items closed, the 1.23 swing item notes the cache). No new deferred item.
+- **Not committed:** commits wait for sonlm's word (memory: commits need sonlm's request).
+- **Status:** Tasks 1–10 done; **Task 11 (the laptop look) is sonlm's**, so sonlm chose code review first (status `review`), with the look after it on the reviewed build. Tests green; needs the laptop look.
 
 ### File List
+
+- `game/scripts/rules/dive_state.gd` (modified)
+- `game/scripts/rules/slot_state.gd` (modified)
+- `game/scripts/rules/tuning.gd` (modified)
+- `game/scripts/world/room.gd` (modified)
+- `game/scripts/world/world.gd` (modified)
+- `game/scripts/actors/player.gd` (modified)
+- `game/scripts/actors/light_source.gd`, `game/scripts/actors/lurker.gd`, `game/scripts/world/room_loader.gd` (comments only)
+- `game/scripts/objects/ember_cache.gd` (new), `game/scripts/objects/ember_cache.gd.uid` (new)
+- `game/scenes/objects/ember_cache.tscn` (new)
+- `game/scripts/dev/dev_tools.gd` (modified)
+- `game/scripts/dev/perf_run.gd` (modified)
+- `tools/sprites/ember_cache.txt` (new)
+- `game/art/ember_cache.png` (new, built), `game/art/ember_cache.png.import` (new)
+- `game/tests/test_embers.gd` (new), `game/tests/test_embers.gd.uid` (new)
+- `game/tests/smoke_embers.gd` (new), `game/tests/smoke_embers.gd.uid` (new)
+- `game/tests/rooms/embers/t_cache_drop.txt` (new)
+- `game/tests/test_state.gd`, `test_saves.gd`, `test_tuning.gd`, `test_room_loader.gd`, `test_light_budget.gd`, `test_dev_args.gd` (modified)
+- `game/tests/smoke_world.gd`, `smoke_health.gd`, `smoke_lurker.gd`, `smoke_perf.gd`, `smoke_dev_tools.gd`, `smoke_dev_boot.gd` (modified)
+- `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/gdd.md` (modified)
+- `_bmad-output/planning-artifacts/gdds/gdd-pixel_art_game-2026-11-10/decision-log.md` (modified)
+- `_bmad-output/planning-artifacts/ux-designs/ux-pixel_art_game-2026-11-10/DESIGN.md` (modified)
+- `_bmad-output/game-architecture.md` (modified)
+- `_bmad-output/project-context.md` (modified)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/implementation-artifacts/1-22-three-ember-stages-the-ember-cache-and-difficulty-tiers.md` (this file)
+- `docs/component-inventory.md`, `docs/architecture.md`, `docs/development-guide.md`, `docs/source-tree-analysis.md`, `docs/perf.md` (modified)
+
+### Change Log
+
+- 2026-11-26: Story 1.22 implemented (Tasks 1–10): the three ember stages, the Ember Cache (state, save, object, spawn, drop spot, recovery), the death cost by tier, `Room.floor_spot()`, `--difficulty`, the perf run's real cache, tests and docs. ALL GREEN (36 tests, 2737 ok), BUILD OK. Task 11 (laptop look) pending sonlm.
+- 2026-11-26: Status → review at sonlm's request: code review first, the laptop look (Task 11) after it, on the reviewed build.

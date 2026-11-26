@@ -24,6 +24,9 @@ var is_dead := false
 ## The cause id of the hit that killed this life (Health.CAUSES), or &"" for a death with no cause
 ## (World's backstops, a test's die()). The death card reads it (Story 1.29).
 var death_cause: StringName = &""
+## The held embers this life's chain lost at its death (chain.lose()). World hands them to the death
+## cost (SlotState.apply_death(), Story 1.22 D3), which the tier turns into carried or lost.
+var held_at_death := 0
 
 var _facing := 1
 var _coyote := 0.0
@@ -270,7 +273,17 @@ func _set_swing_visible(on: bool) -> void:
 
 func _on_banked(amount: int) -> void:
 	if not is_dead:
-		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_BANKED") % amount, Color(1, 0.93, 0.7))
+		popup_banked(amount)
+
+
+## The M1 popups, public since Story 1.22: the Ember Cache's recovery shows "+N banked", World's
+## death cost "-N lost" (only what a death really lost). Stories 1.26 / 1.27 replace them.
+func popup_banked(amount: int) -> void:
+	Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_BANKED") % amount, Color(1, 0.93, 0.7))
+
+
+func popup_lost(amount: int) -> void:
+	Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_LOST") % amount, Color(1, 0.35, 0.3))
 
 
 ## Runtime spawns belong to the room, never to World (AR23, D8): the room frees them with itself.
@@ -411,9 +424,8 @@ func die(cause: StringName = &"") -> void:
 	light_source.extinguish()  # D5: nothing senses a dead player; a hunt of this light ends at once
 	_end_cling()
 	Game.clock.clear()  # a death mid-hitstop must not leave the respawn frozen
-	var lost := chain.lose()  # unbanked embers die with you
-	if lost > 0:
-		Fx.popup(_fx_parent(), global_position + Vector2(0, -10), tr("POPUP_LOST") % lost, Color(1, 0.35, 0.3))
+	# The chain stops at once; what its held embers become is the tier's (World's death cost, D3).
+	held_at_death = chain.lose()
 	velocity = Vector2.ZERO
 	_set_swing_visible(false)
 	died.emit()

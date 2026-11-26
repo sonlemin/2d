@@ -521,7 +521,11 @@ func test_death_and_respawn() -> void:
 	var at := await _await_hit(10)
 	var lethal_frame := Engine.get_physics_frames()
 	check(at > 0 and _died == 1 and p.is_dead and p.death_cause == &"crawler_walker", "at 1 HP a walker's hit kills: died once, death_cause crawler_walker (died %d, cause '%s')" % [_died, p.death_cause])
-	check(Game.dive.carried == carried and p.chain.held == 0, "...and the held 6 are lost, not carried (D2: carried %d -> %d)" % [carried, Game.dive.carried])
+	# Story 1.22, Normal: the held 6 are lost (never carried: no bank at a death), and the carried
+	# ones drop as the Ember Cache.
+	check(_world.last_death_cost().get("held_lost") == 6 and _world.last_death_cost().get("held_carried") == 0 and p.chain.held == 0,
+			"...and the held 6 are lost, not carried (D2; report %s)" % [_world.last_death_cost()])
+	check(carried > 0 and Game.dive.carried == 0 and Game.slot.cache_amount == carried, "...while the %d carried drop as the Ember Cache (carried %d, cache %d)" % [carried, Game.dive.carried, Game.slot.cache_amount])
 	check(_sprite().material == Fx.flash_material(), "...the lethal hit flashes white on its tick (AC8)")
 	await frames(FLASH_TICKS_AC8)
 	check(is_instance_valid(p) and (p.get_node("Sprite") as Sprite2D).material == null, "...and the dead sprite is restored %d ticks later" % FLASH_TICKS_AC8)
@@ -549,6 +553,11 @@ func test_death_and_respawn() -> void:
 	since = Engine.get_physics_frames() - lethal_frame
 	check(second > 0 and since >= GAP_TICKS_Q1 and (q.get_node("Sprite") as Sprite2D).material == Fx.flash_material(),
 			"...and its next hit, %d ticks after it, is white again" % since)
+	# D9: no 80 px cache left in the shared World for the cases after this one.
+	Game.slot.recover_cache(Game.dive)
+	await frames(1)
+	check(not Game.slot.has_cache() and not _room().get_children().any(func(n: Node) -> bool: return n is EmberCache and not n.is_queued_for_deletion()),
+			"the case ends with no cache in the slot or the room")
 
 
 # --- AC8: the squash's clock ----------------------------------------------------------------------

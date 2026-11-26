@@ -66,6 +66,9 @@ const LURKER_HUNT_SPEED := 95.0  ## px/s; the hunt, straight at you and through 
 const LURKER_HUNT_ACCEL := 220.0  ## px/s² toward the hunt speed; it brakes at twice this once it loses you; not in the GDD (M1 lurker.hunt_accel). M1 value, unchanged.
 const LURKER_RETURN_SPEED := 40.0  ## px/s; the slow drift back home after a hunt; not in the GDD (M1 lurker.return_speed). M1 value, unchanged.
 
+# --- Economy (GDD Economy, FR24) ---
+const CACHE_RADIUS := 80.0  ## px; the Ember Cache's glow and the light predators sense, so at ≥ 80 px (the notice floor) it wakes lurkers like the player's light does (GDD Economy "Ember Cache glow", FR24; [ASSUMPTION: tuned at the CP2 gate, 1.30]). GDD Economy; new in M2.
+
 ## Every key `f()` knows, with its base value.
 const BASE := {
 	&"run_speed": RUN_SPEED,
@@ -103,6 +106,7 @@ const BASE := {
 	&"lurker_hunt_speed": LURKER_HUNT_SPEED,
 	&"lurker_hunt_accel": LURKER_HUNT_ACCEL,
 	&"lurker_return_speed": LURKER_RETURN_SPEED,
+	&"cache_radius": CACHE_RADIUS,
 }
 
 ## Rule switches gear can turn on (AR16). Quick Wick's instant Snuff is read from E5/E6.

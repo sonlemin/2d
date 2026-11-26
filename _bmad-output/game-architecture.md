@@ -336,7 +336,7 @@ World (Node2D, world.gd)            # group "world"
 - **Play rect:** `World.play_rect()` returns the visible play area inside the gutters, in world coordinates. Lurker notice ("on screen"), stirring distance, edge cues, glyph-prompt clamps and guarantee tests all use it, never the viewport.
 - **Standalone rooms:** a room builds from its file alone. Test harnesses instance a `Room` plus a test player without `World`, a save or the hub.
 - **Hazard respawn** (spikes): last safe ledge in the current room, tracked by `World` (per-life, not saved). As built (Story 1.19): `World` polls `room.touches_hazard(player.hurt_rect())` each physics tick after the exit check, like an exit (no `Area2D` per cell; a hazard hurts in the bottom 8 px of its cell). Before that, on every tick that crossed no exit, it records the safe ground: the player's exact position on a floor tick that touched no hazard. Every room build (exit or respawn) seeds it with `Room.ground_below(entry)`, the first clean floor straight below the entry cell (else the entry itself), so an `up` arrival has safe ground before its first floor tick. A touch calls `player.hurt(&"spikes")` (1 HP, no knockback) and, if the player lives, `player.place_at(safe)` and a camera snap; while invulnerable there is no damage but the return still happens (sonlm, 2026-11-22). `World.last_safe_position()` is public: Story 1.22's Ember Cache drops there.
-- **Transient entities** (flares, FX, spiderlings, popups) are children of the current room and are freed with it. The Ember Cache is stored in `SlotState` and spawned when its room is built.
+- **Transient entities** (flares, FX, spiderlings, popups) are children of the current room and are freed with it. The Ember Cache is stored in `SlotState` and spawned when its room is built. As built (Story 1.22): `World._swap_room()` spawns it right after the new room enters the tree, at `Room.floor_spot(cache_pos)` (`pos` itself on clean floor, else the nearest clean standing spot, ties to the lower row then column), so a hand-edited save or an edited room never floats it; the drop spot is `floor_spot()` of the safe ground too, which covers `ground_below()`'s mid-air fallback. The node (`objects/ember_cache.gd`, an amber `LightSource` of kind `cache` with a CACHE `BudgetLight`, radius `Tuning` `cache_radius`) is disposable: on any `cache_changed` it goes dark and frees itself, and the next build spawns what the slot holds.
 - **Exit backstop:** crossing a room exit with an active chain **banks it, exactly like a landing**, before the cut. Level design still places exits behind a landing so this rarely fires; it guarantees ADR-2 at runtime. (New rule: note it in the GDD chain table.)
 
 ### Level Authoring
@@ -407,7 +407,7 @@ user://
   - **Version and migrations:** `rules/migrations.gd` holds `VERSION` (1) and `steps()` (`{from_version: Callable}`, empty until Story 4.1). `migrate()` works on a deep copy of the whole file dictionary, so a step may move data between `slot`, `dive` and `meta`; a missing step, or one that doesn't bump the version, makes the file `CORRUPT`.
   - **The resume point follows the dive's respawn point.** `Game.save_now()` writes `slot.resume_room` / `resume_entry` as `dive.respawn_room` / `respawn_entry` beside `dive.to_dict()`, and moves them in memory once the write succeeded; a load puts the dive back, so World wakes the player there. `"dive": null` means no resume save was ever made: a load then starts a fresh dive at the slot's resume point.
   - **The snapshot.** `Game` keeps in memory what the last load or the last **successful** resume save held for `SlotState.RESUME_KEYS` (`resume_room`, `resume_entry`; Story 1.22 adds `cache`) and for the dive. `Game.save_progress()` writes the live slot with those values laid over it. It is not re-read from disk.
-  - **Arming.** `save_now()` and `save_progress()` return `ERR_UNCONFIGURED` and do nothing until `boot()`, `load_slot()` or `new_game()` ran in the process; `reset_for_tests()` disarms them. They are also off while `load_slot()` or `new_game()` replaces the state (a handler that saves on a slot signal would write one slot's state into another's file), and after the active slot is deleted. **Refusal (1.21 review):** a load that found the slot `CORRUPT`, `UNREADABLE` or `NEWER`, and a new game whose old files could not be removed, leave the session refused: every save warns, emits `save_failed` and touches no file until `new_game()` or a load that reads the slot. `Game` holds that verdict itself, because the store judges the files afresh at each write and an unopenable file may open again. `Game.detach_slot()` (DevTools, for `--room`, `--chain`, `--hp`, `--perf`) turns every slot read and write off for the rest of the process.
+  - **Arming.** `save_now()` and `save_progress()` return `ERR_UNCONFIGURED` and do nothing until `boot()`, `load_slot()` or `new_game()` ran in the process; `reset_for_tests()` disarms them. They are also off while `load_slot()` or `new_game()` replaces the state (a handler that saves on a slot signal would write one slot's state into another's file), and after the active slot is deleted. **Refusal (1.21 review):** a load that found the slot `CORRUPT`, `UNREADABLE` or `NEWER`, and a new game whose old files could not be removed, leave the session refused: every save warns, emits `save_failed` and touches no file until `new_game()` or a load that reads the slot. `Game` holds that verdict itself, because the store judges the files afresh at each write and an unopenable file may open again. `Game.detach_slot()` (DevTools, for `--room`, `--chain`, `--hp`, `--difficulty`, `--perf`) turns every slot read and write off for the rest of the process.
   - **Signals:** `save_succeeded(n)`, `save_failed(n, err)`, `settings_save_failed(err)`. `boot()` loads `active_slot` (1 until the slot picker, Story 1.38).
   - **Play time** is counted by World from the wall clock between frames (capped at 0.25 s a frame, not while paused), never from `delta / Engine.time_scale`: that formula over-counts on every frame a hitstop starts (see Time Control).
   - **A saved respawn point World can't use** (an unknown or invalid room, an entry the room doesn't list) is cleared with one warning before the first room is built.
@@ -639,6 +639,8 @@ No remote configuration. No `.tres` until a decision adds one.
 ```gdscript
 # dive_state.gd (RefCounted)
 signal carried_changed(carried: int)
+
+# slot_state.gd (RefCounted): the cache survives rests and saves, so it is per slot (Story 1.22)
 signal cache_changed(room_id: StringName, amount: int)
 
 # gutters.gd (HUD)
@@ -656,7 +658,7 @@ func _on_exit_reached(target: StringName) -> void:
 
 | Tool | What it does |
 |---|---|
-| **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; Story 1.12 added `--glow=on\|off` (a code-built `WorldEnvironment` under DevTools, for the perf check only) and `--perf[=<s>]` (the perf run, below); `--hp` (1.19, landed: `--hp=<n>`, 1–4, every life starts with n HP through its own spawn handler) and `--difficulty` (1.22) each add one row to DevTools' `ARGS` registry |
+| **Entry args** | `godot --path game -- --room=weaver_test --chain=8 --hp=1 --difficulty=hard` starts straight into a room with state set (E2's "debug entry into the Weaver arena": `weaver_test` is E2's dev arena, Story 2.1; `weaver_arena` stays E4's final room). Story 1.11 added `--room`, `--chain`, `--log` and `--set`; Story 1.12 added `--glow=on\|off` (a code-built `WorldEnvironment` under DevTools, for the perf check only) and `--perf[=<s>]` (the perf run, below); `--hp` (1.19, landed: `--hp=<n>`, 1–4, every life starts with n HP through its own spawn handler) and `--difficulty` (1.22, landed: `--difficulty=easy|normal|hard`, set on every spawn through its own handler, since the detached boot resets the slot after DevTools applies; detaches the slot) each added one row to DevTools' `ARGS` registry |
 | **Session settings** | `-- --set=brightness:0` sets any `Settings` key for this session only (typed by its default: int, float, bool `true`/`false`; repeatable) through `Game.override_setting()`; a session with any override writes no settings.json at all. Until Options (1.36) it is how brightness changes |
 | **Overlays** (one dev action cycles them) | 1: play rect + notice rect + gutters · 2: every light's radius + reach, each predator's state, target and `stir`, the sense line and the `stir N` edge markers (Story 1.20), the player's HP line (Story 1.19) · 3: room exits, entries + persistent object ids, the safe ground a spike returns to (Story 1.19) · 4: FPS, `lights n/6, sprites m` (+ `over k`) from `BudgetLight.counts()` on `World.light_rect()` (what the budget counts, Story 1.12), wall-clock frame and worst-frame times, the perf run's progress and summary, active Clock requests |
 | **Log categories** | `-- --log=lurker,clock` (names from `Log.CATEGORIES`, any case) |
@@ -667,7 +669,7 @@ func _on_exit_reached(target: StringName) -> void:
 
 **Arg phases:** the hook is the first statement of `World._ready()`, so DevTools applies `--log`, then `--set`, then `--room` at once, before `Game.boot()` and the first room (which is why `--set` must survive `boot()`'s load). `--chain` arms on every `player_spawned` and is paid as n `ChainState.add_hit()` calls on the first physics tick that ends with that player off the floor; it then breaks and banks like any chain, never pinned. `--room` sets `World.start_room` / `start_entry` (the `P`, else the up entry, else down) and never writes `Game.dive`'s respawn point.
 
-**Perf run** (Story 1.12, decided by sonlm 2026-11-19: the autopilot): `--perf[=<s>]` (60 s by default, 1–600; `?perf` on web) adds `dev/perf_run.gd` under DevTools. On every spawn it locks the player's input, masks its `Hurtbox` off, holds `--chain`'s n (else 20) paid through `--chain`'s take-off arming (never pinned), and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s from a tick counter (repeatable across machines and browsers). Two stand-in `BudgetLight`s ride along under the room: a flare (ALWAYS, at the player's light radius) and an Ember Cache (CACHE, 80 px). It measures wall-clock frame times (`Time.get_ticks_usec()`, never `delta`) and samples `BudgetLight.counts()` every tick, then freezes one summary (frames, avg/min FPS, the worst frame and when, frames over 20 ms, max lights/sprites/over, breaks and deaths, glow, window, adapter), logs it once and shows it in overlay 4. The scene is `rooms/dev/perf_worst.txt`; the procedure, `docs/perf.md`, is run in Story 1.15.
+**Perf run** (Story 1.12, decided by sonlm 2026-11-19: the autopilot): `--perf[=<s>]` (60 s by default, 1–600; `?perf` on web) adds `dev/perf_run.gd` under DevTools. On every spawn it locks the player's input, masks its `Hurtbox` off, holds `--chain`'s n (else 20) paid through `--chain`'s take-off arming (never pinned), and moves it every physics tick along a vertical ping-pong down the room's centre at 100 px/s from a tick counter (repeatable across machines and browsers). Two lights ride along under the room: a stand-in flare (a plain `BudgetLight` of rank ALWAYS, at the player's light radius; the real flare replaces it in 1.23) and, since Story 1.22, a real Ember Cache (`objects/ember_cache.tscn`: rank CACHE, `Tuning` `cache_radius`), a `LightSource` that wakes lurkers in `perf_worst`, who hunt it harmlessly. It measures wall-clock frame times (`Time.get_ticks_usec()`, never `delta`) and samples `BudgetLight.counts()` every tick, then freezes one summary (frames, avg/min FPS, the worst frame and when, frames over 20 ms, max lights/sprites/over, breaks and deaths, glow, window, adapter), logs it once and shows it in overlay 4. The scene is `rooms/dev/perf_worst.txt`; the procedure, `docs/perf.md`, is run in Story 1.15.
 
 **Activation:** `World` adds a `DevTools` node only when `OS.is_debug_build()` is true (editor runs and debug exports). Release exports never contain it. The overlay toggle is a dev-only input action, `dev_overlay`, on the backquote key (`` ` ``, physical keycode 96); DevTools is `PROCESS_MODE_ALWAYS`, so it cycles while paused. **No function keys.**
 
@@ -806,7 +808,7 @@ pixel_art_game/
 │   │   └── dev/                       # debug builds only; nothing depends on dev/
 │   │       ├── dev_tools.gd           # entry args (CLI / URL query), smoke markers
 │   │       ├── overlays.gd            # play rect, light rings, exits/ids, perf
-│   │       └── perf_run.gd            # --perf: the autopilot perf run, stand-in lights, frame stats, summary (1.12)
+│   │       └── perf_run.gd            # --perf: the autopilot perf run, a flare stand-in and a real Ember Cache (1.22), frame stats, summary (1.12)
 │   ├── scenes/                        # mirrors scripts/ domains; thin prefabs
 │   │   ├── world/world.tscn
 │   │   ├── actors/                    # player.tscn, crawler.tscn, lurker.tscn, flare.tscn, weaver/
@@ -1097,8 +1099,10 @@ enter_room(room_id, entry)
     for each legend spawn cell:
       persistent object (header id)  → skip if SlotState flag says taken/opened; else instance with id
       enemy (room_id + cell)         → skip if DiveState.killed has it; else instance
-    Ember Cache                      → spawn if SlotState.cache.room == room_id
-  World: free old room (queue_free) → add new room → place player at entry/anchor
+  World: free old room (queue_free) → add new room
+         → Ember Cache: room.spawn() at room.floor_spot(slot.cache_pos) if slot.cache_room == room_id
+           (World, not RoomLoader, so rooms still load standalone without a save; Story 1.22)
+         → place player at entry/anchor
          → camera limits → reset_physics_interpolation() → SlotState.visit(room_id) → room_entered
 
 exit trigger (built from header `exits=`)
@@ -1106,7 +1110,11 @@ exit trigger (built from header `exits=`)
   → World._swap_room.call_deferred(target, entry)
 
 death
-  Player.died → DiveState/SlotState apply death cost by difficulty (held lost; carried → cache / kept / lost)
+  Player.die(): chain.lose() → held_at_death → Player.died
+  → World: SlotState.apply_death(dive, held, room, room.floor_spot(last_safe_position()))
+    (any earlier cache destroyed; Easy: held → carried; Normal: held lost, carried → the cache;
+    Hard: both lost) → a report {tier, held_lost, held_carried, carried_cached, carried_lost,
+    cache_destroyed}: the popup now, World.last_death_cost() for the death card (1.29)
   → SlotState.death_log.append({cause, room}) → ScreenRouter shows the death card
   → on advance: enter_room(respawn room, respawn object) → new Player (full HP)
 

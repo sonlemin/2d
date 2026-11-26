@@ -3,8 +3,9 @@ extends RefCounted
 ## Per-dive state (AR10, AR14): what one dive from the hub carries. It resets in place on a rest,
 ## on arriving home and on leaving the layer, because subscribers hold on to it. The session's
 ## instance lives in `core/game.gd`. Written only through methods that emit a typed signal (AR18).
-## Carried embers stay at risk until a station (GDD Economy); the death cost and the deposit arrive
-## in Story 1.22. M1's "banked" embers are M2's carried ones.
+## Carried embers stay at risk until a station (GDD Economy): a death costs them by the tier
+## (SlotState.apply_death()) and a rest deposits them (SlotState.deposit_from()), both through
+## take_carried() (Story 1.22). M1's "banked" embers are M2's carried ones.
 ## Killed enemies are never saved (architecture decision 5): `to_dict()` leaves them out, and a
 ## load or a reset brings every enemy back.
 
@@ -23,11 +24,22 @@ var _killed := {}  # room id -> {Vector2i grid cell: true}
 
 
 func add_carried(n: int) -> void:
-	assert(n >= 0, "DiveState.add_carried(%d): an amount is never negative; losses arrive in Story 1.22" % n)
+	assert(n >= 0, "DiveState.add_carried(%d): an amount is never negative; take_carried() removes them" % n)
 	if n == 0:
 		return
 	carried += n
 	carried_changed.emit(carried)
+
+
+## Every carried ember leaves the dive at once (Story 1.22): a deposit, a death's cache or a Hard
+## death's loss, each decided by its caller. Returns the amount; emits only when it was > 0.
+func take_carried() -> int:
+	var n := carried
+	if n == 0:
+		return 0
+	carried = 0
+	carried_changed.emit(0)
+	return n
 
 
 func set_respawn(room_id: StringName, entry: StringName) -> void:

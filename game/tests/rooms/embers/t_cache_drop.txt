@@ -1,0 +1,19 @@
+; Story 1.22 cache-drop test room. Not a level.
+; The up exit at column 5 is open straight down to the down exit at column 5, so ground_below(up)
+; has no floor to find and falls back to the mid-air entry itself (Story 1.19 D6's fallback, the
+; ledger item 1.22 closes): a death on the first tick after an up arrival must still drop the cache
+; on clean floor. The nearest clean floor to the entry is the bottom row beside the opening, at
+; columns 4 and 6 (a tie, to the lower column). Both exits loop to this room, as t_spikes' do.
+id=t_cache_drop
+zone=violet
+exits=up:t_cache_drop@x5, down:t_cache_drop@x5
+---
+#####.#####
+#.........#
+#.........#
+#.........#
+#.........#
+#.........#
+#.........#
+#.........#
+#####.#####

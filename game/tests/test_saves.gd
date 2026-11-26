@@ -15,7 +15,7 @@ extends Node
 
 const TMP := "user://test_saves_tmp"
 ## A whole version-1 slot file as an earlier session left it.
-const GOOD := '{"version": 1, "meta": {"best_chain": 7, "depth": 2, "difficulty": "hard", "play_time": 300, "saved_at": 1795000000}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": ["met_glim"], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}'
+const GOOD := '{"version": 1, "meta": {"best_chain": 7, "depth": 2, "difficulty": "hard", "play_time": 300, "saved_at": 1795000000}, "slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": ["met_glim"], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}'
 const NEWER := '{"version": 2, "slot": {"best_chain": 9}, "dive": null, "future": true}'
 const READ_KEYS := ["dive", "found", "from_bak", "meta", "slot", "version", "why"]
 
@@ -287,7 +287,7 @@ func _test_round_trip() -> void:
 	check(keys == ["dive", "meta", "slot", "version"], "the file is dive, meta, slot, version (got %s)" % [keys])
 	check(d.get("version") is float and d.version == 1.0, "...with version 1 (got %s)" % var_to_str(d.get("version")))
 	check(_text(_slot()).begins_with("{\n\t\"dive\": {\n"), "...written with tabs, keys sorted (D2; starts %s)" % _text(_slot()).left(16).c_escape())
-	var want_slot := {"best_chain": 17.0, "deaths": 3.0, "depth": 4.0, "difficulty": "hard", "flags": ["met_glim"], "play_time": 8040.0,
+	var want_slot := {"best_chain": 17.0, "cache": null, "deaths": 3.0, "deposited": 0.0, "depth": 4.0, "difficulty": "hard", "flags": ["met_glim"], "play_time": 8040.0,
 			"resume_entry": "anchor_m1_1", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}
 	check(d.get("slot") == want_slot, "...slot is %s (got %s)" % [want_slot, d.get("slot")])
 	var want_dive := {"carried": 12.0, "respawn_entry": "anchor_m1_1", "respawn_room": "m1_shaft"}
@@ -566,14 +566,14 @@ func _unlock(path: String) -> void:
 
 func _test_unclean() -> void:
 	_fresh()
-	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"best_chain": "many", "deaths": 1, "depth": 2, "difficulty": "hard", "flags": ["met_glim"], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}')
+	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"cache": null, "deposited": 0, "best_chain": "many", "deaths": 1, "depth": 2, "difficulty": "hard", "flags": ["met_glim"], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}')
 	check(Game.load_slot(1) == SaveStore.Found.USABLE, "a usable file with one bad slot field (best_chain \"many\") still loads: USABLE")
 	check(Game.slot.best_chain == 0, "...that field takes its default 0")
 	check(Game.slot.deaths == 1 and Game.slot.depth == 2 and Game.slot.difficulty == &"hard" and Game.slot.has_flag(&"met_glim") and Game.slot.play_time == 300 and Game.dive.carried == 5, "...the good fields are kept (deaths 1, depth 2, hard, the flag, 300 s, 5 carried)")
 	check(_warnings.take() == 1, "...with one warning")
 	check(Game.save_now() == OK and _warnings.take() == 0, "...and it may be saved again (1.4 D3)")
 	_fresh()
-	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": []}, "dive": {"carried": -4, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}')
+	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": []}, "dive": {"carried": -4, "respawn_entry": "spawn", "respawn_room": "m1_shaft"}}')
 	check(Game.load_slot(1) == SaveStore.Found.USABLE and Game.dive.carried == 0 and Game.dive.respawn_entry == &"spawn" and Game.slot.best_chain == 7 and _warnings.take() == 1, "a bad dive field (carried -4) loads as 0 with the rest kept, one warning")
 	_fresh()
 	_put(_slot(), GOOD)
@@ -679,7 +679,7 @@ func _test_progress_save_without_resume() -> void:
 	check(_parsed(_slot()).has("dive") and _parsed(_slot())["dive"] == null, "...and a progress save after that load still writes \"dive\": null")
 	# D5: no dive snapshot, but the slot has a resume point: a fresh dive that starts there.
 	_fresh()
-	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": []}, "dive": null}')
+	_put(_slot(), '{"version": 1, "meta": {}, "slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "spawn", "resume_room": "m1_shaft", "visited": []}, "dive": null}')
 	check(Game.load_slot(1) == SaveStore.Found.USABLE and _warnings.take() == 0, "a file with \"dive\": null and a resume point loads clean")
 	check(Game.dive.carried == 0 and Game.dive.respawn_room == &"m1_shaft" and Game.dive.respawn_entry == &"spawn", "...as a fresh dive whose respawn point is the slot's resume point (got '%s' / '%s')" % [Game.dive.respawn_room, Game.dive.respawn_entry])
 
@@ -712,7 +712,7 @@ func _test_failed_resume_then_progress() -> void:
 ## D5 (1.21 review): the dive's respawn point and the slot's resume point are equal in every file
 ## the game writes. A dive that lost its point wakes at the slot's, as a null dive does.
 func _test_dive_point() -> void:
-	var slot_part := '"slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": []}'
+	var slot_part := '"slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": []}'
 	_fresh()
 	_put(_slot(), '{"version": 1, "meta": {}, %s, "dive": {"carried": 5, "respawn_entry": "", "respawn_room": ""}}' % slot_part)
 	check(Game.load_slot(1) == SaveStore.Found.USABLE and _warnings.take() == 0, "a dive with an empty respawn point beside a slot resume point loads clean")

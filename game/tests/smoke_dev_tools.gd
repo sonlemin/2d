@@ -137,6 +137,8 @@ func run() -> void:
 	await test_chain_mid_tick_spawn()
 	await test_hp_every_life()
 	await test_bad_hp()
+	await test_difficulty()
+	await test_bad_difficulty()
 	await test_log()
 	await test_set()
 	await test_overlay_cycle()
@@ -288,7 +290,7 @@ func test_real_tokens() -> void:
 	# Story 1.21: this is the process's one boot (the first World that is the current scene), so a
 	# slot planted here is what a real launch would find. Its respawn point is the top entry.
 	var slot_file := TMP.path_join("slot_1.json")
-	var planted := '{"version": 1, "meta": {}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "up", "respawn_room": "m1_shaft"}}'
+	var planted := '{"version": 1, "meta": {}, "slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "up", "respawn_room": "m1_shaft"}}'
 	var f := FileAccess.open(slot_file, FileAccess.WRITE)
 	f.store_string(planted)
 	f.close()
@@ -428,6 +430,7 @@ func test_detach() -> void:
 		[["--room=t_swap_a"], true, "[room] dev: room t_swap_a@spawn, no slot loaded or saved"],
 		[["--chain=3"], true, "[room] dev: chain 3, no slot loaded or saved"],
 		[["--hp=2"], true, "[room] dev: hp 2, no slot loaded or saved"],
+		[["--difficulty=hard"], true, "[room] dev: difficulty hard, no slot loaded or saved"],
 		[["--log=save"], false, "[room] dev: log save"],
 		[["--set=brightness:0"], false, "[room] dev: set brightness=0"],
 		[["--glow=on"], false, "[room] dev: glow on"],
@@ -469,7 +472,7 @@ func test_bad_args() -> void:
 	_build(["--foo=1", "--chain=99", "--log=nope,save", "--room=t_swap_a", "--room=t_dev_room"])
 	var w := _warnings.take()
 	var has := func(part: String) -> bool: return w.any(func(t: String) -> bool: return t.contains(part))
-	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, glow, hp, log, perf, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
+	check(w.size() == 4 and has.call("unknown arg --foo (known: chain, difficulty, glow, hp, log, perf, room, set)") and has.call("--room given 2 times; using the last ('t_dev_room')")
 			and has.call("--chain=99 is outside 0..%d" % ChainState.MAX_CHAIN) and has.call("--log: no category 'nope'"),
 			"bad args: one warning each for --foo, the repeated --room, --chain=99 and --log=nope (got %s)" % [w])
 	check(_room().id == &"t_dev_room" and Log.enabled(Log.SAVE) and not Log.enabled(Log.LURKER),
@@ -494,6 +497,37 @@ func test_hp_every_life() -> void:
 		await frames(1)
 	var q: Player = _spawned[-1]
 	check(_spawned.size() == 2 and q != p and q.health.hp == 1, "...and so does the respawned one (got %d)" % q.health.hp)
+	await _teardown()
+
+
+## Story 1.22 D10: --difficulty sets the tier on every spawn (the first and a respawn) and detaches
+## the slot. A test World never boots, so smoke_dev_boot checks the real order (the boot's reset).
+func test_difficulty() -> void:
+	_build(["--room=t_dev_room", "--difficulty=easy"])
+	var dev := _dev()
+	check(Game.slot.difficulty == &"easy" and Game._slot_detached, "--difficulty=easy: the tier is easy and the slot is detached (got %s, %s)" % [Game.slot.difficulty, Game._slot_detached])
+	check(_world.player_spawned.is_connected(dev._on_player_spawned_difficulty), "...through its own spawn handler")
+	Game.slot.set_difficulty(&"hard")  # stands for anything that reset the tier between lives
+	_spawned[0].die()
+	for i in int((World.RESPAWN_DELAY + 1.0) * Engine.physics_ticks_per_second):
+		if _spawned.size() > 1:
+			break
+		await frames(1)
+	check(_spawned.size() == 2 and Game.slot.difficulty == &"easy", "...and the respawn sets it again (got %s)" % Game.slot.difficulty)
+	await _teardown()
+
+
+func test_bad_difficulty() -> void:
+	_build(["--room=t_dev_room", "--difficulty=Hard"])
+	var w := _warnings.take()
+	var dev := _dev()
+	check(w.size() == 1 and w[0].contains("--difficulty=Hard is not one of easy, normal, hard"), "a bad --difficulty is one warning (got %s)" % [w])
+	check(not _world.player_spawned.is_connected(dev._on_player_spawned_difficulty) and Game.slot.difficulty == &"normal",
+			"...connects nothing and leaves the tier normal (got %s)" % Game.slot.difficulty)
+	await _teardown()
+	_build(["--difficulty=medium"])
+	_warnings.take()
+	check(not Game._slot_detached, "--difficulty=medium alone (refused) detaches nothing")
 	await _teardown()
 
 

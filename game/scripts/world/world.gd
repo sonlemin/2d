@@ -8,7 +8,10 @@ extends Node2D
 ## bound to the player rebinds there.
 ## World also polls hazards like exits (Story 1.19 D5) and tracks the life's safe ground: the last
 ## floor tick that touched no hazard, seeded below the entry at every build (D6). A spike returns the
-## player there; the Ember Cache drops there (Story 1.22, last_safe_position()).
+## player there; the Ember Cache drops at Room.floor_spot() of it (Story 1.22).
+## A death's cost is applied here (Story 1.22 D3): the rule is SlotState.apply_death(), but the drop
+## spot needs the room and the tracker, so a room without World (RoomHarness) costs nothing. Every
+## build spawns the slot's cache when it lies in the new room (RoomLoader stays slot-free, D7).
 ## World also counts the slot's play time (real seconds, `_process`) and its depth record (the
 ## player's screen row, each tick), and checks a loaded respawn point before the first build
 ## (Story 1.21).
@@ -19,6 +22,7 @@ signal player_spawned(player: Player)
 signal room_entered(room_id: StringName)
 
 const PlayerScene := preload("res://scenes/actors/player.tscn")
+const EmberCacheScene := preload("res://scenes/objects/ember_cache.tscn")
 ## Applies the ≤ 6 light budget each physics tick, after the actors (Story 1.12 D5).
 const LightBudgetNode := preload("res://scripts/world/light_budget.gd")
 ## The dive starts here unless the dive holds a respawn point: a loaded slot's resume point
@@ -46,6 +50,7 @@ var _swap_pending := false
 var _safe_pos := Vector2.ZERO  # room-local (the room and World both sit at the origin, so it is the player's `position`); see last_safe_position()
 var _last_white_frame := -1  # the retired Player's last_white_frame, for the next life (Q1)
 var _play_clock_usec := 0  # Time.get_ticks_usec() at the last frame counted as play; 0 = none since the start or a pause
+var _last_death := {}  # the last death's SlotState.apply_death() report; see last_death_cost()
 
 @onready var _darkness: CanvasModulate = $Darkness
 @onready var _room_holder: Node2D = $RoomHolder
@@ -91,10 +96,16 @@ func current_room() -> Room:
 
 ## D6: where the player last stood on the floor touching no hazard, room-local, recorded exactly (so
 ## a return never lands in a spike). Every build seeds it with Room.ground_below(entry), so it is
-## per life and per room, and an `up` arrival has clean floor before its first floor tick. Story
-## 1.22's Ember Cache drops here.
+## per life and per room, and an `up` arrival has clean floor before its first floor tick. The Ember
+## Cache drops at Room.floor_spot() of it (Story 1.22 D6), so never in mid-air or over a hazard.
 func last_safe_position() -> Vector2:
 	return _safe_pos
+
+
+## The last death's cost, SlotState.apply_death()'s report ({} before any death this session): the
+## death card reads what was lost, dropped or destroyed (Story 1.29).
+func last_death_cost() -> Dictionary:
+	return _last_death
 
 
 ## AR24: the one way into another room for an exit (and later a station or a scripted moment).
@@ -220,6 +231,11 @@ func _swap_room(room_id: StringName, entry: StringName, respawn: bool) -> void:
 		_room.queue_free()
 	_room_holder.add_child(room)
 	_room = room
+	# Story 1.22 D7: the slot's cache, on every build of its room (the first, an exit, a respawn's
+	# rebuild). Here, not in RoomLoader, so rooms still load standalone without a save; the room owns
+	# and frees it (AR23). floor_spot() again: a save may be hand-edited or the room edited since.
+	if Game.slot.has_cache() and Game.slot.cache_room == room_id:
+		room.spawn(EmberCacheScene, room.floor_spot(Game.slot.cache_pos))
 	# UX-DR5, Story 1.18 D2: the zone is the room's until E4 adds in-room boundaries and the cross-fade.
 	# Before the warm-up, which outlines its label in the active zone's surface (code review of 1.18:
 	# set after the camera snap, the warm-up drew the previous zone's). The room's own nodes ran
@@ -305,6 +321,11 @@ func _spawn_player(entry: StringName) -> void:
 
 
 func _on_player_died() -> void:
+	# D3: the tier turns the held embers and the carried ones into carried, a cache or nothing.
+	_last_death = Game.slot.apply_death(Game.dive, _player.held_at_death, _room.id, _room.floor_spot(_safe_pos))
+	var lost: int = _last_death.held_lost + _last_death.carried_lost
+	if lost > 0:
+		_player.popup_lost(lost)  # Easy loses nothing; Normal's carried went to the cache, not lost
 	Game.slot.record_death()
 	# Pauses with the tree (AR36) and ignores the time scale. A method, not an await, so the
 	# connection dies with World if a test frees it first.

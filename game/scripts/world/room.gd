@@ -73,7 +73,8 @@ func touches_hazard(rect: Rect2) -> bool:
 ## solid cell below it, when the cell above that is no hazard, with entry_position()'s feet formula.
 ## Else (the column ends on spikes, or in an open bottom) entry_position(entry) itself. World seeds
 ## its safe ground with it, so an `up` arrival hit before its first floor tick is returned to the
-## floor below, never to the top opening (and the Ember Cache never floats, 1.22).
+## floor below, never to the top opening. The Ember Cache's spot goes through floor_spot() too, which
+## also covers the fallback (Story 1.22 D6).
 func ground_below(entry: StringName) -> Vector2:
 	assert(has_entry(entry), "Room %s has no entry '%s'" % [id, entry])
 	var cell: Vector2i = spawn_cell if entry == &"spawn" else exit(entry).entry_cell
@@ -83,6 +84,41 @@ func ground_below(entry: StringName) -> Vector2:
 				break
 			return Vector2(cell.x * TILE + TILE / 2.0, y * TILE - 12)
 	return entry_position(entry)
+
+
+## Story 1.22 D6: where the Ember Cache may lie, room-local, with entry_position()'s feet formula
+## (the floor's top at pos.y + 12). `pos` itself when it stands on clean floor (the feet's cell in
+## the room, not solid, no hazard; solid below; the feet within 1 px of that floor's top), else the
+## nearest clean standing spot by distance, ties to the lower row index then the lower column (the
+## scan order). It covers every way a drop spot goes bad: ground_below()'s fallback to a mid-air
+## entry, a centre hanging past a ledge's edge, a hand-edited save, a room edited since the save.
+## A room with no clean standing cell returns `pos` (validate() makes every real room have one).
+func floor_spot(pos: Vector2) -> Vector2:
+	# The feet sit on a tile edge: half a pixel up finds the standing row without float drift
+	# moving a good spot into the floor's own row.
+	var feet := Vector2i(floori(pos.x / TILE), floori((pos.y + 12.0 - 0.5) / TILE))
+	if _stands_on_clean_floor(feet) and absf(pos.y + 12.0 - (feet.y + 1) * TILE) <= 1.0:
+		return pos
+	var best := pos
+	var best_d := INF
+	for y in size_cells.y:
+		for x in size_cells.x:
+			var cell := Vector2i(x, y)
+			if not _stands_on_clean_floor(cell):
+				continue
+			var spot := Vector2(x * TILE + TILE / 2.0, (y + 1) * TILE - 12)
+			var d := spot.distance_squared_to(pos)
+			if d < best_d:  # strictly smaller: the first in scan order wins a tie
+				best_d = d
+				best = spot
+	return best
+
+
+## A cell a body can stand in: inside the room, open, no hazard, with solid floor right below.
+func _stands_on_clean_floor(cell: Vector2i) -> bool:
+	if cell.x < 0 or cell.y < 0 or cell.x >= size_cells.x or cell.y + 1 >= size_cells.y:
+		return false
+	return not is_solid(cell) and not hazards.has(cell) and is_solid(cell + Vector2i.DOWN)
 
 
 func is_solid(cell: Vector2i) -> bool:

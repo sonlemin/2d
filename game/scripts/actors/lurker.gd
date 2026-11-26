@@ -3,7 +3,7 @@ extends Area2D
 ## A predator drawn to light. It waits inside the walls of the dark, unseen.
 ##
 ## It senses light only through LightSource + Sensing (AR28, AR29): every lit node in group
-## `light_source` (the player's Chain-Light; the Ember Cache in 1.22, flares in 1.23), judged by the
+## `light_source` (the player's Chain-Light, the Ember Cache (Story 1.22); flares in 1.23), judged by the
 ## one rule in rules/sensing.gd. It never looks for the player (lint light_query).
 ## - Notice (wake, and every tick of the telegraph): the light is big enough and near enough, and the
 ##   lurker sits inside the play rect's notice margin, so the whole warning is seen (Pillar 2; AR20).

@@ -30,6 +30,8 @@ pixel_art_game/
 │   │       ├── player.tscn       # Player prefab: body, LightSource/Light, slash/pogo/hurt areas
 │   │       ├── crawler.tscn      # Crawler prefab (CharacterBody2D + edge ray)
 │   │       └── lurker.tscn       # Lurker prefab (Area2D + eyes + red glow light)
+│   │   └── objects/
+│   │       └── ember_cache.tscn  # Ember Cache prefab (Area2D + unshaded sprite + LightSource/Light, rank CACHE; Story 1.22)
 │   ├── scripts/
 │   │   ├── rules/
 │   │   │   ├── chain_state.gd    # ★ Pure chain/light/bloom/embers rules + all chain tuning constants
@@ -38,8 +40,8 @@ pixel_art_game/
 │   │   │   ├── tuning.gd         # ★ Tuning: every gameplay number as a const in BASE; f(&"key"), apply_gear()
 │   │   │   ├── gear.gd           # Gear: the {id, stat, op, value} table (empty until E5)
 │   │   │   ├── settings.gd       # Settings: global settings (brightness so far), set_value() + changed
-│   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags, play time, depth, the resume point
-│   │   │   ├── dive_state.gd     # DiveState: carried embers, respawn point, killed enemies
+│   │   │   ├── slot_state.gd     # SlotState: per-slot records, difficulty, story flags, play time, depth, the resume point, deposited embers, the Ember Cache, the death cost (apply_death)
+│   │   │   ├── dive_state.gd     # DiveState: carried embers (add_carried, take_carried), respawn point, killed enemies
 │   │   │   └── migrations.gd     # Migrations: the slot format VERSION and its migration steps (pure)
 │   │   ├── world/
 │   │   │   ├── world.gd          # ★ World: the game scene; room, player spawn/respawn, play_rect(), light_rect(), the hazard poll and safe ground
@@ -47,7 +49,7 @@ pixel_art_game/
 │   │   │   ├── camera_rig.gd     # CameraRig: follow, downward lead, shake, limits, play_rect(), view_rect()
 │   │   │   ├── room_legend.gd    # RoomLegend: the one definition of every grid char
 │   │   │   ├── room_loader.gd    # ★ RoomLoader: parse, pure validate (file:row:col errors), load, build
-│   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position(), ground_below(), touches_hazard()
+│   │   │   └── room.gd           # Room: a built room; spawn(), bounds(), entry_position(), ground_below(), floor_spot(), touches_hazard()
 │   │   ├── ui/
 │   │   │   ├── gutters.gd        # Gutters: the two flat 60 px HUD strips
 │   │   │   ├── screen_router.gd  # ScreenRouter: one full-screen UI screen at a time
@@ -58,6 +60,8 @@ pixel_art_game/
 │   │   │   ├── light_source.gd   # LightSource: a light predators sense (group light_source); radius() is the rule value; sizes its BudgetLight (Story 1.20)
 │   │   │   ├── crawler.gd        # "Chain fuel": walker or hoverer, dies to any hit
 │   │   │   └── lurker.gd         # Predator FSM: IDLE → TELEGRAPH → HUNT → RETURN, through LightSource + Sensing; retargets; stirs off screen
+│   │   ├── objects/
+│   │   │   └── ember_cache.gd    # EmberCache: the dropped carried embers; an amber light that lures, recovered by touch (Story 1.22)
 │   │   ├── core/
 │   │   │   ├── game.gd           # The Game autoload: refs to session state (`settings`, `slot`, `dive`, `tuning`, `clock`, `display`, `palette`, `store`), boot(), no rules
 │   │   │   ├── clock.gd          # Clock: the only writer of Engine.time_scale (hitstop requests)
@@ -69,9 +73,9 @@ pixel_art_game/
 │   │   │   ├── text_style.gd     # TextStyle: font, sizes, line metrics, CAP_TOP, the play-area outline (play_text LabelSettings, cached)
 │   │   │   └── fx.gd             # Static code-built juice: spark burst, chain popup, floating text; the shared unshaded/additive materials
 │   │   ├── dev/                  # Debug builds only: World's one guarded load() adds DevTools; the release presets exclude it (export.sh checks)
-│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --hp, --log, --set, --glow, --perf; ?… on web), the overlay key
+│   │   │   ├── dev_tools.gd      # DevTools: entry args (--room, --chain, --hp, --difficulty, --log, --set, --glow, --perf; ?… on web), the overlay key
 │   │   │   ├── overlays.gd       # The four overlays (play rect, light/notice, exits/ids, FPS/light budget/frames/perf/Clock); no class_name
-│   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, stand-in lights, frame stats and summary (docs/perf.md); no class_name
+│   │   │   └── perf_run.gd       # PerfRun: the --perf autopilot, a flare stand-in and a real Ember Cache, frame stats and summary (docs/perf.md); no class_name
 │   │   └── **/*.gd.uid           # Godot 4.4+ resource UIDs (committed; keep next to their script)
 │   ├── tests/
 │   │   ├── runner.gd / runner.tscn # Runs one test as a scene; fails on no PASS, a timeout or any engine error
@@ -84,7 +88,8 @@ pixel_art_game/
 │   │   ├── test_state.gd         # Settings/SlotState/DiveState, Game refs, settings.json fallbacks
 │   │   ├── test_migrations.gd    # Migrations.migrate() with fake steps; one step per version below VERSION
 │   │   ├── test_saves.gd         # Slot saves on a temp folder: .tmp/.bak, damaged/newer slots, resume vs progress saves
-│   │   ├── test_room_loader.gd   # Room validator, build, Room API, and the real m1_shaft
+│   │   ├── test_room_loader.gd   # Room validator, build, Room API (floor_spot() from 1.22), and the real m1_shaft
+│   │   ├── test_embers.gd        # The three ember stages, the death cost per tier, the cache's save shape, FR25 by source
 │   │   ├── test_room_sweep.gd    # The pure room sweeps on inline grids (fires + near-miss per rule)
 │   │   ├── test_deferred_owners.gd # Fails while an item in deferred-work.md has no owner
 │   │   ├── test_lint.gd          # Architecture lint over scripts/ (FAIL lint <file>:<line> <rule>)
@@ -105,6 +110,7 @@ pixel_art_game/
 │   │   ├── smoke_moves.gd        # The M1 move checks on m1_shaft: pogo, landing, jump, cling, Snuff release
 │   │   ├── smoke_world.gd        # World: tree, framing, state wiring, respawn without a reload, play rect, R16 loop
 │   │   ├── smoke_room_swap.gd    # Room swaps on tests/rooms/swap/ (t_swap_a, t_swap_b): backstop, arrival, killed cells
+│   │   ├── smoke_embers.gd       # The Ember Cache on world.tscn: drop, rebuild, recovery, drop spots, tiers, saves, a harmless hunt
 │   │   ├── smoke_player_input.gd # Movement pinned from M1 + PlayerInput intents on tests/rooms/input/t_input.txt
 │   │   ├── smoke_lurker.gd       # Light sensing on tests/rooms/sensing/: the M1 trace, LightSource, retargeting, stirring, Q1/Q2 (Story 1.20)
 │   │   ├── smoke_health.gd       # HP on world.tscn with tests/rooms/hazards/: contact, spikes, safe ground, bank-heal, death, flash, squash
@@ -117,7 +123,7 @@ pixel_art_game/
 │   │   ├── deck_mock.gd          # Helper (not a test): the 480×270 gutter-HUD mock for the Deck-size check, one zone's colours
 │   │   ├── room_harness.gd       # Helper (not a test): a room standalone + test player + CameraRig + stub World
 │   │   ├── fixtures/             # Test data: lurker_trace_m1.json (the M1 lurker trace, recorded before Story 1.20; smoke_lurker replays it)
-│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt, hazards/t_spikes.txt, sensing/t_sensing.txt); never exported
+│   │   └── rooms/                # Test-only room fixtures (ok_min, bad_*, swap/, input/, zones/, dev_tools/t_dev_room.txt, hazards/t_spikes.txt, sensing/t_sensing.txt, embers/t_cache_drop.txt); never exported
 │   └── art/                      # ⚠ GENERATED by tools/build_sprites.py — do not hand-edit
 │       ├── player.png  crawler.png  lurker.png  lurker_eyes.png  slash.png  tile.png  spike.png
 │       ├── light.png             # 128×128 radial gradient used by every PointLight2D

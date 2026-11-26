@@ -19,6 +19,7 @@ func run() -> void:
 	await _test_killed_cells()
 	await _test_spikes()
 	await _test_ground_below_fallbacks()
+	await _test_floor_spot()
 	_test_index_queries()
 	print("PASS" if _fail == 0 else "FAILED (%d)" % _fail)
 
@@ -364,5 +365,44 @@ func _test_ground_below_fallbacks() -> void:
 			check(room.ground_below(&"up") == room.entry_position(&"up"), "ground_below(up) falls back to the entry itself when %s (got %s)" % [cases[id][1], room.ground_below(&"up")])
 			room.queue_free()
 		DirAccess.remove_absolute(path)
+	DirAccess.remove_absolute(dir)
+	await get_tree().process_frame
+
+
+## Story 1.22 D6: Room.floor_spot() keeps a spot on clean floor exactly and moves any other to the
+## nearest clean standing spot, ties to the lower row index, then the lower column. Clean standing
+## spots in this room: row 2 at x 40 / 56 (on the ledge), row 5 at x 24 / 40 / 72 / 104 (x 56 is
+## a spike, x 88 is over the bottom opening).
+func _test_floor_spot() -> void:
+	var dir := "user://test_room_loader_tmp"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var path := dir.path_join("t_floor_spot.txt")
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("id=t_floor_spot\nzone=dusk\nexits=up:t_floor_spot@x5, down:t_floor_spot@x5\n---\n#####.##\n#......#\n#......#\n#.##...#\n#......#\n#..^...#\n#####.##\n")
+	f.close()
+	var errors := _errors_of(path)
+	var room := RoomLoader.load_room_from_path(path) if errors.is_empty() else null
+	check(room != null, "t_floor_spot validates and builds (got %s)" % [errors])
+	if room == null:
+		DirAccess.remove_absolute(path)
+		DirAccess.remove_absolute(dir)
+		return
+	add_child(room)
+	var cases := [
+		[Vector2(24, 84), Vector2(24, 84), "a spot standing on clean floor is kept exactly (near-miss)"],
+		[Vector2(21.3, 83.2), Vector2(21.3, 83.2), "...and so is one off the cell centre with the feet 0.8 px above the floor (float drift on a floor tick)"],
+		[Vector2(24, 82), Vector2(24, 84), "feet 2 px above the floor float: moved onto it"],
+		[Vector2(68, 36), Vector2(56, 36), "a centre hanging past the ledge's edge moves back onto the ledge"],
+		[Vector2(56, 84), Vector2(40, 84), "standing over the ^ moves off it, the tie between x 40 and x 72 to the lower column"],
+		[Vector2(40, 60), Vector2(40, 36), "mid-air between the ledge and the floor, the tie goes to the lower row index (the ledge)"],
+		[Vector2(48, 20), Vector2(40, 36), "mid-air above the ledge, the tie between x 40 and x 56 goes to the lower column"],
+		[Vector2(-30, 84), Vector2(24, 84), "outside the room, the nearest clean floor inside it"],
+		[Vector2(88, 84), Vector2(72, 84), "over the bottom opening, the floor beside it"],
+	]
+	for c: Array in cases:
+		var got: Vector2 = room.floor_spot(c[0])
+		check(got == c[1], "floor_spot(%s): %s (want %s, got %s)" % [c[0], c[2], c[1], got])
+	room.queue_free()
+	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(dir)
 	await get_tree().process_frame

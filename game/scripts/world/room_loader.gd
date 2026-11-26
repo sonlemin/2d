@@ -408,7 +408,8 @@ static func _build(parsed: Dictionary, dive: DiveState = null) -> Room:
 					args = args.merged({room_id = room.id, cell = cell})  # never the shared const
 				room.spawn(kind.scene, room.cell_centre(cell), args)
 	# 1.24: persistent objects (header ids) skip here by their SlotState flag.
-	# 1.22: spawn the Ember Cache here when Game.slot's cache is in this room.
+	# The Ember Cache is not spawned here: World spawns it after the build (Story 1.22 D7), so a room
+	# still loads standalone without a save.
 	return room
 
 

@@ -15,7 +15,7 @@ extends Node
 const WorldScene := preload("res://scenes/world/world.tscn")
 const TMP := "user://smoke_dev_boot_tmp"
 ## A slot as an earlier session left it: best chain 7, hard, 5 carried, waking at m1_shaft's top.
-const PLANTED := '{"version": 1, "meta": {}, "slot": {"best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "up", "respawn_room": "m1_shaft"}}'
+const PLANTED := '{"version": 1, "meta": {}, "slot": {"cache": null, "deposited": 0, "best_chain": 7, "deaths": 1, "depth": 2, "difficulty": "hard", "flags": [], "play_time": 300, "resume_entry": "up", "resume_room": "m1_shaft", "visited": ["m1_shaft"]}, "dive": {"carried": 5, "respawn_entry": "up", "respawn_room": "m1_shaft"}}'
 
 var _fail := 0
 var _world: World
@@ -43,7 +43,10 @@ func run() -> void:
 	get_tree().current_scene = runner
 	check(Game._booted, "a World that is the current scene boots Game, after DevTools is ready")
 	check(Game._slot_detached and not Game._slot_armed, "...and --room was applied before that boot: the slot is detached and saves are unarmed")
-	check(Game.slot.best_chain == 0 and Game.slot.difficulty == &"normal" and Game.dive.carried == 0 and Game.dive.respawn_room == &"", "...so the boot loaded no slot: the defaults, not the planted best chain 7, hard, 5 carried (got %d, %s, %d)" % [Game.slot.best_chain, Game.slot.difficulty, Game.dive.carried])
+	check(Game.slot.best_chain == 0 and Game.dive.carried == 0 and Game.dive.respawn_room == &"", "...so the boot loaded no slot: the defaults, not the planted best chain 7, 5 carried (got %d, %d)" % [Game.slot.best_chain, Game.dive.carried])
+	# Story 1.22 D10: --difficulty applies on the spawn, after the boot's reset (normal), and the
+	# first spawn runs inside World's _ready(): easy, neither the planted hard nor the reset's normal.
+	check(Game.slot.difficulty == &"easy", "...and --difficulty=easy outlived the detached boot's reset: the tier is easy (got %s)" % Game.slot.difficulty)
 	check(_world.current_room() != null and _world.current_room().id == &"t_swap_a", "...and the dev room wins over the saved respawn point (m1_shaft's top entry)")
 	Game.slot.record_chain(40)
 	check(Game.save_now() == ERR_UNCONFIGURED and Game.save_progress() == ERR_UNCONFIGURED, "...and no save reaches the slot for the rest of the session")
@@ -66,7 +69,7 @@ func run() -> void:
 ## A method, not a lambda (1.11 D3). Fires for every child World adds.
 func _on_world_child(node: Node) -> void:
 	if node is DevTools:
-		node.tokens = PackedStringArray(["--room=t_swap_a"])
+		node.tokens = PackedStringArray(["--room=t_swap_a", "--difficulty=easy"])
 		node.ready.connect(_make_current, CONNECT_ONE_SHOT)
 
 

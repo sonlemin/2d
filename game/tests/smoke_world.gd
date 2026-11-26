@@ -22,6 +22,7 @@ var _fail := 0
 var _world: World
 var _spawned: Array[Player] = []
 var _spawned_at: Array[Vector2] = []
+var _caches_at_spawn: Array = []  # per spawn, the positions of the EmberCaches in the built room
 var _warm_counts: Array[int] = []  # warm-up items under the room at each room_entered
 
 
@@ -115,6 +116,8 @@ func _on_room_entered(_id: StringName) -> void:
 func _on_spawned(player: Player) -> void:
 	_spawned.append(player)
 	_spawned_at.append(player.position)
+	# Story 1.22: the room's caches as the build left them, before the new player's first tick.
+	_caches_at_spawn.append(_room().get_children().filter(func(n: Node) -> bool: return n is EmberCache).map(func(n: Node) -> Vector2: return n.position))
 
 
 func _player() -> Player:
@@ -343,12 +346,18 @@ func test_death_and_respawn() -> void:
 	var victim_cell := victim.cell
 	victim.take_hit()
 	var carried := Game.dive.carried
+	check(carried > 0 and Game.slot.difficulty == &"normal" and not Game.slot.has_cache(), "setup: Normal, %d carried from the earlier banks, no cache" % carried)
 	for i in 2:
 		old.chain.add_hit()
+	var held := old.chain.held
 	old.global_position += Vector2(0, 160)  # die away from P
 	old.die()
 	check(Game.slot.deaths == 1, "a death records one death on the slot (got %d)" % Game.slot.deaths)
-	check(Game.dive.carried == carried and old.chain.held == 0, "...keeps the carried embers and loses the held ones (carried %d, held %d)" % [Game.dive.carried, old.chain.held])
+	# Story 1.22: on Normal the held embers are lost and the carried ones drop as the Ember Cache.
+	check(Game.dive.carried == 0 and old.chain.held == 0, "...loses the held embers and takes the carried ones (carried %d, held %d)" % [Game.dive.carried, old.chain.held])
+	check(Game.slot.has_cache() and Game.slot.cache_room == &"m1_shaft" and Game.slot.cache_amount == carried, "...which lie in the Ember Cache: %d in m1_shaft (got %s %d)" % [carried, Game.slot.cache_room, Game.slot.cache_amount])
+	var cost := _world.last_death_cost()
+	check(cost.get("held_lost") == held and cost.get("carried_cached") == carried and cost.get("tier") == &"normal", "...and World keeps the report: held_lost %d, carried_cached %d (got %s)" % [held, carried, cost])
 	check(not Game.clock.is_active(&"hitstop") and is_equal_approx(Engine.time_scale, 1.0), "...and clears the Clock: no hitstop survives a death")
 	# AC3 is World's own clear at the respawn: die() already cleared, so a request made during
 	# the delay is the only thing that fails without it. Longer than the delay, so it can't expire.
@@ -362,6 +371,7 @@ func test_death_and_respawn() -> void:
 	check(_spawned.size() == 1 and _spawned[0] == p, "player_spawned fired once, with the new player (fired %d)" % _spawned.size())
 	check(_spawned_at.size() == 1 and _spawned_at[0] == spawn, "...spawned at P, not where it died (got %s, P is %s)" % [_spawned_at, spawn])
 	check(_camera().target == p, "the camera follows the new player")
+	var back := Game.dive.carried
 	for i in 4:
 		p.chain.add_hit()
 	check(Game.slot.best_chain == 4, "the new player's chain is bound: a chain of 4 records best_chain 4 (got %d)" % Game.slot.best_chain)
@@ -369,6 +379,20 @@ func test_death_and_respawn() -> void:
 	check(is_instance_valid(_room()) and _room() != old_room, "the respawn rebuilt the room: a new Room instance (AR25)")
 	check(Game.dive.is_killed(&"m1_shaft", victim_cell), "the kill was marked on the dive (room m1_shaft, cell %s)" % victim_cell)
 	check(_crawlers().size() == crawlers - 1 and not _has_crawler_at(victim_cell), "...and the crawler killed before the death stays dead in it (%d -> %d)" % [crawlers, _crawlers().size()])
+	# The player last stood on P, so the cache dropped there, and the respawn at P took it on the
+	# first tick it overlapped (D7: a touch is a touch).
+	check(_caches_at_spawn.size() == 1 and _caches_at_spawn[0] == [spawn], "...the rebuilt room held the Ember Cache at the drop spot, P's own %s (got %s)" % [spawn, _caches_at_spawn])
+	check(back == carried, "...and the new player standing on it carried its %d again before any chain of its own (carried %d)" % [carried, back])
+	await _recover_cache()
+
+
+## D9: a death case leaves no cache behind, or later cases in this shared World meet an 80 px
+## light in m1_shaft that wakes lurkers.
+func _recover_cache() -> void:
+	var back := Game.slot.recover_cache(Game.dive)
+	await frames(1)
+	var left := _room().get_children().filter(func(n: Node) -> bool: return n is EmberCache and not n.is_queued_for_deletion())
+	check(not Game.slot.has_cache() and left.is_empty(), "the case ends with no cache: %d recovered, its node gone" % back)
 
 
 ## A free row whose two left tiles are wall then open, with room to the right: the player hangs
@@ -485,6 +509,7 @@ func test_hunt_over_death() -> void:
 	await seconds(World.RESPAWN_DELAY + 0.1)
 	check(_spawned.size() == 2 and _player() == _spawned[1], "a second death respawns again")
 	check(not is_instance_valid(c), "...and the rebuild took the hunting lurker away with the old room")
+	await _recover_cache()
 
 
 func _has_crawler_at(cell: Vector2i) -> bool:
